@@ -1,0 +1,53 @@
+#!/bin/sh
+# commit-msg hook: strip AI-authorship trailers from the commit message.
+#
+# Removes lines that credit an AI as an author/contributor - "Co-Authored-By: Claude",
+# "Generated with [Claude Code]", and the Codex / Copilot / Cursor / Gemini equivalents -
+# so no AI lands in your history or your GitHub contributor graph. It runs at the GIT
+# layer, so it catches ANY tool that writes a commit (Claude Code, Codex, plain `git`),
+# not just one agent.
+#
+# It PRESERVES everything else: your commit body, real human "Co-authored-by:"
+# collaborators, and "Claude-Session:" trace links (a pointer, not an authorship claim).
+#
+# Limits: it fixes the commit *message* (the trailer is the contributor-graph vector); it
+# cannot change the commit *author identity* - keep your own name/email in git config. It
+# is bypassable with `git commit --no-verify`, so also deny that in your agent's settings.
+#
+# Fail-closed on the case that matters: if stripping leaves the message EMPTY (it was ONLY AI
+# trailers), the commit is BLOCKED with a request for a real subject - letting that through would
+# defeat the hook. Any other processing error leaves the message untouched (don't block real work
+# on a hook bug). Requires only POSIX sh + awk (both bundled with Git on every platform).
+
+msg_file="$1"
+[ -n "${msg_file:-}" ] && [ -f "$msg_file" ] || exit 0
+tmp_file="$msg_file.aguard.tmp"
+
+if awk '
+{
+  low = tolower($0)
+  # AI *bot* co-author - drop. Matched by the bot address/handle, NOT a first name, so a real
+  # human "Co-authored-by: Claude Martinez <claude@realco.com>" or "Devin Smith" is preserved.
+  if (low ~ /^[ \t]*co-authored-by:/ && low ~ /noreply@anthropic\.com|noreply@openai\.com|\[bot\]/) next
+  # "Generated with [Claude Code]" style trailer. The literal "[" is the discriminator:
+  # prose like "...was generated with Claude for testing" has no bracket, so it stays.
+  if (low ~ /generated with[ ]*\[(claude|codex|copilot|cursor|gemini)/) next
+  buf[n++] = $0
+}
+END {
+  while (n > 0 && buf[n-1] ~ /^[ \t]*$/) n--   # drop trailing blank lines left behind
+  for (i = 0; i < n; i++) print buf[i]
+}
+' "$msg_file" > "$tmp_file" 2>/dev/null; then
+  if grep -q '[^[:space:]]' "$tmp_file" 2>/dev/null; then
+    mv "$tmp_file" "$msg_file"                  # normal case: keep the stripped message
+  else
+    rm -f "$tmp_file"                            # message was ONLY AI trailers -> fail closed
+    echo "the-agent-kit commit-msg: message was only AI-authorship trailers - commit BLOCKED." >&2
+    echo "Write a real commit subject describing YOUR change, then commit again." >&2
+    exit 1
+  fi
+else
+  rm -f "$tmp_file"   # awk itself failed - leave the message untouched, don't block real work
+fi
+exit 0

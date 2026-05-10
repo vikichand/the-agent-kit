@@ -1,0 +1,33 @@
+# the-agent-kit - Codex hardening. Merge into ~/.codex/config.toml.
+#
+# Every key below was checked against the Codex config reference:
+#   https://learn.chatgpt.com/docs/config-file/config-reference
+# (Codex has no "ask" decision, so the tool guard DENIES where Claude Code would prompt.)
+
+# Pause before running commands / applying edits instead of auto-approving them.
+# Valid values: untrusted | on-request | never | { granular = { ... } }
+approval_policy = "on-request"
+
+# Confine writes to the workspace.
+# Valid values: read-only | workspace-write | danger-full-access
+sandbox_mode = "workspace-write"
+
+[sandbox_workspace_write]
+# Deliberately ON. The rules require checking library, API, and version behaviour against live
+# documentation instead of recalling it, and that needs network. Turning this off does not make
+# the agent safer - it makes it fall back on training data, which is the hallucination path
+# those rules exist to close. Two rules that contradict each other are worse than either alone:
+# the agent picks one arbitrarily.
+# Set false when reviewing code you do not trust, and expect doc lookups to fail loudly.
+network_access = true
+
+# Deliberately NOT set: [shell_environment_policy].
+# Codex already excludes secret-looking variable names by default (see ignore_default_excludes in
+# the reference). A hand-written exclude list on top of that is redundant, and a broad one actively
+# breaks builds: patterns like "*_URL" or "*KEY*" strip DATABASE_URL, VITE_API_URL and KEYCLOAK_*
+# out of the environment, so a command fails for a reason the agent cannot see - and it then
+# invents a cause and "fixes" the wrong thing.
+# If you must exclude a specific variable, name it explicitly and use the current `filters` field.
+# The older `exclude` key still parses but is documented as legacy.
+
+# The command-guard PreToolUse hook lives in codex/hooks.json (merged separately by ./install.sh --global).

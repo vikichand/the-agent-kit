@@ -1,0 +1,42 @@
+#!/bin/sh
+# pre-commit hook: block commits that stage obvious secrets.
+#
+# Runs at the GIT layer, so it protects Claude Code, Codex, plain `git`, AND MCP-driven commits
+# alike - the one enforcement point below the tool layer. Fail-CLOSED: a detected secret blocks
+# the commit (exit 1). A built-in high-signal pattern scan (pure grep, no dependencies) ALWAYS
+# runs, so the hook never silently no-ops; gitleaks is used additionally when installed.
+#
+# Bypassable only with `git commit --no-verify` - which the kit denies at the agent layer.
+set -u
+
+added=$(git diff --cached --no-color -U0 --diff-filter=ACMRT 2>/dev/null | grep -E '^\+' | grep -vE '^\+\+\+')
+[ -z "$added" ] && exit 0
+
+hits=""
+scan() { printf '%s\n' "$added" | grep -qE "$1" && hits="$hits
+  - $2"; }
+
+scan 'AKIA[0-9A-Z]{16}'                                              'AWS access key id (AKIA...)'
+scan '(sk|rk)-[A-Za-z0-9]{20,}'                                      'OpenAI/Stripe-style secret key (sk-/rk-...)'
+scan 'gh[pousr]_[A-Za-z0-9]{20,}'                                    'GitHub token (ghp_/gho_/...)'
+scan 'xox[baprs]-[A-Za-z0-9-]{10,}'                                  'Slack token (xox...)'
+scan 'AIza[0-9A-Za-z_-]{30,}'                                        'Google API key (AIza...)'
+scan '\-\-\-\-\-BEGIN[A-Z ]*PRIVATE KEY\-\-\-\-\-'                   'private key block'
+scan 'eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{6,}'  'JWT / signed token (eyJ...)'
+
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks git --staged --no-banner -q >/dev/null 2>&1; rc=$?
+  [ "$rc" != 0 ] && gitleaks protect --staged --no-banner >/dev/null 2>&1; rc=$?
+  [ "$rc" = 1 ] && hits="$hits
+  - gitleaks detected a secret in staged content"
+fi
+
+if [ -n "$hits" ]; then
+  { echo "the-agent-kit pre-commit: possible secret(s) in staged changes - commit BLOCKED:"
+    printf '%s\n' "$hits"
+    echo "Move it to an env var / secrets manager and unstage the file. If you are CERTAIN this is a"
+    echo "false positive, 'git commit --no-verify' bypasses - but that also skips every other check."
+  } >&2
+  exit 1
+fi
+exit 0

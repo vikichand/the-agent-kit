@@ -1,0 +1,39 @@
+#!/bin/sh
+# pre-push hook: refuse dangerous pushes to a protected branch - force / non-fast-forward /
+# delete - unless explicitly overridden. Git runs this itself, so unlike the PreToolUse hook it
+# is reorder-proof and covers every path (aliases, full paths, wrappers, Codex, most MCP).
+#
+# Deliberate force-push override:   AGENT_KIT_ALLOW_FORCE=1 git push ...
+# Protected branches:               main, master, release/*   (edit below to taste)
+#
+# NOTE: `git push --no-verify` skips this hook - which is exactly why --no-verify is ALSO denied
+# at the agent-permission layer. This is the git-layer half of that defense.
+
+zero=0000000000000000000000000000000000000000
+blocked=0
+
+# git feeds "<local ref> <local sha> <remote ref> <remote sha>" per updated ref on stdin
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -n "${remote_ref:-}" ] || continue
+  case "$remote_ref" in
+    refs/heads/main|refs/heads/master|refs/heads/release/*) : ;;
+    *) continue ;;
+  esac
+  if [ "$local_sha" = "$zero" ]; then
+    echo "the-agent-kit pre-push: refusing to DELETE protected branch $remote_ref." >&2
+    blocked=1
+  elif [ "$remote_sha" != "$zero" ] && ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+    echo "the-agent-kit pre-push: refusing NON-FAST-FORWARD (force) push to $remote_ref." >&2
+    blocked=1
+  fi
+done
+
+if [ "$blocked" = 1 ]; then
+  if [ "${AGENT_KIT_ALLOW_FORCE:-}" = 1 ]; then
+    echo "the-agent-kit pre-push: AGENT_KIT_ALLOW_FORCE=1 set - allowing this push." >&2
+    exit 0
+  fi
+  echo "If this is intentional, re-run with:  AGENT_KIT_ALLOW_FORCE=1 git push ..." >&2
+  exit 1
+fi
+exit 0
