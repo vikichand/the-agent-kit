@@ -1,0 +1,16 @@
+// the-agent-kit: a starting-point dev container so agents run isolated from your host.
+// The kit's hooks reduce slop; a container is what actually contains a mistake. This gives you a
+// clean, disposable box. For real network-egress control, add a default-deny firewall in
+// postCreateCommand, or use Anthropic's OS sandbox: https://code.claude.com/docs/en/sandbox-environments
+{
+  "name": "the-agent-kit (isolated)",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/python:1": { "version": "3.12" }
+  },
+  // Install the kit's git hooks, then run the doctor so any failure is VISIBLE in the create log
+  // (check its output - a green ./install.sh --check is your confirmation the guards are live).
+  "postCreateCommand": "sh ./install.sh --global && sh ./install.sh --check || true",
+  "remoteUser": "vscode"
+}

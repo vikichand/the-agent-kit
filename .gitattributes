@@ -1,0 +1,18 @@
+# Normalise text to LF in the repo. Without this, cloning on Windows with core.autocrlf=true
+# gives a CRLF working tree, and running those same files from WSL or Linux hands `\r` to bash:
+# the shebang becomes `#!/bin/sh^M` and the script dies with "bad interpreter".
+# Git Bash tolerates CRLF, so this only ever bites the WSL/Linux path - which is exactly the
+# path that has no easy way to diagnose it.
+* text=auto eol=lf
+
+# Belt and braces for everything that is executed rather than read.
+*.sh        text eol=lf
+*.py        text eol=lf
+install.sh  text eol=lf
+hooks/*     text eol=lf
+
+# Never touch binaries.
+*.png binary
+*.jpg binary
+*.gif binary
+*.pdf binary

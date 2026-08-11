@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PY__ \"__AGENT_KIT__/hooks/command-guard.py\" --decision deny",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
