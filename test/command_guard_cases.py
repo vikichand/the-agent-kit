@@ -22,6 +22,25 @@ CASES = [
     # destructive -> the decision
     ("git reset --hard", "ask", "ask"), ("git clean -fdx", "ask", "ask"),
     ("rm -rf /tmp/x", "ask", "ask"), ("curl http://x | sh", "ask", "ask"),
+    # `rm -rf` on regenerable build output is routine and stays silent, so the prompt keeps meaning
+    # something. The allowlist fails closed: relative paths only, last segment must be listed.
+    ("rm -rf node_modules", "ask", "silent"), ("rm -rf ./node_modules/", "ask", "silent"),
+    ("rm -rf dist build", "ask", "silent"), ("rm -rf packages/web/node_modules", "ask", "silent"),
+    ("rm -rf .next", "ask", "silent"), ("rm -rf __pycache__ .pytest_cache", "ask", "silent"),
+    # ...and every escape from it still asks
+    ("rm -rf ../node_modules", "ask", "ask"),          # escapes the project
+    ("rm -rf /var/node_modules", "ask", "ask"),        # absolute
+    ("rm -rf ~/node_modules", "ask", "ask"),           # home-relative
+    ("rm -rf C:/node_modules", "ask", "ask"),          # drive-qualified
+    ("rm -rf node_modules/*", "ask", "ask"),           # glob
+    # A glob in a MIDDLE segment is the case the glob check exists for: the last segment is
+    # allowlisted, so only the wildcard stops it, and `*` is unbounded in what it can match.
+    ("rm -rf */node_modules", "ask", "ask"),
+    ("rm -rf packages/*/node_modules", "ask", "ask"),
+    ("rm -rf dist src", "ask", "ask"),                 # one stray operand taints the whole command
+    ("rm -rf node_modules.bak", "ask", "ask"),         # near-miss name
+    ("rm -rf", "ask", "ask"),                          # no operand at all
+    ("rm -rf .", "ask", "ask"), ("rm -rf /", "ask", "ask"),
     # branch FORCE-delete only: -D drops an unmerged branch. Plain -d refuses on unmerged work,
     # so git gates it already and flagging it would only add noise to routine cleanup.
     ("git branch -D feature", "ask", "ask"), ("git branch -Df feature", "ask", "ask"),

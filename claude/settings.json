@@ -6,6 +6,8 @@
   "permissions": {
     "ask": [
       "Bash(git push:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
       "Edit(**/AGENTS.md)",
       "Write(**/AGENTS.md)",
       "Edit(**/CLAUDE.md)",
@@ -28,17 +30,7 @@
       "Bash(cargo install *)",
       "Bash(cargo add *)",
       "Bash(go install *)",
-      "Bash(gem install *)"
-    ],
-    "deny": [
-      "Bash(git commit --no-verify:*)",
-      "Bash(git commit -n:*)",
-      "Bash(git commit --amend --no-verify:*)",
-      "Bash(git push --no-verify:*)",
-      "Bash(git push --force:*)",
-      "Bash(git push -f:*)",
-      "Bash(git push --force-with-lease:*)",
-      "Bash(git config *core.hooksPath*)",
+      "Bash(gem install *)",
       "Read(./.env)",
       "Read(**/.env)",
       "Read(**/.env.local)",
@@ -53,7 +45,17 @@
       "Read(**/.gnupg/**)",
       "Read(**/.npmrc)",
       "Read(**/.netrc)",
-      "Read(**/secrets/**)",
+      "Read(**/secrets/**)"
+    ],
+    "deny": [
+      "Bash(git commit --no-verify:*)",
+      "Bash(git commit -n:*)",
+      "Bash(git commit --amend --no-verify:*)",
+      "Bash(git push --no-verify:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push --force-with-lease:*)",
+      "Bash(git config *core.hooksPath*)",
       "Edit(**/.git/hooks/**)",
       "Write(**/.git/hooks/**)",
       "Edit(**/.git/config)",
