@@ -56,7 +56,16 @@ cd /path/to/your/project && ~/.the-agent-kit/install.sh
 ~/.the-agent-kit/install.sh --check
 ```
 
-To update later, re-clone and re-run `--global`; it refreshes `~/.the-agent-kit` in place.
+**To update later:** re-clone and re-run `--global` (refreshes `~/.the-agent-kit` in place - hooks and
+guard update machine-wide instantly), then in each project:
+
+```bash
+~/.the-agent-kit/install.sh --update-rules   # new rules in; your PROJECT-CONFIG block survives byte-for-byte
+```
+
+Don't copy the new `AGENTS.md` over by hand - that wipes your filled `PROJECT-CONFIG` block, which is
+exactly what `--update-rules` exists to preserve. It fails closed (refuses, changes nothing) if the
+markers are missing, and redirects you to your global files if the project uses an `--extension` stub.
 
 Skipping step 1 is a supported choice: you get the rules and no enforcement. Skipping step 2 gets you
 enforcement with an agent that hasn't read the rules. They're independent.

@@ -5,6 +5,8 @@
 #                             imports it, so nothing is duplicated) + git hooks in THIS repo
 #   ./install.sh --extension  per-project (extends global): project-config stub + git hooks
 #   ./install.sh --global     machine-wide: git hooks via core.hooksPath + printed tool snippets
+#   ./install.sh --update-rules  refresh THIS repo's AGENTS.md to the kit's current rules; the
+#                             project's PROJECT-CONFIG block is preserved byte-for-byte
 #   ./install.sh --check      doctor: verify the interpreter resolves and the guard actually fires
 #
 # Safe by design: never overwrites an existing CLAUDE.md / AGENTS.md / git hook, and never blindly
@@ -158,6 +160,47 @@ install_global() {
   say "    cat \"$KIT/AGENTS.md\" >> ~/.claude/CLAUDE.md   ;   cat \"$KIT/AGENTS.md\" >> ~/.codex/AGENTS.md"
 }
 
+update_rules() {  # refresh the universal rules in this repo's AGENTS.md, preserving its PROJECT-CONFIG block
+  root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+  tgt="$root/AGENTS.md"
+  if [ ! -e "$tgt" ]; then
+    say "  ! no AGENTS.md in $root - nothing to update. Run './install.sh' to install the rules first."
+    exit 2
+  fi
+  # An --extension stub carries no universal rules on purpose - they live in the global files.
+  if grep -q 'universal rules live in your global' "$tgt" 2>/dev/null; then
+    say "  = this AGENTS.md is an --extension stub: the universal rules live in your GLOBAL files"
+    say "    (~/.claude/CLAUDE.md / ~/.codex/AGENTS.md) - update those; this file only holds project config."
+    exit 0
+  fi
+  # Fail closed without both markers: there is no way to tell project config from rules, so replace nothing.
+  if ! grep -q 'PROJECT-CONFIG:START' "$tgt" 2>/dev/null || ! grep -q 'PROJECT-CONFIG:END' "$tgt" 2>/dev/null; then
+    say "  ! $tgt has no PROJECT-CONFIG markers - refusing to guess which part is yours."
+    say "    Add the markers (see the kit's AGENTS.md) or update the file by hand."
+    exit 2
+  fi
+  tmp="$tgt.update-rules.tmp"
+  # Pass 1 saves the project's block (markers inclusive); pass 2 prints the kit's current rules with
+  # the kit's placeholder block swapped for the saved one.
+  awk '
+    NR==FNR { if (/PROJECT-CONFIG:START/) c=1
+              if (c) blk = blk $0 ORS
+              if (/PROJECT-CONFIG:END/)  c=0
+              next }
+    /PROJECT-CONFIG:START/ { skip=1; printf "%s", blk }
+    !skip { print }
+    /PROJECT-CONFIG:END/   { skip=0 }
+  ' "$tgt" "$KIT/AGENTS.md" > "$tmp"
+  if [ ! -s "$tmp" ]; then rm -f "$tmp"; say "  ! update produced an empty file - aborted, nothing changed."; exit 2; fi
+  if cmp -s "$tmp" "$tgt"; then
+    rm -f "$tmp"; say "  = AGENTS.md already carries the current rules - nothing to do."
+  else
+    mv "$tmp" "$tgt"
+    say "  + updated the universal rules in $tgt - your PROJECT-CONFIG block is untouched."
+    say "    Anything else hand-edited OUTSIDE the markers was replaced; review:  git diff AGENTS.md"
+  fi
+}
+
 doctor() {
   hr; say "the-agent-kit --check (doctor)"
   py=$(detect_py)
@@ -254,10 +297,11 @@ doctor() {
 }
 
 case "$MODE" in
-  --global|global)        install_global ;;
-  --extension|extension)  install_extension ;;
-  --check|check|doctor)   doctor ;;
-  ""|project|--project)   install_project ;;
-  -h|--help)              say "Usage: ./install.sh [--extension | --global | --check]" ;;
-  *) say "Unknown mode: $MODE"; say "Usage: ./install.sh [--extension | --global | --check]"; exit 2 ;;
+  --global|global)              install_global ;;
+  --extension|extension)        install_extension ;;
+  --update-rules|update-rules)  update_rules ;;
+  --check|check|doctor)         doctor ;;
+  ""|project|--project)         install_project ;;
+  -h|--help)              say "Usage: ./install.sh [--extension | --global | --update-rules | --check]" ;;
+  *) say "Unknown mode: $MODE"; say "Usage: ./install.sh [--extension | --global | --update-rules | --check]"; exit 2 ;;
 esac
