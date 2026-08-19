@@ -32,6 +32,12 @@ cp ~/.the-agent-kit/AGENTS.md .    # the rules
 cp ~/.the-agent-kit/CLAUDE.md .    # one line: @AGENTS.md (Claude Code doesn't read AGENTS.md)
 ```
 
+Pairs well with a third copy:
+[**the-ultimate-gitignore-ai**](https://github.com/vikichand/the-ultimate-gitignore-ai) as the project's
+`.gitignore`. The two agree by design: `AGENTS.md` / `CLAUDE.md` stay committed (team intent), the files
+agent sessions generate (`.claude/settings.local.json`, `CLAUDE.local.md`) stay ignored, and `.env` is
+ignored while `.env.example` stays readable - the same carve-out the kit's permission rules make.
+
 Then run the **[project setup prompt](docs/project-setup-prompt.md)** once from inside the project: it
 fills `PROJECT-CONFIG` with the repo's real build/test/lint commands and, for user-facing apps, the
 senior quality bars for its platform. Until then the doctor warns and the agent guesses your commands.
