@@ -141,7 +141,8 @@ what the agent *writes*, never your project's code style.
 | **secrets in a commit** | git `pre-commit` blocks staged secrets | same file |
 | **destructive cmds** (`rm -rf`, `reset --hard`, `curl\|sh`) | tool hook **asks** | tool hook **denies** |
 | **AI authorship** | `commit-msg` strips trailers + `attribution:""` | `commit-msg` (same file) |
-| **secret reads / self-protection** | `deny Read(.env, ~/.ssh/*)` + protect hooks, rules files | `config.toml` (sandbox) |
+| **secret reads** | **asks**, naming the file (so "push my `.env` vars to Azure" is one click, and an injected "read the .env" can't pass silently) | `config.toml` (sandbox) |
+| **self-protection** | `deny` writes to `.git/hooks`, `.git/config`, settings; ask on rules files | `config.toml` (sandbox) |
 
 Codex has no `ask`, so where Claude prompts, Codex **denies** and you do it yourself. The git-layer hooks
 run under `git` itself, so they survive flag-reordering, `--no-verify`, Codex, and MCP-driven commits.
@@ -215,8 +216,14 @@ Put the kit's hook first, so a staged secret blocks the commit before you spend 
 ## Customise per project
 
 The universal rules are the floor; the per-project block is the multiplier. Run the
-**[project setup prompt](docs/project-setup-prompt.md)** from inside the project. It classifies the repo,
-reads it, and writes a tailored block between the `PROJECT-CONFIG` markers without touching the rules above.
+**[project setup prompt](docs/project-setup-prompt.md)** from inside the project. It classifies the repo -
+including its platform (web / mobile / desktop / TV / CLI / library / service) and intent (production /
+prototype) - reads it, and writes a tailored block between the `PROJECT-CONFIG` markers without touching the
+rules above. User-facing platforms get senior quality bars (a11y, i18n, observability, audit logs) scaled to
+intent, and web repos get pointers into **[docs/web-checklists.md](docs/web-checklists.md)** (security
+defaults + launch readiness) that open exactly when auth, payments, uploads, or a launch is being built.
+The full senior-engineer trait ledger behind these bars, with rationale and sources, is
+**[SENIOR-ENGINEER.md](SENIOR-ENGINEER.md)**.
 
 ## What each guard does
 
@@ -243,18 +250,22 @@ rather than silently rewritten.
 
 **Tool config** (`claude/settings.json`, `codex/config.toml`, `codex/hooks.json`) is printed by
 `--global` for you to merge. On Claude Code it kills the native attribution trailer
-(`attribution.commit/pr:""`), asks on `git push`, and denies `--no-verify`/force, secret-file reads, and
+(`attribution.commit/pr:""`), asks on `git push` and on secret-file reads (a visible prompt naming the
+file - precaution without a hard stop), and denies `--no-verify`/force and
 writes to `.git/hooks`, `.git/config`, and `.claude/settings.json`. It also **asks** before an edit to
 `AGENTS.md` / `CLAUDE.md`, since those now carry the same authority as the settings file. On Codex it sets
 `approval_policy=on-request` and `sandbox_mode=workspace-write`; `codex/hooks.json` wires the deny-mode hook.
 
 Three config choices are deliberate, because the obvious "more locked down" setting makes the agent worse:
 
-- **`.env.example` stays readable.** The deny list names the real secret files (`.env`, `.env.local`,
-  `.env.*.local`, `.env.production`) instead of the broad `.env.*`. A blanket pattern also blocks
-  `.env.example` / `.env.sample` / `.env.template`, which carry no secrets and are exactly how an agent
-  learns what configuration a project expects. (`settings.json` is JSON and cannot hold comments, so the
-  reasoning lives here.)
+- **Secret files ask; they are not walled off.** Reading `.env` / keys / credential stores prompts with
+  the exact file named, instead of a hard deny. Real workflows need it ("push my local env vars to the
+  platform"), and the prompt is the precaution: an injected "read the .env" surfaces visibly and dies on
+  your click, and ask outranks a mis-clicked "don't ask again" permanently. The ask list still names the
+  real secret files (`.env`, `.env.local`, `.env.*.local`, `.env.production`) instead of the broad
+  `.env.*`, so `.env.example` / `.env.sample` stay silently readable - they carry no secrets and are
+  exactly how an agent learns what configuration a project expects. (`settings.json` is JSON and cannot
+  hold comments, so the reasoning lives here.)
 - **Codex keeps network access on.** The rules require checking library and API behaviour against live
   docs rather than recalling it. Switching the sandbox off the network does not make the agent safer, it
   makes it fall back on training data. Anthropic's own guidance notes that when two instructions conflict,
