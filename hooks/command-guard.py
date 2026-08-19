@@ -93,6 +93,35 @@ def short_has(flags, letter):
     return any(re.match(r"^-[A-Za-z]+$", a) and lo in a[1:].lower() for a in flags)
 
 
+# Build output is regenerable, and `rm -rf node_modules` is routine housekeeping. Prompting for it
+# every time trains you to click through the prompt without reading it - which is how the prompts
+# that DO matter stop working. So this list buys back the false positives, and nothing else.
+REGENERABLE = {
+    "node_modules", "dist", "build", "out", "coverage", "target",
+    ".next", ".nuxt", ".svelte-kit", ".turbo", ".parcel-cache", ".cache",
+    "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache",
+    ".venv", "venv",
+}
+
+
+def regenerable_path(p):
+    """True only for a relative path whose last segment is regenerable build output.
+
+    Fails closed on everything ambiguous: a glob (it can match far more than it reads as), an
+    absolute or drive-qualified or ~ path (that is not this project's build dir), and any `..`
+    (which escapes the project entirely). `rm -rf ../../node_modules` is not housekeeping.
+    """
+    if any(ch in p for ch in "*?["):
+        return False
+    q = p.replace("\\", "/").rstrip("/")
+    if not q or q.startswith("/") or q.startswith("~") or re.match(r"^[A-Za-z]:", q):
+        return False
+    segs = [s for s in q.split("/") if s and s != "."]
+    if not segs or ".." in segs:
+        return False
+    return segs[-1] in REGENERABLE
+
+
 def is_no_verify(flags):                       # git-CONTEXT use (we already know it's a git commit/push)
     return any(a.lower().startswith("--no-v") for a in flags)
 
@@ -169,6 +198,11 @@ def classify(tokens, decision):
         recursive = "r" in letters or any(a.lower().startswith("--r") for a in ftoks)
         force = "f" in letters or any(a.lower().startswith("--f") for a in ftoks)
         if recursive and force:
+            # Silent ONLY when every operand is regenerable build output. One stray target - an
+            # absolute path, a glob, a source dir - and the whole command asks, as before.
+            targets = [a for a in rest if not a.startswith("-")]
+            if targets and all(regenerable_path(t) for t in targets):
+                return None
             return decision, "`rm -rf` irreversibly deletes files."
     if verb in ("dd", "mkfs") or verb.startswith("mkfs"):
         return decision, "`%s` can irreversibly destroy data." % verb
