@@ -79,8 +79,10 @@ stray operand.
   (§5 requires live doc lookups; switching it off just sends the agent back to memory) · no hand-written env exclude
   list (Codex excludes secret names by default, and a broad one strips `DATABASE_URL` and breaks builds invisibly).
   **`codex/hooks.json`** wires the deny-mode hook.
-- **`install.sh`**: four modes, default (full rules) · `--extension` (lean, extends global) · `--global` (machine-wide) ·
-  `--check` (doctor). Never overwrites; detects a working Python; prints tool-config snippets rather than clobbering.
+- **`install.sh`**: five modes, default (full rules) · `--extension` (lean, extends global) · `--global` (machine-wide) ·
+  `--update-rules` (refresh a project's universal rules; its `PROJECT-CONFIG` block survives byte-for-byte;
+  fails closed without markers) · `--check` (doctor). Never overwrites; detects a working Python; prints
+  tool-config snippets rather than clobbering.
   The doctor verifies each git hook **by identity**, not just presence, and prints `core.hooksPath` when a redirect is set.
 - **`docs/environment-setup-prompt.md`**: optional, agent-run recipe for a machine's MCP servers / plugins / skills
   (Context7 · Playwright · Chrome DevTools · superpowers · codex · watch). Ships two drop-in rules:
@@ -92,7 +94,8 @@ stray operand.
   capability claims. Anti-churn by contract: NO CHANGE is the default verdict, max five proposals, each
   `AGENTS.md` addition names a line to cut, propose-never-edit.
 - **`test/`**: `run-tests.sh` (git-layer end-to-end + 12 doctor checks: foreign-hook false green, redirect actually
-  followed, delegating shim not misreported, unfilled `PROJECT-CONFIG` warned with a false-positive control)
+  followed, delegating shim not misreported, unfilled `PROJECT-CONFIG` warned with a false-positive control;
+  + 4 `--update-rules` cases: block preserved, marker-less refused, stub redirected, no-op detected)
   + `command_guard_cases.py` (96 cases).
   **`.devcontainer/`**: an isolated-container starting point.
 

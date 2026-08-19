@@ -156,6 +156,31 @@ has 'PROJECT-CONFIG is still the empty placeholder' "$d" \
   && bad "D11 filled PROJECT-CONFIG still warned (false positive)" || pass "D11 filled PROJECT-CONFIG is silent"
 cd "$KIT"; rm -rf "$w"
 
+# ---------- install.sh --update-rules ----------
+echo "== install.sh --update-rules =="
+w=$(mktemp -d) || exit 2; cd "$w" || exit 2
+git init -q -b main || exit 2
+# U1: stale rules + a FILLED block -> rules refreshed, the block survives byte-for-byte
+sed 's/## 0\. Size the task before doing anything else/## 0. OLD STALE HEADING/' "$KIT/AGENTS.md" > AGENTS.md
+sed 's/Not configured yet\. Run the setup prompt (the-agent-kit docs\/project-setup-prompt.md) to fill this in\./Build: make all  Test: make test/' AGENTS.md > A2 && mv A2 AGENTS.md
+sh "$KIT/install.sh" --update-rules >/dev/null 2>&1 || bad "U1 --update-rules exited non-zero"
+grep -q 'OLD STALE HEADING' AGENTS.md && bad "U1 stale rules NOT replaced" || pass "U1 stale rules replaced with the kit's"
+grep -q 'Build: make all' AGENTS.md && pass "U1 filled PROJECT-CONFIG preserved" || bad "U1 filled PROJECT-CONFIG LOST"
+# U2: no markers -> refuse and change nothing (fail-closed: can't tell project config from rules)
+printf 'my own rules, no markers\n' > AGENTS.md
+if sh "$KIT/install.sh" --update-rules >/dev/null 2>&1; then bad "U2 marker-less file was updated"; else pass "U2 marker-less file refused (fail-closed)"; fi
+grep -q 'my own rules' AGENTS.md && pass "U2 marker-less file untouched" || bad "U2 file MODIFIED despite refusal"
+# U3: an --extension stub holds no universal rules; updating must redirect to the global files, not inject them
+rm -f AGENTS.md CLAUDE.md; sh "$KIT/install.sh" --extension >/dev/null 2>&1
+d=$(sh "$KIT/install.sh" --update-rules 2>&1)
+has 'GLOBAL' "$d" && pass "U3 extension stub redirected to global rules" || bad "U3 extension stub not recognised"
+grep -q 'universal rules live in your global' AGENTS.md && pass "U3 stub untouched" || bad "U3 stub was REWRITTEN"
+# U4: already-current file -> explicit no-op, no rewrite
+rm -f AGENTS.md; cp "$KIT/AGENTS.md" AGENTS.md
+d=$(sh "$KIT/install.sh" --update-rules 2>&1)
+has 'already carries the current rules' "$d" && pass "U4 current rules detected, no rewrite" || bad "U4 no-op not detected"
+cd "$KIT"; rm -rf "$w"
+
 echo "---"
 [ "$fail" -eq 0 ] && echo "ALL PASS" || echo "FAILURES PRESENT"
 exit "$fail"
