@@ -25,6 +25,14 @@ Set up the AGENTS.md in this project for me.
      with little buildable code.
    - CODE + AGENT - it has real code AND research/agent behavior. If you are between BOTH and one, choose BOTH.
 
+   If CODE, also name two more things:
+   - PLATFORM: web / mobile / desktop / TV / CLI / library / backend service. User-facing platforms (web, mobile,
+     desktop, TV) get the product-quality bars below; a CLI, library, or pure service does NOT - never make a CLI
+     carry HSTS rules in its context window.
+   - INTENT: production or prototype. Ask me if it isn't obvious. Production means the quality bars are part of
+     "done"; prototype means the bars downgrade to flag-don't-block (note the debt aloud, keep moving) so
+     exploration stays fast and the debt stays visible.
+
 2. GATHER the details below from the repo / docs / plan. If anything is missing, unclear, or there is no codebase
    yet (greenfield or plan-only), ASK ME targeted questions instead of guessing. Never invent commands, frameworks,
    or rules you cannot confirm.
@@ -32,6 +40,11 @@ Set up the AGENTS.md in this project for me.
      commands that must pass before "done" (build / test / typecheck / lint - use the project's real ones from its
      scripts / Makefile / CI; if none exist, say so and ask whether to add them); 2-4 canonical files that show the
      patterns to follow; do-not-touch zones (generated files, migrations, infra, secrets, public API contracts).
+   - If CODE on a USER-FACING platform, also detect (never assume) the project's mechanisms for the quality bars:
+     the i18n layer (or note its absence), the a11y tooling (lint rule, axe, platform inspector), and the
+     observability target from the infra actually present (Azure -> App Insights; AWS -> CloudWatch; GCP -> Cloud
+     Logging; otherwise OpenTelemetry). Name the platform's secure-storage and focus-management mechanisms if
+     they differ from the web defaults.
    - If AGENT: what a good run produces and its quality bar; the sources it may use and any that are off-limits; the
      evidence bar that defines "done" (e.g. every claim cites a resolvable source; findings triangulated across >=2
      independent sources; citations checked that they actually support the claim; nothing unsourced or speculative;
@@ -43,8 +56,9 @@ Set up the AGENTS.md in this project for me.
    block); if the markers aren't there, add them at the very bottom. DO NOT touch anything above the markers - the
    universal rules are the floor. If those universal rules ALREADY live globally (~/.claude/CLAUDE.md or
    ~/.codex/AGENTS.md), this file EXTENDS them: write ONLY the block, never re-copy the ruleset. Keep the block tight
-   and concrete - short bullets, real commands / paths / rules, no filler, ~15-30 lines (one screen, not a chapter);
-   the whole file must stay well under Codex's 32 KiB AGENTS.md limit (it's read on every turn).
+   and concrete - short bullets, real commands / paths / rules, no filler, ~15-25 lines (one screen, not a chapter);
+   the whole file must stay under ~200 effective lines and well under Codex's 32 KiB AGENTS.md limit (it's read on
+   every turn). If the block wants more room, trim the block - never the universal rules above it.
 
 4. SHOW me the block you wrote, plus one line on how you classified the project and why.
 
@@ -54,10 +68,19 @@ Use this shape for the block (include the CODE part, the AGENT part, or both, de
 ## This project: <CODE | AGENT | CODE + AGENT> - <name>
 
 **Stack:** ...
-**Platform / infra:** ...
+**Platform / intent:** <web | mobile | desktop | TV | CLI | library | service> - <production | prototype>
+**Infra:** ...
 **Must pass before "done":** `<build>` / `<test>` / `<typecheck>` / `<lint>`
 **Follow these patterns:** <canonical files>
 **Careful zones / do-not-touch:** ...
+
+<!-- USER-FACING platforms only; scale to intent (production: part of "done" / prototype: flag, don't block): -->
+**Quality bars:** a11y (<lint rule / axe / inspector>, WCAG AA floor); i18n (<layer>, no hardcoded user-facing
+strings); observability (<detected target>, structured logs, no PII); audit log on sensitive mutations;
+skeleton loaders on data views; no redundant explainer text under headings.
+<!-- WEB only: -->
+**Checklists:** building auth / uploads / payments / a new endpoint / AI features -> open
+<kit>/docs/web-checklists.md (security); preparing a public launch -> same file (launch readiness).
 
 **A good run produces:** ...
 **Sources:** <allowed>   **Off-limits:** ...
