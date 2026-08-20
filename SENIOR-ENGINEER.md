@@ -1,9 +1,20 @@
-# Senior engineer traits - DRAFT for review
+# Senior engineer traits - the ledger
 
-> **Status: structured for merge - still not wired in.** Nothing here is active yet. The file is
-> grouped by destination, so merging is lifting a block, not re-sorting a brainstorm.
-> Tags: **[covered SN]** already in `AGENTS.md` section N · **[partial]** kit touches it, not fully ·
-> **[NEW]** not in the kit. The bake-in proposal is at the bottom, with the flagged-for-removal list.
+> **Status: MERGED and audited 2026-08-20. This file is the record, not the runtime.** The agent never
+> reads it; it reads `AGENTS.md`. Every trait below has been distilled into a file that IS consumed, and
+> the audit that proved it is at the bottom. Keep it as the "why" behind the rules - what was adopted,
+> what was deliberately rejected, and what it cost - so a future session doesn't re-litigate settled
+> decisions or merge the same idea twice.
+>
+> | Part | Lives now in | Loaded |
+> |---|---|---|
+> | I - universal discipline | `AGENTS.md` §invariants, §1-§10 | every turn, every repo |
+> | II - product quality bars | `PROJECT-CONFIG`, written by `docs/project-setup-prompt.md` | every turn, in user-facing repos |
+> | III - web security | `docs/web-checklists.md` | on demand, when auth / payments / uploads are built |
+> | IV - launch readiness | `docs/web-checklists.md` | on demand, before a public launch |
+>
+> Tags below are historical: **[covered SN]** was already in `AGENTS.md` · **[partial]** was partly there ·
+> **[NEW]** was added by this work.
 
 ## The organizing idea
 
@@ -315,6 +326,30 @@ warns past ~200 effective lines; `AGENTS.md` is at ~160). So: distill, and load 
 - **Tier 4 - guards, only where mechanical.** The existing hooks already cover secrets and git. Most
   of Part III is not reliably greppable; keep it as rules, not guards, rather than shipping noisy
   false positives.
+
+## Audit: is every trait actually consumed? (2026-08-20)
+
+Traced each trait to the file that carries it, because a ledger nobody checks drifts into decoration.
+Method: extract every bolded trait, then grep the destination for its distinctive phrasing, then
+hand-verify each miss (keyword checks produce false negatives - "Every line traces to the task" was
+flagged only because `AGENTS.md` says "trace", not "traces").
+
+**Result: 50 of 54 traits were already live. Four were stranded here and have now been merged:**
+
+| Stranded trait | Was missing from | Now in |
+|---|---|---|
+| UI work gets proof in a real browser | `AGENTS.md` | §5 |
+| Breaking changes announced, not smuggled | `AGENTS.md` | §7 |
+| Risky changes behind a flag; watch them land | `AGENTS.md` | §7 |
+| Privacy by default | `PROJECT-CONFIG` | quality-bars line in the setup prompt |
+
+Paid for under the anti-churn contract by moving "What this file can and can't do" into an HTML
+comment: it addresses the human maintaining the file, not the agent, and Claude strips block-level
+comments before context, so it stays readable on disk at zero cost per turn. `AGENTS.md` 179 -> 180
+effective lines, still under the 200 target.
+
+Re-run this audit after any future merge: extract the bolded traits, grep the destinations, and
+hand-check every miss.
 
 ## Flagged items - resolved 2026-08-19
 
