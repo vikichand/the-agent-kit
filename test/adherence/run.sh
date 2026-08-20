@@ -35,6 +35,19 @@ done
 command -v claude >/dev/null 2>&1 || { echo "FAIL: the 'claude' CLI is not on PATH."; exit 2; }
 [ -f "$KIT/AGENTS.md" ] || { echo "FAIL: $KIT/AGENTS.md not found."; exit 2; }
 
+# The control arm is only as clean as the machine it runs on. Global memory (~/.claude/CLAUDE.md,
+# ~/.codex/AGENTS.md) loads in BOTH arms, so if it already carries engineering conventions, the
+# "without" run is not ruleless and the measured gap is a FLOOR, not the kit's absolute value.
+for gm in "$HOME/.claude/CLAUDE.md" "$HOME/.codex/AGENTS.md"; do
+  if [ -s "$gm" ]; then
+    echo "WARNING: $gm ($(grep -c . "$gm") non-blank lines) loads in BOTH arms."
+    echo "         Whatever it already tells the agent is present in the 'without' control, so the"
+    echo "         gap below understates the rules' effect. For an absolute number, move it aside"
+    echo "         yourself for the duration of the run."
+    echo ""
+  fi
+done
+
 mflag=""; [ -n "$MODEL" ] && mflag="--model $MODEL"
 jflag=""; [ -n "$JUDGE" ] && jflag="--model $JUDGE"
 
