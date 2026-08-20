@@ -57,9 +57,7 @@
       "Bash(git push --force-with-lease:*)",
       "Bash(git config *core.hooksPath*)",
       "Edit(**/.git/hooks/**)",
-      "Write(**/.git/hooks/**)",
       "Edit(**/.git/config)",
-      "Write(**/.git/config)",
       "Edit(**/.claude/settings.json)"
     ]
   },

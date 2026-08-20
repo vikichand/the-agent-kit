@@ -1,0 +1,1 @@
+invariant: the worktree is the human's
