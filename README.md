@@ -233,8 +233,9 @@ The universal rules are the floor; the per-project block is the multiplier. Run 
 including its platform (web / mobile / desktop / TV / CLI / library / service) and intent (production /
 prototype) - reads it, and writes a tailored block between the `PROJECT-CONFIG` markers without touching the
 rules above. User-facing platforms get senior quality bars (a11y, i18n, observability, audit logs) scaled to
-intent, and web repos get pointers into **[docs/web-checklists.md](docs/web-checklists.md)** (security
-defaults + launch readiness) that open exactly when auth, payments, uploads, or a launch is being built.
+intent, web repos additionally get **path-scoped rules** in `.claude/rules/` that load themselves when the
+agent opens auth, API, payment or migration code, and **[docs/web-checklists.md](docs/web-checklists.md)**
+for launch readiness.
 The full senior-engineer trait ledger behind these bars, with rationale and sources, is
 **[SENIOR-ENGINEER.md](SENIOR-ENGINEER.md)**.
 

@@ -80,8 +80,9 @@ strings); observability (<detected target>, structured logs, no PII); audit log 
 privacy (collect the minimum personal data, keep PII out of logs / URLs / analytics); skeleton loaders on
 data views; no redundant explainer text under headings.
 <!-- WEB only: -->
-**Checklists:** building auth / uploads / payments / a new endpoint / AI features -> open
-<kit>/docs/web-checklists.md (security); preparing a public launch -> same file (launch readiness).
+**Checklists:** preparing a public launch -> open <kit>/docs/web-checklists.md (launch readiness).
+Security rules need no pointer: .claude/rules/web-security.md self-loads on auth / api / webhook /
+payment paths.
 
 **A good run produces:** ...
 **Sources:** <allowed>   **Off-limits:** ...
