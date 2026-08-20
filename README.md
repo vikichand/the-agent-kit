@@ -19,6 +19,11 @@ sh install.sh --update    # fetches the kit into ~/.the-agent-kit + prints the t
 Two steps, not `curl … | sh`, on purpose: that pipes code you have not seen into a shell, and the
 rules in this kit tell an agent never to do it. Read the file, then run it.
 
+**No `curl`? You don't need it.** The clone below uses only `git`, which the kit requires anyway. Or
+download with what your shell already ships: PowerShell has `iwr <url> -OutFile install.sh`, and most
+Linux boxes have `wget -qO install.sh <url>`. Nothing to install first - Git for Windows bundles
+curl, and Windows 10+ and macOS ship it.
+
 Prefer a clone? Same result:
 
 ```bash
@@ -28,6 +33,17 @@ git clone https://github.com/vikichand/agent-kit.git && cd agent-kit
 
 Merge the two snippets it prints into `~/.claude/settings.json` and `~/.codex/config.toml`.
 **The tool-layer guard is not active until you do.**
+
+<a id="powershell"></a>
+**Using Windows PowerShell?** Every command on this page is POSIX shell. Git Bash and WSL run them
+as written; PowerShell needs two swaps - `bash` in front of any `.sh`, and `curl.exe` rather than
+`curl`, which PowerShell 5.1 aliases to `Invoke-WebRequest` and which rejects these flags:
+
+```powershell
+curl.exe -fsSLO https://raw.githubusercontent.com/vikichand/agent-kit/main/install.sh
+bash install.sh --update
+bash "$env:USERPROFILE/.the-agent-kit/install.sh" --update-rules   # $env:USERPROFILE, not ~
+```
 
 `--global` copies the whole kit (rules, hooks, installer, docs) to `~/.the-agent-kit`, so **you can
 delete the clone now.** Nothing points back at it:
@@ -78,10 +94,14 @@ cd /path/to/project && ~/.the-agent-kit/install.sh --update-rules
 ```
 
 `--update` prints the old and new commit plus what changed, does nothing when you're already current,
-and refuses to overwrite your install if the download doesn't look like the kit. Hooks and the guard
-go live machine-wide the moment it finishes; `--update-rules` is per project, so run it in each repo
-you use the kit in (or only the ones you're actively working on - stale rules still work, they're
-just older).
+and refuses to overwrite your install if the download doesn't look like the kit.
+
+The two have different scopes, which is the thing to get right: **`--update` is machine-wide and runs
+from anywhere** - it uses absolute paths, so your working directory is irrelevant, and the hooks and
+guard go live everywhere the moment it finishes. **`--update-rules` is per project and must run
+inside the repo** you want refreshed, because it edits that repo's `AGENTS.md`. (`--check` is
+per-repo for the same reason.) Refresh only the projects you're actively working on if you like -
+stale rules still work, they're just older.
 
 Don't copy the new `AGENTS.md` over by hand - that wipes your filled `PROJECT-CONFIG` block, which is
 exactly what `--update-rules` exists to preserve. It fails closed (refuses, changes nothing) if the
@@ -90,7 +110,8 @@ markers are missing, and redirects you to your global files if the project uses 
 Skipping step 1 is a supported choice: you get the rules and no enforcement. Skipping step 2 gets you
 enforcement with an agent that hasn't read the rules. They're independent.
 
-Needs `git`, POSIX `sh`/`awk`/`grep` (bundled with git), and Python 3 for the tool-layer guard. On
+Needs `git`, POSIX `sh`/`awk`/`grep` (bundled with git - so Git for Windows already supplies the
+`bash` the [PowerShell note](#powershell) uses), and Python 3 for the tool-layer guard. On
 Windows a bare `python3` can be a no-op Store stub, which is why `--check` verifies the interpreter
 actually runs Python 3 rather than merely existing, and prefers the fastest working one. Nothing is ever
 overwritten: an existing `CLAUDE.md`, `AGENTS.md`, or git hook is left untouched.
