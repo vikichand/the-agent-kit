@@ -31,7 +31,7 @@ stays local · own your incidents (stop and report, no silent cleanup) · don't 
 | 7 | Checkpoint to files · commit only when asked · **sync before you ship** (fetch + rebase before push/PR) |
 | 8 | Execution discipline running a plan |
 | 9 | Ownership · **no AI-authorship** (no `Co-Authored-By` / `Generated with` / AI-as-author) · **no AI prose tells** (em dashes, "not just X, it's Y", delve/leverage/seamless) |
-| 10 | **READMEs: the working path first** · Quick Start in the first screenful · reference tables · no filler · **docs move in the same diff** |
+| 10 | **READMEs: the working path first** · Quick Start in the first screenful · reference tables · **name the shell differences, don't assume POSIX** · no filler · **docs move in the same diff** |
 
 **Project-setup block**: a setup prompt ([`docs/project-setup-prompt.md`](docs/project-setup-prompt.md))
 classifies the repo (CODE / AGENT / BOTH), its **platform** (web / mobile / desktop / TV / CLI / library /
