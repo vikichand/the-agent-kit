@@ -96,6 +96,8 @@ claude plugin marketplace add anthropics/claude-plugins-official
 claude plugin marketplace add obra/superpowers-marketplace
 claude plugin marketplace add openai/codex-plugin-cc
 claude plugin marketplace add bradautomates/claude-video
+claude plugin marketplace add DietrichGebert/ponytail
+claude plugin marketplace add headroomlabs-ai/headroom
 ```
 
 > **If a marketplace add fails with `git@github.com: Permission denied (publickey)`**, the clone went
@@ -112,19 +114,40 @@ At **user** scope:
 claude plugin install superpowers@superpowers-marketplace --scope user
 claude plugin install codex@openai-codex --scope user
 claude plugin install watch@claude-video --scope user
+claude plugin install ponytail@ponytail --scope user
+claude plugin install headroom@headroom-marketplace --scope user
 ```
+
+(Both projects' READMEs document the in-session `/plugin marketplace add` and `/plugin install` form;
+the lines above are the CLI equivalents, kept consistent with the rest of this file.)
 
 - **superpowers** is the big one: a large skill library that changes how the agent approaches
   most tasks.
 - **codex** lets Claude Code hand work to Codex.
 - **watch** gives Claude Code the ability to watch videos, which it otherwise cannot do.
+- **ponytail** ("lazy senior dev mode", MIT) re-asserts a minimalism ladder that deliberately overlaps
+  this kit's §3 and §6 - the kit harvested two of its ideas. **You are not buying new rules; you are
+  buying persistence.** A rules file is read once and its grip loosens as context fills (this kit says
+  so itself); ponytail re-injects its ruleset on session start and on *every* prompt, which is the one
+  thing a static file cannot do. Price it honestly: 6 skill descriptions plus a per-prompt injection,
+  very roughly 2k tokens of always-on context, and a `node` process on every prompt submit.
+- **headroom** (Apache-2.0) is orthogonal to everything else here: it compresses tool output, logs and
+  file reads *before* they reach the model, reversibly, so a 78k-token read does not eat the window.
+  Rules govern what the agent writes; this governs how much it reads. The Claude Code plugin path
+  ships **hooks only, no skills**, so its always-on context cost is zero - but it runs a local proxy on
+  `127.0.0.1:8787` and respawns it, which you should know before installing it on a work machine.
 
-> **Deliberately not on this list: a second general skill library.** Every skill's *description* stays
-> in context permanently, because that is what the model matches on to decide when to fire. A second
-> lifecycle library (spec, plan, TDD, review, ship) triples that always-on block to re-state what
+> **Vendor figures are self-reported.** Both projects publish benchmarks from their own suites;
+> ponytail's headline numbers come from five toy tasks, its more defensible agentic suite is smaller.
+> Treat them as direction, not measurement, and check your own token usage before and after.
+
+> **Deliberately not on this list: a second *general lifecycle* skill library.** Every skill's
+> *description* stays in context permanently, because that is what the model matches on to decide when
+> to fire. A second spec/plan/TDD/review/ship library triples that always-on block to re-state what
 > superpowers and the rules already cover, and duplicate skill names give the model two competing
-> answers to the same trigger. If you want one specific skill from another library, take that skill
-> alone rather than the whole set.
+> answers to the same trigger. Ponytail is the deliberate exception and the reason is narrow: it is
+> single-purpose (minimalism), not a lifecycle set, and what it sells is re-injection rather than new
+> coverage. If you want one specific skill from any other library, take that skill alone, not the set.
 
 After installing, run `claude plugin list` and confirm each shows as enabled. If a plugin installed
 but is disabled, enable it with `claude plugin enable <name>` and say so.

@@ -140,6 +140,9 @@ Most agents skip this; it matters most. Your own judgement degrades as the sessi
   bar - the critic sees the output and the bar, never the builder's reasoning for its choices.
 - **"Looks right" is not done.** Done = tests green, typecheck/lint clean, original ask demonstrably satisfied.
   State how you verified.
+- **UI work gets proof in a real browser.** A green unit suite does not prove a button works. Drive the real
+  flow, then inspect with the browser's own tools when it misbehaves; the accessibility check rides along in
+  the same pass rather than waiting for a someday audit.
 - **Look it up. Do not recall it.** Training data is stale and confidently wrong about exactly the things that
   break builds: config keys, CLI flags, API signatures, model names, default values, version behaviour. Before
   asserting any of those - or writing them into code - open the current official docs. *A memory of the docs is
@@ -162,6 +165,9 @@ Most agents skip this; it matters most. Your own judgement degrades as the sessi
 - **Treat the session as disposable.** Never let the conversation be the only record of a decision.
 - **Checkpoint to files** (a plan / NOTES / a STATUS line) so any step is revertible. **Commit when the user asks,
   not on your own** - and never stage their unrelated changes (see the invariants).
+- **Announce breaking changes; flag risky ones.** A changed public contract (API shape, event schema,
+  exported signature) is called out and versioned, never smuggled in. Gate genuinely risky behavior behind a
+  flag where the project supports one, and read the logs after it deploys - green CI is not a healthy prod.
 - **Sync before you ship.** When asked to push or raise a PR, fetch and rebase/merge first - conflicts are the
   author's to resolve, not the reviewer's to discover.
 - For wide exploration, delegate to a subagent with its own context and have it report back a compact summary -
@@ -219,12 +225,16 @@ Configuration -> How it works -> Limits -> Contributing -> License (last).**
 
 ---
 
-## What this file can and can't do
+<!-- ## What this file can and can't do
 
-- **Always-on but soft.** An agent treats this as strong guidance, not a hard contract - adherence slips as context
-  fills. It biases behavior; the *enforcement* is the kit's hooks plus your tests / lint / diff review, not this file.
-- **Meant to grow, kept tight.** When the agent repeats a mistake, add one line that prevents it - and cut one,
-  because every line is read on every turn.
+     - Always-on but soft. An agent treats this as strong guidance, not a hard contract - adherence slips as
+       context fills. It biases behavior; the ENFORCEMENT is the kit's hooks plus your tests / lint / diff
+       review, not this file.
+     - Meant to grow, kept tight. When the agent repeats a mistake, add one line that prevents it - and cut
+       one, because every line is read on every turn.
+
+     Addressed to whoever maintains this file, not to the agent, so it lives in a comment: Claude Code strips
+     block-level HTML comments before the content reaches context. Free to keep, free to read. -->
 
 ---
 
