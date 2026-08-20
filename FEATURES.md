@@ -38,9 +38,9 @@ classifies the repo (CODE / AGENT / BOTH), its **platform** (web / mobile / desk
 service) and **intent** (production / prototype), and writes a tailored block *only* between `PROJECT-CONFIG`
 markers (real build/test/lint commands, canonical files, do-not-touch zones). User-facing platforms get
 **senior quality bars** (a11y, i18n, observability - detected from the infra, not assumed - audit logs) scaled
-to intent: part of "done" in production, flag-don't-block in a prototype. Web repos get pointers that open
-[`docs/web-checklists.md`](docs/web-checklists.md) (security defaults + launch readiness) exactly when auth,
-payments, uploads, or a launch is being built. A CLI never carries HSTS rules in its context. Universal rules
+to intent: part of "done" in production, flag-don't-block in a prototype. Security rules self-load by path (see the depth tier above);
+[`docs/web-checklists.md`](docs/web-checklists.md) now carries launch readiness only, opened when a public
+launch is being prepared. A CLI never carries HSTS rules in its context. Universal rules
 are the floor; the block is the per-project multiplier. The full trait ledger and rationale live in
 [`SENIOR-ENGINEER.md`](SENIOR-ENGINEER.md).
 

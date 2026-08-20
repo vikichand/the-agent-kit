@@ -13,56 +13,14 @@ pinning, code-signing hygiene) rather than this list verbatim.
 
 ## Security defaults
 
-**Open this checklist when building or touching: auth, sessions, uploads, payments, any new
-endpoint, or any AI-backed feature.** These are the default shape of a web app, not hardening to
-schedule for later. The classic agent failure: the happy path ships, and the login page is the
-softest target in the application.
+**These moved.** They now live in `claude/rules/web-security.md` as a **path-scoped rule**, installed
+into your project as `.claude/rules/web-security.md`. That means they arrive automatically the moment
+the agent opens anything under `auth/`, `api/`, `routes/`, `middleware/`, `**/webhook*` or
+`**/payment*` - rather than waiting for someone to remember to open this file, which is what used to
+happen and why they were being missed.
 
-### Auth and sessions
-
-- [ ] Session tokens in `httpOnly` + `Secure` + `SameSite` cookies - never `localStorage` (any XSS
-      becomes a stolen session).
-- [ ] Authorization checked server-side on every request; a client-side admin check is decoration.
-      Every NEW endpoint or mutation re-checks - don't copy an endpoint and drop the check it had.
-- [ ] Login and password-reset endpoints rate-limited, with lockout or backoff after repeated
-      failures.
-- [ ] 2FA / one-time-password flow, so nobody signs up as somebody else.
-- [ ] Password rules enforced server-side, plus a breached-password check.
-- [ ] Sessions invalidated on password change.
-- [ ] Reset links single-use and expiring.
-- [ ] Login/reset responses never reveal whether an account exists (no user enumeration).
-
-### Input and content
-
-- [ ] Validate and sanitize before storing; encode on output.
-- [ ] Uploads: allowlist permitted types (never blocklist), cap size, never trust client
-      MIME type or filename.
-- [ ] Request body size capped at the framework or proxy level.
-
-### Platform
-
-- [ ] HSTS on; secure cookie flags on; CSRF tokens on every state-changing form post.
-- [ ] CORS locked to known origins - never `*` on anything carrying credentials.
-- [ ] Directory listing off; default, debug, and sample admin routes removed before ship.
-- [ ] The app's database account has least privilege - it cannot DROP, and ideally cannot touch
-      tables it doesn't own.
-- [ ] Security events (logins, failures, lockouts, permission changes) logged - they feed the
-      project's audit trail.
-
-### Money
-
-- [ ] Prices and amounts set server-side; the client sends product IDs, never prices. An agent that
-      reads the price from the request body has built a pay-what-you-want store.
-- [ ] Payment webhooks signature-verified and replay-safe (idempotent handlers - they WILL fire twice).
-
-### AI features
-
-- [ ] Model output and user prompts treated as untrusted input (prompt injection); a model response
-      never triggers a privileged action without a server-side check of its own.
-- [ ] Usage capped per user/key (rate limits, spend limits) - an uncapped AI endpoint is a blank
-      check drawn on your API bill.
-
----
+Keeping a second copy here would guarantee the two drift apart, so this is a pointer, not a summary.
+Read the rule file if you want the list.
 
 ## Launch readiness
 
