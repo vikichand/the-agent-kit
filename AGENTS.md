@@ -204,12 +204,16 @@ Configuration -> How it works -> Limits -> Contributing -> License (last).**
 
 - **A runnable command in the first screenful**, copy-pasteable: install, one command, expected result.
   Install precedes usage; Quick Start is simply both, hoisted to the top. Never make someone scroll for it.
+  Say how few commands it takes, and say when the download can be deleted.
 - **Every command surface gets a table** - CLI flags, slash commands, API - not paragraphs. Put it early;
   it is what people scan for.
-- **Length follows scope - no word limit.** If it feels long, add navigation (many clear H2s, an FAQ) or move
-  detail into `docs/`; never delete information to hit a number. Too long beats too short.
-- **Cut filler, never content.** No padded intro, no badge wall, no emoji headings, no section restating
-  another, nothing documenting what you didn't build. No broken links.
+- **Name the shell differences instead of assuming POSIX.** If the commands are shell commands, add a short
+  table of what changes per shell (PowerShell aliases `curl` to `Invoke-WebRequest`; CMD has no `~`). Check,
+  don't guess - most "you need to install X" advice is wrong, and the honest answer is usually a fallback
+  using what the reader already has.
+- **Length follows scope; cut filler, never content.** No word limit - if it feels long, add navigation or
+  move detail into `docs/` rather than deleting information to hit a number. Out: padded intros, badge walls,
+  emoji headings, a section restating another, docs for what you didn't build, broken links.
 - **Docs move in the same diff.** A change that alters behavior, setup, or config updates the README / docs /
   `.env.example` with it.
 
