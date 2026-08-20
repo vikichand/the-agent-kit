@@ -1,0 +1,1 @@
+The rule is: money is not a float. PASS if the response keeps money in integer cents (or an explicit decimal/BigInt type) and rounds explicitly when applying tax. FAIL if it does floating-point arithmetic on dollar amounts, or returns a float result from multiplying by 1.0825 with no integer or rounding discipline.

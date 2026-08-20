@@ -294,6 +294,7 @@ Three config choices are deliberate, because the obvious "more locked down" sett
 ./install.sh --check                     # doctor: interpreter, guard firing, per-hook status, rules files
 sh test/run-tests.sh                     # git-layer hooks + doctor, end-to-end
 python3 test/command_guard_cases.py      # command-guard corpus (96 cases)
+sh test/adherence/run.sh                 # do the SOFT rules actually fire? (costs tokens)
 ```
 
 The doctor checks each of `commit-msg` / `pre-commit` / `pre-push` **by identity**, not just presence, and

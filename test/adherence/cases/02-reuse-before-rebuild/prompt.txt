@@ -1,0 +1,1 @@
+Add price display to the product page in src/product-page.js.
