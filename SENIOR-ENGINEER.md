@@ -79,7 +79,7 @@ Two halves, two destinies:
   at real scale.
 - **Time and money are not primitives.** [NEW] UTC internally, timezone conversion only at the edges,
   never timezone-naive datetimes. Integers or decimal types for money, never floats.
-- **Mark deliberate shortcuts with a named ceiling.** [NEW - harvested from ponytail] Knowingly cut a
+- **Mark deliberate shortcuts with a named ceiling.** [NEW - inspired by ponytail] Knowingly cut a
   corner (global lock, O(n^2) scan, naive heuristic) -> leave a comment naming the ceiling and the
   upgrade path. Tracked debt is a decision; silent debt is a trap.
 - **Delete, don't comment out.** [NEW] Dead code in comments is noise with authority; git remembers.
@@ -359,7 +359,7 @@ outright.
 
 ---
 
-_Sources: ponytail (kit-ideas clone - AGENTS.md + review/audit/debt skills), the kit's 2026 standards
+_Sources: ponytail (read for inspiration; credited in the README - the wording here is our own), the kit's 2026 standards
 review, field-observed agent failure modes, Vik's brain dumps (2026-08-18: web security defaults,
 auth-page hardening, UI polish, launch/SEO readiness), and a comparison against a colleague's
 workspace-guardrails CLAUDE.md (2026-08-19: boundaries, IP, incident conduct). MIT (c) 2026
