@@ -1,5 +1,14 @@
 # Adherence eval: do the soft rules actually fire?
 
+> **STATUS: WORK IN PROGRESS. Do not quote numbers from this harness yet.**
+> As of 2026-08-21 it is not a trustworthy instrument. Known defects: some cells return ERROR
+> (an empty response from the agent or the judge) and are counted as non-passes; results flip
+> between identical runs, so single runs are anecdotes; the judge sometimes returns incoherent
+> justifications; and the runner discards stderr, which makes the errors undiagnosable - the same
+> `catch { return [] }` pattern §3 forbids and case 05 exists to catch, committed here by the
+> author of both. Until those are fixed, a low score here says more about the harness than about
+> the rules.
+
 The kit enforces about a dozen rules with hooks and permission rules. Those hold no matter how full
 the context gets, because nothing has to remember them. The other ~34 rule families - the reuse
 ladder, blast radius, test-first, never game the oracle, root cause, sync before ship - are
