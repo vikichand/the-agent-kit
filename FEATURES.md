@@ -27,7 +27,7 @@ stays local · own your incidents (stop and report, no silent cleanup) · don't 
 | 3 | Simplicity · YAGNI/DRY · **reuse ladder** · match the codebase · **senior correctness defaults** (no silent fallbacks, idempotent handlers, the 100k-rows question, UTC + decimal money, staged migrations) · **named-ceiling shortcuts** · **copied code carries its license** |
 | 4 | Surgical changes: every line traces to the task |
 | 5 | **Verification is the spine**: external oracle · **test-first by default** (§0 sizes the ceremony) · **never game the oracle** (no deleted tests / loosened asserts) · **look it up, don't recall it** · **bounded loops** · **no self-grading** |
-| 6 | Debug by root cause · **fix the shared function, not the reported path** · two-attempt rule |
+| 6 | Debug by root cause · **fix it where it is shared, not where it surfaced** · two-attempt rule |
 | 7 | Checkpoint to files · commit only when asked · **sync before you ship** (fetch + rebase before push/PR) |
 | 8 | Execution discipline running a plan |
 | 9 | Ownership · **no AI-authorship** (no `Co-Authored-By` / `Generated with` / AI-as-author) · **no AI prose tells** (em dashes, "not just X, it's Y", delve/leverage/seamless) |

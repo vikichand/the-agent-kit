@@ -351,6 +351,9 @@ but the primary link could not be verified, it is attributed by talk and date in
   engineering"): **§5.** *"If you haven't seen it run, it's not a working system."*
 - **[Kent Beck](https://simonwillison.net/2025/Dec/16/kent-beck/)** (created TDD): **§5.** *Augmented*
   coding: move faster with AI while keeping quality. The test-first cycle in §5 is his.
+- **[ponytail](https://github.com/DietrichGebert/ponytail)** (MIT): **§3, §6.** Its "lazy senior dev" framing
+  sharpened two rules here - stopping at the first rung of a reuse ladder, and marking a deliberate shortcut
+  with the ceiling it carries. The wording in this kit is its own; the thinking was better for having read theirs.
 - Supporting data: Google's **[DORA 2025](https://dora.dev/)** (AI *amplifies* existing practices) and a
   Dec 2025 UC San Diego / Cornell study ([arXiv:2512.14012](https://arxiv.org/abs/2512.14012)):
   professional developers don't vibe, they control.

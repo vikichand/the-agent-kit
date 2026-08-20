@@ -153,9 +153,9 @@ Most agents skip this; it matters most. Your own judgement degrades as the sessi
 ## 6. Debug by root cause, not by symptom
 
 - **Reproduce -> minimize -> hypothesize -> validate.** Find the actual cause before changing a line.
-- **Fix the shared function once, not the path that was reported.** A bug report names a symptom on one route.
-  Grep every caller of the function you're about to touch: one guard in the shared function is a smaller diff
-  than one per caller, and patching only the reported path leaves its siblings broken.
+- **Fix it where it is shared, not where it surfaced.** A ticket describes one route; the defect usually sits
+  upstream of it. Before editing, list what else reaches that code - if the same fault serves three call sites,
+  three local patches is the wrong shape, and the two you never opened stay broken.
 - Don't paper over a symptom with a patch you don't fully understand - that's how new, orthogonal breakage appears.
 - **Two-attempt rule:** if two honest attempts fail, stop. Reset and re-approach from a different angle instead of
   piling on more changes.
