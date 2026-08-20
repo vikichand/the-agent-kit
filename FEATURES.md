@@ -89,7 +89,9 @@ stray operand.
   detects a working Python; prints tool-config snippets rather than clobbering.
   The doctor verifies each git hook **by identity**, not just presence, and prints `core.hooksPath` when a redirect is set.
 - **`docs/environment-setup-prompt.md`**: optional, agent-run recipe for a machine's MCP servers / plugins / skills
-  (Context7 · Playwright · Chrome DevTools · superpowers · codex · watch). Ships two drop-in rules:
+  (Context7 · Playwright · Chrome DevTools · superpowers · codex · watch · ponytail · headroom, each with its
+  always-on context cost and execution footprint stated - ponytail re-injects on every prompt, headroom runs a
+  local proxy). Ships two drop-in rules:
   `docs/context7.md` (routes library questions to live docs - §5's enforcement half) and
   `docs/browser-tools.md` (picks Playwright vs DevTools by the question). The kit installs **none** of them;
   it halts for you on the API key rather than typing a credential.

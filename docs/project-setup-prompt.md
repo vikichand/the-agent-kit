@@ -77,7 +77,8 @@ Use this shape for the block (include the CODE part, the AGENT part, or both, de
 <!-- USER-FACING platforms only; scale to intent (production: part of "done" / prototype: flag, don't block): -->
 **Quality bars:** a11y (<lint rule / axe / inspector>, WCAG AA floor); i18n (<layer>, no hardcoded user-facing
 strings); observability (<detected target>, structured logs, no PII); audit log on sensitive mutations;
-skeleton loaders on data views; no redundant explainer text under headings.
+privacy (collect the minimum personal data, keep PII out of logs / URLs / analytics); skeleton loaders on
+data views; no redundant explainer text under headings.
 <!-- WEB only: -->
 **Checklists:** building auth / uploads / payments / a new endpoint / AI features -> open
 <kit>/docs/web-checklists.md (security); preparing a public launch -> same file (launch readiness).
