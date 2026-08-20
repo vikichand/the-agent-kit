@@ -181,6 +181,33 @@ d=$(sh "$KIT/install.sh" --update-rules 2>&1)
 has 'already carries the current rules' "$d" && pass "U4 current rules detected, no rewrite" || bad "U4 no-op not detected"
 cd "$KIT"; rm -rf "$w"
 
+# ---------- path-scoped rules ----------
+# The deep tier. These must ship valid frontmatter and must be installed by BOTH per-project modes,
+# or the conditional rules silently never load and nobody finds out.
+echo "== path-scoped rules =="
+n=0
+for r in "$KIT"/claude/rules/*.md; do
+  [ -e "$r" ] || continue
+  n=$((n+1))
+  b=$(basename "$r")
+  head -2 "$r" | grep -q '^paths:$' && : || bad "R1 $b missing 'paths:' frontmatter on line 2"
+  grep -q '^  - "' "$r" || bad "R1 $b declares no glob patterns"
+done
+[ "$n" -gt 0 ] && pass "R1 $n path-scoped rule files, all with paths: frontmatter" || bad "R1 no rule files found"
+w=$(mktemp -d) || exit 2; cd "$w" || exit 2; git init -q
+sh "$KIT/install.sh" >/dev/null 2>&1
+c=$(ls .claude/rules/*.md 2>/dev/null | wc -l | tr -d ' ')
+[ "$c" = "$n" ] && pass "R2 default install deploys all $n rules" || bad "R2 deployed $c of $n rules"
+sh "$KIT/install.sh" >/dev/null 2>&1
+c2=$(ls .claude/rules/*.md 2>/dev/null | wc -l | tr -d ' ')
+[ "$c2" = "$n" ] && pass "R3 re-install does not duplicate rules" || bad "R3 rule count changed to $c2"
+cd "$KIT"; rm -rf "$w"
+w=$(mktemp -d) || exit 2; cd "$w" || exit 2; git init -q
+sh "$KIT/install.sh" --extension >/dev/null 2>&1
+c3=$(ls .claude/rules/*.md 2>/dev/null | wc -l | tr -d ' ')
+[ "$c3" = "$n" ] && pass "R4 --extension deploys the rules too" || bad "R4 --extension deployed $c3 of $n"
+cd "$KIT"; rm -rf "$w"
+
 # ---------- install.sh --update ----------
 # Runs against a LOCAL clone source with a fake HOME: no network, and the real ~/.the-agent-kit
 # is never touched. AGENT_KIT_REPO is the same override a fork would use.
