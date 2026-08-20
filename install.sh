@@ -5,6 +5,7 @@
 #                             imports it, so nothing is duplicated) + git hooks in THIS repo
 #   ./install.sh --extension  per-project (extends global): project-config stub + git hooks
 #   ./install.sh --global     machine-wide: git hooks via core.hooksPath + printed tool snippets
+#   ./install.sh --update     pull the latest kit from GitHub into ~/.the-agent-kit (no clone needed)
 #   ./install.sh --update-rules  refresh THIS repo's AGENTS.md to the kit's current rules; the
 #                             project's PROJECT-CONFIG block is preserved byte-for-byte
 #   ./install.sh --check      doctor: verify the interpreter resolves and the guard actually fires
@@ -16,6 +17,8 @@ set -eu
 
 KIT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 MODE="${1:-project}"
+# Where --update pulls from. Overridable so a fork (or the test suite) can point elsewhere.
+KIT_REPO="${AGENT_KIT_REPO:-https://github.com/vikichand/agent-kit.git}"
 
 say() { printf '%s\n' "$*"; }
 hr()  { printf '%s\n' "------------------------------------------------------------"; }
@@ -123,6 +126,10 @@ install_global() {
   cp "$KIT/AGENTS.md" "$KIT/CLAUDE.md" "$KIT/install.sh" "$share/"
   cp "$KIT/docs/"*.md "$share/docs/" 2>/dev/null || true
   chmod +x "$share/hooks/"* "$share/git-hooks/"* "$share/install.sh"
+  # Stamp the source commit so --update can tell "already current" from "a month behind", and show
+  # you what actually changed. Absent (or "unknown") when installed from a non-git copy - not fatal.
+  ver=$( (cd "$KIT" && git rev-parse --short HEAD 2>/dev/null) || true )
+  printf '%s\n' "${ver:-unknown}" > "$share/.kit-version"
   say "Copied the kit to $share (rules + hooks + installer + docs)"
   say "  -> $share is now self-contained: the clone you ran this from can be deleted."
 
@@ -158,6 +165,37 @@ install_global() {
   say "The tool guard is NOT active until you merge the snippet(s) above - then verify:  ./install.sh --check"
   say "Optional global rules (lets projects stay lean via --extension), review the merge first:"
   say "    cat \"$KIT/AGENTS.md\" >> ~/.claude/CLAUDE.md   ;   cat \"$KIT/AGENTS.md\" >> ~/.codex/AGENTS.md"
+}
+
+update_kit() {  # refresh ~/.the-agent-kit from GitHub, so the clone stays disposable
+  share="$HOME/.the-agent-kit"
+  command -v git >/dev/null 2>&1 || { say "  ! git not found - cannot update. Install git, or re-clone by hand."; exit 2; }
+  old=$(cat "$share/.kit-version" 2>/dev/null || printf 'unknown')
+  tmp=$(mktemp -d) || exit 2
+  say "Fetching the latest kit from $KIT_REPO"
+  if ! git clone --quiet --depth 50 "$KIT_REPO" "$tmp/kit" 2>/dev/null; then
+    rm -rf "$tmp"; say "  ! clone failed (offline, or the repo moved) - NOTHING was changed."; exit 2
+  fi
+  # Never overwrite a working install from a surprise payload: prove the download is actually the kit
+  # before it touches anything. A moved/renamed/hijacked repo fails here instead of half-installing.
+  for f in install.sh AGENTS.md hooks/command-guard.py hooks/pre-commit; do
+    [ -f "$tmp/kit/$f" ] || { rm -rf "$tmp"; say "  ! downloaded tree has no $f - that is not the kit. NOTHING was changed."; exit 2; }
+  done
+  new=$( (cd "$tmp/kit" && git rev-parse --short HEAD 2>/dev/null) || printf 'unknown' )
+  if [ "$old" = "$new" ] && [ "$old" != "unknown" ]; then
+    rm -rf "$tmp"; say "  = already at $new - nothing to update."; return 0
+  fi
+  say "  $old -> $new"
+  # Shallow clones may not reach `old`, so this is best-effort context, never a gate.
+  (cd "$tmp/kit" && git log --oneline "$old..$new" 2>/dev/null | sed 's/^/    /') || true
+  hr
+  # Run the DOWNLOADED installer, not this one: a newer kit can ship files an older installer does
+  # not know to copy. It is code from the network, which is why the identity check above runs first.
+  sh "$tmp/kit/install.sh" --global
+  rm -rf "$tmp"
+  hr
+  say "Machine-wide guards + ~/.the-agent-kit are now current. Then, in each project using the kit:"
+  say "    ~/.the-agent-kit/install.sh --update-rules     # new rules in, your PROJECT-CONFIG kept"
 }
 
 update_rules() {  # refresh the universal rules in this repo's AGENTS.md, preserving its PROJECT-CONFIG block
@@ -296,12 +334,14 @@ doctor() {
   hr
 }
 
+USAGE="Usage: ./install.sh [--extension | --global | --update | --update-rules | --check]"
 case "$MODE" in
   --global|global)              install_global ;;
   --extension|extension)        install_extension ;;
+  --update|update)              update_kit ;;
   --update-rules|update-rules)  update_rules ;;
   --check|check|doctor)         doctor ;;
   ""|project|--project)         install_project ;;
-  -h|--help)              say "Usage: ./install.sh [--extension | --global | --update-rules | --check]" ;;
-  *) say "Unknown mode: $MODE"; say "Usage: ./install.sh [--extension | --global | --update-rules | --check]"; exit 2 ;;
+  -h|--help)                    say "$USAGE" ;;
+  *) say "Unknown mode: $MODE"; say "$USAGE"; exit 2 ;;
 esac

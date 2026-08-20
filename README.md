@@ -56,12 +56,19 @@ cd /path/to/your/project && ~/.the-agent-kit/install.sh
 ~/.the-agent-kit/install.sh --check
 ```
 
-**To update later:** re-clone and re-run `--global` (refreshes `~/.the-agent-kit` in place - hooks and
-guard update machine-wide instantly), then in each project:
+**To update later, two commands - no re-clone.** The first refreshes the machine copy straight from
+GitHub, the second refreshes one project's rules:
 
 ```bash
-~/.the-agent-kit/install.sh --update-rules   # new rules in; your PROJECT-CONFIG block survives byte-for-byte
+~/.the-agent-kit/install.sh --update          # pulls the latest kit into ~/.the-agent-kit
+cd /path/to/project && ~/.the-agent-kit/install.sh --update-rules
 ```
+
+`--update` prints the old and new commit plus what changed, does nothing when you're already current,
+and refuses to overwrite your install if the download doesn't look like the kit. Hooks and the guard
+go live machine-wide the moment it finishes; `--update-rules` is per project, so run it in each repo
+you use the kit in (or only the ones you're actively working on - stale rules still work, they're
+just older).
 
 Don't copy the new `AGENTS.md` over by hand - that wipes your filled `PROJECT-CONFIG` block, which is
 exactly what `--update-rules` exists to preserve. It fails closed (refuses, changes nothing) if the
