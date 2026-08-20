@@ -5,124 +5,80 @@ Rules and guardrails that make coding agents behave. One install, wired for both
 
 ## Quick Start
 
-**Step 1, once per machine.** This is the only step that needs a script, and the reason is narrow:
-git hooks have to live in `.git/hooks`, which git owns. No file you paste into a project folder can
-reach there.
-
-One file bootstraps the rest - no clone, no package manager:
+Three commands: two set up the machine, one sets up a project.
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/vikichand/agent-kit/main/install.sh
-sh install.sh --update    # fetches the kit into ~/.the-agent-kit + prints the tool-guard snippets
+curl -fsSLO https://raw.githubusercontent.com/vikichand/the-agent-kit/main/install.sh
+sh install.sh --update                               # machine: kit -> ~/.the-agent-kit + git hooks
+cd /path/to/project && ~/.the-agent-kit/install.sh   # project: rules + this repo's hooks
 ```
 
-Two steps, not `curl … | sh`, on purpose: that pipes code you have not seen into a shell, and the
-rules in this kit tell an agent never to do it. Read the file, then run it.
+Two steps rather than `curl … | sh` on purpose: that pipes code you have not read into a shell, and
+the rules in this kit tell an agent never to do it.
 
-**No `curl`? You don't need it.** The clone below uses only `git`, which the kit requires anyway. Or
-download with what your shell already ships: PowerShell has `iwr <url> -OutFile install.sh`, and most
-Linux boxes have `wget -qO install.sh <url>`. Nothing to install first - Git for Windows bundles
-curl, and Windows 10+ and macOS ship it.
+Then two follow-ups, both printed by the installer:
 
-Prefer a clone? Same result:
+1. **Merge the two config snippets** into `~/.claude/settings.json` and `~/.codex/config.toml`.
+   The tool-layer guard is inactive until you do.
+2. **Run the [project setup prompt](docs/project-setup-prompt.md)** inside the project. It fills
+   `PROJECT-CONFIG` with your real build / test / lint commands; without it the agent guesses them,
+   which is the largest hallucination surface the kit has.
+
+Confirm with `~/.the-agent-kit/install.sh --check`, run inside the project: every line should read
+`OK:`. **Then delete the downloaded `install.sh` (or the clone) whenever you like** - `~/.the-agent-kit`
+holds the whole kit and nothing points back at it.
+
+The two halves are independent: machine-only gives you enforcement with an agent that has not read
+the rules, project-only gives you the rules with no enforcement.
+
+### Your shell
+
+| Shell | What changes |
+|---|---|
+| Git Bash · WSL · macOS · Linux | Nothing. The commands work as written. |
+| PowerShell | `curl.exe`, not `curl` - PowerShell aliases `curl` to `Invoke-WebRequest`, which rejects these flags. `sh`, `cp` and `~` all work. |
+| CMD | `%USERPROFILE%` in place of `~`. |
+
+**No `curl`?** You never need it - this does the same job with git, which the kit requires anyway:
 
 ```bash
-git clone https://github.com/vikichand/agent-kit.git && cd agent-kit
-./install.sh --global     # git hooks for EVERY repo + prints the tool-guard snippets
+git clone https://github.com/vikichand/the-agent-kit.git && cd the-agent-kit && ./install.sh --global
 ```
 
-Merge the two snippets it prints into `~/.claude/settings.json` and `~/.codex/config.toml`.
-**The tool-layer guard is not active until you do.**
+### Updating
 
-<a id="powershell"></a>
-**Using Windows PowerShell?** Every command on this page is POSIX shell. Git Bash and WSL run them
-as written; PowerShell needs two swaps - `bash` in front of any `.sh`, and `curl.exe` rather than
-`curl`, which PowerShell 5.1 aliases to `Invoke-WebRequest` and which rejects these flags:
-
-```powershell
-curl.exe -fsSLO https://raw.githubusercontent.com/vikichand/agent-kit/main/install.sh
-bash install.sh --update
-bash "$env:USERPROFILE/.the-agent-kit/install.sh" --update-rules   # $env:USERPROFILE, not ~
-```
-
-`--global` copies the whole kit (rules, hooks, installer, docs) to `~/.the-agent-kit`, so **you can
-delete the clone now.** Nothing points back at it:
+The same command you installed with, now living in the installed copy - nothing to re-clone:
 
 ```bash
-cd .. && rm -rf the-agent-kit     # optional; ~/.the-agent-kit is self-contained
-```
-
-**Step 2, per project: copy two files.** That is the whole thing. The hooks are already machine-wide
-from step 1, so a new project needs nothing but the rules:
-
-```bash
-cp ~/.the-agent-kit/AGENTS.md .    # the rules
-cp ~/.the-agent-kit/CLAUDE.md .    # one line: @AGENTS.md (Claude Code doesn't read AGENTS.md)
-```
-
-Pairs well with a third copy:
-[**the-ultimate-gitignore-ai**](https://github.com/vikichand/the-ultimate-gitignore-ai) as the project's
-`.gitignore`. The two agree by design: `AGENTS.md` / `CLAUDE.md` stay committed (team intent), the files
-agent sessions generate (`.claude/settings.local.json`, `CLAUDE.local.md`) stay ignored, and `.env` is
-ignored while `.env.example` stays readable - the same carve-out the kit's permission rules make.
-
-Then run the **[project setup prompt](docs/project-setup-prompt.md)** once from inside the project: it
-fills `PROJECT-CONFIG` with the repo's real build/test/lint commands and, for user-facing apps, the
-senior quality bars for its platform. Until then the doctor warns and the agent guesses your commands.
-
-Only those two files do anything inside a project; everything else is kit maintenance. Or let the
-installer make the same two copies, plus per-repo hooks:
-
-```bash
-cd /path/to/your/project && ~/.the-agent-kit/install.sh
-```
-
-**Step 3, confirm it's real.** Run from inside the project; every line should read `OK:`, except a
-`WARN` about `PROJECT-CONFIG` until you fill it in.
-
-```bash
-~/.the-agent-kit/install.sh --check
-```
-
-**To update later, the same command you installed with** - it lives in the installed copy now, so
-there is nothing to re-clone. The first line refreshes the machine copy from GitHub, the second
-refreshes one project's rules:
-
-```bash
-~/.the-agent-kit/install.sh --update          # pulls the latest kit into ~/.the-agent-kit
+~/.the-agent-kit/install.sh --update                 # machine-wide; run it from anywhere
 cd /path/to/project && ~/.the-agent-kit/install.sh --update-rules
 ```
 
-`--update` prints the old and new commit plus what changed, does nothing when you're already current,
-and refuses to overwrite your install if the download doesn't look like the kit.
+`--update` reports `old -> new` with the commits between, does nothing when you are already current,
+and refuses to overwrite your install if the download is not the kit. `--update-rules` replaces a
+project's universal rules while **preserving its `PROJECT-CONFIG` block**, which is exactly why you
+should never hand-copy a new `AGENTS.md` over the old one. Scope differs: `--update` is machine-wide
+and ignores your working directory; `--update-rules` and `--check` act on the repo you are standing in.
 
-The two have different scopes, which is the thing to get right: **`--update` is machine-wide and runs
-from anywhere** - it uses absolute paths, so your working directory is irrelevant, and the hooks and
-guard go live everywhere the moment it finishes. **`--update-rules` is per project and must run
-inside the repo** you want refreshed, because it edits that repo's `AGENTS.md`. (`--check` is
-per-repo for the same reason.) Refresh only the projects you're actively working on if you like -
-stale rules still work, they're just older.
+### Also worth having
 
-Don't copy the new `AGENTS.md` over by hand - that wipes your filled `PROJECT-CONFIG` block, which is
-exactly what `--update-rules` exists to preserve. It fails closed (refuses, changes nothing) if the
-markers are missing, and redirects you to your global files if the project uses an `--extension` stub.
+[**the-ultimate-gitignore-ai**](https://github.com/vikichand/the-ultimate-gitignore-ai) as the
+project's `.gitignore`. The two agree by design: `AGENTS.md` / `CLAUDE.md` stay committed (team
+intent), the files agent sessions generate (`.claude/settings.local.json`, `CLAUDE.local.md`) stay
+ignored, and `.env` is ignored while `.env.example` stays readable - the same carve-out the kit's
+permission rules make.
 
-Skipping step 1 is a supported choice: you get the rules and no enforcement. Skipping step 2 gets you
-enforcement with an agent that hasn't read the rules. They're independent.
+Needs `git`, POSIX `sh` / `awk` / `grep` (bundled with git), and Python 3 for the tool-layer guard.
+On Windows a bare `python3` can be a no-op Store stub, so `--check` verifies the interpreter actually
+runs Python 3 and picks the fastest working one. Nothing is ever overwritten: an existing
+`CLAUDE.md`, `AGENTS.md`, or git hook is left untouched.
 
-Needs `git`, POSIX `sh`/`awk`/`grep` (bundled with git - so Git for Windows already supplies the
-`bash` the [PowerShell note](#powershell) uses), and Python 3 for the tool-layer guard. On
-Windows a bare `python3` can be a no-op Store stub, which is why `--check` verifies the interpreter
-actually runs Python 3 rather than merely existing, and prefers the fastest working one. Nothing is ever
-overwritten: an existing `CLAUDE.md`, `AGENTS.md`, or git hook is left untouched.
-
-Setting up a new machine's MCP servers, plugins, and skills is a separate job, deliberately not
-automated here: see [`docs/environment-setup-prompt.md`](docs/environment-setup-prompt.md). If the
-project does browser work, [`docs/browser-tools.md`](docs/browser-tools.md) settles Playwright vs
-Chrome DevTools. To keep the kit itself current as industry practice moves, run
-[`docs/staying-current-prompt.md`](docs/staying-current-prompt.md) quarterly: it researches what
-shifted, checks the kit's own references for rot, and proposes at most a handful of changes for
-your approval - with NO CHANGE as the expected verdict.
+MCP servers, plugins, and skills are a separate job, deliberately not automated:
+[`docs/environment-setup-prompt.md`](docs/environment-setup-prompt.md). For browser work,
+[`docs/browser-tools.md`](docs/browser-tools.md) settles Playwright vs Chrome DevTools. To keep the
+kit current as practice moves, run [`docs/staying-current-prompt.md`](docs/staying-current-prompt.md)
+quarterly - it researches what shifted and proposes at most a handful of changes, with NO CHANGE as
+the expected verdict.
 
 ## Table of Contents
 
@@ -138,23 +94,32 @@ your approval - with NO CHANGE as the expected verdict.
 
 ## What you get
 
-Two things, one install. **The rules**: a tight `CLAUDE.md` / `AGENTS.md` that makes an agent work like a
-disciplined engineer rather than an over-eager intern. **The guards**: hooks at the **git layer**
-(reorder-proof, covering Claude Code, Codex, plain `git`, and any MCP tool that shells out to `git`) plus
-the **tool layer**, a fast prompt-time veto. Both are itemised below; full map in [`FEATURES.md`](FEATURES.md).
+Two things, one install.
 
-**Honest about what this is:** these guards *reduce* slop and mistakes; they are **not a sandbox.** The
-tool-layer hook parses shell text, which can't be made bulletproof (`bash -c`, `eval`, `$(...)`, and MCP
-tools bypass it). That's why the real veto lives at the **git layer**, and why for anything unattended
-you should add server-side branch protection and run the agent in a
+**The rules** - a tight `AGENTS.md` that gets an agent working like a senior engineer instead of an
+eager intern: reuse what the codebase already has rather than rebuilding it, know the blast radius
+before editing, test first and never fake a green test, fix the root cause instead of the reported
+symptom, and ship no "improvement" nobody asked for. Per-project setup adds your real build and test
+commands, and for user-facing apps the quality bars an agent otherwise skips - accessibility, i18n,
+observability, audit logs.
+
+**The guards** - hooks at the **git layer** (reorder-proof, covering Claude Code, Codex, plain `git`,
+and any MCP tool that shells out to `git`) plus the **tool layer**, a fast prompt-time veto. Full map
+in [`FEATURES.md`](FEATURES.md); the senior-engineer trait ledger with sources is
+[`SENIOR-ENGINEER.md`](SENIOR-ENGINEER.md).
+
+**Honest about what this is:** the guards *reduce* slop and mistakes; they are **not a sandbox.** The
+tool-layer hook parses shell text, which can't be made bulletproof (`bash -c`, `eval`, `$(...)`, and
+MCP tools bypass it). That's why the real veto lives at the git layer, and why for anything unattended
+you want server-side branch protection and a
 [container / OS sandbox](https://code.claude.com/docs/en/sandbox-environments) (the bundled
-[`.devcontainer/`](.devcontainer/) is a starting point). A sandbox constrains the
-filesystem, not a credential you hand it. The two layers are complements, not substitutes. Nothing here
-guarantees the agent never pushes or never leaks; it makes the careless paths fail **closed and loud**.
+[`.devcontainer/`](.devcontainer/) is a starting point). A sandbox constrains the filesystem, not a
+credential you hand it. Nothing here guarantees an agent never pushes or never leaks; it makes the
+careless paths fail **closed and loud**.
 
-I built it because I got tired of the same four failure modes (silent assumptions, bloat, drive-by edits,
-confident-but-unverified "done") and of agents pushing when I only wanted the commit, or signing themselves
-into my history.
+Built because the same four failure modes kept recurring - silent assumptions, bloat, drive-by edits,
+confident-but-unverified "done" - along with agents pushing when only a commit was wanted, or signing
+themselves into the history.
 
 ## Features
 
@@ -211,44 +176,31 @@ run under `git` itself, so they survive flag-reordering, `--no-verify`, Codex, a
 
 ## Install
 
-Two scopes, because that's how these actually want to live.
+Quick Start covers the usual path. The installer has six modes:
 
-**Once per machine: the guards.**
+| Mode | Scope | What it does |
+|---|---|---|
+| `--update` | machine | Fetch the latest kit into `~/.the-agent-kit`, then run `--global`. Needs no kit beside it, so one downloaded `install.sh` bootstraps everything. |
+| `--global` | machine | Git hooks for every repo via `core.hooksPath`; **prints** the tool-guard snippets to merge. |
+| *(none)* | project | Full rules - `AGENTS.md` plus a `CLAUDE.md` that imports it - and this repo's git hooks. |
+| `--extension` | project | Project block only, for when the universal rules already live in your global files, so nothing is duplicated into context. |
+| `--update-rules` | project | Replace the universal rules, keep `PROJECT-CONFIG` byte-for-byte. |
+| `--check` | project | Doctor: interpreter, guard firing, per-hook identity, rules-file size and wiring. |
 
-```bash
-./install.sh --global
-```
+> **Merge, don't replace.** If your `settings.json` already has `permissions` or `hooks`, fold these
+> keys into them. Pasting the whole snippet over an existing file wipes what's there.
 
-Installs the git-layer hooks for every repo via `git core.hooksPath`, and **prints** the `command-guard`
-snippets to merge into `~/.claude/settings.json` and `~/.codex/`. It prints rather than clobbers.
+**Why two rules files.** `AGENTS.md` is the cross-tool standard (Codex, Cursor, Aider, Copilot).
+Claude Code reads `CLAUDE.md` and *not* `AGENTS.md`, so the kit follows Anthropic's documented
+pattern: `CLAUDE.md` contains `@AGENTS.md` and nothing else. One source of truth, and an edit reaches
+both tools at once. A symlink works too but needs Administrator or Developer Mode on Windows.
 
-> **Merge, don't replace.** If your `settings.json` already has `permissions` or `hooks`, fold these keys
-> into them. Pasting the whole snippet over an existing file wipes what's there.
-
-**Once per project: the rules.** Two shapes:
-
-```bash
-./install.sh              # self-contained: full rules + project block in this repo
-./install.sh --extension  # lean: project block ONLY, when the rules are already global
-```
-
-Either writes **`AGENTS.md`** (the rules) plus a one-line **`CLAUDE.md`** that imports it, and installs the
-`commit-msg` hook locally. Use `--extension` once the universal rules live in your global files; then each
-project carries only its own config, with no duplicated ruleset eating context.
-
-**Why two files and not one copy each.** `AGENTS.md` is the cross-tool standard, read by Codex, Cursor,
-Aider, Copilot and others. Claude Code reads `CLAUDE.md` and *not* `AGENTS.md`, so the kit follows
-Anthropic's documented pattern: `CLAUDE.md` contains `@AGENTS.md` and nothing else. One source of truth,
-nothing to keep in sync, and edits to the rules reach both tools at once. A symlink does the same job but
-needs Administrator or Developer Mode on Windows, so the import is the default.
-
-Two limits worth knowing, because both are enforced **silently**. Codex truncates past 32 KiB
-(`project_doc_max_bytes`) with no warning, and that cap applies to the *combined* `AGENTS.md` chain read
-root-to-leaf, so nested files count toward it. Claude Code loads `CLAUDE.md` in full at any length but
-[documents](https://code.claude.com/docs/en/memory) a target of "under 200 lines per CLAUDE.md file", since
-"longer files consume more context and reduce adherence". `./install.sh --check` reports both.
-[Block-level HTML comments are stripped](https://code.claude.com/docs/en/memory) before the content reaches
-Claude's context, so human-facing notes inside `<!-- -->` cost nothing and are excluded from that count.
+**Two limits, both enforced silently.** Codex truncates past 32 KiB (`project_doc_max_bytes`) with no
+warning, and the cap covers the *combined* `AGENTS.md` chain, so nested files count. Claude Code
+loads `CLAUDE.md` in full but [targets](https://code.claude.com/docs/en/memory) "under 200 lines",
+since "longer files consume more context and reduce adherence". `--check` reports both.
+[Block-level HTML comments are stripped](https://code.claude.com/docs/en/memory) before the content
+reaches Claude, so notes inside `<!-- -->` cost nothing and are excluded from the count.
 
 ### Coexisting with Husky, lefthook, or pre-commit
 

@@ -18,7 +18,7 @@ set -eu
 KIT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 MODE="${1:-project}"
 # Where --update pulls from. Overridable so a fork (or the test suite) can point elsewhere.
-KIT_REPO="${AGENT_KIT_REPO:-https://github.com/vikichand/agent-kit.git}"
+KIT_REPO="${AGENT_KIT_REPO:-https://github.com/vikichand/the-agent-kit.git}"
 
 say() { printf '%s\n' "$*"; }
 hr()  { printf '%s\n' "------------------------------------------------------------"; }
