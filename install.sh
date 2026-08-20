@@ -86,6 +86,29 @@ write_claude_importer() {  # $1 = target CLAUDE.md - imports AGENTS.md instead o
 IMP
 }
 
+install_path_rules() {  # $1 = repo root. Path-scoped rules: the deep tier, free until a path matches.
+  # These load ONLY when the agent opens a file matching their `paths:` globs. Measured on a 53 KiB
+  # rule: 65,347 tokens of context with it present and not matching, versus 65,510 with no rule file
+  # at all - i.e. free. The same file costs its full size the moment a path matches, which is the
+  # point. `paths:` is read by Claude Code, VS Code Copilot and Cline; other tools ignore the folder
+  # and still get the full universal floor from AGENTS.md.
+  # Two possible homes: claude/rules in the repo, rules/ in the relocated ~/.the-agent-kit copy.
+  src=""
+  [ -d "$KIT/claude/rules" ] && src="$KIT/claude/rules"
+  [ -z "$src" ] && [ -d "$KIT/rules" ] && src="$KIT/rules"
+  [ -n "$src" ] || return 0
+  mkdir -p "$1/.claude/rules"
+  for r in "$src/"*.md; do
+    [ -e "$r" ] || continue
+    b=$(basename "$r")
+    if [ -e "$1/.claude/rules/$b" ]; then
+      say "  = .claude/rules/$b already exists - left untouched."
+    else
+      cp "$r" "$1/.claude/rules/$b"; say "  + wrote .claude/rules/$b (loads only on matching paths)"
+    fi
+  done
+}
+
 install_project() {   # self-contained: full rules + git hooks
   root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
   say "Installing FULL rules + git hooks into: $root"
@@ -96,6 +119,7 @@ install_project() {   # self-contained: full rules + git hooks
   else cp "$KIT/AGENTS.md" "$root/AGENTS.md"; say "  + wrote AGENTS.md (full rules + empty project block)"; fi
   if [ -e "$root/CLAUDE.md" ]; then say "  = CLAUDE.md already exists - left untouched."
   else write_claude_importer "$root/CLAUDE.md"; say "  + wrote CLAUDE.md (imports AGENTS.md - single source of truth)"; fi
+  install_path_rules "$root"
   install_git_hooks "$root"
   hr
   say "Tool-layer guard is machine-wide - run once:  ./install.sh --global   then:  ./install.sh --check"
@@ -112,6 +136,7 @@ install_extension() { # lean: project-config stub + git hooks
   else write_stub "$root/AGENTS.md"; say "  + wrote AGENTS.md (project-config stub; extends your global rules)"; fi
   if [ -e "$root/CLAUDE.md" ]; then say "  = CLAUDE.md already exists - left untouched."
   else write_claude_importer "$root/CLAUDE.md"; say "  + wrote CLAUDE.md (imports AGENTS.md)"; fi
+  install_path_rules "$root"
   install_git_hooks "$root"
 }
 
@@ -125,6 +150,8 @@ install_global() {
   for h in commit-msg pre-commit pre-push; do cp "$KIT/hooks/$h" "$share/git-hooks/$h"; done
   cp "$KIT/AGENTS.md" "$KIT/CLAUDE.md" "$KIT/install.sh" "$share/"
   cp "$KIT/docs/"*.md "$share/docs/" 2>/dev/null || true
+  mkdir -p "$share/rules"
+  cp "$KIT/claude/rules/"*.md "$share/rules/" 2>/dev/null || cp "$KIT/rules/"*.md "$share/rules/" 2>/dev/null || true
   chmod +x "$share/hooks/"* "$share/git-hooks/"* "$share/install.sh"
   # Stamp the source commit so --update can tell "already current" from "a month behind", and show
   # you what actually changed. Absent (or "unknown") when installed from a non-git copy - not fatal.

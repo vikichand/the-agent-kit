@@ -44,6 +44,28 @@ payments, uploads, or a launch is being built. A CLI never carries HSTS rules in
 are the floor; the block is the per-project multiplier. The full trait ledger and rationale live in
 [`SENIOR-ENGINEER.md`](SENIOR-ENGINEER.md).
 
+## The depth tier: `claude/rules/*.md` (path-scoped, free until they match)
+
+`AGENTS.md` is the always-on floor and pays for every line on every turn, which caps how much can live
+there. The deep material instead ships as **path-scoped rules** - `paths:` frontmatter globs that load
+only when the agent opens a matching file. **Measured, not assumed:** a 53 KiB rule present but not
+matching cost 65,347 tokens of context against a 65,510-token baseline with no rule file at all, and
+the same file cost +12.7k the moment a path matched. Free until relevant, in other words, which is why
+nothing had to be deleted to make room.
+
+| Rule | Loads when you touch | Carries |
+|---|---|---|
+| `code-correctness.md` | source files | no silent fallbacks · idempotent + transactional writes · the 100k-rows question · UTC and decimal money · named-ceiling shortcuts |
+| `web-security.md` | `auth/**`, `api/**`, `**/webhook*`, `**/payment*`, routes, middleware | sessions and authz · input and uploads · HSTS/CSRF/CORS · server-side prices · AI endpoint limits |
+| `frontend-quality.md` | components, pages, `*.tsx`, `*.jsx` | a11y (and its legal exposure) · i18n · skeleton loaders · UI restraint |
+| `data-layer.md` | migrations, models, schema, `*.sql` | expand -> migrate -> contract · N+1 and indexes · money and time column types · privacy |
+| `tests.md` | test files | never game the oracle · behaviour over internals · the edges · test-first |
+
+`paths:` is read by **Claude Code, VS Code Copilot and Cline**; every other tool ignores the folder and
+still gets the complete floor from `AGENTS.md`, so this degrades gracefully rather than forking the kit.
+`@import` deliberately is NOT used for this - imports are expanded at launch, so splitting files that
+way is organisation with no context saving.
+
 ## The guards: enforcement, two tiers
 
 **Git layer** (reorder-proof; covers Claude Code, Codex, plain `git`, git-shelling MCP):

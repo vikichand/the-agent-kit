@@ -46,6 +46,11 @@ These are hard lines. Section 0's "skip the ceremony" scales down *planning*, ne
 - **Don't touch the guardrails.** Never edit, disable, or bypass the guard hooks or their settings, use
   `--no-verify`, or repoint `core.hooksPath` to skip them.
 
+<!-- DEPTH TIER: this file is the always-on floor. Longer, situation-specific rules live in
+     .claude/rules/*.md with `paths:` frontmatter and load ONLY when a matching file is opened -
+     measured at zero context cost until they match. Read by Claude Code, VS Code Copilot and Cline;
+     other tools ignore that folder and still get everything in this file. -->
+
 ## 0. Size the task before doing anything else
 
 This gate decides whether the rest applies. Get it right and none of this adds friction.
