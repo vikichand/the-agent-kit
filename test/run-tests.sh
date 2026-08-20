@@ -214,6 +214,34 @@ else
   fi
   [ "$(cat "$w/.the-agent-kit/.kit-version" 2>/dev/null)" = "$head" ] \
     && pass "U7 existing install left intact after refusal" || bad "U7 install was CLOBBERED by a bad source"
+  # U8 is the real-world path: updating by running the INSTALLED copy, which --global then overwrites.
+  # sh reads a script lazily by byte offset, so a shell that keeps going resumes inside the replaced
+  # file and executes fragments of it - hit live as "sac: command not found", with the version
+  # silently failing to advance. The fix is the exec handoff in update_kit.
+  # HONEST LIMIT: this is a smoke test, not a reproduction. Whether the corruption fires depends on
+  # how much of the script the shell had already buffered, so it is not deterministic - removing the
+  # exec does NOT reliably fail this case. U9 asserts the structural property instead, which is the
+  # part that can be checked reliably. Both are here on purpose; neither alone is enough.
+  # The new install.sh must differ in LENGTH from the installed one or this proves nothing: an
+  # identical overwrite leaves every byte offset where the running shell expects it, and the bug
+  # cannot show. Padding the top shifts everything after it, which is the real-world case.
+  { head -1 "$w/src/install.sh"
+    i=0; while [ $i -lt 60 ]; do echo "# pad line $i - shifts every byte offset below this point"; i=$((i+1)); done
+    tail -n +2 "$w/src/install.sh"; } > "$w/src/install.new" && mv "$w/src/install.new" "$w/src/install.sh"
+  head2=$( (cd "$w/src" && git -c core.autocrlf=false add -A \
+           && git -c core.autocrlf=false -c user.email=t@e.com -c user.name=T \
+              commit -qm "second, shifted offsets" 2>/dev/null && git rev-parse --short HEAD) || printf '' )
+  d=$(HOME="$w" AGENT_KIT_REPO="$w/src" sh "$w/.the-agent-kit/install.sh" --update 2>&1)
+  has 'command not found' "$d" && bad "U8 self-overwrite corrupted the running script -> [$(printf '%s' "$d" | grep -i 'command not found')]" \
+    || pass "U8 updating from the installed copy runs clean"
+  [ -n "$head2" ] && [ "$(cat "$w/.the-agent-kit/.kit-version" 2>/dev/null)" = "$head2" ] \
+    && pass "U8 update landed when run from the installed copy" || bad "U8 version did NOT advance"
+  # U9: the structural guard U8 cannot be. update_kit must END by exec-ing the downloaded installer -
+  # exec replaces the process, so not one more byte is read from the file --global is overwriting.
+  # Any refactor that turns this back into a plain call reintroduces the corruption, silently.
+  awk '/^update_kit\(\)/,/^}/' "$KIT/install.sh" | grep -q '^ *exec sh -c' \
+    && pass "U9 update_kit hands off with exec (self-overwrite guard)" \
+    || bad  "U9 update_kit no longer execs - it will read the file --global just overwrote"
 fi
 cd "$KIT"; rm -rf "$w"
 

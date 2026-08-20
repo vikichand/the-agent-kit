@@ -191,11 +191,19 @@ update_kit() {  # refresh ~/.the-agent-kit from GitHub, so the clone stays dispo
   hr
   # Run the DOWNLOADED installer, not this one: a newer kit can ship files an older installer does
   # not know to copy. It is code from the network, which is why the identity check above runs first.
-  sh "$tmp/kit/install.sh" --global
-  rm -rf "$tmp"
-  hr
-  say "Machine-wide guards + ~/.the-agent-kit are now current. Then, in each project using the kit:"
-  say "    ~/.the-agent-kit/install.sh --update-rules     # new rules in, your PROJECT-CONFIG kept"
+  #
+  # exec, and nothing after it, is load-bearing. You are usually running $share/install.sh, which
+  # --global is about to overwrite - and sh reads a script lazily by byte offset, so a shell that
+  # kept going here would resume at a stale offset inside the NEW file and execute whatever fragment
+  # of a line landed there ("sac: command not found", observed). exec replaces this process, so not
+  # one more byte is read from the file being replaced. Keep the tail below inside the handoff.
+  exec sh -c '
+    sh "$1/install.sh" --global || exit $?
+    rm -rf "$2"
+    printf "%s\n" "------------------------------------------------------------"
+    printf "%s\n" "Machine-wide guards + ~/.the-agent-kit are now current. Then, per project:"
+    printf "%s\n" "    ~/.the-agent-kit/install.sh --update-rules     # new rules in, your PROJECT-CONFIG kept"
+  ' _ "$tmp/kit" "$tmp"
 }
 
 update_rules() {  # refresh the universal rules in this repo's AGENTS.md, preserving its PROJECT-CONFIG block
