@@ -181,6 +181,42 @@ d=$(sh "$KIT/install.sh" --update-rules 2>&1)
 has 'already carries the current rules' "$d" && pass "U4 current rules detected, no rewrite" || bad "U4 no-op not detected"
 cd "$KIT"; rm -rf "$w"
 
+# ---------- install.sh --update ----------
+# Runs against a LOCAL clone source with a fake HOME: no network, and the real ~/.the-agent-kit
+# is never touched. AGENT_KIT_REPO is the same override a fork would use.
+echo "== install.sh --update =="
+w=$(mktemp -d) || exit 2; cd "$w" || exit 2
+# The source repo is built from the WORKING TREE, not from $KIT's HEAD: --update deliberately runs
+# the installer it just downloaded, so cloning the last commit would test yesterday's code and go
+# green on a change that is still broken here.
+mkdir -p "$w/src" || exit 2
+(cd "$KIT" && cp -r install.sh AGENTS.md CLAUDE.md hooks docs claude codex "$w/src/") || exit 2
+head=$( (cd "$w/src" && git init -q -b main && git add -A \
+        && git -c user.email=t@e.com -c user.name=T commit -qm "working tree" \
+        && git rev-parse --short HEAD) 2>/dev/null || printf '' )
+if [ -z "$head" ]; then
+  echo "SKIP: could not build a source repo - --update not exercised"
+else
+  d=$(HOME="$w" AGENT_KIT_REPO="$w/src" sh "$KIT/install.sh" --update 2>&1) || bad "U5 --update exited non-zero"
+  [ -f "$w/.the-agent-kit/AGENTS.md" ] && pass "U5 --update populated a fresh ~/.the-agent-kit" || bad "U5 kit not installed"
+  [ "$(cat "$w/.the-agent-kit/.kit-version" 2>/dev/null)" = "$head" ] \
+    && pass "U5 version stamped from the source commit" || bad "U5 .kit-version wrong or missing"
+  # Second run must detect it is current and do nothing.
+  d=$(HOME="$w" AGENT_KIT_REPO="$w/src" sh "$KIT/install.sh" --update 2>&1)
+  has 'already at' "$d" && pass "U6 second --update is a no-op" || bad "U6 no-op NOT detected"
+  # A repo that is not the kit must be refused BEFORE anything is overwritten.
+  mkdir -p "$w/impostor" && (cd "$w/impostor" && git init -q -b main && printf 'hi\n' > README.md \
+    && git add README.md && git -c core.autocrlf=false -c user.email=t@e.com -c user.name=T commit -qm x 2>/dev/null) || exit 2
+  if d=$(HOME="$w" AGENT_KIT_REPO="$w/impostor" sh "$KIT/install.sh" --update 2>&1); then
+    bad "U7 non-kit repo was accepted"
+  else
+    has 'not the kit' "$d" && pass "U7 non-kit repo refused" || bad "U7 refused for the wrong reason -> [$d]"
+  fi
+  [ "$(cat "$w/.the-agent-kit/.kit-version" 2>/dev/null)" = "$head" ] \
+    && pass "U7 existing install left intact after refusal" || bad "U7 install was CLOBBERED by a bad source"
+fi
+cd "$KIT"; rm -rf "$w"
+
 echo "---"
 [ "$fail" -eq 0 ] && echo "ALL PASS" || echo "FAILURES PRESENT"
 exit "$fail"

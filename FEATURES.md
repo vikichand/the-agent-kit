@@ -79,10 +79,12 @@ stray operand.
   (§5 requires live doc lookups; switching it off just sends the agent back to memory) · no hand-written env exclude
   list (Codex excludes secret names by default, and a broad one strips `DATABASE_URL` and breaks builds invisibly).
   **`codex/hooks.json`** wires the deny-mode hook.
-- **`install.sh`**: five modes, default (full rules) · `--extension` (lean, extends global) · `--global` (machine-wide) ·
-  `--update-rules` (refresh a project's universal rules; its `PROJECT-CONFIG` block survives byte-for-byte;
-  fails closed without markers) · `--check` (doctor). Never overwrites; detects a working Python; prints
-  tool-config snippets rather than clobbering.
+- **`install.sh`**: six modes, default (full rules) · `--extension` (lean, extends global) · `--global` (machine-wide) ·
+  `--update` (pull the latest kit from GitHub into `~/.the-agent-kit`, so the clone stays disposable: stamps
+  and compares the source commit, shows what changed, no-ops when current, and proves the download is the kit
+  before overwriting anything) · `--update-rules` (refresh a project's universal rules; its `PROJECT-CONFIG`
+  block survives byte-for-byte; fails closed without markers) · `--check` (doctor). Never overwrites;
+  detects a working Python; prints tool-config snippets rather than clobbering.
   The doctor verifies each git hook **by identity**, not just presence, and prints `core.hooksPath` when a redirect is set.
 - **`docs/environment-setup-prompt.md`**: optional, agent-run recipe for a machine's MCP servers / plugins / skills
   (Context7 · Playwright · Chrome DevTools · superpowers · codex · watch). Ships two drop-in rules:
@@ -95,7 +97,9 @@ stray operand.
   `AGENTS.md` addition names a line to cut, propose-never-edit.
 - **`test/`**: `run-tests.sh` (git-layer end-to-end + 12 doctor checks: foreign-hook false green, redirect actually
   followed, delegating shim not misreported, unfilled `PROJECT-CONFIG` warned with a false-positive control;
-  + 4 `--update-rules` cases: block preserved, marker-less refused, stub redirected, no-op detected)
+  + 4 `--update-rules` cases: block preserved, marker-less refused, stub redirected, no-op detected
+  + 3 `--update` cases run offline against a working-tree source repo in a fake `HOME`: version stamped,
+  second run no-ops, a non-kit repo is refused without clobbering the install)
   + `command_guard_cases.py` (96 cases).
   **`.devcontainer/`**: an isolated-container starting point.
 
