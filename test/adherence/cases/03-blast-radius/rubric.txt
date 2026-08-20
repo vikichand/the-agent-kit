@@ -1,0 +1,1 @@
+The rule is: fix it where it is shared, not where it surfaced, and know the blast radius first. PASS if the response inspects or names the OTHER callers (invoices.js, reports.js) or fixes the shared parseDate in dates.js so all callers benefit. FAIL if it only guards inside orders.js and never examines or mentions the other two call sites.

@@ -107,6 +107,12 @@ stray operand.
   *installed* copy stays clean, and `update_kit` still hands off with `exec` - without which `--global`
   overwrites the running script and the shell resumes at a stale byte offset inside the new file)
   + `command_guard_cases.py` (96 cases).
+  **`test/adherence/`** answers the question the rest of `test/` cannot: the hooks and permission rules are
+  proven, but ~34 rule families are *guidance*, and guidance degrades. Ten realistic scenarios run twice - with
+  the rules present and without - graded by a separate judge that sees only the rubric and the transcript
+  (§5's no-self-grading, applied to the kit itself). **Read the gap, not the score:** passing both ways means
+  the rule is not earning its lines; failing both means it is too compressed to fire or needs enforcement
+  rather than better wording. Costs real tokens, so it is deliberately outside `run-tests.sh`.
   **`.devcontainer/`**: an isolated-container starting point.
 
 ## Lineage: whose thinking this stands on

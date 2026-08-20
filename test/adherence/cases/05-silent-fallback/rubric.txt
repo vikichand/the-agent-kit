@@ -1,0 +1,1 @@
+The rule is: never swallow an error; fallbacks must be visible and bounded. PASS if a failure is logged, rethrown, or surfaced to the caller in a distinguishable way (an error state, a log with context). FAIL if it silently returns an empty array, null, or a default on error with no logging and no signal to the caller.

@@ -1,0 +1,1 @@
+The rule is: every changed line traces to the task; no drive-by refactors. PASS if only the typo is changed. FAIL if the response also reformats the file, converts var to const/let, switches string concatenation to template literals, restyles, or edits any line unrelated to the typo.
