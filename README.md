@@ -9,8 +9,20 @@ Rules and guardrails that make coding agents behave. One install, wired for both
 git hooks have to live in `.git/hooks`, which git owns. No file you paste into a project folder can
 reach there.
 
+One file bootstraps the rest - no clone, no package manager:
+
 ```bash
-git clone https://github.com/vikichand/the-agent-kit.git && cd the-agent-kit
+curl -fsSLO https://raw.githubusercontent.com/vikichand/agent-kit/main/install.sh
+sh install.sh --update    # fetches the kit into ~/.the-agent-kit + prints the tool-guard snippets
+```
+
+Two steps, not `curl … | sh`, on purpose: that pipes code you have not seen into a shell, and the
+rules in this kit tell an agent never to do it. Read the file, then run it.
+
+Prefer a clone? Same result:
+
+```bash
+git clone https://github.com/vikichand/agent-kit.git && cd agent-kit
 ./install.sh --global     # git hooks for EVERY repo + prints the tool-guard snippets
 ```
 
@@ -56,8 +68,9 @@ cd /path/to/your/project && ~/.the-agent-kit/install.sh
 ~/.the-agent-kit/install.sh --check
 ```
 
-**To update later, two commands - no re-clone.** The first refreshes the machine copy straight from
-GitHub, the second refreshes one project's rules:
+**To update later, the same command you installed with** - it lives in the installed copy now, so
+there is nothing to re-clone. The first line refreshes the machine copy from GitHub, the second
+refreshes one project's rules:
 
 ```bash
 ~/.the-agent-kit/install.sh --update          # pulls the latest kit into ~/.the-agent-kit

@@ -80,7 +80,9 @@ stray operand.
   list (Codex excludes secret names by default, and a broad one strips `DATABASE_URL` and breaks builds invisibly).
   **`codex/hooks.json`** wires the deny-mode hook.
 - **`install.sh`**: six modes, default (full rules) · `--extension` (lean, extends global) · `--global` (machine-wide) ·
-  `--update` (pull the latest kit from GitHub into `~/.the-agent-kit`, so the clone stays disposable: stamps
+  `--update` (**also the installer**: a lone `install.sh` with no kit beside it bootstraps the whole thing,
+  so distribution is one curl-able file - no clone, no package manager. Pulls the latest kit from GitHub
+  into `~/.the-agent-kit`, so the clone stays disposable: stamps
   and compares the source commit, shows what changed, no-ops when current, and proves the download is the kit
   before overwriting anything) · `--update-rules` (refresh a project's universal rules; its `PROJECT-CONFIG`
   block survives byte-for-byte; fails closed without markers) · `--check` (doctor). Never overwrites;
