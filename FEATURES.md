@@ -100,8 +100,10 @@ stray operand.
 - **`test/`**: `run-tests.sh` (git-layer end-to-end + 12 doctor checks: foreign-hook false green, redirect actually
   followed, delegating shim not misreported, unfilled `PROJECT-CONFIG` warned with a false-positive control;
   + 4 `--update-rules` cases: block preserved, marker-less refused, stub redirected, no-op detected
-  + 3 `--update` cases run offline against a working-tree source repo in a fake `HOME`: version stamped,
-  second run no-ops, a non-kit repo is refused without clobbering the install)
+  + 5 `--update` cases run offline against a working-tree source repo in a fake `HOME`: version stamped,
+  second run no-ops, a non-kit repo is refused without clobbering the install, an update run from the
+  *installed* copy stays clean, and `update_kit` still hands off with `exec` - without which `--global`
+  overwrites the running script and the shell resumes at a stale byte offset inside the new file)
   + `command_guard_cases.py` (96 cases).
   **`.devcontainer/`**: an isolated-container starting point.
 
