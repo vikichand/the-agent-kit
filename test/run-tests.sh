@@ -206,6 +206,24 @@ w=$(mktemp -d) || exit 2; cd "$w" || exit 2; git init -q
 sh "$KIT/install.sh" --extension >/dev/null 2>&1
 c3=$(ls .claude/rules/*.md 2>/dev/null | wc -l | tr -d ' ')
 [ "$c3" = "$n" ] && pass "R4 --extension deploys the rules too" || bad "R4 --extension deployed $c3 of $n"
+# R5/R6: the doctor must report on the depth tier - a rule that fails to install is otherwise
+# invisible, since the whole point is that it stays silent until a path matches.
+w=$(mktemp -d) || exit 2; cd "$w" || exit 2; git init -q
+# The real scenario: rules present in the repo but the depth tier never deployed (an older kit, or a
+# hand-copied AGENTS.md). A repo with no AGENTS.md at all is a different case the doctor covers above.
+cp "$KIT/AGENTS.md" AGENTS.md; printf '@AGENTS.md
+' > CLAUDE.md
+d=$(sh "$KIT/install.sh" --check 2>&1)
+has 'deep conditional rules are not installed' "$d"   && pass "R5 doctor reports a missing depth tier" || bad "R5 missing rules NOT reported"
+rm -f AGENTS.md CLAUDE.md
+sh "$KIT/install.sh" >/dev/null 2>&1
+d=$(sh "$KIT/install.sh" --check 2>&1)
+has 'path-scoped rules in .claude/rules' "$d"   && pass "R6 doctor confirms installed rules" || bad "R6 installed rules NOT confirmed"
+# A rule with no paths: frontmatter loads on EVERY turn - the opposite of the intent. Must be flagged.
+printf 'no frontmatter here
+' > .claude/rules/broken.md
+d=$(sh "$KIT/install.sh" --check 2>&1)
+has "lack 'paths:' frontmatter" "$d"   && pass "R7 doctor flags a rule that would load always-on" || bad "R7 frontmatter-less rule NOT flagged"
 cd "$KIT"; rm -rf "$w"
 
 # ---------- install.sh --update ----------
