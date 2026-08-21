@@ -356,6 +356,27 @@ doctor() {
       say "  WARN: PROJECT-CONFIG is still the empty placeholder. Without it the agent GUESSES this project's"
       say "        build / test / lint commands. Fill it via docs/project-setup-prompt.md - biggest win available."
     fi
+    # The depth tier. It is invisible by design - it loads only on matching paths - so if it silently
+    # failed to install, nothing else would ever say so. The doctor is the only place that can.
+    if [ -d .claude/rules ]; then
+      rn=$(ls .claude/rules/*.md 2>/dev/null | wc -l | tr -d ' ')
+      rbad=0
+      for rf in .claude/rules/*.md; do
+        [ -e "$rf" ] || continue
+        grep -q '^paths:' "$rf" 2>/dev/null || rbad=$((rbad+1))
+      done
+      if [ "$rn" -eq 0 ]; then
+        say "  WARN: .claude/rules exists but holds no rules - the depth tier is not installed here."
+      elif [ "$rbad" -gt 0 ]; then
+        say "  WARN: $rbad of $rn rules in .claude/rules lack 'paths:' frontmatter - those load on EVERY"
+        say "        turn instead of only on matching files, which is the opposite of the intent."
+      else
+        say "  OK:   $rn path-scoped rules in .claude/rules (load only on matching paths, free otherwise)"
+      fi
+    else
+      say "  NOTE: no .claude/rules here - the deep conditional rules are not installed. Run ./install.sh"
+      say "        in this repo to add them (they cost nothing until a matching file is opened)."
+    fi
     if [ -e CLAUDE.md ]; then
       if grep -q '@AGENTS.md' CLAUDE.md 2>/dev/null; then
         say "  OK:   CLAUDE.md imports AGENTS.md - one source of truth"
