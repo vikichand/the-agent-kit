@@ -37,9 +37,13 @@ Already using Husky or lefthook? They own `core.hooksPath` too - see
 
 ### 3. Merge the printed settings snippets
 
-`--update` prints two blocks, for `~/.claude/settings.json` and `~/.codex/config.toml`. Fold them
-into your existing files rather than replacing them. **The tool-layer guard does nothing until you
-do.**
+Step 1 printed two blocks. Without them the tool-layer guard does nothing.
+
+- **No `~/.claude/settings.json` yet?** Save the printed Claude block as that file, as-is.
+- **Already have one?** Copy the `permissions` and `hooks` keys from the block into yours. If you
+  already have those keys, add the entries to the existing lists rather than replacing them - the
+  file is JSON, so mind the commas.
+- Same for `~/.codex/config.toml` if you use Codex. Skip it if you don't.
 
 ### 4. Set up a project
 
@@ -47,12 +51,40 @@ do.**
 cd /path/to/project && ~/.the-agent-kit/install.sh
 ```
 
-That writes `AGENTS.md` (the rules), a one-line `CLAUDE.md` that imports it, and `.claude/rules/`
-(deeper rules that load only when the agent opens matching files - security rules on API code,
-accessibility rules on components, and so on). Then run the
-**[project setup prompt](docs/project-setup-prompt.md)** once inside the project: it records your
-real build, test and lint commands. Without it the agent guesses them, which is the largest
-hallucination surface the kit has.
+That writes three things: `AGENTS.md` (the rules), a one-line `CLAUDE.md` that imports it, and
+`.claude/rules/` - deeper rules that load only when the agent opens a matching file, so security
+rules arrive on API code and accessibility rules on components, and cost nothing the rest of the time.
+
+### 5. Run the setup prompt, once per project
+
+This is the highest-value step and takes about a minute. It records **your** build, test and lint
+commands; without it the agent guesses them, which is the single largest hallucination surface the
+kit has.
+
+1. Open [`docs/project-setup-prompt.md`](docs/project-setup-prompt.md) (also at
+   `~/.the-agent-kit/docs/project-setup-prompt.md`).
+2. Copy everything inside the ```` ```text ```` fence - that is the prompt itself.
+3. Start your agent **inside the project** and paste it in.
+4. Answer its questions. It writes the result between the `PROJECT-CONFIG` markers in `AGENTS.md`
+   and shows you the block. Nothing above those markers is touched.
+
+Re-run it whenever the project changes; it replaces the block rather than stacking a second one.
+
+### Prefer the rules global instead?
+
+If you would rather set the rules up once per machine, append them to your global files and use the
+lean per-project install:
+
+```bash
+cat ~/.the-agent-kit/AGENTS.md >> ~/.claude/CLAUDE.md      # and ~/.codex/AGENTS.md for Codex
+cd /path/to/project && ~/.the-agent-kit/install.sh --extension
+```
+
+**One thing this costs you, tested:** `~/.claude/rules/` is *not* read - path-scoped rules only load
+from a project's own `.claude/rules/`. So global rules give you the universal floor everywhere but
+none of the depth tier. `--extension` still installs the depth tier into the project, which is why
+it is in the command above. Global rules also stay on your machine, so cloud agents, CI and
+teammates see only what is committed in the repo.
 
 ### Check it worked
 

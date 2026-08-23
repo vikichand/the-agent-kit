@@ -163,6 +163,10 @@ These are plain directories, not packages. Report what is present and flag anyth
 | `~/.claude/rules/context7.md` | Rule that routes library questions to Context7 | copy from the kit: [`context7.md`](context7.md) |
 | `~/.claude/rules/browser-tools.md` | Rule that picks Playwright vs Chrome DevTools by the question | copy from the kit: [`browser-tools.md`](browser-tools.md) |
 
+Note: `~/.claude/rules/` holds drop-in rules that Claude Code reads as part of your global
+memory. It does **not** support `paths:` frontmatter - tested, and a path-scoped rule placed there
+never fires. Path-scoped rules only load from a *project's* own `.claude/rules/`.
+
 If a **rule** is missing, copy it from the kit's `docs/` (the Source column links both). If a
 **skill** is missing, clone `anthropics/skills` and copy **only that skill's folder** into
 `~/.claude/skills/` - the repo is also a plugin marketplace, but installing its whole
