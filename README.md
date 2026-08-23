@@ -5,31 +5,67 @@ Rules and guardrails that make coding agents behave. One install, wired for both
 
 ## Quick Start
 
-Three commands: two set up the machine, one sets up a project.
+Four steps. Two set up your machine, two set up each project.
+
+### 1. Get the kit
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/vikichand/the-agent-kit/main/install.sh
-sh install.sh --update                               # machine: kit -> ~/.the-agent-kit + git hooks
-cd /path/to/project && ~/.the-agent-kit/install.sh   # project: rules + this repo's hooks
+sh install.sh --update
 ```
 
-Two steps rather than `curl … | sh` on purpose: that pipes code you have not read into a shell, and
-the rules in this kit tell an agent never to do it.
+That copies everything to `~/.the-agent-kit`. Two steps rather than `curl … | sh` on purpose: that
+pipes code you have not read into a shell, and the rules in this kit tell an agent never to do it.
+Once it finishes you can delete the downloaded `install.sh` - nothing points back at it.
 
-Then two follow-ups, both printed by the installer:
+### 2. Turn on the git hooks
 
-1. **Merge the two config snippets** into `~/.claude/settings.json` and `~/.codex/config.toml`.
-   The tool-layer guard is inactive until you do.
-2. **Run the [project setup prompt](docs/project-setup-prompt.md)** inside the project. It fills
-   `PROJECT-CONFIG` with your real build / test / lint commands; without it the agent guesses them,
-   which is the largest hallucination surface the kit has.
+The installer prints this command; it cannot run it for you.
 
-Confirm with `~/.the-agent-kit/install.sh --check`, run inside the project: every line should read
-`OK:`. **Then delete the downloaded `install.sh` (or the clone) whenever you like** - `~/.the-agent-kit`
-holds the whole kit and nothing points back at it.
+```bash
+git config --global core.hooksPath "$HOME/.the-agent-kit/git-hooks"
+```
 
-The two halves are independent: machine-only gives you enforcement with an agent that has not read
-the rules, project-only gives you the rules with no enforcement.
+**Run it in a normal terminal, not inside Claude Code.** The kit denies `git config core.hooksPath`
+so an agent cannot quietly point git away from the hooks - and that denial applies to you too while
+you are in an agent session. This is the step that turns on the secret scanner, the force-push
+block, and the AI-attribution stripper, for every repo on the machine. Skip it and the rules still
+work, but almost nothing is enforced.
+
+Already using Husky or lefthook? They own `core.hooksPath` too - see
+[Coexisting](#coexisting-with-husky-lefthook-or-pre-commit) instead of running the line above.
+
+### 3. Merge the printed settings snippets
+
+`--update` prints two blocks, for `~/.claude/settings.json` and `~/.codex/config.toml`. Fold them
+into your existing files rather than replacing them. **The tool-layer guard does nothing until you
+do.**
+
+### 4. Set up a project
+
+```bash
+cd /path/to/project && ~/.the-agent-kit/install.sh
+```
+
+That writes `AGENTS.md` (the rules), a one-line `CLAUDE.md` that imports it, and `.claude/rules/`
+(deeper rules that load only when the agent opens matching files - security rules on API code,
+accessibility rules on components, and so on). Then run the
+**[project setup prompt](docs/project-setup-prompt.md)** once inside the project: it records your
+real build, test and lint commands. Without it the agent guesses them, which is the largest
+hallucination surface the kit has.
+
+### Check it worked
+
+```bash
+~/.the-agent-kit/install.sh --check
+```
+
+Run it inside a project. You want the three git hooks reported as **live**, and the tool guard
+firing. A `WARN` about `PROJECT-CONFIG` is expected until you run the setup prompt.
+
+Steps 1-3 are per machine; step 4 is per project. They are independent: machine-only gives you
+enforcement with an agent that has not read the rules, project-only gives the rules with no
+enforcement.
 
 ### Your shell
 
