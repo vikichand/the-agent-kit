@@ -176,6 +176,9 @@ install_global() {
     say "  A global core.hooksPath makes git use ONLY that dir for EVERY repo, SHADOWING any repo's own"
     say "  .git/hooks (Husky, a secret scanner, ...). If you rely on those, prefer the per-project install."
     say "  To enable globally anyway:   git config --global core.hooksPath \"$share/git-hooks\""
+    say "  Run that in a NORMAL terminal, not inside an agent session: this kit denies"
+    say "  'git config core.hooksPath' so an agent cannot point git away from the hooks,"
+    say "  and that denial applies to you too while you are in one."
   fi
 
   hr
