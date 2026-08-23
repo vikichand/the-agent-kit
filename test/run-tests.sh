@@ -211,6 +211,27 @@ w=$(mktemp -d) || exit 2; cd "$w" || exit 2; git init -q
 sh "$KIT/install.sh" --extension >/dev/null 2>&1
 c3=$(ls .claude/rules/*.md 2>/dev/null | wc -l | tr -d ' ')
 [ "$c3" = "$n" ] && pass "R4 --extension deploys the rules too" || bad "R4 --extension deployed $c3 of $n"
+# S1-S3: skills are the TASK-shaped tier. Same silent-failure risk as rules - if one does not
+# install, nothing says so, because a skill is meant to be quiet until a task matches it.
+sn=0
+for sd in "$KIT"/claude/skills/*/; do
+  [ -d "$sd" ] || continue
+  sn=$((sn+1))
+  f="$sd/SKILL.md"
+  [ -f "$f" ] || bad "S1 $(basename "$sd") has no SKILL.md"
+  head -1 "$f" | grep -q '^---$' || bad "S1 $(basename "$sd") missing frontmatter"
+  grep -q '^description:' "$f" || bad "S1 $(basename "$sd") has no description - the model matches on it"
+done
+[ "$sn" -gt 0 ] && pass "S1 $sn skill(s), each with frontmatter and a description" || bad "S1 no skills found"
+w=$(mktemp -d) || exit 2; cd "$w" || exit 2; git init -q
+sh "$KIT/install.sh" >/dev/null 2>&1
+sc=$(ls -d .claude/skills/*/ 2>/dev/null | wc -l | tr -d ' ')
+[ "$sc" = "$sn" ] && pass "S2 install deploys all $sn skill(s)" || bad "S2 deployed $sc of $sn skills"
+sh "$KIT/install.sh" >/dev/null 2>&1
+sc2=$(ls -d .claude/skills/*/ 2>/dev/null | wc -l | tr -d ' ')
+[ "$sc2" = "$sn" ] && pass "S3 re-install does not duplicate skills" || bad "S3 skill count changed to $sc2"
+cd "$KIT"; rm -rf "$w"
+
 # R5/R6: the doctor must report on the depth tier - a rule that fails to install is otherwise
 # invisible, since the whole point is that it stays silent until a path matches.
 w=$(mktemp -d) || exit 2; cd "$w" || exit 2; git init -q

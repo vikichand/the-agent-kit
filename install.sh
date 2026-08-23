@@ -109,6 +109,26 @@ install_path_rules() {  # $1 = repo root. Path-scoped rules: the deep tier, free
   done
 }
 
+install_skills() {  # $1 = repo root. Task-shaped guidance: only the description sits in context.
+  # Skills are matched against the TASK, not against file paths, which is why orchestration lives here
+  # rather than in .claude/rules (path-triggered) or AGENTS.md (always-on and budget-capped).
+  src=""
+  [ -d "$KIT/claude/skills" ] && src="$KIT/claude/skills"
+  [ -z "$src" ] && [ -d "$KIT/skills" ] && src="$KIT/skills"
+  [ -n "$src" ] || return 0
+  for sd in "$src"/*/; do
+    [ -d "$sd" ] || continue
+    b=$(basename "$sd")
+    if [ -e "$1/.claude/skills/$b/SKILL.md" ]; then
+      say "  = .claude/skills/$b already exists - left untouched."
+    else
+      mkdir -p "$1/.claude/skills/$b"
+      cp "$sd/SKILL.md" "$1/.claude/skills/$b/SKILL.md"
+      say "  + wrote .claude/skills/$b (loads when a task matches it)"
+    fi
+  done
+}
+
 install_project() {   # self-contained: full rules + git hooks
   root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
   say "Installing FULL rules + git hooks into: $root"
@@ -120,6 +140,7 @@ install_project() {   # self-contained: full rules + git hooks
   if [ -e "$root/CLAUDE.md" ]; then say "  = CLAUDE.md already exists - left untouched."
   else write_claude_importer "$root/CLAUDE.md"; say "  + wrote CLAUDE.md (imports AGENTS.md - single source of truth)"; fi
   install_path_rules "$root"
+  install_skills "$root"
   install_git_hooks "$root"
   hr
   say "Tool-layer guard is machine-wide - run once:  ./install.sh --global   then:  ./install.sh --check"
@@ -137,6 +158,7 @@ install_extension() { # lean: project-config stub + git hooks
   if [ -e "$root/CLAUDE.md" ]; then say "  = CLAUDE.md already exists - left untouched."
   else write_claude_importer "$root/CLAUDE.md"; say "  + wrote CLAUDE.md (imports AGENTS.md)"; fi
   install_path_rules "$root"
+  install_skills "$root"
   install_git_hooks "$root"
 }
 
@@ -152,6 +174,8 @@ install_global() {
   cp "$KIT/docs/"*.md "$share/docs/" 2>/dev/null || true
   mkdir -p "$share/rules"
   cp "$KIT/claude/rules/"*.md "$share/rules/" 2>/dev/null || cp "$KIT/rules/"*.md "$share/rules/" 2>/dev/null || true
+  if [ -d "$KIT/claude/skills" ]; then cp -r "$KIT/claude/skills" "$share/skills" 2>/dev/null || true
+  elif [ -d "$KIT/skills" ]; then cp -r "$KIT/skills" "$share/skills" 2>/dev/null || true; fi
   chmod +x "$share/hooks/"* "$share/git-hooks/"* "$share/install.sh"
   # Stamp the source commit so --update can tell "already current" from "a month behind", and show
   # you what actually changed. Absent (or "unknown") when installed from a non-git copy - not fatal.
@@ -279,6 +303,7 @@ update_rules() {  # refresh the universal rules in this repo's AGENTS.md, preser
   # before the depth tier existed has no .claude/rules, and updating only AGENTS.md would leave it
   # silently missing every path-scoped rule while reporting success.
   install_path_rules "$root"
+  install_skills "$root"
 }
 
 doctor() {

@@ -66,6 +66,27 @@ still gets the complete floor from `AGENTS.md`, so this degrades gracefully rath
 `@import` deliberately is NOT used for this - imports are expanded at launch, so splitting files that
 way is organisation with no context saving.
 
+## The task tier: `claude/skills/` (matched on the task, not the path)
+
+Some guidance is triggered by *what you are doing*, not by *which file you opened* - so it fits neither
+`AGENTS.md` (always-on, budget-capped) nor `.claude/rules/` (path-triggered). Skills are the right home:
+only the short `description` sits in context, and the body loads when a task matches it.
+
+- **`orchestrating-work`** - when to fan out and when not to. Built on the one thing every credible
+  source agrees on: **reads parallelise, writes do not**. Covers freezing shared contracts before
+  fan-out (the failure is conflicting *implicit decisions*, not conflicting text), one-slice-one-owner
+  file ownership, worktree isolation, sequential integration with scoped tests, and the
+  orchestrator-worker split - the lead keeps decomposition, the contract and the final review; workers
+  execute specs that are already complete. **Route by how completely a slice is specified, never by
+  budget alone**, and a worker that meets ambiguity escalates instead of guessing.
+
+  It also names the setting that silently breaks the intent: `worktree.baseRef` defaults to `fresh`,
+  which branches workers from the **remote default branch** rather than your in-progress work. The
+  kit's `claude/settings.json` now sets `"worktree": {"baseRef": "head"}`.
+
+Honest labelling inside the skill: the contract-freeze pattern and the verify-RED gate are
+**well-reasoned practice, not measured results**, and it says so rather than inventing authority.
+
 ## The guards: enforcement, two tiers
 
 **Git layer** (reorder-proof; covers Claude Code, Codex, plain `git`, git-shelling MCP):
