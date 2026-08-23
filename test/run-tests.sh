@@ -99,6 +99,11 @@ cd "$KIT"; rm -rf "$w"
 echo "== install.sh --check (doctor) =="
 w=$(mktemp -d) || exit 2; cd "$w" || exit 2
 git init -q -b main || exit 2
+# Pin this throwaway repo's hooks dir. Without it the suite inherits the machine's GLOBAL hooks
+# redirect - which is exactly what the kit's own --global install sets up - and D1-D3 would then
+# inspect the developer's real hooks directory instead of this repo, passing or failing on someone's
+# machine configuration rather than on the code. D4 below re-points it on purpose.
+git config core.hooksPath .git/hooks
 
 d=$(sh "$KIT/install.sh" --check 2>&1)
 has 'pre-commit not installed' "$d" && pass "D1 missing hook reported" || bad "D1 missing hook NOT reported"
@@ -281,6 +286,15 @@ else
     || pass "U8 updating from the installed copy runs clean"
   [ -n "$head2" ] && [ "$(cat "$w/.the-agent-kit/.kit-version" 2>/dev/null)" = "$head2" ] \
     && pass "U8 update landed when run from the installed copy" || bad "U8 version did NOT advance"
+  # U10: upgrading an OLD project must bring the WHOLE kit, not just AGENTS.md. A project created
+  # before the depth tier existed has no .claude/rules; if --update-rules refreshes the text and
+  # silently skips the rules, the upgrade path quietly under-delivers and reports success.
+  u=$(mktemp -d) && (cd "$u" && git init -q && cp "$KIT/AGENTS.md" . && printf '@AGENTS.md
+' > CLAUDE.md       && sh "$KIT/install.sh" --update-rules >/dev/null 2>&1)
+  rc=$(ls "$u"/.claude/rules/*.md 2>/dev/null | wc -l | tr -d ' ')
+  kc=$(ls "$KIT"/claude/rules/*.md 2>/dev/null | wc -l | tr -d ' ')
+  [ "$rc" = "$kc" ] && pass "U10 --update-rules also deploys the depth tier ($rc rules)"     || bad "U10 upgrade left the depth tier missing: $rc of $kc rules"
+  rm -rf "$u"
   # U9: the structural guard U8 cannot be. update_kit must END by exec-ing the downloaded installer -
   # exec replaces the process, so not one more byte is read from the file --global is overwriting.
   # Any refactor that turns this back into a plain call reintroduces the corruption, silently.

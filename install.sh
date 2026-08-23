@@ -275,6 +275,10 @@ update_rules() {  # refresh the universal rules in this repo's AGENTS.md, preser
     say "  + updated the universal rules in $tgt - your PROJECT-CONFIG block is untouched."
     say "    Anything else hand-edited OUTSIDE the markers was replaced; review:  git diff AGENTS.md"
   fi
+  # Bringing a project up to date has to mean the WHOLE kit, not just this one file. A project set up
+  # before the depth tier existed has no .claude/rules, and updating only AGENTS.md would leave it
+  # silently missing every path-scoped rule while reporting success.
+  install_path_rules "$root"
 }
 
 doctor() {
