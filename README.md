@@ -171,6 +171,10 @@ symptom, and ship no "improvement" nobody asked for. Per-project setup adds your
 commands, and for user-facing apps the quality bars an agent otherwise skips - accessibility, i18n,
 observability, audit logs.
 
+**The depth tier** - longer, situational rules that load only when the agent opens a file they apply
+to, so security rules arrive on API code and accessibility rules on components, at no cost the rest of
+the time.
+
 **The guards** - hooks at the **git layer** (reorder-proof, covering Claude Code, Codex, plain `git`,
 and any MCP tool that shells out to `git`) plus the **tool layer**, a fast prompt-time veto. Full map
 in [`FEATURES.md`](FEATURES.md); the senior-engineer trait ledger with sources is
@@ -224,6 +228,30 @@ machine-made; the writing does it too. So §9 bans the tells in anything the age
 commit bodies, PR descriptions): **em dashes** above all, plus "it's not just X, it's Y", filler openers,
 hedges, *delve / leverage / seamless / robust*, emoji headings, and bolding every third phrase. It governs
 what the agent *writes*, never your project's code style.
+
+### The depth tier: rules that cost nothing until they apply
+
+`AGENTS.md` is read on every turn, so every line in it is paid for on every task - which caps how much
+can live there. The deep, situational material instead ships as **path-scoped rules** in
+`.claude/rules/`, each carrying `paths:` frontmatter. They load only when the agent opens a file that
+matches, and nothing at all otherwise.
+
+| Rule | Loads when the agent touches | Carries |
+|---|---|---|
+| `code-correctness.md` | source files | no silent fallbacks · idempotent, transactional writes · "what happens at 100k rows" · UTC and decimal money · named-ceiling shortcuts |
+| `web-security.md` | `auth/**`, `api/**`, `**/webhook*`, `**/payment*`, routes, middleware | sessions and server-side authz · uploads · HSTS/CSRF/CORS · server-side prices · limits on AI endpoints |
+| `frontend-quality.md` | components, pages, `*.tsx`, `*.jsx` | accessibility (and its legal exposure) · i18n · skeleton loaders · UI restraint |
+| `data-layer.md` | migrations, models, schema, `*.sql` | expand -> migrate -> contract · N+1 and indexes · money and time column types · privacy |
+| `tests.md` | test files | never game the oracle · behaviour over internals · the edges · test-first |
+
+**Measured, not assumed.** A 53 KiB rule present but not matching cost 65,347 tokens of context,
+against 65,510 with no rule file at all - free, within noise. The same file cost +12.7k the moment a
+path matched. That is why the deep material could grow without anything being deleted to make room.
+
+`paths:` is read by Claude Code, VS Code Copilot and Cline. Every other tool ignores the folder and
+still gets the complete floor from `AGENTS.md`, so this degrades rather than forking the kit.
+`@import` is deliberately **not** used for this: imports expand at launch, so splitting a file that
+way is organisation with no context saving at all.
 
 ### The guards: what's enforced, and where
 
