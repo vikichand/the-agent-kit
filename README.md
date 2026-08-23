@@ -253,6 +253,18 @@ still gets the complete floor from `AGENTS.md`, so this degrades rather than for
 `@import` is deliberately **not** used for this: imports expand at launch, so splitting a file that
 way is organisation with no context saving at all.
 
+### The task tier: skills
+
+A third trigger, for guidance keyed to *what you are doing* rather than which file you opened. Only the
+skill's one-line description sits in context; the body loads when a task matches.
+
+**`orchestrating-work`** fires when a task looks decomposable, or when you ask to parallelise or use
+subagents. Its spine is the rule every credible source agrees on - **reads parallelise, writes do
+not** - plus freezing shared contracts before fan-out, one owner per file, worktree isolation,
+sequential integration, and an orchestrator-worker split where the lead keeps decomposition, the
+contract and the final review while workers execute already-complete specs. Multi-agent runs cost
+roughly 15x the tokens of a chat, so it also says plainly when *not* to fan out.
+
 ### The guards: what's enforced, and where
 
 | Guard | Claude Code | Codex |

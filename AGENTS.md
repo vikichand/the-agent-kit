@@ -87,6 +87,12 @@ This gate decides whether the rest applies. Get it right and none of this adds f
   which wrote the plan is too invested to see.
 - **Say what is out of scope.** A plan that names what it will *not* touch bounds exploration as much as the
   steps bound the work - scope creep in an agent shows up as unrequested "improvements" (§4).
+- **Reads parallelise; writes do not.** Fan out freely for investigation - audits, surveys, finding every
+  caller. Split *writing* only across slices that are genuinely independent, and only after the shared
+  surface (interfaces, types, schemas, file ownership) is frozen: the failure is conflicting implicit
+  decisions, not conflicting text. Single-agent is the default and usually the right answer. Delegate
+  execution of a complete spec, never judgement - decomposition, the contract, and the final review stay
+  with you, and a worker that meets ambiguity escalates instead of guessing.
 - If writing the plan reveals the task is actually one sentence, drop the plan and just do it (Section 0).
 
 ## 3. Simplicity is the default, at every stage
