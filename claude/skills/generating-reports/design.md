@@ -10,6 +10,11 @@ and glow as jewellery, never as noise.
 explicit token background. (If a report is ever published as a claude.ai artifact, invert the
 cascade to light-on-root per the artifact contract - standalone kit reports stay dark-first.)
 
+**Responsive is part of the contract.** The stylesheet below already handles phones: chrome, foot
+and colophon wrap; the theme button never breaks its brackets; property rows stack under 480px;
+step rows wrap their pills; tables scroll inside `.tblwrap`. Keep it that way - any new component
+must survive a 390px viewport without horizontal page scroll.
+
 Every report is ONE self-contained .html: inline CSS/JS, no CDN, no external fonts/images (data:
 URIs if unavoidable), renders from a `file://` double-click offline. Name: `YYYY-MM-DD-<slug>.html`.
 
@@ -135,6 +140,19 @@ details[open] summary{color:var(--orange);text-shadow:var(--ng-o-soft)}
 .colophon{margin-top:30px;padding-top:12px;border-top:1px dashed var(--hair);display:flex;justify-content:center;align-items:center;gap:10px;font:10px var(--mono);letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
 .colophon .mark{color:var(--orange);text-shadow:var(--ng-o);font-size:12px}
 .colophon .repo{color:var(--text)}
+.tbtn{white-space:nowrap}
+.chrome{flex-wrap:wrap;row-gap:6px}
+.foot{flex-wrap:wrap;row-gap:6px}
+.colophon{flex-wrap:wrap;row-gap:4px;text-align:center}
+.tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+@media (max-width:480px){
+  .chrome,.kicker{letter-spacing:1px}
+  .prop{flex-direction:column;align-items:flex-start;gap:4px}
+  .prop .k{width:auto}
+  .step{flex-wrap:wrap;row-gap:8px}
+  th,td{padding:9px 12px}
+  .hero{padding:32px 2px 24px}
+}
 @media print{.glass,.termcard{backdrop-filter:none!important;background:var(--bg)!important;box-shadow:none}
   body::before,body::after{display:none}.tbtn{display:none}}
 ```
@@ -246,8 +264,9 @@ middle in glowing orange. Keep titles short (2-3 words); the renderer reads `ari
   callouts add `style="border-color:rgba(255,90,45,.35);box-shadow:var(--cardshadow),var(--ng-o-soft)"`.
 - **Step row** (`.step` inside `.glass`): pixel state icon with matching `.ic-*` glow, `Sn` chip,
   text, status pill. Done rows get `.done` (muted + strikethrough). Pills: done / next / risk / gate.
-- **Table** (inside `.glass`): mono uppercase headers, hairline rows, first column glowing orange
-  mono. Wide tables scroll inside the card, never the page.
+- **Table** (inside `.glass`, wrapped in `<div class="tblwrap">`): mono uppercase headers, hairline
+  rows, first column glowing orange mono. The wrapper scrolls horizontally on narrow screens; the
+  page never scrolls sideways.
 - **Terminal card** (`.glass.termcard`): dark in BOTH themes - the deliberate contrast block. Holds
   mini-stats, a chart, a 9.5px caption, real command output. Command prompt in `.p`, pass counts in
   `.ok`, warnings in `.sk`.
