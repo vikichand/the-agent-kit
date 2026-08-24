@@ -25,6 +25,10 @@ none of this):
    `plan.md` -> `2026-08-24-plan.html`. Style and structure it per [design.md](design.md) in this
    folder - it carries the tokens, the page anatomy, the per-report-type section skeletons, and the
    restraint rules. Light theme is the default; the toggle stamps dark.
+   The markdown is never optional and never extra work - it is written FIRST and the HTML is
+   rendered from it. A report the human reads once and closes still leaves the .md behind as the
+   diffable record, at zero added cost. Never invert this by writing the HTML first, and never ask
+   whether to "also" produce the markdown - there is nothing to also produce; it is the source.
 3. **Authority flows one way.** The HTML is generated *from* the markdown and is disposable -
    regenerate it after any change. Decisions, edits, and review feedback land in the `.md`, never
    only in the HTML. If the human marks up the rendered view, carry every change back into the
