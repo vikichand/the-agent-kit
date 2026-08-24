@@ -147,10 +147,11 @@ details[open] summary{color:var(--orange);text-shadow:var(--ng-o-soft)}
 @supports not selector(::-webkit-scrollbar){
   html{scrollbar-width:thin;scrollbar-color:rgba(255,90,45,.55) transparent}
 }
-::-webkit-scrollbar{width:11px;height:9px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:rgba(255,90,45,.45);border-radius:999px;border:3px solid transparent;background-clip:padding-box}
-::-webkit-scrollbar-thumb:hover{background:rgba(255,90,45,.75)}
+::-webkit-scrollbar{width:14px;height:12px;background:transparent}
+::-webkit-scrollbar-track,::-webkit-scrollbar-track-piece{background:transparent;border:none;box-shadow:none}
+::-webkit-scrollbar-button{display:none;width:0;height:0}
+::-webkit-scrollbar-thumb{background:rgba(255,90,45,.55);border-radius:999px;border:4px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,90,45,.85);background-clip:content-box}
 ::-webkit-scrollbar-corner{background:transparent}
 .sec canvas{align-self:center}
 .tbtn{white-space:nowrap}
@@ -345,8 +346,11 @@ aria-level="2"` for sections) so the page reads correctly to assistive tech.
 
 ## 9. Scrollbars
 
-Custom, thin, and branded - the stylesheet already carries them: a transparent track and an orange
-pill thumb (`rgba(255,90,45,.45)`, stronger on hover) via the `::-webkit-scrollbar` pseudos, with
+A **floating pill**: no rail, no track, no arrow buttons - just the thumb hovering in the gutter.
+The trick is `background-clip:content-box` with a transparent 4px border, which insets the painted
+pill inside a 14px scrollbar box so nothing touches the edges; track, track-piece, buttons and
+corner are all explicitly transparent/hidden. Orange thumb (`rgba(255,90,45,.55)`, stronger on
+hover), with
 the standard `scrollbar-color`/`scrollbar-width` applied ONLY under a
 `@supports not selector(::-webkit-scrollbar)` guard for Firefox. That guard is load-bearing:
 without it Chromium discards the webkit styling entirely and shows a near-invisible native bar.
