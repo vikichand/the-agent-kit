@@ -140,6 +140,14 @@ details[open] summary{color:var(--orange);text-shadow:var(--ng-o-soft)}
 .colophon{margin-top:30px;padding-top:12px;border-top:1px dashed var(--hair);display:flex;justify-content:center;align-items:center;gap:10px;font:10px var(--mono);letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
 .colophon .mark{color:var(--orange);text-shadow:var(--ng-o);font-size:12px}
 .colophon .repo{color:var(--text)}
+/* scrollbars - thin pill, brand orange, stronger on hover */
+html{scrollbar-width:thin;scrollbar-color:rgba(255,90,45,.35) transparent}
+::-webkit-scrollbar{width:10px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,90,45,.30);border-radius:999px;border:3px solid transparent;background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,90,45,.65)}
+::-webkit-scrollbar-corner{background:transparent}
+.sec canvas{align-self:center}
 .tbtn{white-space:nowrap}
 .chrome{flex-wrap:wrap;row-gap:6px}
 .foot{flex-wrap:wrap;row-gap:6px}
@@ -205,7 +213,7 @@ Kicker -> pixel headline -> metadata dots, in this order:
 ```html
 <div class="hero">
   <div class="kicker"><span class="brk">[ 1/1 ]</span> DOC TYPE &#8212;&gt; CURRENT STATE</div>
-  <canvas id="pxtitle" width="10" height="10" aria-label="SHORT TITLE"></canvas>
+  <canvas id="pxtitle" class="pxt" data-text="SHORT TITLE" data-accent="1" data-px="9" aria-label="SHORT TITLE"></canvas>
   <div class="sub">
     <span><span class="dot">&#9679;</span> ID <b>doc-id</b></span>
     <span><span class="dot">&#9679;</span> SOURCE OF TRUTH <b>source.md</b></span>
@@ -233,25 +241,33 @@ middle in glowing orange. Keep titles short (2-3 words); the renderer reads `ari
 })();
 (function(){
   var G={A:["01110","10001","10001","11111","10001","10001","10001"],B:["11110","10001","11110","10001","10001","10001","11110"],C:["01110","10001","10000","10000","10000","10001","01110"],D:["11110","10001","10001","10001","10001","10001","11110"],E:["11111","10000","10000","11110","10000","10000","11111"],F:["11111","10000","10000","11110","10000","10000","10000"],G:["01110","10001","10000","10111","10001","10001","01110"],H:["10001","10001","10001","11111","10001","10001","10001"],I:["01110","00100","00100","00100","00100","00100","01110"],J:["00111","00010","00010","00010","00010","10010","01100"],K:["10001","10010","10100","11000","10100","10010","10001"],L:["10000","10000","10000","10000","10000","10000","11111"],M:["10001","11011","10101","10101","10001","10001","10001"],N:["10001","11001","10101","10011","10001","10001","10001"],O:["01110","10001","10001","10001","10001","10001","01110"],P:["11110","10001","10001","11110","10000","10000","10000"],Q:["01110","10001","10001","10001","10101","10010","01101"],R:["11110","10001","10001","11110","10100","10010","10001"],S:["01111","10000","10000","01110","00001","00001","11110"],T:["11111","00100","00100","00100","00100","00100","00100"],U:["10001","10001","10001","10001","10001","10001","01110"],V:["10001","10001","10001","10001","10001","01010","00100"],W:["10001","10001","10001","10101","10101","11011","10001"],X:["10001","01010","00100","00100","00100","01010","10001"],Y:["10001","01010","00100","00100","00100","00100","00100"],Z:["11111","00001","00010","00100","01000","10000","11111"],"0":["01110","10001","10011","10101","11001","10001","01110"],"1":["00100","01100","00100","00100","00100","00100","01110"],"2":["01110","10001","00001","00110","01000","10000","11111"],"3":["01110","10001","00001","00110","00001","10001","01110"],"4":["00010","00110","01010","10010","11111","00010","00010"],"5":["11111","10000","11110","00001","00001","10001","01110"],"6":["01110","10000","11110","10001","10001","10001","01110"],"7":["11111","00001","00010","00100","01000","01000","01000"],"8":["01110","10001","10001","01110","10001","10001","01110"],"9":["01110","10001","10001","01111","00001","00001","01110"],"-":["00000","00000","00000","01110","00000","00000","00000"]," ":["00000","00000","00000","00000","00000","00000","00000"]};
-  var c=document.getElementById("pxtitle");
-  var text=(c.getAttribute("aria-label")||"REPORT").toUpperCase();
-  var px=9, gap=2, adv=6, dpr=window.devicePixelRatio||1;
-  var w=(text.length*adv-1)*px, h=7*px;
-  c.width=w*dpr; c.height=h*dpr; c.style.width=Math.min(w,820)+"px"; c.style.height="auto";
-  var x=c.getContext("2d"); x.scale(dpr,dpr);
-  function rr(a,b,s,r){x.beginPath();x.moveTo(a+r,b);x.arcTo(a+s,b,a+s,b+s,r);x.arcTo(a+s,b+s,a,b+s,r);x.arcTo(a,b+s,a,b,r);x.arcTo(a,b,a+s,b,r);x.fill();}
-  function draw(){
-    var ink=getComputedStyle(document.documentElement).getPropertyValue("--px-ink").trim()||"#ECEAE6";
-    x.clearRect(0,0,w,h);
-    var mid=Math.floor(text.length/2); var idx=text[mid]===" "?mid+1:mid;
-    for(var i=0;i<text.length;i++){var g=G[text[i]]||G[" "];
-      if(i===idx){x.fillStyle="#FF5A2D";x.shadowColor="#FF5A2D";x.shadowBlur=10;}
-      else{x.fillStyle=ink;x.shadowBlur=0;}
-      for(var r=0;r<7;r++)for(var col=0;col<5;col++)
-        if(g[r][col]==="1") rr((i*adv+col)*px,r*px,px-gap,2.6);}
-    x.shadowBlur=0;
+  function build(c){
+    var text=(c.getAttribute("data-text")||c.getAttribute("aria-label")||"").toUpperCase();
+    var px=parseFloat(c.getAttribute("data-px"))||9;
+    var gap=px>=6?2:1, adv=6, dpr=window.devicePixelRatio||1;
+    var w=(text.length*adv-1)*px, h=7*px;
+    c.width=w*dpr; c.height=h*dpr;
+    c.style.width=Math.min(w,820)+"px"; c.style.height="auto"; c.style.maxWidth="100%";
+    var x=c.getContext("2d"); x.setTransform(dpr,0,0,dpr,0,0);
+    function rr(a,b,s,r){x.beginPath();x.moveTo(a+r,b);x.arcTo(a+s,b,a+s,b+s,r);x.arcTo(a+s,b+s,a,b+s,r);x.arcTo(a,b+s,a,b,r);x.arcTo(a,b,a+s,b,r);x.fill();}
+    return function(){
+      var ink=getComputedStyle(document.documentElement).getPropertyValue("--px-ink").trim()||"#ECEAE6";
+      x.clearRect(0,0,w,h);
+      var accent=c.getAttribute("data-accent")==="1";
+      var mid=Math.floor(text.length/2); var idx=text[mid]===" "?mid+1:mid;
+      var rad=px>=6?2.6:1.1;
+      for(var i=0;i<text.length;i++){var g=G[text[i]]||G[" "];
+        if(accent&&i===idx){x.fillStyle="#FF5A2D";x.shadowColor="#FF5A2D";x.shadowBlur=10;}
+        else{x.fillStyle=ink;x.shadowBlur=0;}
+        for(var r=0;r<7;r++)for(var col=0;col<5;col++)
+          if(g[r][col]==="1") rr((i*adv+col)*px,r*px,px-gap,rad);}
+      x.shadowBlur=0;
+    };
   }
-  window.__drawTitle=draw; draw();
+  var fns=[]; var list=document.querySelectorAll("canvas.pxt");
+  for(var i=0;i<list.length;i++) fns.push(build(list[i]));
+  function drawAll(){for(var i=0;i<fns.length;i++)fns[i]();}
+  window.__drawTitle=drawAll; drawAll();
 })();
 </script>
 ```
@@ -270,7 +286,10 @@ middle in glowing orange. Keep titles short (2-3 words); the renderer reads `ari
 - **Terminal card** (`.glass.termcard`): dark in BOTH themes - the deliberate contrast block. Holds
   mini-stats, a chart, a 9.5px caption, real command output. Command prompt in `.p`, pass counts in
   `.ok`, warnings in `.sk`.
-- **Section header** (`.sec`): glowing `1.0` number, uppercase title, hairline rule, right micro-tag.
+- **Section header** (`.sec`): glowing `1.0` number, then the title as SMALL PIXEL TYPE - a
+  `<canvas class="pxt" data-text="SECTION TITLE" data-px="3" role="heading" aria-level="2"
+  aria-label="Section Title">` - then hairline rule and right micro-tag. Same renderer as the
+  headline at 3px cells, plain ink, no accent letter.
 - **Disclosure** (`details` inside a `.glass`): depth behind a mono uppercase `summary` that glows
   orange when open. Nothing important lives ONLY inside one.
 - **Pixel icons**: inline SVGs on a 6-9px grid, `shape-rendering="crispEdges"`, with the matching
@@ -306,7 +325,27 @@ foot -> colophon. Numbered sections per report type (converging practice from pu
 - **task completion**: summary -> changes made -> verification -> next steps
 - **comparison**: options table -> per-option analysis -> recommendation
 
-## 8. Glass guardrails and restraint
+## 8. Pixel type - where it appears, and nowhere else
+
+The dot font is the signature, and it stays scarce. It appears in EXACTLY three places:
+
+1. The headline (`data-px="9"`, one glowing orange accent letter).
+2. Section headings (`data-px="3"`, plain ink, no accent).
+3. The `&#9787;` marks in chrome and colophon (text glyphs, not canvas).
+
+Never at body sizes, never in tables, pills, captions or the terminal. The renderer draws every
+`canvas.pxt` from its `data-text`/`data-px` attributes and re-inks all of them on theme toggle -
+one script serves the whole page. Give each canvas an `aria-label` (and `role="heading"
+aria-level="2"` for sections) so the page reads correctly to assistive tech.
+
+## 9. Scrollbars
+
+Custom, thin, and branded - the stylesheet already carries them: a transparent track and a pill
+thumb in faint orange (`rgba(255,90,45,.30)`) that strengthens on hover, `scrollbar-width:thin` +
+`scrollbar-color` for Firefox, and the same treatment on inner scrollers (`.tblwrap`, wide code).
+Do not restyle them per report and do not use OS-default chunky bars.
+
+## 10. Glass guardrails and restraint
 
 - Glass ONLY over the controlled ground (the glows + grid) - never over images or busy content.
 - The fill is the barrier layer: body-text contrast holds at 4.5:1 (3:1 large text) measured with
