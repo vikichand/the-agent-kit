@@ -123,7 +123,9 @@ install_skills() {  # $1 = repo root. Task-shaped guidance: only the description
       say "  = .claude/skills/$b already exists - left untouched."
     else
       mkdir -p "$1/.claude/skills/$b"
-      cp "$sd/SKILL.md" "$1/.claude/skills/$b/SKILL.md"
+      # The whole folder, not just SKILL.md - skills may carry reference files (a design.md, a
+      # template) that the body points at, and a skill deployed without them is silently broken.
+      cp "$sd"*.md "$1/.claude/skills/$b/" 2>/dev/null || cp "$sd/SKILL.md" "$1/.claude/skills/$b/SKILL.md"
       say "  + wrote .claude/skills/$b (loads when a task matches it)"
     fi
   done
@@ -292,10 +294,16 @@ refresh_kit_owned() {  # $1 = repo root. Kit-NAMED rules and skills are kit-owne
   if [ -n "$ssrc" ]; then
     for sd in "$ssrc"/*/; do
       [ -d "$sd" ] || continue
-      b=$(basename "$sd"); tgt="$1/.claude/skills/$b/SKILL.md"
-      if [ -e "$tgt" ] && ! cmp -s "$sd/SKILL.md" "$tgt"; then
-        cp -f "$sd/SKILL.md" "$tgt"; say "  ~ refreshed .claude/skills/$b (kit-owned)"
-      fi
+      b=$(basename "$sd")
+      for sf in "$sd"*.md; do
+        [ -e "$sf" ] || continue
+        fn=$(basename "$sf"); tgt="$1/.claude/skills/$b/$fn"
+        if [ -e "$tgt" ] && ! cmp -s "$sf" "$tgt"; then
+          cp -f "$sf" "$tgt"; say "  ~ refreshed .claude/skills/$b/$fn (kit-owned)"
+        elif [ ! -e "$tgt" ] && [ -d "$1/.claude/skills/$b" ]; then
+          cp "$sf" "$tgt"; say "  + added .claude/skills/$b/$fn (new kit file)"
+        fi
+      done
     done
   fi
 }

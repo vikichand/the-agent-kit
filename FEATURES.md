@@ -88,6 +88,16 @@ only the short `description` sits in context, and the body loads when a task mat
   which branches workers from the **remote default branch** rather than your in-progress work. The
   kit's `claude/settings.json` now sets `"worktree": {"baseRef": "head"}`.
 
+- **`generating-reports`** - the dual-format rule for anything a human reviews: **markdown is the
+  source of truth** (frontmatter, stable step IDs, checkboxes as execution state, acceptance-criteria
+  blocks - labelled kit convention, since no formal spec exists), rendered alongside as **one
+  self-contained HTML file** for the human, styled per the skill's `design.md` (neobrutalism with a
+  pixel display face; verified token values, system-font fallbacks, no external requests). Authority
+  flows one way: the HTML is disposable, decisions land in the .md. This is the synthesis position of
+  the 2026 "HTML is the new Markdown" debate - render for the human, keep markdown canonical for
+  diffs, co-editing and tokens. Also carries the prose standards: Diataxis for docs structure, the
+  project's declared style guide, and a deliberate NON-mandate of Conventional Commits.
+
 Honest labelling inside the skill: the contract-freeze pattern and the verify-RED gate are
 **well-reasoned practice, not measured results**, and it says so rather than inventing authority.
 
