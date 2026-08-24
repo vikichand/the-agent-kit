@@ -140,12 +140,17 @@ details[open] summary{color:var(--orange);text-shadow:var(--ng-o-soft)}
 .colophon{margin-top:30px;padding-top:12px;border-top:1px dashed var(--hair);display:flex;justify-content:center;align-items:center;gap:10px;font:10px var(--mono);letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
 .colophon .mark{color:var(--orange);text-shadow:var(--ng-o);font-size:12px}
 .colophon .repo{color:var(--text)}
-/* scrollbars - thin pill, brand orange, stronger on hover */
-html{scrollbar-width:thin;scrollbar-color:rgba(255,90,45,.35) transparent}
-::-webkit-scrollbar{width:10px;height:8px}
+/* scrollbars - thin pill, brand orange, stronger on hover.
+   ENGINE TRAP: if scrollbar-color/scrollbar-width are set unconditionally, Chromium IGNORES all
+   ::-webkit-scrollbar styling and renders a near-invisible native bar. The standard properties
+   therefore apply ONLY where the webkit pseudos are unsupported (Firefox). Keep this guard. */
+@supports not selector(::-webkit-scrollbar){
+  html{scrollbar-width:thin;scrollbar-color:rgba(255,90,45,.55) transparent}
+}
+::-webkit-scrollbar{width:11px;height:9px}
 ::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:rgba(255,90,45,.30);border-radius:999px;border:3px solid transparent;background-clip:padding-box}
-::-webkit-scrollbar-thumb:hover{background:rgba(255,90,45,.65)}
+::-webkit-scrollbar-thumb{background:rgba(255,90,45,.45);border-radius:999px;border:3px solid transparent;background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,90,45,.75)}
 ::-webkit-scrollbar-corner{background:transparent}
 .sec canvas{align-self:center}
 .tbtn{white-space:nowrap}
@@ -340,10 +345,13 @@ aria-level="2"` for sections) so the page reads correctly to assistive tech.
 
 ## 9. Scrollbars
 
-Custom, thin, and branded - the stylesheet already carries them: a transparent track and a pill
-thumb in faint orange (`rgba(255,90,45,.30)`) that strengthens on hover, `scrollbar-width:thin` +
-`scrollbar-color` for Firefox, and the same treatment on inner scrollers (`.tblwrap`, wide code).
-Do not restyle them per report and do not use OS-default chunky bars.
+Custom, thin, and branded - the stylesheet already carries them: a transparent track and an orange
+pill thumb (`rgba(255,90,45,.45)`, stronger on hover) via the `::-webkit-scrollbar` pseudos, with
+the standard `scrollbar-color`/`scrollbar-width` applied ONLY under a
+`@supports not selector(::-webkit-scrollbar)` guard for Firefox. That guard is load-bearing:
+without it Chromium discards the webkit styling entirely and shows a near-invisible native bar.
+Same treatment on inner scrollers (`.tblwrap`, wide code). Do not restyle per report and never
+OS-default chunky bars.
 
 ## 10. Glass guardrails and restraint
 
