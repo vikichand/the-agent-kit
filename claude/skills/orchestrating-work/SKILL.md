@@ -7,7 +7,8 @@ description: Use when a task is big enough to split into parallel slices, or whe
 
 The goal is to get the most out of the harness and the subscription: the strongest model spends its
 budget on judgement, cheaper models spend theirs on execution, and neither is asked to do the other's
-job. Multi-agent runs cost roughly **15x the tokens of a chat**, so fan-out that is not earning its
+job. Multi-agent runs cost roughly **15x the tokens of a chat** (Anthropic's published figure for its own
+multi-agent research system), so fan-out that is not earning its
 keep is not neutral - it is expensive and it is slower to integrate.
 
 ## First, decide whether to fan out at all
@@ -66,8 +67,9 @@ Haiku" - and Anthropic's own cost guidance says outright: "For simple subagent t
 capacity the lead model keeps for judgement. Two caveats, stated honestly: Anthropic publishes no
 per-model multiplier, so never promise a number; and the docs name `/clear` between unrelated tasks
 as the single most effective lever for stretching usage - cheaper than any routing. One nuance worth
-knowing: only the Opus limit is model-specific, so when it runs dry, switching models keeps you
-working.
+knowing: some models carry their own sub-limit on top of the shared pool - which models varies by
+plan and changes over time, so check `/status` rather than memorising it; when a model-specific
+limit runs dry, switching models keeps you working.
 
 **Final review is always the lead's**, and it is not optional. This is what makes the whole
 arrangement safe: cheap execution is only cheap if something competent checks it.
@@ -106,7 +108,8 @@ work that needs a deterministic pipeline - use a dynamic workflow instead of mor
 
 Spec -> failing test -> implement -> review. Write the acceptance criteria first, then the test, and
 **watch the test fail before implementing**. A test that has never been observed failing has proven
-nothing about the code; nearly half of agent validation evidence has been measured as carrying no
-bug-discriminating information, and observing the red state is what makes it discriminating.
+nothing about the code. One 2026 study (arXiv 2607.28871) measured 46% of repair agents' positive
+validation evidence as carrying no bug-discriminating information; observing the red state is
+precisely what makes the evidence discriminating.
 
 `AGENTS.md` §0 still governs: a one-line change does not need any of this.

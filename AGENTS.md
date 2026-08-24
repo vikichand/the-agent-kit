@@ -57,7 +57,7 @@ This gate decides whether the rest applies. Get it right and none of this adds f
 
 - **One-sentence diff** (typo, obvious one-liner, rename one symbol): just do it. Skip the ceremony.
 - **Multi-file, ambiguous, irreversible, or you're not sure what's being asked**: run the full loop below
-  (Explore -> Plan -> Implement -> Verify -> Commit).
+  (Explore -> Plan -> Implement -> Verify -> Commit - the commit itself only when asked, per the invariants).
 - If you can't tell which bucket you're in, you're in the second one. (The safety invariants above apply to both.)
 
 ## 1. Think before you touch anything
