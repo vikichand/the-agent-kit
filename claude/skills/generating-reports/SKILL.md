@@ -21,8 +21,10 @@ For any plan, review, audit, or report of substance (§0 sizing applies - a thre
 none of this):
 
 1. **Write the markdown file first.** It is the source of truth and the only file that gets edited.
-2. **Render a self-contained HTML view of it** beside the markdown, same basename: `plan.md` ->
-   `plan.html`. Style it per [design.md](design.md) in this folder.
+2. **Render a self-contained HTML view of it** beside the markdown, dated:
+   `plan.md` -> `2026-08-24-plan.html`. Style and structure it per [design.md](design.md) in this
+   folder - it carries the tokens, the page anatomy, the per-report-type section skeletons, and the
+   restraint rules. Light theme is the default; the toggle stamps dark.
 3. **Authority flows one way.** The HTML is generated *from* the markdown and is disposable -
    regenerate it after any change. Decisions, edits, and review feedback land in the `.md`, never
    only in the HTML. If the human marks up the rendered view, carry every change back into the
