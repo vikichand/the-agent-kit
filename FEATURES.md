@@ -78,7 +78,10 @@ only the short `description` sits in context, and the body loads when a task mat
   file ownership, worktree isolation, sequential integration with scoped tests, and the
   orchestrator-worker split - the lead keeps decomposition, the contract and the final review; workers
   execute specs that are already complete. **Route by how completely a slice is specified, never by
-  budget alone**, and a worker that meets ambiguity escalates instead of guessing.
+  budget alone**, and a worker that meets ambiguity escalates instead of guessing. The economics are
+  documented, not folklore: weekly limits are one shared pool that models drain at very different rates,
+  and Anthropic's own cost guidance says to give simple subagent tasks `model: haiku` - so delegation is
+  also how a subscription stretches the week.
 
   It also names the setting that silently breaks the intent: `worktree.baseRef` defaults to `fresh`,
   which branches workers from the **remote default branch** rather than your in-progress work. The
