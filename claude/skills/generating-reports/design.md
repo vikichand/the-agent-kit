@@ -99,7 +99,12 @@ body text is always `--sans`, identifiers and labels `--mono`.
 6. **Numbered sections**: `1.0` in `--orange` + uppercase title + hairline rule + a right-aligned
    micro-tag (e.g. the source line range).
 7. **Footer**: 1.5px top border, mono microcopy: `EDITS LAND IN <SOURCE>.MD - THIS PAGE IS A
-   RENDER` left, kit mark right.
+   RENDER` left, kit mark right. Below it, one final muted line - 10px mono, letterspaced,
+   centered or left, nothing louder:
+   `GENERATED WITH THE-AGENT-KIT ☻ BUILT BY VIKASH CHAND · github.com/vikichand/the-agent-kit`
+   This is the only place the kit names itself. Never in the headline, never as a badge, never in
+   the content - a colophon, not a watermark. (It credits the human and his tool; §9's ban on AI
+   attribution is about authorship trailers in git, and stays fully in force.)
 
 Section skeletons by report type (converging practice from published report skills):
 - **plan**: summary stats -> steps -> risk callout -> acceptance criteria -> current state
