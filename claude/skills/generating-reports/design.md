@@ -1,95 +1,134 @@
-# design.md - the report page look: neobrutalism, pixel-display variant
+# design.md - report pages: editorial pixel-tech with glass
 
-The style is **neobrutalism** (the neobrutalism.dev / RetroUI component lineage) with a
-pixel/terminal display face for headings - the merged aesthetic the 8bitcn library codified. Token
-values below are taken from the neobrutalism-components registry, not invented. Every page is ONE
-self-contained .html: inline CSS, no CDN, no external fonts or images. System-font fallbacks only -
-do not fetch Departure Mono or Silkscreen from the network; if a licensed .woff2 is present in the
-project it may be embedded as a base64 data: URI, otherwise the fallback stacks below carry the look.
+The look: a technical document wearing a fashion-editorial skin. Type-specimen chrome, a drawn
+rounded-pixel headline, one hot orange accent, frosted-glass cards over a controlled ground, and a
+deliberately dark terminal card in both themes. Clean first; pixel as jewellery, never as noise.
 
-## Tokens - paste as-is
+**Light is the default.** A report opens light regardless of OS setting; the toggle stamps
+`data-theme="dark"` on `<html>`. Every colour is defined as a token on bare `:root` and never only
+inside a theme block, and `body` always sets an explicit token background - this matches the
+published three-state artifact cascade, so a report also publishes as an artifact unchanged.
+
+Every report is ONE self-contained .html: inline CSS and JS, no CDN, no external fonts or images
+(data: URIs if an image is unavoidable). It must render from a `file://` double-click, offline.
+Name it `YYYY-MM-DD-<slug>.html`, beside its markdown source of truth.
+
+## Tokens - paste as-is, style ONLY through these
 
 ```css
-:root {
-  /* light (default) */
-  --bg: #FEF2E8;            /* cream page ground - never pure white */
-  --surface: #FFFFFF;       /* cards, tables */
-  --text: #000000;
-  --muted-text: #4A4A4A;
-  --border: #000000;        /* ALL borders are black, always */
-  --main: #FFDC58;          /* primary accent (yellow); alt sets at the bottom */
-  --main-fg: #000000;       /* text on an accent fill is always black */
-  --accent-blue: #88AAEE;  --accent-green: #A3E636;
-  --accent-red:  #FF6B6B;  --accent-purple: #A388EE;  --accent-orange: #FD9745;
-  --shadow: 4px 4px 0px 0px var(--border);   /* hard offset, NO blur, NO alpha */
-  --shadow-sm: 2px 2px 0px 0px var(--border);
-  --radius: 5px;            /* small; 0 is allowed for a harder look; never more than 8px */
-  --bw: 2px;                /* border width for every component */
-  --w-base: 500;  --w-heading: 800;
-  --font-display: "Departure Mono", "Silkscreen", "Cascadia Mono", Consolas, monospace;
-  --font-body: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: ui-monospace, "Cascadia Code", Consolas, Menlo, monospace;
+:root {            /* LIGHT - the default */
+  --bg:#F2F1ED; --text:#141414; --muted:#6E6A63; --hair:rgba(20,20,20,.12);
+  --glass:rgba(255,255,255,.62); --glass2:rgba(20,20,20,.06);
+  --glow-a:rgba(255,90,45,.14); --glow-b:rgba(61,120,220,.08); --glow-c:rgba(61,220,151,.07);
+  --gridline:rgba(20,20,20,.03); --cardshadow:0 8px 26px rgba(20,20,20,.08);
+  --px-ink:#141414;
+  --orange:#FF5A2D; --green:#0E8A57; --amber:#B07B00; --red:#D6403A; --violet:#6C4FE0;
+  --mono:"Cascadia Mono",Consolas,Menlo,monospace;
+  --sans:"Segoe UI",system-ui,Roboto,Helvetica,Arial,sans-serif;
 }
-/* dark - borders stay black, accents unchanged */
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #272933; --surface: #212121;
-  --text: #E6E6E6; --muted-text: #A0A0A0;
-  --shadow: 4px 4px 0px 0px #000; --shadow-sm: 2px 2px 0px 0px #000;
-} }
 :root[data-theme="dark"] {
-  --bg: #272933; --surface: #212121;
-  --text: #E6E6E6; --muted-text: #A0A0A0;
-  --shadow: 4px 4px 0px 0px #000; --shadow-sm: 2px 2px 0px 0px #000;
+  --bg:#0D1015; --text:#ECEAE6; --muted:#8B93A1; --hair:rgba(255,255,255,.10);
+  --glass:rgba(255,255,255,.055); --glass2:rgba(255,255,255,.085);
+  --glow-a:rgba(255,90,45,.32); --glow-b:rgba(61,120,220,.16); --glow-c:rgba(61,220,151,.10);
+  --gridline:rgba(255,255,255,.025); --cardshadow:0 8px 30px rgba(0,0,0,.35);
+  --px-ink:#ECEAE6;
+  --green:#3DDC97; --amber:#FFC53D; --red:#FF6B6B; --violet:#A78BFA;
 }
-body { background: var(--bg); color: var(--text); font-family: var(--font-body);
-       font-weight: var(--w-base); font-size: 16px; line-height: 1.6;
-       max-width: 880px; margin: 0 auto; padding: 32px 24px; }
+body { background:var(--bg); color:var(--text); font:15px/1.65 var(--sans); }
 ```
 
-## What makes it read as "the style" - all four are required
+Ground: two fixed pseudo-layers behind the page - three soft radial glows (`--glow-a/b/c`, orange
+top-right, blue lower-left, green bottom) and a faint 28px grid of `--gridline`. That is the ONLY
+thing glass ever sits over.
 
-1. **Hard offset shadows**: `box-shadow: var(--shadow)` on every card, badge, and button - solid
-   black, zero blur. One blurred or grey shadow breaks the whole aesthetic.
-2. **Uniform 2px black borders** on every component, in light AND dark mode.
-3. **Flat saturated fills**: accents as full block fills with black text. No gradients, no
-   transparency, no glassmorphism.
-4. **Chunky display type**: headings in `--font-display`, UPPERCASE.
+## The glass, with its guardrails
 
-## Type rules (accessibility)
+`background:var(--glass); border:1px solid var(--hair); border-radius:18px;
+backdrop-filter:blur(16px); box-shadow:var(--cardshadow);`
 
-- The pixel/display font is HEADLINE-ONLY: h1-h3, badges, kbd chips, big stat numbers, minimum
-  18px. Never body paragraphs - pair it with the plain readable body stack, which is standard
-  practice for this aesthetic.
-- h1: display font, 28-36px, uppercase, sitting on a `--main` block or over a 4-6px black underline
-  bar. h2: display, 20-24px. Body: 16px `--font-body`.
-- Contrast: black-on-accent passes AA for every accent above. In dark mode, accent fills KEEP black
-  text (`--main-fg`) - never white on yellow or green.
+Glassmorphism is banned by some practitioners as an AI tell, and the readability criticism behind
+that is real. This design keeps glass as a deliberate identity by meeting the criticism:
 
-## Components (the report vocabulary)
+1. Glass sits ONLY over the controlled ground above - never over images or busy content.
+2. The fill doubles as a barrier layer: body-text contrast must hold at WCAG's 4.5:1 (3:1 for
+   large text) measured with the blur applied. If a glow makes text marginal, raise the fill
+   opacity, never lower the text contrast.
+3. Blur stays high (16px+). Low blur over a varied ground is the failure mode.
+4. Print gets flat cards: in `@media print`, replace glass with solid `--bg`-derived fills.
 
-- **Card**: `--surface` bg, 2px border, `--shadow`, `--radius`, 24px padding, 32px gaps between cards.
-- **Verdict banner** (top of every report): full-width card, accent fill by outcome
-  (green = pass, red = fail, yellow = warn), display font, large - the first thing the eye hits.
-- **Badge** (severity/status): inline-block, accent fill, black text, 2px border, `--shadow-sm`,
-  radius 0-3px, display font 11-12px uppercase, padding 2px 10px.
-  Map: red = BLOCKER/FAIL · orange = MAJOR · yellow = MINOR/WARN · green = PASS · blue = INFO.
-- **Table**: 2px black outer border + `--shadow` on a wrapper with `overflow-x: auto`; header row
-  `--main` fill, black text, display font; 2px black row separators; no zebra striping.
-- **Checklist**: square 18px custom boxes (2px border, `--shadow-sm`); checked = accent fill with a
-  black check mark. Never native rounded checkboxes.
-- **Code block**: `#1B1B1B` bg in both modes, `#E6E6E6` text, `--font-mono` 13-14px, 2px border +
-  `--shadow`, 16px padding. Inline code: `--main`-tinted bg with a 1px border.
-- **Links**: text-colored with a 2px underline; hover flips to a `--main` background.
-- **Hover on interactive elements**: `translate(4px, 4px)` with `box-shadow: none` - the element
-  presses into its own shadow. Transitions 100ms or less; no fades.
+## The pixel headline - drawn, not a font
 
-## Hard prohibitions
+Pixel display fonts cannot be fetched in a self-contained file, so the headline is DRAWN: 5x7
+glyphs as rounded squares on a canvas. Include this renderer; call `draw()` again on theme toggle.
 
-No gradients. No blur or soft shadows. No border-radius above 8px. No grey hairline borders. No
-opacity on text. No pastel accents. No external requests of any kind.
+```html
+<canvas id="pxtitle" aria-label="TITLE"></canvas>
+<script>
+(function(){
+  var G={A:["01110","10001","10001","11111","10001","10001","10001"],B:["11110","10001","11110","10001","10001","10001","11110"],C:["01110","10001","10000","10000","10000","10001","01110"],D:["11110","10001","10001","10001","10001","10001","11110"],E:["11111","10000","10000","11110","10000","10000","11111"],F:["11111","10000","10000","11110","10000","10000","10000"],G:["01110","10001","10000","10111","10001","10001","01110"],H:["10001","10001","10001","11111","10001","10001","10001"],I:["01110","00100","00100","00100","00100","00100","01110"],J:["00111","00010","00010","00010","00010","10010","01100"],K:["10001","10010","10100","11000","10100","10010","10001"],L:["10000","10000","10000","10000","10000","10000","11111"],M:["10001","11011","10101","10101","10001","10001","10001"],N:["10001","11001","10101","10011","10001","10001","10001"],O:["01110","10001","10001","10001","10001","10001","01110"],P:["11110","10001","10001","11110","10000","10000","10000"],Q:["01110","10001","10001","10001","10101","10010","01101"],R:["11110","10001","10001","11110","10100","10010","10001"],S:["01111","10000","10000","01110","00001","00001","11110"],T:["11111","00100","00100","00100","00100","00100","00100"],U:["10001","10001","10001","10001","10001","10001","01110"],V:["10001","10001","10001","10001","10001","01010","00100"],W:["10001","10001","10001","10101","10101","11011","10001"],X:["10001","01010","00100","00100","00100","01010","10001"],Y:["10001","01010","00100","00100","00100","00100","00100"],Z:["11111","00001","00010","00100","01000","10000","11111"],"0":["01110","10001","10011","10101","11001","10001","01110"],"1":["00100","01100","00100","00100","00100","00100","01110"],"2":["01110","10001","00001","00110","01000","10000","11111"],"3":["01110","10001","00001","00110","00001","10001","01110"],"4":["00010","00110","01010","10010","11111","00010","00010"],"5":["11111","10000","11110","00001","00001","10001","01110"],"6":["01110","10000","11110","10001","10001","10001","01110"],"7":["11111","00001","00010","00100","01000","01000","01000"],"8":["01110","10001","10001","01110","10001","10001","01110"],"9":["01110","10001","10001","01111","00001","00001","01110"],"-":["00000","00000","00000","01110","00000","00000","00000"]," ":["00000","00000","00000","00000","00000","00000","00000"]};
+  var text=(document.getElementById("pxtitle").getAttribute("aria-label")||"REPORT").toUpperCase();
+  var px=9, gap=2, adv=6, dpr=window.devicePixelRatio||1;
+  var c=document.getElementById("pxtitle"), w=(text.length*adv-1)*px, h=7*px;
+  c.width=w*dpr; c.height=h*dpr; c.style.width=Math.min(w,820)+"px"; c.style.height="auto"; c.style.maxWidth="100%";
+  var x=c.getContext("2d"); x.scale(dpr,dpr);
+  function rr(a,b,s,r){x.beginPath();x.moveTo(a+r,b);x.arcTo(a+s,b,a+s,b+s,r);x.arcTo(a+s,b+s,a,b+s,r);x.arcTo(a,b+s,a,b,r);x.arcTo(a,b,a+s,b,r);x.fill();}
+  function draw(){var ink=getComputedStyle(document.documentElement).getPropertyValue("--px-ink").trim()||"#141414";
+    x.clearRect(0,0,w,h);
+    var mid=Math.floor(text.length/2); var idx=text[mid]===" "?mid+1:mid;   /* one accent letter */
+    for(var i=0;i<text.length;i++){var g=G[text[i]]||G[" "];
+      x.fillStyle = i===idx ? "#FF5A2D" : ink;
+      for(var r=0;r<7;r++)for(var col=0;col<5;col++) if(g[r][col]==="1") rr((i*adv+col)*px,r*px,px-gap,2.6);}}
+  window.__drawTitle=draw; draw();
+})();
+</script>
+```
 
-## Alt accent sets (swap `--main` and the light `--bg` together; dark mode stays unchanged)
+Exactly ONE letter (near the middle) renders in `--orange` - the specimen accent. Headline only;
+body text is always `--sans`, identifiers and labels `--mono`.
 
-- blue: main `#88AAEE`, bg `#DFE5F2`
-- green: main `#A3E636`, bg `#E9F5D8`
-- purple: main `#A388EE`, bg `#E3DFF2`
+## Page anatomy - same order, every report
+
+1. **Chrome bar**: `TYPE ☻ NAME` left, `REV nn / date [ THEME TOGGLE ]` right; 1.5px `--text`
+   bottom border. The toggle is a bordered pill button; JS stamps/unstamps `data-theme="dark"`
+   and calls `__drawTitle()`.
+2. **Kicker**: `[ n/n ]` in `--muted`, then doc type and current state in `--orange`, 11px mono
+   uppercase, 2px letterspacing.
+3. **Pixel headline**, then orange-dot metadata line: ID, source of truth, "render: disposable".
+4. **Properties card** (glass): Status / Source / Progress rows, mono uppercase keys, pill values.
+5. **"How to review" callout** (glass): the two actions - approve, or comment in the .md.
+6. **Numbered sections**: `1.0` in `--orange` + uppercase title + hairline rule + a right-aligned
+   micro-tag (e.g. the source line range).
+7. **Footer**: 1.5px top border, mono microcopy: `EDITS LAND IN <SOURCE>.MD - THIS PAGE IS A
+   RENDER` left, kit mark right.
+
+Section skeletons by report type (converging practice from published report skills):
+- **plan**: summary stats -> steps -> risk callout -> acceptance criteria -> current state
+- **review/audit**: verdict banner -> score/pass-fail table -> findings (worst first) -> per-finding detail -> recommendations
+- **task completion**: summary -> changes made -> verification -> next steps
+- **comparison**: options table -> per-option analysis -> recommendation
+
+## Components
+
+- **Step row**: pixel state icon (SVG `shape-rendering="crispEdges"`), `Sn` id chip, text, status
+  pill. Done rows: `--muted` + strikethrough. Pills: mono uppercase 11px, 999px radius;
+  done=`--green` tint, next=solid `--orange` with dark text, risky=`--red` tint, gate=`--violet` tint.
+- **Callout**: glass row, pixel SVG icon, bold lead phrase in the accent of its meaning. Risk
+  callouts add an orange-tinted border.
+- **Table**: mono uppercase 10.5px headers, hairline row rules, first column in `--orange` mono.
+  Wrapper card scrolls horizontally; the page never does.
+- **Terminal card**: stays dark in BOTH themes (`rgba(13,16,21,.92)`, light text) - the deliberate
+  contrast block. Carries mini-stats, an optional thin-bar chart (6px bars, 3px radius; highlighted
+  bars `--orange` with a soft glow), a 9.5px mono caption, and real command output.
+- **Pixel icons**: small inline SVGs on a 6-9px grid with `crispEdges` - checkmark, square,
+  warning, diamond. Never emoji.
+- **Layered disclosure**: summary and tables at top level; depth goes in `<details>` blocks.
+  Nothing important lives ONLY inside a collapsible.
+
+## Restraint - what keeps it clean
+
+- Every chart must earn its place or become a table (Tufte's erasing test) - but keep redundancy
+  that aids reading: direct labels over legends, muted gridlines.
+- Banned: gradients as decoration, emoji headers, text over blur without the barrier check,
+  more than one accent family per page, pixel font at body sizes, any external request.
+- Density is handled by disclosure and tables, never by deleting information the reader needs.
+- One page, one purpose. A report that wants a nav bar is two reports.
