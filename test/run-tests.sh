@@ -116,6 +116,8 @@ n=$(printf '%s\n' "$d" | grep -c 'live in')
 printf '#!/bin/sh\necho some other tool\n' > .git/hooks/pre-commit; chmod +x .git/hooks/pre-commit
 d=$(sh "$KIT/install.sh" --check 2>&1)
 has "is NOT the kit" "$d" && pass "D3 foreign hook flagged INACTIVE" || bad "D3 foreign hook passed as OK (false green)"
+# The exit code is the API scripts and CI actually read. FAIL text over exit 0 is false confidence.
+if sh "$KIT/install.sh" --check >/dev/null 2>&1; then bad "D3b doctor exited 0 despite a FAIL"; else pass "D3b doctor exit code reflects FAIL"; fi
 
 mkdir -p .other-hooks; git config core.hooksPath .other-hooks
 cp "$KIT/hooks/pre-commit" .other-hooks/pre-commit; chmod +x .other-hooks/pre-commit
@@ -315,6 +317,14 @@ else
   rc=$(ls "$u"/.claude/rules/*.md 2>/dev/null | wc -l | tr -d ' ')
   kc=$(ls "$KIT"/claude/rules/*.md 2>/dev/null | wc -l | tr -d ' ')
   [ "$rc" = "$kc" ] && pass "U10 --update-rules also deploys the depth tier ($rc rules)"     || bad "U10 upgrade left the depth tier missing: $rc of $kc rules"
+  rm -rf "$u"
+  # U11: a kit-owned rule that drifted (older version, or a hand edit to a kit-named file) must be
+  # brought current by an update - otherwise a security fix never reaches installed projects.
+  u=$(mktemp -d) && (cd "$u" && git init -q && cp "$KIT/AGENTS.md" . && printf '@AGENTS.md\n' > CLAUDE.md \
+      && mkdir -p .claude/rules && printf 'stale old content\n' > .claude/rules/web-security.md \
+      && sh "$KIT/install.sh" --update-rules >/dev/null 2>&1)
+  cmp -s "$KIT/claude/rules/web-security.md" "$u/.claude/rules/web-security.md" \
+    && pass "U11 stale kit-owned rule refreshed by --update-rules" || bad "U11 stale kit rule NOT refreshed"
   rm -rf "$u"
   # U9: the structural guard U8 cannot be. update_kit must END by exec-ing the downloaded installer -
   # exec replaces the process, so not one more byte is read from the file --global is overwriting.

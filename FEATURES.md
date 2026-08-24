@@ -50,8 +50,9 @@ are the floor; the block is the per-project multiplier. The full trait ledger an
 there. The deep material instead ships as **path-scoped rules** - `paths:` frontmatter globs that load
 only when the agent opens a matching file. **Measured, not assumed:** a 53 KiB rule present but not
 matching cost 65,347 tokens of context against a 65,510-token baseline with no rule file at all, and
-the same file cost +12.7k the moment a path matched. Free until relevant, in other words, which is why
-nothing had to be deleted to make room.
+the same file cost +12.7k the moment a path matched. The 163-token delta is measurement noise - a
+non-matching rule is indistinguishable from no rule file at all - which is why nothing had to be
+deleted to make room.
 
 | Rule | Loads when you touch | Carries |
 |---|---|---|
@@ -111,8 +112,9 @@ stray operand.
 ## Wiring · installer · verification
 
 - **`claude/settings.json`**: kills the native attribution trailer (`attribution.commit/pr:""`), asks on
-  `git add`/`commit`/`push` (the worktree is the human's - §invariants; enforcement, not just guidance), on every
-  package-manager install (npm/pnpm/yarn/bun/pip/uv/cargo/go/gem - enforcing "confirm dependencies"), and on
+  `git add`/`commit`/`push` (the worktree is the human's - §invariants; enforcement, not just guidance), on the
+  common package-manager install commands (npm/pnpm/yarn/bun/pip/uv/cargo/go/gem - a prefix list, not a
+  hermetic one: exotic invocations can slip past, which is why "confirm dependencies" is also a rule), and on
   **secret-file reads** (`.env*`, keys, credential stores - a visible prompt naming the file, so "push my local
   env vars to Azure" works with one click while an injected "read the .env" can't get through silently),
   denies `--no-verify`/force + self-protection (`.git/hooks`, `.git/config`, `.claude/settings.json`).

@@ -164,13 +164,23 @@ install_extension() { # lean: project-config stub + git hooks
 
 install_global() {
   share="$HOME/.the-agent-kit"
-  mkdir -p "$share/hooks" "$share/git-hooks" "$share/docs"
+  # Running the installed copy's own --global would copy every file onto itself and die under
+  # set -e ("are the same file"). Refreshing the share is --update's job.
+  if [ "$KIT" = "$share" ]; then
+    say "This IS the installed copy - nothing to copy onto itself. To refresh it from GitHub:"
+    say "    $share/install.sh --update"
+    return 0
+  fi
+  mkdir -p "$share/hooks" "$share/git-hooks" "$share/docs" "$share/claude" "$share/codex"
   # Copy the WHOLE kit, not just the hooks, so the clone you ran this from becomes disposable.
   # git-hooks/ is the core.hooksPath target (those three only); hooks/ is the full set, which is
   # what the relocated install.sh compares against in --check and copies from per project.
   for h in command-guard.py commit-msg pre-commit pre-push; do cp "$KIT/hooks/$h" "$share/hooks/$h"; done
   for h in commit-msg pre-commit pre-push; do cp "$KIT/hooks/$h" "$share/git-hooks/$h"; done
   cp "$KIT/AGENTS.md" "$KIT/CLAUDE.md" "$KIT/install.sh" "$share/"
+  # The installer prints these as merge snippets, so the relocated copy must carry them too.
+  cp "$KIT/claude/settings.json" "$share/claude/" 2>/dev/null || true
+  cp "$KIT/codex/config.toml" "$KIT/codex/hooks.json" "$share/codex/" 2>/dev/null || true
   cp "$KIT/docs/"*.md "$share/docs/" 2>/dev/null || true
   mkdir -p "$share/rules"
   cp "$KIT/claude/rules/"*.md "$share/rules/" 2>/dev/null || cp "$KIT/rules/"*.md "$share/rules/" 2>/dev/null || true
@@ -224,6 +234,7 @@ install_global() {
 update_kit() {  # refresh ~/.the-agent-kit from GitHub, so the clone stays disposable
   share="$HOME/.the-agent-kit"
   command -v git >/dev/null 2>&1 || { say "  ! git not found - cannot update. Install git, or re-clone by hand."; exit 2; }
+  [ -n "${AGENT_KIT_REPO:-}" ] && say "  ! AGENT_KIT_REPO override active - updating from $KIT_REPO, NOT the official repo."
   old=$(cat "$share/.kit-version" 2>/dev/null || printf 'unknown')
   tmp=$(mktemp -d) || exit 2
   say "Fetching the latest kit from $KIT_REPO"
@@ -258,6 +269,35 @@ update_kit() {  # refresh ~/.the-agent-kit from GitHub, so the clone stays dispo
     printf "%s\n" "Machine-wide guards + ~/.the-agent-kit are now current. Then, per project:"
     printf "%s\n" "    ~/.the-agent-kit/install.sh --update-rules     # new rules in, your PROJECT-CONFIG kept"
   ' _ "$tmp/kit" "$tmp"
+}
+
+refresh_kit_owned() {  # $1 = repo root. Kit-NAMED rules and skills are kit-owned: a fix to
+  # web-security.md must reach installed projects, or every update silently under-delivers.
+  # Files under other names are the user's and are never touched.
+  src=""
+  [ -d "$KIT/claude/rules" ] && src="$KIT/claude/rules"
+  [ -z "$src" ] && [ -d "$KIT/rules" ] && src="$KIT/rules"
+  if [ -n "$src" ]; then
+    for r in "$src"/*.md; do
+      [ -e "$r" ] || continue
+      b=$(basename "$r"); tgt="$1/.claude/rules/$b"
+      if [ -e "$tgt" ] && ! cmp -s "$r" "$tgt"; then
+        cp -f "$r" "$tgt"; say "  ~ refreshed .claude/rules/$b (kit-owned; local edits to kit-named files are replaced)"
+      fi
+    done
+  fi
+  ssrc=""
+  [ -d "$KIT/claude/skills" ] && ssrc="$KIT/claude/skills"
+  [ -z "$ssrc" ] && [ -d "$KIT/skills" ] && ssrc="$KIT/skills"
+  if [ -n "$ssrc" ]; then
+    for sd in "$ssrc"/*/; do
+      [ -d "$sd" ] || continue
+      b=$(basename "$sd"); tgt="$1/.claude/skills/$b/SKILL.md"
+      if [ -e "$tgt" ] && ! cmp -s "$sd/SKILL.md" "$tgt"; then
+        cp -f "$sd/SKILL.md" "$tgt"; say "  ~ refreshed .claude/skills/$b (kit-owned)"
+      fi
+    done
+  fi
 }
 
 update_rules() {  # refresh the universal rules in this repo's AGENTS.md, preserving its PROJECT-CONFIG block
@@ -302,30 +342,32 @@ update_rules() {  # refresh the universal rules in this repo's AGENTS.md, preser
   # Bringing a project up to date has to mean the WHOLE kit, not just this one file. A project set up
   # before the depth tier existed has no .claude/rules, and updating only AGENTS.md would leave it
   # silently missing every path-scoped rule while reporting success.
+  refresh_kit_owned "$root"
   install_path_rules "$root"
   install_skills "$root"
 }
 
 doctor() {
+  dfail=0
   hr; say "the-agent-kit --check (doctor)"
   py=$(detect_py)
   if [ -z "$py" ]; then
-    say "  FAIL: no working python (python3/python/py). On Windows 'python3' is often a no-op Store stub."
+    dfail=1; say "  FAIL: no working python (python3/python/py). On Windows 'python3' is often a no-op Store stub."
     say "        -> the tool-layer command-guard will NOT run. Install Python 3."
   else
     say "  OK:   python = $py"
     d=$(printf '%s' '{"tool_input":{"command":"git push"}}'         | $py "$KIT/hooks/command-guard.py" --decision ask 2>/dev/null)
-    case "$d" in *'"ask"'*)  say "  OK:   command-guard fires on 'git push'" ;; *) say "  FAIL: command-guard emitted no decision for 'git push'" ;; esac
+    case "$d" in *'"ask"'*)  say "  OK:   command-guard fires on 'git push'" ;; *) dfail=1; say "  FAIL: command-guard emitted no decision for 'git push'" ;; esac
     f=$(printf '%s' '{"tool_input":{"command":"git push --force"}}' | $py "$KIT/hooks/command-guard.py" --decision ask 2>/dev/null)
-    case "$f" in *'"deny"'*) say "  OK:   force-push is denied" ;; *) say "  FAIL: force-push not denied" ;; esac
+    case "$f" in *'"deny"'*) say "  OK:   force-push is denied" ;; *) dfail=1; say "  FAIL: force-push not denied" ;; esac
     n=$(printf '%s' '{"tool_input":{"command":"git commit -an -m x"}}' | $py "$KIT/hooks/command-guard.py" --decision ask 2>/dev/null)
-    case "$n" in *'"deny"'*) say "  OK:   bundled --no-verify (git commit -an) is denied" ;; *) say "  FAIL: bundled --no-verify (-an) NOT denied" ;; esac
+    case "$n" in *'"deny"'*) say "  OK:   bundled --no-verify (git commit -an) is denied" ;; *) dfail=1; say "  FAIL: bundled --no-verify (-an) NOT denied" ;; esac
     h=$(printf '%s' '{"tool_input":{"command":"git -c core.hooksPath=/x commit -m y"}}' | $py "$KIT/hooks/command-guard.py" --decision ask 2>/dev/null)
-    case "$h" in *'"deny"'*) say "  OK:   -c core.hooksPath override is denied" ;; *) say "  FAIL: -c core.hooksPath NOT denied" ;; esac
+    case "$h" in *'"deny"'*) say "  OK:   -c core.hooksPath override is denied" ;; *) dfail=1; say "  FAIL: -c core.hooksPath NOT denied" ;; esac
     e=$(printf '%s' '{"tool_input":{"command":"nice -n 5 git commit --no-verify -m x"}}' | $py "$KIT/hooks/command-guard.py" --decision ask 2>/dev/null)
-    case "$e" in *'"deny"'*) say "  OK:   wrapper-composed --no-verify is denied" ;; *) say "  FAIL: wrapper-composed --no-verify NOT denied" ;; esac
+    case "$e" in *'"deny"'*) say "  OK:   wrapper-composed --no-verify is denied" ;; *) dfail=1; say "  FAIL: wrapper-composed --no-verify NOT denied" ;; esac
     g=$(printf '%s' '{"tool_input":{"command":"printf x >> .git/config"}}' | $py "$KIT/hooks/command-guard.py" --decision deny 2>/dev/null)
-    case "$g" in *'"deny"'*) say "  OK:   direct .git/config write is flagged" ;; *) say "  FAIL: direct .git/config write NOT flagged" ;; esac
+    case "$g" in *'"deny"'*) say "  OK:   direct .git/config write is flagged" ;; *) dfail=1; say "  FAIL: direct .git/config write NOT flagged" ;; esac
   fi
   for h in commit-msg pre-commit pre-push; do
     if [ -x "$KIT/hooks/$h" ]; then say "  OK:   hooks/$h present + executable"; else say "  WARN: hooks/$h missing or not executable"; fi
@@ -351,7 +393,7 @@ doctor() {
       elif grep -q 'the-agent-kit' "$hd/$h" 2>/dev/null; then
         say "  OK:   $h in $hd calls the kit (shim) - text match only; open it to confirm it still runs."
       else
-        say "  FAIL: $hd/$h is NOT the kit's - that guard is INACTIVE. Merge the kit's $h into it."
+        dfail=1; say "  FAIL: $hd/$h is NOT the kit's - that guard is INACTIVE. Merge the kit's $h into it."
       fi
     done
   fi
@@ -365,7 +407,7 @@ doctor() {
     if [ "$ab" -lt 0 ]; then
       say "  WARN: AGENTS.md exists but could not be read to measure it (permissions? file lock?)."
     elif [ "$ab" -gt 32768 ]; then
-      say "  FAIL: AGENTS.md is $ab bytes - Codex SILENTLY truncates past 32768 (project_doc_max_bytes)."
+      dfail=1; say "  FAIL: AGENTS.md is $ab bytes - Codex SILENTLY truncates past 32768 (project_doc_max_bytes)."
       say "        That cap applies to the COMBINED AGENTS.md chain read root-to-leaf, so nested files count too."
     else
       say "  OK:   AGENTS.md $ab bytes (Codex silently truncates the combined chain past 32768)"
@@ -420,6 +462,9 @@ doctor() {
     fi
   fi
   hr
+  # A doctor that prints FAIL and exits 0 is worse than no doctor: CI and scripts read the exit code,
+  # and a green exit over red text is false confidence.
+  [ "$dfail" -eq 0 ] || exit 1
 }
 
 USAGE="Usage: ./install.sh [--extension | --global | --update | --update-rules | --check]"

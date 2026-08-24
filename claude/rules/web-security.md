@@ -29,7 +29,7 @@ in the application. Treat this as the default shape of the work, not hardening s
 - Passwords: server-side rules plus a breached-password check. Sessions invalidated on password
   change. Reset links single-use and expiring.
 - Login and reset responses must not reveal whether an account exists.
-- 2FA or a one-time-password flow, so nobody can sign up as somebody else.
+- 2FA or a one-time-password flow, so a stolen or reused password alone is not an account takeover.
 
 ## Input and uploads
 
@@ -51,7 +51,8 @@ in the application. Treat this as the default shape of the work, not hardening s
 
 - Prices and amounts are set **server-side**. The client sends product ids, never prices. An
   endpoint that reads the price from the request body is a pay-what-you-want store.
-- Payment webhooks are signature-verified and replay-safe. Stripe will deliver the same event twice.
+- Payment webhooks are signature-verified and replay-safe. Providers can and do deliver the same
+  event more than once - retries make duplicates a matter of time, not chance.
 
 ## AI-backed endpoints
 

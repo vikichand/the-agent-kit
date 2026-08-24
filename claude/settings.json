@@ -45,7 +45,18 @@
       "Read(**/.gnupg/**)",
       "Read(**/.npmrc)",
       "Read(**/.netrc)",
-      "Read(**/secrets/**)"
+      "Read(**/secrets/**)",
+      "Bash(npm install)",
+      "Bash(npm ci)",
+      "Bash(npm ci *)",
+      "Bash(yarn install)",
+      "Bash(bun install)",
+      "Bash(bun install *)",
+      "Bash(pnpm install)",
+      "Bash(python -m pip install *)",
+      "Bash(python3 -m pip install *)",
+      "Read(**/.env.staging)",
+      "Read(**/.env.test)"
     ],
     "deny": [
       "Bash(git commit --no-verify:*)",
