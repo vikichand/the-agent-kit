@@ -58,6 +58,17 @@ a complete spec is good economics. A cheaper model handed an ambiguous slice wil
 guess arrives looking like finished work. If a worker hits ambiguity it must stop and escalate rather
 than decide - say so explicitly in the delegation.
 
+**On a subscription, delegation is also how you stretch the week.** This part is documented, not
+folklore: session and weekly limits are one shared pool across all models, but models drain that pool
+at very different rates - "Opus costs several times more per turn than Sonnet, and Sonnet more than
+Haiku" - and Anthropic's own cost guidance says outright: "For simple subagent tasks, specify
+`model: haiku` in your subagent configuration." So every mechanical slice a cheap worker executes is
+capacity the lead model keeps for judgement. Two caveats, stated honestly: Anthropic publishes no
+per-model multiplier, so never promise a number; and the docs name `/clear` between unrelated tasks
+as the single most effective lever for stretching usage - cheaper than any routing. One nuance worth
+knowing: only the Opus limit is model-specific, so when it runs dry, switching models keeps you
+working.
+
 **Final review is always the lead's**, and it is not optional. This is what makes the whole
 arrangement safe: cheap execution is only cheap if something competent checks it.
 
