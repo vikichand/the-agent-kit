@@ -239,7 +239,7 @@ matches, and nothing at all otherwise.
 | Rule | Loads when the agent touches | Carries |
 |---|---|---|
 | `code-correctness.md` | source files | no silent fallbacks · idempotent, transactional writes · "what happens at 100k rows" · UTC and decimal money · named-ceiling shortcuts |
-| `web-security.md` | `auth/**`, `api/**`, `**/webhook*`, `**/payment*`, routes, middleware | sessions and server-side authz · uploads · HSTS/CSRF/CORS · server-side prices · limits on AI endpoints |
+| `web-security.md` | `auth/**`, `api/**`, `**/webhook*`, `**/payment*`, routes, middleware, edge config (`nginx.conf`, `Caddyfile`, `vercel.json`, `wrangler.toml`, `fly.toml`, `.htaccess`) | sessions and server-side authz · rate limits that survive a second instance · uploads · HSTS/CSRF/CORS · server-side prices · limits on AI endpoints |
 | `frontend-quality.md` | components, pages, `*.tsx`, `*.jsx` | accessibility (and its legal exposure) · i18n · skeleton loaders · UI restraint |
 | `data-layer.md` | migrations, models, schema, `*.sql` | expand -> migrate -> contract · N+1 and indexes · money and time column types · privacy |
 | `tests.md` | test files | never game the oracle · behaviour over internals · the edges · test-first |

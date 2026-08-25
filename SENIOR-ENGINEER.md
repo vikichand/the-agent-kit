@@ -216,7 +216,15 @@ Per-platform checklists get written when a real project needs them, not speculat
 - Authorization checked server-side on every request; a client-side admin check is decoration. Every
   NEW endpoint or mutation re-checks - the classic agent failure is copying an endpoint and dropping
   the check it had.
-- Login and password-reset endpoints rate-limited, with lockout or backoff after repeated failures.
+- Login and password-reset endpoints rate-limited. The limiter is where this goes wrong, and every
+  default is the wrong one: a shared store, not the in-process one that resets on deploy and counts
+  per instance; a client IP resolved through trusted-proxy config, not a raw `X-Forwarded-For` the
+  attacker supplies; per-account AND per-IP, since brute force is one shape or the other;
+  escalating backoff, not a hard account lock, which hands anyone the power to lock any user out of
+  their own account. Signup, reset email, search and uploads get limits too, not just login. Over
+  the limit is `429` with `Retry-After`, logged as a security event.
+- Volumetric abuse and IP blocking are an EDGE concern (CDN/WAF), not application code - and the
+  origin must not still answer around it. Part IV carries the launch check.
 - 2FA / one-time-password flow, so nobody signs up as somebody else.
 - Password rules enforced server-side plus a breached-password check. Sessions invalidated on
   password change. Reset links single-use and expiring. Login/reset responses never reveal whether
@@ -263,6 +271,10 @@ Per-platform checklists get written when a real project needs them, not speculat
   tab, Google snippet, and SEO baseline in one move.
 - **`sitemap.xml`** listing all public pages, submitted in Google Search Console - then watch the
   console for indexing errors instead of assuming Google found you.
+- **Something in front of the origin**: a CDN or WAF carrying IP reputation, bot scoring and IP
+  blocking - the only layer that can absorb volumetric abuse, since application code cannot refuse a
+  request it has already paid to receive. **And the origin must not answer around it**: an origin IP
+  still live on :443 undoes the whole layer, which is the step people skip.
 
 ---
 
@@ -285,6 +297,10 @@ Per-platform checklists get written when a real project needs them, not speculat
 | Session token in localStorage | III auth and sessions |
 | Copied endpoint missing authz | III auth and sessions |
 | Client-side price | III money |
+| In-memory rate limiter behind a load balancer | III rate limits and abuse |
+| Limiter keyed on a raw `X-Forwarded-For` | III rate limits and abuse |
+| Hard account lockout - a DoS on your own users | III rate limits and abuse |
+| Retries a `429` without honouring `Retry-After` | I.2 bounded, jittered retries |
 | Hallucinated package name | I.1 vet a dependency |
 | Redundant explainer text under headings | II UI restraint |
 | Ships with no OG image / sitemap | IV launch readiness |

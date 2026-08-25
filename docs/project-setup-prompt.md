@@ -82,7 +82,7 @@ data views; no redundant explainer text under headings.
 <!-- WEB only: -->
 **Checklists:** preparing a public launch -> open <kit>/docs/web-checklists.md (launch readiness).
 Security rules need no pointer: .claude/rules/web-security.md self-loads on auth / api / webhook /
-payment paths.
+payment paths and on edge config (nginx, Caddy, vercel.json, wrangler.toml, fly.toml, .htaccess).
 
 **A good run produces:** ...
 **Sources:** <allowed>   **Off-limits:** ...

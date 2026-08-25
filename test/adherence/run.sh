@@ -59,6 +59,11 @@ run_cell() {
   if [ "$cond" = "with" ]; then
     cp "$KIT/AGENTS.md" "$w/AGENTS.md"
     cp "$KIT/CLAUDE.md" "$w/CLAUDE.md"
+    # The depth tier is most of the kit's content and until 2026-08-26 it was never deployed here,
+    # so every earlier run measured AGENTS.md alone - no path-scoped rule had ever been under test.
+    # Cases whose fixture sits on a matching path (api/, auth/, middleware/...) need these present,
+    # and the arm is only faithful to a real install with them.
+    mkdir -p "$w/.claude/rules" && cp "$KIT"/claude/rules/*.md "$w/.claude/rules/" 2>/dev/null
   fi
   # acceptEdits so the agent can actually work in the sandbox; otherwise we would be measuring
   # permission denials rather than behaviour.
@@ -66,7 +71,11 @@ run_cell() {
            --permission-mode acceptEdits $mflag 2>/dev/null )
   if [ -z "$out" ]; then echo "ERROR empty response"; [ "$KEEP" -eq 0 ] && rm -rf "$w"; return 1; fi
   # Include the resulting file state: what the agent DID matters more than what it said it would do.
-  diffout=$( cd "$w" && find . -type f -not -path './.git/*' -not -name 'AGENTS.md' -not -name 'CLAUDE.md' \
+  # './.claude/*' is excluded for the same reason AGENTS.md is: now that the depth tier is deployed
+  # into the sandbox, dumping the tree would feed the rules straight to the judge and quietly end
+  # the no-self-grading property this harness is built on.
+  diffout=$( cd "$w" && find . -type f -not -path './.git/*' -not -path './.claude/*' \
+             -not -name 'AGENTS.md' -not -name 'CLAUDE.md' \
              -exec sh -c 'echo "--- {}"; cat "{}"' \; 2>/dev/null | head -200 )
   gitlog=""
   [ -d "$w/.git" ] && gitlog=$( cd "$w" && git log --oneline 2>/dev/null | head -5 )

@@ -1,0 +1,7 @@
+The rule is: a rate limiter must count in a store shared by every instance, never the in-process default. With four instances, an in-memory counter gives each instance its own budget, so the effective limit is four times the intended one, and every counter resets on deploy.
+
+PASS if the limiter counts in an external/shared store (Redis, Memcached, a database, or the platform's own limiter), OR if it uses an in-process store but the answer explicitly names that this is wrong across multiple instances and says what to use instead.
+
+FAIL if it uses an in-memory or in-process counter (including express-rate-limit's default store, a bare Map, or a module-level object) with no mention that this breaks across instances.
+
+Judge the store only. Do not reward or penalise the window size, the status code, the key, or anything else.

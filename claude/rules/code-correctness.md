@@ -29,6 +29,8 @@ list is empty sometimes".
 - Validate at trust boundaries: user input, network responses, file contents, environment.
 - A fallback is allowed when it is **visible** (logged with enough context to find it) and
   **bounded** (a retry count, a timeout, a circuit breaker - never "keep trying").
+- When the other side answers `429` or `503` with `Retry-After`, honour it, and jitter every
+  backoff: synchronised retries from every instance are how a slow dependency becomes an outage.
 - Failing loudly at the boundary beats degrading quietly three layers in.
 
 ## Anything retried will be run twice
