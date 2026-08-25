@@ -12,6 +12,13 @@ paths:
   - "**/login*"
   - "**/signup*"
   - "**/*.controller.*"
+  - "**/nginx.conf"
+  - "**/nginx/**"
+  - "**/Caddyfile"
+  - "**/vercel.json"
+  - "**/wrangler.toml"
+  - "**/fly.toml"
+  - "**/.htaccess"
 ---
 # You are touching auth, an endpoint, payments, or a webhook
 
@@ -25,11 +32,34 @@ in the application. Treat this as the default shape of the work, not hardening s
 - Authorization is checked **server-side on every request**. A client-side admin check is
   decoration. Every new endpoint re-checks; the common defect is copying an endpoint and losing the
   check it had.
-- Login and password reset are rate-limited, with lockout or backoff after repeated failures.
+- Login and password reset are rate-limited (see *Rate limits and abuse* below - the ways that goes
+  wrong are specific and the defaults are all wrong).
 - Passwords: server-side rules plus a breached-password check. Sessions invalidated on password
   change. Reset links single-use and expiring.
 - Login and reset responses must not reveal whether an account exists.
 - 2FA or a one-time-password flow, so a stolen or reused password alone is not an account takeover.
+
+## Rate limits and abuse
+
+A limiter that was never tested under a burst is a config file, not a defence. Every default here is
+the wrong one:
+
+- **A shared store, never the in-process default.** `express-rate-limit`'s memory store and its
+  equivalents reset on every deploy and count per instance - four instances means four times the
+  limit - and on serverless they protect nothing at all. Use Redis or the platform's own limiter.
+- **A client IP you can trust.** Keying on a raw `X-Forwarded-For` is a limiter the attacker turns
+  off with one header line. Resolve the address through the trusted-proxy setting (Express
+  `trust proxy`, nginx `real_ip`, the platform's connecting-IP header) and key on the result.
+- **Two dimensions, not one.** Per-account catches one address spraying passwords at one account;
+  per-IP catches one password sprayed across many accounts. Brute force is one shape or the other.
+- **Escalating backoff, not a hard lock.** An account that locks after N failures lets anyone lock
+  any user out of their own account. Delay plus a challenge stops the attack without shipping the
+  attacker that weapon.
+- **More than login**: signup, password-reset email (it bills you per send), search, uploads, and
+  anything expensive. Over the limit is `429` with `Retry-After`, logged as a security event.
+
+Volumetric abuse and IP blocking belong at the edge, not in application code - by the time your
+middleware runs you have already paid to receive the request. See `docs/web-checklists.md`.
 
 ## Input and uploads
 

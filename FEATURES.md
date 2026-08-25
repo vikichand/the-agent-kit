@@ -57,7 +57,7 @@ deleted to make room.
 | Rule | Loads when you touch | Carries |
 |---|---|---|
 | `code-correctness.md` | source files | no silent fallbacks · idempotent + transactional writes · the 100k-rows question · UTC and decimal money · named-ceiling shortcuts |
-| `web-security.md` | `auth/**`, `api/**`, `**/webhook*`, `**/payment*`, routes, middleware | sessions and authz · input and uploads · HSTS/CSRF/CORS · server-side prices · AI endpoint limits |
+| `web-security.md` | `auth/**`, `api/**`, `**/webhook*`, `**/payment*`, routes, middleware, edge config (`nginx.conf`, `Caddyfile`, `vercel.json`, `wrangler.toml`, `fly.toml`, `.htaccess`) | sessions and authz · rate limits and brute-force defence · input and uploads · HSTS/CSRF/CORS · server-side prices · AI endpoint limits |
 | `frontend-quality.md` | components, pages, `*.tsx`, `*.jsx` | a11y (and its legal exposure) · i18n · skeleton loaders · UI restraint |
 | `data-layer.md` | migrations, models, schema, `*.sql` | expand -> migrate -> contract · N+1 and indexes · money and time column types · privacy |
 | `tests.md` | test files | never game the oracle · behaviour over internals · the edges · test-first |

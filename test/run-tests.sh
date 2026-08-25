@@ -254,6 +254,30 @@ d=$(sh "$KIT/install.sh" --check 2>&1)
 has "lack 'paths:' frontmatter" "$d"   && pass "R7 doctor flags a rule that would load always-on" || bad "R7 frontmatter-less rule NOT flagged"
 cd "$KIT"; rm -rf "$w"
 
+# R8: the security rule has to REACH edge config, because that is where rate limiting and IP
+# blocking actually get written - and no rule may claim a glob so broad it drags 12 KiB of the depth
+# tier into projects it has nothing to say about.
+#
+# STRUCTURAL ONLY, and read it as nothing more: this proves the globs are DECLARED. It does not
+# prove Claude Code matches them - that was measured once for the tier by token count (free on a
+# non-match, +12.7k on a match) and is not re-measured here.
+ws="$KIT/claude/rules/web-security.md"
+miss=""
+for g in 'nginx.conf' 'Caddyfile' 'vercel.json' 'wrangler.toml' 'fly.toml' '.htaccess'; do
+  grep -q "\"\*\*/$g\"" "$ws" || miss="$miss $g"
+done
+[ -z "$miss" ] && pass "R8 web-security.md reaches edge config (nginx, Caddy, vercel, wrangler, fly, htaccess)" \
+                || bad "R8 web-security.md declares no glob for:$miss"
+broad=""
+for r in "$KIT"/claude/rules/*.md; do
+  [ -e "$r" ] || continue
+  awk '/^paths:/{p=1;next} /^---/{if(p)exit} p' "$r" \
+    | grep -qE '"\*\*/\*\.(ya?ml|json|toml|tf|md|txt)"|"\*\*/\*"|"\*"' \
+    && broad="$broad $(basename "$r")"
+done
+[ -z "$broad" ] && pass "R8 no rule claims a catch-all glob that would load it into unrelated projects" \
+                 || bad "R8 over-broad glob in:$broad"
+
 # ---------- install.sh --update ----------
 # Runs against a LOCAL clone source with a fake HOME: no network, and the real ~/.the-agent-kit
 # is never touched. AGENT_KIT_REPO is the same override a fork would use.

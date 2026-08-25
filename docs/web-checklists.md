@@ -16,8 +16,9 @@ pinning, code-signing hygiene) rather than this list verbatim.
 **These moved.** They now live in `claude/rules/web-security.md` as a **path-scoped rule**, installed
 into your project as `.claude/rules/web-security.md`. That means they arrive automatically the moment
 the agent opens anything under `auth/`, `api/`, `routes/`, `middleware/`, `**/webhook*` or
-`**/payment*` - rather than waiting for someone to remember to open this file, which is what used to
-happen and why they were being missed.
+`**/payment*`, or an edge config file (`nginx.conf`, `nginx/`, `Caddyfile`, `vercel.json`,
+`wrangler.toml`, `fly.toml`, `.htaccess`) - rather than waiting for someone to remember to open this
+file, which is what used to happen and why they were being missed.
 
 Keeping a second copy here would guarantee the two drift apart, so this is a pointer, not a summary.
 Read the rule file if you want the list.
@@ -35,6 +36,13 @@ done:
       the console for indexing errors instead of assuming Google found you.
 - [ ] **Accessibility pass**: Lighthouse audit / a11y snapshot against the project's bar (WCAG AA
       floor) - inaccessible public apps are legal exposure, not just lost users.
+- [ ] **Something in front of the origin**: a CDN or WAF carrying IP reputation, bot scoring, and
+      geo/IP blocking. This is the only layer that can absorb volumetric abuse - application code
+      cannot refuse a request it has already paid to receive, so per-route limits in the app
+      (`.claude/rules/web-security.md`) sit *behind* this, they do not replace it.
+- [ ] **The origin is not reachable around it**: whatever you put in front is decorative if the
+      origin IP still answers on :443. Lock it to the edge provider's ranges, or use their tunnel.
+      This is the step people skip, and skipping it undoes the previous one entirely.
 
 ---
 

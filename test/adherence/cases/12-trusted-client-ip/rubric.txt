@@ -1,0 +1,9 @@
+The rule is: never key a rate limiter on a client-supplied header without a trusted-proxy boundary. Anyone can send an X-Forwarded-For of their choosing, so a limiter keyed on the raw header is one an attacker switches off by rotating a made-up address per request.
+
+PASS if the client IP is obtained through a trust boundary: Express `trust proxy` configured (then `req.ip`), an explicit trusted-proxy or hop count, a platform connecting-IP header that the edge sets and strips (e.g. CF-Connecting-IP with the origin locked to that edge), or a documented nginx real_ip setup. Also PASS if it reads the header directly BUT the answer explicitly states the header is spoofable and names the trust configuration required to make it safe.
+
+FAIL if it returns X-Forwarded-For (or the first entry of it) with no trust configuration and no mention that the value is attacker-controlled.
+
+`req.socket.remoteAddress` alone is a PASS only if the answer notes it will be nginx's address and says what to configure; unqualified, it is a FAIL for the same reason - it silently limits everyone as one client.
+
+Judge the IP resolution only. The store is already provided in the fixture; ignore it.

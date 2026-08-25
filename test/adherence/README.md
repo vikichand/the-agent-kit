@@ -34,7 +34,7 @@ of `run-tests.sh`, which stays free, offline, and fast.
 ## How it works
 
 Each case is a throwaway repo, a realistic prompt, and a rubric. It runs twice: once with
-`AGENTS.md` + `CLAUDE.md` present, once without. A **separate** judge call then grades the
+`AGENTS.md` + `CLAUDE.md` + `.claude/rules/` present, once without. A **separate** judge call grades the
 transcript plus the resulting files against the rubric alone - it never sees the rules file or the
 agent's reasoning, which is the kit's own "don't grade your own homework" rule applied to itself.
 
@@ -61,6 +61,13 @@ agent's reasoning, which is the kit's own "don't grade your own homework" rule a
 | `08-unasked-commit` | invariant | Committing when only a fix was asked for |
 | `09-test-first` | §5 | Shipping the implementation with no test |
 | `10-idempotent-webhook` | §3 + payments checklist | A payment webhook that neither dedupes nor verifies signatures |
+| `11-rate-limit-store` | `web-security.md` | An in-memory limiter on a service that runs four instances |
+| `12-trusted-client-ip` | `web-security.md` | Keying the limiter on a raw, attacker-supplied `X-Forwarded-For` |
+
+Cases 11 and 12 test the **depth tier**, not `AGENTS.md`, so their fixtures deliberately sit on
+paths that `web-security.md` declares (`api/`, `middleware/`). Move the fixture off those paths and
+the rule stops loading and the case silently measures nothing - which is what the harness itself did
+until 2026-08-26, when it began deploying `.claude/rules/` into the "with" arm at all.
 
 ## What this does not tell you
 
@@ -70,7 +77,7 @@ Be honest about the limits when quoting any number from it:
   more is the minimum for a claim, and even then the cases are pass/fail, not graded.
 - **The judge can be wrong.** It is a model reading a rubric. Spot-check with `--keep` before
   trusting a surprising verdict.
-- **It measures a proxy.** Ten scenarios in throwaway repos are not your codebase under a long
+- **It measures a proxy.** Twelve scenarios in throwaway repos are not your codebase under a long
   session, which is exactly when adherence decays. A rule passing here can still slip at hour three.
 - **The control is imperfect.** "Without rules" still has whatever lives in `~/.claude/CLAUDE.md`
   and any global rules on the machine running it, so the measured gap is a floor, not a ceiling.
@@ -80,12 +87,16 @@ Be honest about the limits when quoting any number from it:
 One directory under `cases/`, four files:
 
 ```
-cases/11-your-rule/
+cases/13-your-rule/
   rule.txt     one line: which rule this tests
   prompt.txt   what the user asks - realistic, and it must be possible to answer badly
   rubric.txt   what PASS and FAIL look like, concretely enough that a judge cannot waffle
   setup.sh     builds the fixture in a throwaway cwd (use printf, not heredocs)
 ```
+
+If the rule under test lives in `claude/rules/` rather than `AGENTS.md`, put the fixture on a path
+that rule's `paths:` frontmatter actually matches. Otherwise both arms are identical and a green
+result means nothing.
 
 The prompt has to be one where a careless answer is genuinely tempting. A case the model passes
 anyway teaches you nothing about the rule.
