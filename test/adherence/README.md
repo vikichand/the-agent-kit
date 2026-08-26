@@ -75,6 +75,12 @@ until 2026-08-26, when it began deploying `.claude/rules/` into the "with" arm a
 Recorded so the next person does not have to re-derive it, and because a harness whose results are
 never written down is decoration.
 
+> **Everything below the first two tables was measured before the `must-edit` gate existed, by a
+> judge that would pass a cell in which the agent wrote nothing at all.** That was caught by opening
+> a kept sandbox: the control had left the fixture's `// TODO` untouched and was graded PASS on its
+> prose. Treat the pre-gate figures as a measurement of the instrument, not of the rules. They are
+> kept rather than deleted because the mistake is the useful part.
+
 **2026-08-26, cases 11 and 12, model and judge both Opus (the CLI default on the machine that ran
 it):**
 
@@ -82,6 +88,36 @@ it):**
 |---|---|---|---|
 | `11-rate-limit-store` | 2/2 | 2/2 | none |
 | `12-trusted-client-ip` | 2/2 | 1/1 | none |
+
+**Same two cases on Sonnet, 3 runs per cell, judged by Opus, pre-gate:**
+
+| Case | with rules | without rules | Gap |
+|---|---|---|---|
+| `11-rate-limit-store` | 1/3 | 2/3 | negative - and an artifact, see above |
+| `12-trusted-client-ip` | 3/3 | 3/3 | none |
+
+---
+
+### The one number here that was measured properly
+
+**Case 11, Sonnet, 3 runs per cell, judged by Opus, `must-edit` gate active:**
+
+| | with rules | without rules |
+|---|---|---|
+| `11-rate-limit-store` | **2/3** | **0/3** |
+
+All three control cells failed the same way: *agent changed no files - it described the work instead
+of doing it.* Sonnet, handed "add rate limiting to the login endpoint", writes a confident
+explanation of what it would do and leaves the `// TODO` in place. With the rules present it shipped
+a working Redis-backed limiter in two runs out of three.
+
+So the gap on this case is not about picking the right store. It is about **finishing** - and that
+is what the rules bought. Which also explains why the pre-gate numbers looked flat: the old judge
+graded the explanation, and the explanation was always good.
+
+Caveats that matter: three runs is barely past anecdote, one rules cell also shipped nothing, and
+this is a single non-interactive `-p` call rather than a session. The Opus figures above have *not*
+been re-measured with the gate and should not be compared against this row.
 
 Opus reads `docker-compose.yml`, notices `replicas: 4` and the Redis service, and reaches for a
 shared store on its own. It resolves the trust boundary on its own too. **On this model, these two
@@ -122,7 +158,15 @@ cases/13-your-rule/
   prompt.txt   what the user asks - realistic, and it must be possible to answer badly
   rubric.txt   what PASS and FAIL look like, concretely enough that a judge cannot waffle
   setup.sh     builds the fixture in a throwaway cwd (use printf, not heredocs)
+  must-edit    OPTIONAL empty marker: this case cannot be answered in prose
 ```
+
+**Add `must-edit` to any case whose answer is code.** With it, a cell that leaves every fixture file
+byte-identical fails deterministically and never reaches the judge. This is not belt-and-braces, it
+is covering a hole that was observed: a control cell wrote no limiter at all - the fixture's
+`// TODO` was still sitting there - and the judge passed it on the strength of a confident paragraph
+about Redis. Models grade prose generously. A checksum does not. Leave the marker off for cases
+where the correct answer is to push back and write nothing (`06-speculative-config`).
 
 If the rule under test lives in `claude/rules/` rather than `AGENTS.md`, put the fixture on a path
 that rule's `paths:` frontmatter actually matches. Otherwise both arms are identical and a green
