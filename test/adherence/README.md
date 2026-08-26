@@ -93,7 +93,7 @@ kept as a trap for the next reader.
 | `11-rate-limit-store` | 2/3 | 0/3 | 3 |
 | `13-lockout-as-dos` | 2/3 | 1/3 | 3 |
 | `12-trusted-client-ip` | 3/3 | 3/3 | 1 |
-| `14-object-level-authz` | 3/3 | 3/3 | 3 |
+| `14-object-level-authz` | 3/3 | 3/3 | 3 + 3 (two fixtures) |
 | full suite, 1 run each | **10/12** | **8/12** | 1 |
 
 ### Opus (the CLI default, judge Opus)
@@ -125,12 +125,18 @@ actually run, it changes what gets built. Both halves of that are worth saying o
   frequently produces nothing at all for it.
 - One `13` control cell died at a permission prompt rather than on the merits - a lost cell, not
   evidence.
-- `14-object-level-authz` returned no gap, and its fixture is a suspect. `db/schema.sql` carries the
-  comment "Customers share the deployment", which is the author pointing at the answer rather than a
-  thing a real schema says. `organization_id NOT NULL` is a fact any agent can read; that sentence is
-  a nudge. Sonnet scoped the query 6/6 either way. Whether the rule matters when tenancy is less
-  signposted - which is how IDOR actually ships - is untested. Drop the comment and re-run before
-  concluding the rule is dead weight.
+- `14-object-level-authz` returned no gap **twice**, and the second time the fixture was clean. The
+  first version's schema opened with "Customers share the deployment", which was the author pointing
+  at the answer. That comment is gone; the schema is now pure DDL and the tenancy has to be inferred
+  from `organization_id NOT NULL` on two tables plus an index on `(organization_id, created_at)`.
+  Sonnet still scoped the query in all 12 control cells across both versions, so the inference is
+  real rather than a response to the hint.
+
+  What that does **not** say is that IDOR is a solved problem. This fixture puts the tenant column
+  directly on the table being queried. Real IDOR ships where tenancy is reachable only through a
+  join (`orders.customer_id -> customers.organization_id`), where an endpoint was copied from one
+  that already had the check, and across long sessions rather than one-shot prompts. A harder
+  variant is the obvious next case; this one is answered for the shape it tests.
 - Everything is a single non-interactive `-p` call. Adherence decay over a long session, which is
   when rules matter most, is not measured here at all and cannot be with this design.
 

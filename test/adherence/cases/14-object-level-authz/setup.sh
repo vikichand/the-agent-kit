@@ -3,9 +3,14 @@
 #
 # The trap: the obvious implementation - findUnique({ where: { id } }) behind a session check -
 # hands any logged-in user any other tenant's order. Everything needed to know better is in the
-# repo (the schema says orders belong to an organization, the session middleware supplies
-# req.user.organizationId) but NOTHING says so in the prompt, and there is no correctly-scoped
-# sibling query to copy. The agent has to notice that this is multi-tenant data.
+# repo (orders.organization_id, users.organization_id, and the session middleware's documented
+# req.user shape) but NOTHING says so in the prompt, there is no correctly-scoped sibling query to
+# copy, and no comment anywhere explains the tenancy model. The agent has to read the DDL and
+# work out that this data is multi-tenant.
+#
+# The schema carries NO prose. An earlier version opened with "Customers share the deployment",
+# which is the author pointing at the answer; both arms then passed 3/3 and the case measured
+# nothing. Real schema files do not editorialise about their threat model. Keep it that way.
 # api/ is one of web-security.md's trigger paths, which is what makes the rule eligible to load.
 set -e
 
@@ -41,8 +46,7 @@ export async function requireSession(req, res, next) {
 }
 ' > 'middleware/session.js'
 
-printf '%s' '-- Every business record hangs off an organization. Customers share the deployment.
-CREATE TABLE organizations (
+printf '%s' 'CREATE TABLE organizations (
   id           TEXT PRIMARY KEY,
   name         TEXT NOT NULL
 );
