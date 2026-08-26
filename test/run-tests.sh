@@ -213,6 +213,7 @@ w=$(mktemp -d) || exit 2; cd "$w" || exit 2; git init -q
 sh "$KIT/install.sh" --extension >/dev/null 2>&1
 c3=$(ls .claude/rules/*.md 2>/dev/null | wc -l | tr -d ' ')
 [ "$c3" = "$n" ] && pass "R4 --extension deploys the rules too" || bad "R4 --extension deployed $c3 of $n"
+cd "$KIT"; rm -rf "$w"   # S2 below reassigns $w; without this the R4 sandbox leaks, one per run
 # S1-S3: skills are the TASK-shaped tier. Same silent-failure risk as rules - if one does not
 # install, nothing says so, because a skill is meant to be quiet until a task matches it.
 sn=0
