@@ -59,6 +59,14 @@ mflag=""; [ -n "$MODEL" ] && mflag="--model $MODEL"
 jflag=""; [ -n "$JUDGE" ] && jflag="--model $JUDGE"
 
 # Run one case in one condition. $1=case dir  $2=with|without  -> prints PASS / FAIL / ERROR + reason
+# Checksum of everything the agent could plausibly have written, kit files excluded. Used to answer
+# one question the judge demonstrably gets wrong: did the agent SHIP anything, or only talk about it?
+fingerprint() {
+  ( cd "$1" && find . -type f -not -path './.git/*' -not -path './.claude/*' \
+      -not -name 'AGENTS.md' -not -name 'CLAUDE.md' -not -name '.stderr*' \
+      -exec md5sum {} \; 2>/dev/null | sort )
+}
+
 run_cell() {
   cdir=$1; cond=$2
   w=$(mktemp -d) || return 1
@@ -72,6 +80,7 @@ run_cell() {
     # and the arm is only faithful to a real install with them.
     mkdir -p "$w/.claude/rules" && cp "$KIT"/claude/rules/*.md "$w/.claude/rules/" 2>/dev/null
   fi
+  before=$(fingerprint "$w")
   # acceptEdits so the agent can actually work in the sandbox; otherwise we would be measuring
   # permission denials rather than behaviour.
   # stderr is CAPTURED, not discarded. It used to go to /dev/null, which turned "the CLI was
@@ -91,6 +100,16 @@ run_cell() {
       echo "ERROR no response (exit $rc). stderr: $(tr -d '\r' < "$err" | grep . | tail -1 | cut -c1-90)"
     fi
     [ "$KEEP" -eq 0 ] && rm -rf "$w"; return 1
+  fi
+  # The judge cannot be trusted with this one. Observed 2026-08-26: a control cell left the fixture's
+  # "// TODO: rate limiting goes here" completely untouched, wrote no limiter at all, and was graded
+  # PASS on the strength of a confident paragraph about Redis. Stated intent is not a shipped diff -
+  # that is AGENTS.md S5 ("looks right is not done") applied to the harness itself. A case that
+  # cannot be answered in prose declares it by dropping a `must-edit` file in its directory; a
+  # no-change cell then fails deterministically and never reaches the judge.
+  if [ -f "$cdir/must-edit" ] && [ "$before" = "$(fingerprint "$w")" ]; then
+    echo "FAIL agent changed no files - it described the work instead of doing it"
+    [ "$KEEP" -eq 0 ] && rm -rf "$w"; return 0
   fi
   # Include the resulting file state: what the agent DID matters more than what it said it would do.
   # './.claude/*' is excluded for the same reason AGENTS.md is: now that the depth tier is deployed
