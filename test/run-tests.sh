@@ -351,6 +351,16 @@ else
   cmp -s "$KIT/claude/rules/web-security.md" "$u/.claude/rules/web-security.md" \
     && pass "U11 stale kit-owned rule refreshed by --update-rules" || bad "U11 stale kit rule NOT refreshed"
   rm -rf "$u"
+  # U12: every command the installer TELLS a human to run must still work after it exits. --update
+  # clones to a temp dir and deletes it on the way out, so anything printed with that path is broken
+  # by the time it is read. This caught exactly that: `cat "$KIT/AGENTS.md" >> ~/.claude/CLAUDE.md`
+  # pointed at the throwaway clone. Assert that no path the output names has vanished.
+  missing=""
+  for p in $(printf '%s\n' "$d" | grep -oE '/tmp/[A-Za-z0-9._/-]+' | sort -u); do
+    [ -e "$p" ] || missing="$missing $p"
+  done
+  [ -z "$missing" ] && pass "U12 every path the installer prints still exists after it exits" \
+                    || bad "U12 installer printed vanished path(s):$missing"
   # U9: the structural guard U8 cannot be. update_kit must END by exec-ing the downloaded installer -
   # exec replaces the process, so not one more byte is read from the file --global is overwriting.
   # Any refactor that turns this back into a plain call reintroduces the corruption, silently.

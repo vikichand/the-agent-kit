@@ -5,7 +5,81 @@ Rules and guardrails that make coding agents behave. One install, wired for both
 
 ## Quick Start
 
-Four steps. Two set up your machine, two set up each project.
+Two ways in. They end in the same place - pick whichever you prefer.
+
+### Option A: hand it to your agent
+
+Paste one of these into Claude Code or Codex **from inside the project you want set up**. Nothing to
+clone, download, or run first.
+
+**Install:**
+
+```text
+Set up the-agent-kit for me - machine-wide first, then in this project.
+
+1. Download https://raw.githubusercontent.com/vikichand/the-agent-kit/main/install.sh into a
+   temporary directory OUTSIDE this project and run `sh install.sh --update` from there. That
+   copies the kit to ~/.the-agent-kit and prints two settings snippets. Delete the download after.
+2. Merge the printed Claude snippet into ~/.claude/settings.json. Create that file if it does not
+   exist. If it does exist, ADD the entries to the existing "permissions" and "hooks" lists rather
+   than replacing them, and keep the file valid JSON. Only touch ~/.codex/config.toml if I use Codex.
+3. From this project's root, run `~/.the-agent-kit/install.sh`.
+4. Run `~/.the-agent-kit/install.sh --check` and show me the output.
+5. You are NOT allowed to turn on the git hooks: the kit denies `git config core.hooksPath` so an
+   agent cannot point git away from them, and that denial applies to you too. Print the exact
+   command and tell me to run it myself in a normal terminal.
+6. Finally, open ~/.the-agent-kit/docs/project-setup-prompt.md and follow the prompt inside it for
+   this project.
+
+Change nothing outside the files named above, and summarise what you did at the end.
+```
+
+**Update, later:**
+
+```text
+Update the-agent-kit for me.
+
+1. Run `~/.the-agent-kit/install.sh --update`. It reports old -> new, or says it is already current.
+2. From this project's root, run `~/.the-agent-kit/install.sh --update-rules`. That refreshes the
+   universal rules and keeps my PROJECT-CONFIG block.
+3. Show me `git diff AGENTS.md`. An update replaces anything hand-edited OUTSIDE the
+   PROJECT-CONFIG markers, so I want to see what moved.
+4. Run `~/.the-agent-kit/install.sh --check` and show me the output.
+
+If the settings snippets changed, tell me what changed and wait for my go-ahead before touching
+~/.claude/settings.json.
+```
+
+### Option B: run it yourself
+
+**Install:**
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/vikichand/the-agent-kit/main/install.sh
+sh install.sh --update                                # -> ~/.the-agent-kit, prints 2 snippets
+git config --global core.hooksPath "$HOME/.the-agent-kit/git-hooks"
+cd /path/to/project && ~/.the-agent-kit/install.sh    # per project
+```
+
+**Update, later:**
+
+```bash
+~/.the-agent-kit/install.sh --update                            # machine-wide, run from anywhere
+cd /path/to/project && ~/.the-agent-kit/install.sh --update-rules   # keeps your PROJECT-CONFIG
+```
+
+Two things neither option can skip. **Merge the settings snippets** that line 2 prints, or the tool
+guard does nothing ([step 3](#3-merge-the-printed-settings-snippets)). And **run the per-project
+setup prompt** once ([step 5](#5-run-the-setup-prompt-once-per-project)) - it is the single
+highest-value minute you will spend, because without it the agent guesses your build and test
+commands.
+
+The `core.hooksPath` line must run in a **normal terminal, not inside an agent session** - the kit
+denies it precisely so an agent cannot disable its own guards.
+
+## Every step, in detail
+
+Five steps. Three set up your machine, two set up each project.
 
 ### 1. Get the kit
 
