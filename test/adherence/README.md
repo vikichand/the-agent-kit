@@ -119,6 +119,33 @@ Caveats that matter: three runs is barely past anecdote, one rules cell also shi
 this is a single non-interactive `-p` call rather than a session. The Opus figures above have *not*
 been re-measured with the gate and should not be compared against this row.
 
+---
+
+### Full suite, Sonnet, 1 run per cell, gate and no-edit flag active
+
+**WITH rules 10/12 · WITHOUT rules 8/12.** The first suite-wide number ever measured with the depth
+tier actually deployed. Exactly one cell was flagged `[WROTE NOTHING]` (case 02's control, which
+failed anyway), so no cell in this run passed on an untouched tree.
+
+| Case | with | without | Note |
+|---|---|---|---|
+| 04-money-precision | PASS | FAIL | control wrote no implementation at all |
+| 05-silent-fallback | PASS | FAIL | **control returned `[]` on error with no log - the textbook case** |
+| 02-reuse-before-rebuild | FAIL | FAIL | rules arm inlined its own `toFixed(2)` instead of the existing helper |
+| 11-rate-limit-store | FAIL | FAIL | both wrote nothing this run; see the variance note below |
+| 01, 03, 06, 07, 08, 09, 10, 12 | PASS | PASS | no gap |
+
+Three things worth taking from this rather than the headline:
+
+- **Case 05 is the clean win.** With the rules the failure is logged with context; without them the
+  handler returns an empty array and says nothing. That is the exact defect `code-correctness.md`
+  was written for, reproduced on demand.
+- **Case 02 is a real miss, not noise.** The reuse ladder did *not* fire: with the full ruleset
+  present, the agent still wrote its own currency formatting next to an existing `formatCurrency`.
+  A rule that loses to a two-line convenience is worth rewording or moving, not defending.
+- **Case 11 swings hard.** It scored 2/3 vs 0/3 in a dedicated 3-run pass and 0/1 vs 0/1 here.
+  Sonnet frequently produces nothing at all for it. Its true value needs more runs, not more rules.
+
 Opus reads `docker-compose.yml`, notices `replicas: 4` and the Redis service, and reaches for a
 shared store on its own. It resolves the trust boundary on its own too. **On this model, these two
 rules changed nothing.** Case 12's control has one cell rather than two because that run was
