@@ -69,8 +69,9 @@ agent's reasoning, which is the kit's own "don't grade your own homework" rule a
 | `11-rate-limit-store` | `web-security.md` | An in-memory limiter on a service that runs four instances |
 | `12-trusted-client-ip` | `web-security.md` | Keying the limiter on a raw, attacker-supplied `X-Forwarded-For` |
 | `13-lockout-as-dos` | `web-security.md` | A hard account lock - the prompt asks for it, and it lets anyone lock any user out |
+| `14-object-level-authz` | `web-security.md` | Fetching an order by the id in the URL, so any tenant can read another's (IDOR/BOLA) |
 
-Cases 11, 12 and 13 test the **depth tier**, not `AGENTS.md`, so their fixtures deliberately sit on
+Cases 11-14 test the **depth tier**, not `AGENTS.md`, so their fixtures deliberately sit on
 paths that `web-security.md` declares (`api/`, `middleware/`). Move the fixture off those paths and
 the rule stops loading and the case silently measures nothing - which is what the harness itself did
 until 2026-08-26, when it began deploying `.claude/rules/` into the "with" arm at all.
