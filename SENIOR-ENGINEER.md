@@ -74,6 +74,10 @@ Two halves, two destinies:
 - **Multi-step writes are transactional; retried work is idempotent.** [NEW] A crash between two
   writes must not leave half a record. Webhooks, queue consumers, and retried requests WILL fire
   twice; a senior's handler survives replay, an agent's handler double-charges.
+- **Check-then-act is a race.** [NEW 2026-08-27] The gap between "has enough credits" and "take the
+  credits" is where two concurrent requests both pass. Make it one conditional write whose affected
+  rows you inspect, a unique constraint, or a held lock - never SELECT then UPDATE. Invisible to any
+  test that sends one request at a time.
 - **Ask "what happens at 100k rows?"** [NEW] No query inside a loop (N+1), no fetch-all without
   pagination or limit, no loading a whole file or table into memory. Fine at demo scale, an incident
   at real scale.
@@ -216,7 +220,7 @@ Per-platform checklists get written when a real project needs them, not speculat
 - Authorization checked server-side on every request; a client-side admin check is decoration. Every
   NEW endpoint or mutation re-checks - the classic agent failure is copying an endpoint and dropping
   the check it had.
-- **Authenticated is not authorized.** Every query filters by the caller's user/tenant id in the
+- **Authenticated is not authorized** (IDOR; BOLA in the API top ten). Every query filters by the caller's user/tenant id in the
   WHERE clause, rather than checking a session exists and then fetching by the id in the URL. This
   is the defect that hands one customer another's data, and it is invisible to every test written
   with a single account.
@@ -336,7 +340,8 @@ Per-platform checklists get written when a real project needs them, not speculat
 | Session token in localStorage | III auth and sessions |
 | Copied endpoint missing authz | III auth and sessions |
 | Client-side price | III money |
-| Fetches by the id in the URL with no tenant filter | III authenticated is not authorized |
+| Fetches by the id in the URL with no tenant filter (IDOR/BOLA) | III authenticated is not authorized |
+| `SELECT` balance, then `UPDATE` it | I.2 check-then-act is a race |
 | Spreads `req.body` into the model | III allowlist what is settable |
 | String-concatenates SQL, a shell command, or a path | III one bug in six costumes |
 | `catch { return true }` around a permission check | III fail closed |

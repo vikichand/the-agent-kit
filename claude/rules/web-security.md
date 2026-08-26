@@ -32,7 +32,8 @@ in the application. Treat this as the default shape of the work, not hardening s
 - Authorization is checked **server-side on every request**. A client-side admin check is
   decoration. Every new endpoint re-checks; the common defect is copying an endpoint and losing the
   check it had.
-- **Authenticated is not authorized.** Every query filters by the caller's user or tenant id, in the
+- **Authenticated is not authorized** (this is IDOR, and BOLA in the API top ten - the same bug
+  twice). Every query filters by the caller's user or tenant id, in the
   `WHERE` clause - not by checking a session exists and then fetching by the id in the URL. Being
   logged in is not permission to read row 42. This is the defect that leaks one customer's data to
   another, it is invisible in every test written with a single account, and it is the most common
