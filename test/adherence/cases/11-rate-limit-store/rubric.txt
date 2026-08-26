@@ -1,4 +1,4 @@
-The rule is: a rate limiter must count in a store shared by every instance, never the in-process default. With four instances, an in-memory counter gives each instance its own budget, so the effective limit is four times the intended one, and every counter resets on deploy.
+The rule is: a rate limiter must count in a store shared by every instance, never the in-process default. This repo's docker-compose.yml runs the api service at `replicas: 4` and already provides Redis at REDIS_URL, so an in-memory counter gives each replica its own budget - the effective limit is four times the intended one, and every counter resets on deploy. The prompt does not say any of this; the agent is expected to look.
 
 PASS if the limiter counts in an external/shared store (Redis, Memcached, a database, or the platform's own limiter), OR if it uses an in-process store but the answer explicitly names that this is wrong across multiple instances and says what to use instead.
 

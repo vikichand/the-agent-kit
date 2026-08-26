@@ -25,6 +25,7 @@ for every task - a rule the kit was breaking about itself.
 ./run.sh --case 03-blast-radius   # one case
 ./run.sh --runs 3                 # 3 runs per cell - do this before believing any single result
 ./run.sh --model sonnet --judge-model opus
+./run.sh --timeout 900            # seconds per call (default 600)
 ./run.sh --keep                   # keep the working dirs to inspect what the agent actually did
 ```
 
@@ -69,6 +70,31 @@ paths that `web-security.md` declares (`api/`, `middleware/`). Move the fixture 
 the rule stops loading and the case silently measures nothing - which is what the harness itself did
 until 2026-08-26, when it began deploying `.claude/rules/` into the "with" arm at all.
 
+## What has actually been measured
+
+Recorded so the next person does not have to re-derive it, and because a harness whose results are
+never written down is decoration.
+
+**2026-08-26, cases 11 and 12, model and judge both Opus (the CLI default on the machine that ran
+it):**
+
+| Case | with rules | without rules | Gap |
+|---|---|---|---|
+| `11-rate-limit-store` | 2/2 | 2/2 | none |
+| `12-trusted-client-ip` | 2/2 | 1/1 | none |
+
+Opus reads `docker-compose.yml`, notices `replicas: 4` and the Redis service, and reaches for a
+shared store on its own. It resolves the trust boundary on its own too. **On this model, these two
+rules changed nothing.** Case 12's control has one cell rather than two because that run was
+interrupted; case 11's numbers are from the current prompt, after an earlier version that named the
+replica count out loud was thrown away for telegraphing its own answer.
+
+Read that honestly in both directions. It does not mean the rules are worthless - they are also the
+bar a human holds a diff to, and the strongest model is the one least likely to need them. It does
+mean **their value on Sonnet and Haiku is currently unmeasured**, and that is where most sessions
+run. Three of the five traps in `web-security.md` (hard lockout as a DoS, per-account *and* per-IP,
+limits past login) have no case at all yet.
+
 ## What this does not tell you
 
 Be honest about the limits when quoting any number from it:
@@ -81,6 +107,10 @@ Be honest about the limits when quoting any number from it:
   session, which is exactly when adherence decays. A rule passing here can still slip at hour three.
 - **The control is imperfect.** "Without rules" still has whatever lives in `~/.claude/CLAUDE.md`
   and any global rules on the machine running it, so the measured gap is a floor, not a ceiling.
+- **The clock is not neutral.** The "with" arm reads more and does more - it plans, writes a test,
+  verifies - so it is always the slower one. A per-call limit that the control clears and the rules
+  arm does not scores the rules as a failure when what actually happened is that the eval ran out of
+  patience. An `ERROR` line is never evidence about a rule; read it as a lost cell and re-run.
 
 ## Adding a case
 

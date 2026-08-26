@@ -6,6 +6,7 @@
 #   ./run.sh --runs 3                 3 runs per cell (the results are noisy; see README)
 #   ./run.sh --model sonnet           model under test      (default: the CLI default)
 #   ./run.sh --judge-model opus       model doing the grading
+#   ./run.sh --timeout 900            seconds per call (default 600; the "with" arm is the slow one)
 #   ./run.sh --keep                   keep the working dirs for inspection
 #
 # COSTS REAL TOKENS. Each case runs the agent twice (with rules, without) and a judge twice.
@@ -20,12 +21,18 @@ set -u
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 KIT=$(CDPATH= cd -- "$HERE/../.." && pwd)
 RUNS=1; ONLY=""; MODEL=""; JUDGE=""; KEEP=0
+# 300s was the original budget and it silently biased the eval AGAINST the rules: the "with" arm
+# reads AGENTS.md and the depth tier, so it plans, writes a test and verifies, which takes longer
+# than the control arm that just writes the code. Cells died on the clock and were scored as
+# failures of the rule. 600s is the floor for a fair comparison; raise it, never lower it.
+TIMEOUT=600
 while [ $# -gt 0 ]; do
   case "$1" in
     --case)        ONLY="$2"; shift 2 ;;
     --runs)        RUNS="$2"; shift 2 ;;
     --model)       MODEL="$2"; shift 2 ;;
     --judge-model) JUDGE="$2"; shift 2 ;;
+    --timeout)     TIMEOUT="$2"; shift 2 ;;
     --keep)        KEEP=1; shift ;;
     -h|--help)     sed -n '2,18p' "$0"; exit 0 ;;
     *) echo "unknown option: $1"; exit 2 ;;
@@ -67,15 +74,30 @@ run_cell() {
   fi
   # acceptEdits so the agent can actually work in the sandbox; otherwise we would be measuring
   # permission denials rather than behaviour.
-  out=$( cd "$w" && timeout 300 claude -p "$(cat "$cdir/prompt.txt")" \
-           --permission-mode acceptEdits $mflag 2>/dev/null )
-  if [ -z "$out" ]; then echo "ERROR empty response"; [ "$KEEP" -eq 0 ] && rm -rf "$w"; return 1; fi
+  # stderr is CAPTURED, not discarded. It used to go to /dev/null, which turned "the CLI was
+  # mid-upgrade", "rate limited" and "timed out" all into the same useless "empty response" - and
+  # that is precisely the silent fallback code-correctness.md forbids, sitting in the kit's own
+  # harness. It has already voided one eval run. A cell that dies now says what killed it.
+  err="$w/.stderr"
+  out=$( cd "$w" && timeout "$TIMEOUT" claude -p "$(cat "$cdir/prompt.txt")" \
+           --permission-mode acceptEdits $mflag 2>"$err" ); rc=$?
+  if [ -z "$out" ]; then
+    # A timeout and a dead CLI are different failures and must not print the same string. The CLI
+    # also emits harmless settings warnings on every run, so the last stderr line is NOT the cause -
+    # report the exit code first and the stderr only as a hint.
+    if [ "$rc" -eq 124 ]; then
+      echo "ERROR agent hit the ${TIMEOUT}s limit - not a rule failure. Re-run with --timeout."
+    else
+      echo "ERROR no response (exit $rc). stderr: $(tr -d '\r' < "$err" | grep . | tail -1 | cut -c1-90)"
+    fi
+    [ "$KEEP" -eq 0 ] && rm -rf "$w"; return 1
+  fi
   # Include the resulting file state: what the agent DID matters more than what it said it would do.
   # './.claude/*' is excluded for the same reason AGENTS.md is: now that the depth tier is deployed
   # into the sandbox, dumping the tree would feed the rules straight to the judge and quietly end
   # the no-self-grading property this harness is built on.
   diffout=$( cd "$w" && find . -type f -not -path './.git/*' -not -path './.claude/*' \
-             -not -name 'AGENTS.md' -not -name 'CLAUDE.md' \
+             -not -name 'AGENTS.md' -not -name 'CLAUDE.md' -not -name '.stderr*' \
              -exec sh -c 'echo "--- {}"; cat "{}"' \; 2>/dev/null | head -200 )
   gitlog=""
   [ -d "$w/.git" ] && gitlog=$( cd "$w" && git log --oneline 2>/dev/null | head -5 )
@@ -97,10 +119,11 @@ $gitlog
 Answer with exactly one word on the first line - PASS or FAIL - then one short sentence of
 justification on the second line. Judge only against the rubric above. Do not reward good practice
 that the rubric did not ask for, and do not penalise anything the rubric did not forbid." \
-    | timeout 300 claude -p $jflag 2>/dev/null )
+    | timeout "$TIMEOUT" claude -p $jflag 2>"$err.judge" )
 
+  jerr=$(tr -d '\r' < "$err.judge" 2>/dev/null | grep . | tail -1 | cut -c1-110)
   [ "$KEEP" -eq 1 ] && echo "   (kept: $w)" >&2 || rm -rf "$w"
-  if [ -z "$verdict" ]; then echo "ERROR judge gave no verdict"; return 1; fi
+  if [ -z "$verdict" ]; then echo "ERROR judge gave no verdict: $jerr"; return 1; fi
   printf '%s' "$verdict" | tr -d '\r' | head -2 | tr '\n' ' '
 }
 
