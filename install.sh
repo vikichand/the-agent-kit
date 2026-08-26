@@ -228,9 +228,13 @@ install_global() {
   cat "$KIT/codex/config.toml"
 
   hr
-  say "The tool guard is NOT active until you merge the snippet(s) above - then verify:  ./install.sh --check"
+  # $share, never $KIT. Under --update, $KIT is a temp clone this run deletes on its way out, so a
+  # command printed with that path is already broken by the time anyone reads it. $share is where
+  # the kit actually lives afterwards.
+  say "The tool guard is NOT active until you merge the snippet(s) above - then verify:"
+  say "    $share/install.sh --check"
   say "Optional global rules (lets projects stay lean via --extension), review the merge first:"
-  say "    cat \"$KIT/AGENTS.md\" >> ~/.claude/CLAUDE.md   ;   cat \"$KIT/AGENTS.md\" >> ~/.codex/AGENTS.md"
+  say "    cat \"$share/AGENTS.md\" >> ~/.claude/CLAUDE.md   ;   cat \"$share/AGENTS.md\" >> ~/.codex/AGENTS.md"
 }
 
 update_kit() {  # refresh ~/.the-agent-kit from GitHub, so the clone stays disposable
