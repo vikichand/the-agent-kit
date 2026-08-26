@@ -43,6 +43,19 @@ Webhooks retry. Queues redeliver. Users double-click. Networks time out after th
   two must not leave half a record.
 - The failure mode is not theoretical: a non-idempotent payment handler double-charges.
 
+## Two requests arrive at once
+
+The gap between checking and acting is where money leaks. "Has this user got enough credits?" and
+"take the credits" are two statements, and a second request slips between them and passes the same
+check. The coupon redeems twice, the balance goes negative, the last seat sells to two people.
+
+- Make the check and the change **one** operation: a conditional write (`UPDATE ... WHERE balance
+  >= :amount`) whose affected-row count you actually inspect, a unique index, or a row lock held for
+  the duration. A `SELECT` followed by an `UPDATE` is not a check, it is a hope.
+- Uniqueness is enforced by a constraint, never by asking whether the row exists first.
+- This is invisible to every test that sends one request at a time, which is every test unless
+  someone deliberately wrote otherwise.
+
 ## Ask what happens at 100k rows
 
 Demo data hides every scaling defect.
