@@ -32,6 +32,14 @@ in the application. Treat this as the default shape of the work, not hardening s
 - Authorization is checked **server-side on every request**. A client-side admin check is
   decoration. Every new endpoint re-checks; the common defect is copying an endpoint and losing the
   check it had.
+- **Authenticated is not authorized.** Every query filters by the caller's user or tenant id, in the
+  `WHERE` clause - not by checking a session exists and then fetching by the id in the URL. Being
+  logged in is not permission to read row 42. This is the defect that leaks one customer's data to
+  another, it is invisible in every test written with a single account, and it is the most common
+  serious bug in applications that were shipped fast.
+- **A security check that errors must fail closed.** `catch { return true }` around a permission
+  lookup, or a token check skipped when the auth service times out, converts an outage into open
+  access. Deny on error, and say so in the log.
 - Login and password reset are rate-limited (see *Rate limits and abuse* below - the ways that goes
   wrong are specific and the defaults are all wrong).
 - Passwords: server-side rules plus a breached-password check. Sessions invalidated on password
@@ -64,15 +72,29 @@ middleware runs you have already paid to receive the request. See `docs/web-chec
 ## Input and uploads
 
 - Validate and sanitize before storing; encode on output. Both, not either.
+- **One bug wears six costumes.** SQL injection, command injection, unsafe deserialization, path
+  traversal, SSRF and open redirects are all the same mistake: user input reaching an interpreter or
+  naming a resource. The fix is the same shape every time - never concatenate input into the thing
+  being interpreted. Parameterised queries, argument arrays instead of a shell string, no
+  deserialising untrusted bytes into live objects, resolve-then-verify-inside-the-root for paths,
+  and an allowlist for any URL or redirect target the user influences.
+- **Allowlist what is settable.** Spreading `req.body` into a model or an `UPDATE` lets the caller
+  set `role`, `is_admin`, `credits` or `user_id`. Name the fields you accept.
 - Uploads: allowlist the permitted types (never blocklist), cap the size, and never trust the
-  client's MIME type or filename.
+  client's MIME type or filename. Store outside the web root, and never serve them from your own
+  origin unless you have to.
 - Cap request body size at the framework or proxy.
 
 ## Platform
 
 - HSTS on. Secure cookie flags on. CSRF tokens on every state-changing form post.
 - CORS locked to known origins - never `*` on anything carrying credentials.
-- Directory listing off. Default, debug, and sample admin routes removed before ship.
+- Directory listing off. Default, debug, and sample admin routes removed before ship. Default
+  credentials changed. Staging is not reachable from the internet without a login.
+- Error responses say what failed, never where: no stack traces, SQL, or internal hostnames to the
+  client. Production builds ship no source maps to the public.
+- Object storage (S3, Firebase, Supabase, blob containers) is private by default. "Public bucket" is
+  a decision someone makes on purpose, in writing - never a default nobody revisited.
 - The app's database account has least privilege: it cannot DROP, and ideally cannot reach tables it
   does not own.
 - Log security events - logins, failures, lockouts, permission changes.
@@ -89,3 +111,9 @@ middleware runs you have already paid to receive the request. See `docs/web-chec
 - Model output and user prompts are untrusted input. A model response never triggers a privileged
   action without a server-side check of its own.
 - Cap usage per user and per key. An uncapped AI endpoint is a blank cheque drawn on your API bill.
+- Model output is never executed, `eval`'d, run as a query, or shell-interpreted without the same
+  treatment any other untrusted string gets. Generated SQL is still SQL an attacker can steer.
+- An agent gets the narrowest credential that does the job. "It needs admin so it can do anything
+  the user asks" is how a prompt in a support ticket ends up reading your database.
+- Whatever goes into the prompt can come out of it. Do not feed one tenant's data into a request
+  serving another, and keep secrets out of prompts and out of the traces you log.
