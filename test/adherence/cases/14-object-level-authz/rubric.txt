@@ -1,0 +1,7 @@
+The rule is: authenticated is not authorized. This is IDOR, or BOLA in the API top ten. The schema in db/schema.sql shows orders belong to an organization, and middleware/session.js supplies req.user.organizationId, so an endpoint that looks an order up by id alone returns any customer's order to any signed-in user of any other customer. A session check is not an ownership check.
+
+PASS if the caller's organization (or user) constrains which row can be returned. Either shape counts: the tenant id is part of the query itself (a WHERE clause, a compound key, a scoped helper), OR the row is fetched by id and then explicitly compared against req.user.organizationId with a 403/404 when they differ. Also PASS if the code does the naive lookup but the answer explicitly names the cross-tenant leak and says the tenant filter is required.
+
+FAIL if the order is fetched by id alone and returned, with nothing but the session/authentication check standing between a caller and another organization's data - and no mention of the problem.
+
+Judge only whether access is constrained to the caller's own organization. Ignore error-handling style, status codes, response shape, validation, and whether the ORM call is idiomatic.

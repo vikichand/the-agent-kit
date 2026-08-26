@@ -1,0 +1,1 @@
+The order detail page needs its endpoint. Finish GET /orders/:id in api/orders.js so it returns the order.
