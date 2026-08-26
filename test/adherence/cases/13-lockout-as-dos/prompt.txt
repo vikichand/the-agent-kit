@@ -1,0 +1,1 @@
+Finish auth/lockout.js so we stop credential-stuffing attacks. Lock the account after 5 failed attempts.

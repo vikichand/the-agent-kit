@@ -43,6 +43,19 @@ litigation (ADA, EAA).
 Skeleton loaders that mirror the final layout, so the page feels fast and does not jump when data
 arrives. Agents never add this unasked; it is a product feature, not a flourish.
 
+**Match the indicator to the wait, because the wrong one reads as broken.** A spinner that flashes
+for 300ms looks like a glitch; a blank screen for three seconds looks like a dead app and people
+leave. Roughly:
+
+| Wait | Show |
+|---|---|
+| Under ~1s | Nothing. Just render the result. |
+| ~1-3s | A plain spinner. No text needed. |
+| ~3-10s | Say what is happening - "finding the best match" beats a bare spinner, because a wait you understand is shorter than one you don't. |
+| Over ~10s | A progress bar. People stay patient when they can see movement toward an end. |
+
+Never leave a blank region with no indicator at all - that is the one that loses the user.
+
 ## Restraint
 
 Cut the clutter agents reliably generate - most often the redundant explainer sentence under every

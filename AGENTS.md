@@ -99,11 +99,11 @@ This gate decides whether the rest applies. Get it right and none of this adds f
 
 - **Write the minimum code that solves the actual problem.** No speculative abstraction, configurability, or
   "flexibility" nobody asked for. No error handling for states that can't occur.
-- **Climb the reuse ladder first. Stop at the first rung that holds:** does this need building at all -> does it
-  already exist *in this codebase* (reuse the helper, don't rewrite it) -> does the standard library do it -> does
-  a platform feature -> does an already-installed dependency -> can it be one line -> only then write it. Run the
-  ladder *after* you understand the problem, never instead of it: the smallest change in the wrong place is a
-  second bug, not a small diff.
+- **Grep this codebase for an existing helper before you write a new one.** Actually search - the formatter,
+  the validator, the date util is usually already there, and a second copy is the bug. Then take the rest in
+  order, stopping at the first that holds: does this need building at all -> standard library -> platform
+  feature -> an already-installed dependency -> one line -> only then write it. Do this *after* you understand
+  the problem, never instead of it: the smallest change in the wrong place is a second bug, not a small diff.
 - **YAGNI and DRY.** If you wrote 200 lines and it could be 50, rewrite it as 50 before moving on - write the
   clean version first, not after being challenged.
 - **The senior-engineer test:** would a senior engineer call this overcomplicated? If yes, simplify.

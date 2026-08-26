@@ -10,7 +10,7 @@
 > |---|---|---|
 > | I - universal discipline | `AGENTS.md` §invariants, §1-§10 | every turn, every repo |
 > | II - product quality bars | `PROJECT-CONFIG`, written by `docs/project-setup-prompt.md` | every turn, in user-facing repos |
-> | III - web security | `docs/web-checklists.md` | on demand, when auth / payments / uploads are built |
+> | III - web security | `claude/rules/web-security.md` + `claude/rules/ci-cd.md` | automatically, on matching paths |
 > | IV - launch readiness | `docs/web-checklists.md` | on demand, before a public launch |
 >
 > Tags below are historical: **[covered SN]** was already in `AGENTS.md` · **[partial]** was partly there ·
@@ -216,6 +216,12 @@ Per-platform checklists get written when a real project needs them, not speculat
 - Authorization checked server-side on every request; a client-side admin check is decoration. Every
   NEW endpoint or mutation re-checks - the classic agent failure is copying an endpoint and dropping
   the check it had.
+- **Authenticated is not authorized.** Every query filters by the caller's user/tenant id in the
+  WHERE clause, rather than checking a session exists and then fetching by the id in the URL. This
+  is the defect that hands one customer another's data, and it is invisible to every test written
+  with a single account.
+- **Security checks fail closed.** A permission lookup wrapped in `catch { return true }`, or a
+  token check skipped when the auth service times out, turns an outage into open access.
 - Login and password-reset endpoints rate-limited. The limiter is where this goes wrong, and every
   default is the wrong one: a shared store, not the in-process one that resets on deploy and counts
   per instance; a client IP resolved through trusted-proxy config, not a raw `X-Forwarded-For` the
@@ -233,12 +239,21 @@ Per-platform checklists get written when a real project needs them, not speculat
 **Input and content**
 
 - Validate and sanitize before storing; encode on output.
+- **One bug in six costumes:** SQL injection, command injection, unsafe deserialization, path
+  traversal, SSRF and open redirects are all user input reaching an interpreter or naming a
+  resource. Never concatenate input into the thing being interpreted; allowlist any URL or path the
+  user influences.
+- **Allowlist what is settable.** Spreading `req.body` into a model lets the caller set `role` or
+  `is_admin`.
 - Uploads: allowlist permitted types (never blocklist), cap size, never trust client MIME/filename.
 - Cap request body size at the framework or proxy level.
 
 **Platform**
 
 - HSTS on, secure cookie flags on, CSRF tokens on every state-changing form post.
+- Object storage private by default; a public bucket is a decision made on purpose, not a leftover.
+- Errors say what failed, never where - no stack traces or internal hostnames to the client, and no
+  public source maps. Default credentials changed; staging not reachable without a login.
 - CORS locked to known origins - never `*` on anything carrying credentials.
 - Directory listing off; default, debug, and sample admin routes removed before ship.
 - The app's database account has least privilege - it cannot DROP, and ideally cannot touch tables
@@ -258,6 +273,18 @@ Per-platform checklists get written when a real project needs them, not speculat
   triggers a privileged action without a server-side check of its own.
 - Usage capped per user/key (rate limits, spend limits) - an uncapped AI endpoint is a blank check
   drawn on your API bill.
+- Model output is never executed, `eval`'d, or run as a query without the treatment any untrusted
+  string gets. An agent gets the narrowest credential that does the job, never admin "so it can do
+  anything the user asks".
+
+**The pipeline** [NEW as a block; carried by `claude/rules/ci-cd.md`]
+
+- CI holds production's credentials with none of production's review. Third-party actions and images
+  are pinned to a digest, not a moving tag; installs resolve against the lockfile.
+- Start at `permissions: contents: read` and grant up per job. `pull_request_target` plus a checkout
+  of the PR head runs a stranger's code against your secrets.
+- Secrets arrive via `env:`/`with:`, never interpolated into a `run:` line where they land in logs.
+- A gate that errors fails the build. `continue-on-error` on a scanner reports green forever.
 
 ---
 
@@ -271,6 +298,18 @@ Per-platform checklists get written when a real project needs them, not speculat
   tab, Google snippet, and SEO baseline in one move.
 - **`sitemap.xml`** listing all public pages, submitted in Google Search Console - then watch the
   console for indexing errors instead of assuming Google found you.
+- **[NEW] What you need the first time something breaks**: crash reporting someone actually
+  receives; hard spend caps on every paid API and an alert on any LLM balance; backups with a
+  *rehearsed* restore (an unrehearsed backup is a belief); a kill switch that disables the risky
+  feature without a deploy; timeouts on every outbound call; production keys swapped in and
+  verified; one real signup through a never-used address, which is how you find out SPF/DKIM/DMARC
+  is sending every confirmation to spam.
+- **[NEW] The promises you are making** (not legal advice, and the kit must never read as if it
+  were): a reachable privacy policy that says you collect data, **that AI is involved**, and which
+  third parties receive it; deletion that actually deletes, including object storage and backups,
+  behind a button rather than a support request; buckets confirmed private by fetching a URL while
+  signed out; cancelling no harder than subscribing; a trial that warns before it charges;
+  testimonials that are real; and a safe response if a chat interface meets someone in crisis.
 - **Something in front of the origin**: a CDN or WAF carrying IP reputation, bot scoring and IP
   blocking - the only layer that can absorb volumetric abuse, since application code cannot refuse a
   request it has already paid to receive. **And the origin must not answer around it**: an origin IP
@@ -297,6 +336,13 @@ Per-platform checklists get written when a real project needs them, not speculat
 | Session token in localStorage | III auth and sessions |
 | Copied endpoint missing authz | III auth and sessions |
 | Client-side price | III money |
+| Fetches by the id in the URL with no tenant filter | III authenticated is not authorized |
+| Spreads `req.body` into the model | III allowlist what is settable |
+| String-concatenates SQL, a shell command, or a path | III one bug in six costumes |
+| `catch { return true }` around a permission check | III fail closed |
+| `uses: owner/action@v4` - a moving tag | III the pipeline |
+| `continue-on-error` on a security gate | III the pipeline |
+| Blank region while data loads | II perceived performance |
 | In-memory rate limiter behind a load balancer | III rate limits and abuse |
 | Limiter keyed on a raw `X-Forwarded-For` | III rate limits and abuse |
 | Hard account lockout - a DoS on your own users | III rate limits and abuse |
