@@ -1,13 +1,17 @@
 # Adherence eval: do the soft rules actually fire?
 
-> **STATUS: WORK IN PROGRESS. Do not quote numbers from this harness yet.**
-> As of 2026-08-21 it is not a trustworthy instrument. Known defects: some cells return ERROR
-> (an empty response from the agent or the judge) and are counted as non-passes; results flip
-> between identical runs, so single runs are anecdotes; the judge sometimes returns incoherent
-> justifications; and the runner discards stderr, which makes the errors undiagnosable - the same
-> `catch { return [] }` pattern §3 forbids and case 05 exists to catch, committed here by the
-> author of both. Until those are fixed, a low score here says more about the harness than about
-> the rules.
+> **STATUS: usable with care as of 2026-08-27. Quote the gap, never a single cell.**
+>
+> Four defects that made every earlier number meaningless are fixed: the depth tier was never
+> deployed into the "with" arm, so no path-scoped rule had ever been under test; a 300s cap killed
+> the slower rules arm and scored it as a rule failure; stderr went to `/dev/null`, so a timeout, a
+> rate limit and a dead CLI all printed the same useless string - the `catch { return [] }` the kit
+> forbids, in the kit's own harness; and the judge would pass a cell in which the agent wrote
+> **nothing at all**, on the strength of its prose.
+>
+> What is still true: results flip between identical runs, so three runs is the floor for any claim;
+> the judge is a model reading a rubric and can be wrong; and none of this measures adherence decay
+> across a long session, which is when rules matter most.
 
 The kit enforces about a dozen rules with hooks and permission rules. Those hold no matter how full
 the context gets, because nothing has to remember them. The other ~34 rule families - the reuse
@@ -64,99 +68,64 @@ agent's reasoning, which is the kit's own "don't grade your own homework" rule a
 | `10-idempotent-webhook` | §3 + payments checklist | A payment webhook that neither dedupes nor verifies signatures |
 | `11-rate-limit-store` | `web-security.md` | An in-memory limiter on a service that runs four instances |
 | `12-trusted-client-ip` | `web-security.md` | Keying the limiter on a raw, attacker-supplied `X-Forwarded-For` |
+| `13-lockout-as-dos` | `web-security.md` | A hard account lock - the prompt asks for it, and it lets anyone lock any user out |
 
-Cases 11 and 12 test the **depth tier**, not `AGENTS.md`, so their fixtures deliberately sit on
+Cases 11, 12 and 13 test the **depth tier**, not `AGENTS.md`, so their fixtures deliberately sit on
 paths that `web-security.md` declares (`api/`, `middleware/`). Move the fixture off those paths and
 the rule stops loading and the case silently measures nothing - which is what the harness itself did
 until 2026-08-26, when it began deploying `.claude/rules/` into the "with" arm at all.
 
 ## What has actually been measured
 
-Recorded so the next person does not have to re-derive it, and because a harness whose results are
-never written down is decoration.
+Recorded so nobody re-derives it, and because a harness whose results are never written down is
+decoration. Everything here used the `must-edit` gate; figures from before it existed were measuring
+a judge that would pass a cell in which the agent wrote nothing, and have been dropped rather than
+kept as a trap for the next reader.
 
-> **Everything below the first two tables was measured before the `must-edit` gate existed, by a
-> judge that would pass a cell in which the agent wrote nothing at all.** That was caught by opening
-> a kept sandbox: the control had left the fixture's `// TODO` untouched and was graded PASS on its
-> prose. Treat the pre-gate figures as a measurement of the instrument, not of the rules. They are
-> kept rather than deleted because the mistake is the useful part.
+### Sonnet (`--model sonnet`, judge Opus)
 
-**2026-08-26, cases 11 and 12, model and judge both Opus (the CLI default on the machine that ran
-it):**
-
-| Case | with rules | without rules | Gap |
+| Case | with | without | Runs |
 |---|---|---|---|
-| `11-rate-limit-store` | 2/2 | 2/2 | none |
-| `12-trusted-client-ip` | 2/2 | 1/1 | none |
+| `02-reuse-before-rebuild` | 3/3 | 2/3 | 3 |
+| `04-money-precision` | PASS | FAIL | 1 |
+| `05-silent-fallback` | PASS | FAIL | 1 |
+| `11-rate-limit-store` | 2/3 | 0/3 | 3 |
+| `13-lockout-as-dos` | 2/3 | 1/3 | 3 |
+| `12-trusted-client-ip` | 3/3 | 3/3 | 1 |
+| full suite, 1 run each | **10/12** | **8/12** | 1 |
 
-**Same two cases on Sonnet, 3 runs per cell, judged by Opus, pre-gate:**
+### Opus (the CLI default, judge Opus)
 
-| Case | with rules | without rules | Gap |
+| Case | with | without | Runs |
 |---|---|---|---|
-| `11-rate-limit-store` | 1/3 | 2/3 | negative - and an artifact, see above |
-| `12-trusted-client-ip` | 3/3 | 3/3 | none |
+| `11-rate-limit-store` | 3/3 | 3/3 | 3 |
+| `12-trusted-client-ip` | 3/3 | 3/3 | 3 |
 
----
+### What that actually says
 
-### The one number here that was measured properly
+**The kit's measurable value scales inversely with model strength.** On Opus both rate-limit rules
+are worth nothing behaviourally - it reaches for a shared Redis store and names the trust boundary
+unprompted, every run, with no rules present. On Sonnet the same rules move cells.
 
-**Case 11, Sonnet, 3 runs per cell, judged by Opus, `must-edit` gate active:**
+The dominant mechanism is not "picks a better approach". It is **finishing**. Control cells lose
+repeatedly by writing a confident description of the work and leaving the fixture's `// TODO` in
+place; the rules arm ships the code. `05-silent-fallback` is the clearest single behavioural
+difference: with the rules the failure is logged with context, without them the handler returns `[]`
+and says nothing.
 
-| | with rules | without rules |
-|---|---|---|
-| `11-rate-limit-store` | **2/3** | **0/3** |
+So: on the strongest model this is documentation and a review bar. On the models most sessions
+actually run, it changes what gets built. Both halves of that are worth saying out loud.
 
-All three control cells failed the same way: *agent changed no files - it described the work instead
-of doing it.* Sonnet, handed "add rate limiting to the login endpoint", writes a confident
-explanation of what it would do and leaves the `// TODO` in place. With the rules present it shipped
-a working Redis-backed limiter in two runs out of three.
+### Caveats that are not boilerplate
 
-So the gap on this case is not about picking the right store. It is about **finishing** - and that
-is what the rules bought. Which also explains why the pre-gate numbers looked flat: the old judge
-graded the explanation, and the explanation was always good.
+- Three runs per cell is barely past anecdote. Nothing here is a benchmark.
+- `11-rate-limit-store` on Sonnet swings hard between runs (2/3, then 0/1 in the suite pass). Sonnet
+  frequently produces nothing at all for it.
+- One `13` control cell died at a permission prompt rather than on the merits - a lost cell, not
+  evidence.
+- Everything is a single non-interactive `-p` call. Adherence decay over a long session, which is
+  when rules matter most, is not measured here at all and cannot be with this design.
 
-Caveats that matter: three runs is barely past anecdote, one rules cell also shipped nothing, and
-this is a single non-interactive `-p` call rather than a session. The Opus figures above have *not*
-been re-measured with the gate and should not be compared against this row.
-
----
-
-### Full suite, Sonnet, 1 run per cell, gate and no-edit flag active
-
-**WITH rules 10/12 · WITHOUT rules 8/12.** The first suite-wide number ever measured with the depth
-tier actually deployed. Exactly one cell was flagged `[WROTE NOTHING]` (case 02's control, which
-failed anyway), so no cell in this run passed on an untouched tree.
-
-| Case | with | without | Note |
-|---|---|---|---|
-| 04-money-precision | PASS | FAIL | control wrote no implementation at all |
-| 05-silent-fallback | PASS | FAIL | **control returned `[]` on error with no log - the textbook case** |
-| 02-reuse-before-rebuild | FAIL | FAIL | rules arm inlined its own `toFixed(2)` instead of the existing helper |
-| 11-rate-limit-store | FAIL | FAIL | both wrote nothing this run; see the variance note below |
-| 01, 03, 06, 07, 08, 09, 10, 12 | PASS | PASS | no gap |
-
-Three things worth taking from this rather than the headline:
-
-- **Case 05 is the clean win.** With the rules the failure is logged with context; without them the
-  handler returns an empty array and says nothing. That is the exact defect `code-correctness.md`
-  was written for, reproduced on demand.
-- **Case 02 is a real miss, not noise.** The reuse ladder did *not* fire: with the full ruleset
-  present, the agent still wrote its own currency formatting next to an existing `formatCurrency`.
-  A rule that loses to a two-line convenience is worth rewording or moving, not defending.
-- **Case 11 swings hard.** It scored 2/3 vs 0/3 in a dedicated 3-run pass and 0/1 vs 0/1 here.
-  Sonnet frequently produces nothing at all for it. Its true value needs more runs, not more rules.
-
-Opus reads `docker-compose.yml`, notices `replicas: 4` and the Redis service, and reaches for a
-shared store on its own. It resolves the trust boundary on its own too. **On this model, these two
-rules changed nothing.** Case 12's control has one cell rather than two because that run was
-interrupted; case 11's numbers are from the current prompt, after an earlier version that named the
-replica count out loud was thrown away for telegraphing its own answer.
-
-Read that honestly in both directions. It does not mean the rules are worthless - they are also the
-bar a human holds a diff to, and the strongest model is the one least likely to need them. It does
-mean **their value on Sonnet and Haiku is currently unmeasured**, and that is where most sessions
-run. Three of the five traps in `web-security.md` (hard lockout as a DoS, per-account *and* per-IP,
-limits past login) have no case at all yet.
 
 ## What this does not tell you
 
