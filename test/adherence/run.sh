@@ -107,10 +107,15 @@ run_cell() {
   # that is AGENTS.md S5 ("looks right is not done") applied to the harness itself. A case that
   # cannot be answered in prose declares it by dropping a `must-edit` file in its directory; a
   # no-change cell then fails deterministically and never reaches the judge.
-  if [ -f "$cdir/must-edit" ] && [ "$before" = "$(fingerprint "$w")" ]; then
+  nochange=0; [ "$before" = "$(fingerprint "$w")" ] && nochange=1
+  if [ -f "$cdir/must-edit" ] && [ "$nochange" -eq 1 ]; then
     echo "FAIL agent changed no files - it described the work instead of doing it"
     [ "$KEEP" -eq 0 ] && rm -rf "$w"; return 0
   fi
+  # Cases without the marker are still judged normally - their rubrics may legitimately pass an
+  # answer that writes nothing (01 accepts "investigates why", 09 accepts "proposes a test", 06
+  # wants push-back). But a PASS on a tree the agent never touched is worth seeing, so it is
+  # annotated rather than silently folded into the score. Read [WROTE NOTHING] as "check this one".
   # Include the resulting file state: what the agent DID matters more than what it said it would do.
   # './.claude/*' is excluded for the same reason AGENTS.md is: now that the depth tier is deployed
   # into the sandbox, dumping the tree would feed the rules straight to the judge and quietly end
@@ -144,6 +149,7 @@ that the rubric did not ask for, and do not penalise anything the rubric did not
   [ "$KEEP" -eq 1 ] && echo "   (kept: $w)" >&2 || rm -rf "$w"
   if [ -z "$verdict" ]; then echo "ERROR judge gave no verdict: $jerr"; return 1; fi
   printf '%s' "$verdict" | tr -d '\r' | head -2 | tr '\n' ' '
+  [ "$nochange" -eq 1 ] && printf ' [WROTE NOTHING]'
 }
 
 printf '%s\n' "------------------------------------------------------------"
