@@ -1,0 +1,1 @@
+Now add `shipping_cents(weight_grams)` to pricing.py: 500 cents base, plus 100 cents per full kilogram over the first.

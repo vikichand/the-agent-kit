@@ -55,7 +55,10 @@ These are hard lines. Section 0's "skip the ceremony" scales down *planning*, ne
 
 This gate decides whether the rest applies. Get it right and none of this adds friction.
 
-- **One-sentence diff** (typo, obvious one-liner, rename one symbol): just do it. Skip the ceremony.
+- **One-sentence diff** (typo, obvious one-liner, rename one symbol): just do it. Skip the ceremony - but never
+  silently. Name the step you skipped, in a clause: "no test, it only composes tested functions." An unstated
+  omission is indistinguishable from having forgotten, and deadline pressure is exactly when habits disappear
+  without anyone noticing.
 - **Multi-file, ambiguous, irreversible, or you're not sure what's being asked**: run the full loop below
   (Explore -> Plan -> Implement -> Verify -> Commit - the commit itself only when asked, per the invariants).
 - If you can't tell which bucket you're in, you're in the second one. (The safety invariants above apply to both.)

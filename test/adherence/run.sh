@@ -81,6 +81,21 @@ fingerprint() {
       -exec md5sum {} \; 2>/dev/null | sort )
 }
 
+# A session id chosen here rather than relying on `--continue`, which resumes "the most recent
+# conversation" - on a machine also running interactive sessions that is not necessarily the
+# sandbox's, and turn 2 continuing the wrong conversation would look like a multi-turn result
+# without being one. The format is checked because python3 on Windows is often a Store stub that
+# prints nothing at all.
+newsid() {
+  for p in python python3; do
+    id=$("$p" -c 'import uuid;print(uuid.uuid4())' 2>/dev/null) || continue
+    case "$id" in
+      ????????-????-????-????-????????????) printf '%s' "$id"; return 0 ;;
+    esac
+  done
+  return 1
+}
+
 # Windows holds locks on files a just-exited process touched, so `rm -rf` on a sandbox loses a race
 # and prints "Device or resource busy" - leaving a throwaway repo behind on every affected run. Three
 # runs this week each leaked one, and they were cleaned by hand. Retry briefly, then say so rather
@@ -125,8 +140,32 @@ run_cell() {
   # that is precisely the silent fallback code-correctness.md forbids, sitting in the kit's own
   # harness. It has already voided one eval run. A cell that dies now says what killed it.
   err="$w/.stderr"
-  out=$( cd "$w" && timeout "$TIMEOUT" claude -p "$(cat "$cdir/prompt.txt")" \
-           --permission-mode acceptEdits --allowedTools $ALLOW $mflag 2>"$err" ); rc=$?
+  # MULTI-TURN. A case may ship prompt-2.txt / prompt-3.txt alongside prompt.txt; they run as
+  # further turns of the SAME conversation, resumed by an id this script chose. That is the only way
+  # to measure the thing single-turn cases structurally cannot: whether a rule that fired on turn 1
+  # is still holding on turn 3, which is when adherence actually decays and when the rules matter
+  # most. A case with only prompt.txt behaves exactly as before.
+  sid=$(newsid) || sid=""
+  out=""; rc=0; turn=0
+  for pf in "$cdir/prompt.txt" "$cdir/prompt-2.txt" "$cdir/prompt-3.txt" "$cdir/prompt-4.txt"; do
+    [ -f "$pf" ] || continue
+    turn=$((turn + 1))
+    if [ "$turn" -eq 1 ]; then
+      sflag=""; [ -n "$sid" ] && sflag="--session-id $sid"
+    else
+      # Without a usable id there is no honest way to continue; stop rather than silently run the
+      # later turns as fresh conversations, which would look like a multi-turn result and not be one.
+      [ -n "$sid" ] || { echo "ERROR cannot resume: no usable session id (python missing?)"; \
+                         [ "$KEEP" -eq 0 ] && scrub "$w"; return 1; }
+      sflag="--resume $sid"
+    fi
+    tout=$( cd "$w" && timeout "$TIMEOUT" claude -p "$(cat "$pf")" \
+              --permission-mode acceptEdits --allowedTools $ALLOW $sflag $mflag 2>>"$err" ); rc=$?
+    [ "$rc" -eq 127 ] && break
+    out="$out
+=== TURN $turn - the user asked: $(cat "$pf")
+$tout"
+  done
   # 127 means the `claude` binary itself vanished - an npm self-update mid-run. Every later cell
   # would report ERROR and the suite would still print a confident-looking aggregate over them.
   # That has now happened three times. Abort loudly instead of publishing a number built on holes.
