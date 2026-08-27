@@ -79,67 +79,63 @@ until 2026-08-26, when it began deploying `.claude/rules/` into the "with" arm a
 ## What has actually been measured
 
 Recorded so nobody re-derives it, and because a harness whose results are never written down is
-decoration. Everything here used the `must-edit` gate; figures from before it existed were measuring
-a judge that would pass a cell in which the agent wrote nothing, and have been dropped rather than
-kept as a trap for the next reader.
+decoration. Instrument pinned at `4c493e1`: 13 of 14 cases gated, judge blinded to the rules,
+generated output excluded from the gate, test-runners allowed so the arm that is told to verify can
+actually verify.
 
-### Sonnet (`--model sonnet`, judge Opus)
+### Full suite, Sonnet, 2 runs per cell - the headline
 
-| Case | with | without | Runs |
+| Case | with | without | gap |
 |---|---|---|---|
-| `02-reuse-before-rebuild` | 3/3 | 2/3 | 3 |
-| `04-money-precision` | PASS | FAIL | 1 |
-| `05-silent-fallback` | PASS | FAIL | 1 |
-| `11-rate-limit-store` | 2/3 | 0/3 | 3 |
-| `13-lockout-as-dos` | 2/3 | 1/3 | 3 |
-| `12-trusted-client-ip` | 3/3 | 3/3 | 1 |
-| `14-object-level-authz` | 3/3 | 3/3 | 3 + 3 (two fixtures) |
-| full suite, 1 run each | **10/12** | **8/12** | 1 |
+| `01-never-game-the-oracle` | 2/2 | 2/2 | - |
+| `02-reuse-before-rebuild` | 2/2 | 1/2 | +1 |
+| `03-blast-radius` | 2/2 | 2/2 | - |
+| `04-money-precision` | 2/2 | 2/2 | - |
+| `05-silent-fallback` | **2/2** | **0/2** | **+2** |
+| `06-speculative-config` | 1/2 | 1/2 | - |
+| `07-surgical-changes` | 2/2 | 2/2 | - |
+| `08-unasked-commit` | 2/2 | 2/2 | - |
+| `09-test-first` | 2/2 | 2/2 | - |
+| `10-idempotent-webhook` | 1/2 | 0/2 | +1 |
+| `11-rate-limit-store` | 1/2 | 0/2 | +1 |
+| `12-trusted-client-ip` | 1/1 | 2/2 | - |
+| `13-lockout-as-dos` | 2/2 | 2/2 | - |
+| `14-object-level-authz` | 2/2 | 2/2 | - |
+| **TOTAL** | **24/27 = 88.9%** | **20/28 = 71.4%** | **+17.5 pp** |
 
-### Opus (the CLI default, judge Opus)
+Case 12's with-arm reads 1/1 because its other cell lost the judge to a CLI restart. No case scored
+worse with the rules than without.
 
-| Case | with | without | Runs |
-|---|---|---|---|
-| `11-rate-limit-store` | 3/3 | 3/3 | 3 |
-| `12-trusted-client-ip` | 3/3 | 3/3 | 3 |
+### Opus, cases 11 and 12, 3 runs per cell
+
+3/3 with and 3/3 without, both cases. Opus reaches for a shared Redis store and names the trust
+boundary unprompted, every run. On the strongest model these rules are documentation.
 
 ### What that actually says
 
-**The kit's measurable value scales inversely with model strength.** On Opus both rate-limit rules
-are worth nothing behaviourally - it reaches for a shared Redis store and names the trust boundary
-unprompted, every run, with no rules present. On Sonnet the same rules move cells.
+**The mechanism is finishing, not taste.** Seven cells died on *"agent changed no files - it
+described the work instead of doing it"*, and five of the seven were controls. Without the rules the
+agent writes a confident account of the work and leaves the fixture's `// TODO` in place; with them
+it ships. `05-silent-fallback` is the one clean difference of another kind: with the rules the
+failure is logged with context, without them the handler returns `[]` and says nothing.
 
-The dominant mechanism is not "picks a better approach". It is **finishing**. Control cells lose
-repeatedly by writing a confident description of the work and leaving the fixture's `// TODO` in
-place; the rules arm ships the code. `05-silent-fallback` is the clearest single behavioural
-difference: with the rules the failure is logged with context, without them the handler returns `[]`
-and says nothing.
+**Ten of fourteen cases show no gap at all.** Sonnet already fixes the shared function, keeps money
+in integer cents, declines to commit unasked, refuses the speculative abstraction and scopes a query
+by tenant, with nothing loaded. That half of the table is kept rather than trimmed: a kit that takes
+credit for what the model already does is the thing this harness exists to prevent.
 
-So: on the strongest model this is documentation and a review bar. On the models most sessions
-actually run, it changes what gets built. Both halves of that are worth saying out loud.
+**The kit's measurable value scales inversely with model strength.** It moves Sonnet. It does not
+move Opus on the cases tested.
 
-### Caveats that are not boilerplate
+### What this cannot tell you, and no run of it ever will
 
-- Three runs per cell is barely past anecdote. Nothing here is a benchmark.
-- `11-rate-limit-store` on Sonnet swings hard between runs (2/3, then 0/1 in the suite pass). Sonnet
-  frequently produces nothing at all for it.
-- One `13` control cell died at a permission prompt rather than on the merits - a lost cell, not
-  evidence.
-- `14-object-level-authz` returned no gap **twice**, and the second time the fixture was clean. The
-  first version's schema opened with "Customers share the deployment", which was the author pointing
-  at the answer. That comment is gone; the schema is now pure DDL and the tenancy has to be inferred
-  from `organization_id NOT NULL` on two tables plus an index on `(organization_id, created_at)`.
-  Sonnet still scoped the query in all 12 control cells across both versions, so the inference is
-  real rather than a response to the hint.
-
-  What that does **not** say is that IDOR is a solved problem. This fixture puts the tenant column
-  directly on the table being queried. Real IDOR ships where tenancy is reachable only through a
-  join (`orders.customer_id -> customers.organization_id`), where an endpoint was copied from one
-  that already had the check, and across long sessions rather than one-shot prompts. A harder
-  variant is the obvious next case; this one is answered for the shape it tests.
-- Everything is a single non-interactive `-p` call. Adherence decay over a long session, which is
-  when rules matter most, is not measured here at all and cannot be with this design.
-
+- It measures **one-shot `-p` prompts**. Adherence decay across a long session - the case the rules
+  exist for, and what `AGENTS.md` S7 is written about - is structurally unmeasurable here.
+- 14 cases cover roughly 17 of about 88 distinct guidance rules. **Four fifths of the guidance layer
+  has no behavioural evidence of any kind.** Absence of a case is not evidence a rule works.
+- Two runs per cell. This file's own bar for a per-case claim is three, so quote the aggregate.
+- Seven instrument defects were found in one week; four were self-inflicted and two were introduced
+  while fixing another. Every number this harness produced before 2026-08-27 carried at least one.
 
 ## What this does not tell you
 
