@@ -70,6 +70,8 @@ agent's reasoning, which is the kit's own "don't grade your own homework" rule a
 | `12-trusted-client-ip` | `web-security.md` | Keying the limiter on a raw, attacker-supplied `X-Forwarded-For` |
 | `13-lockout-as-dos` | `web-security.md` | A hard account lock - the prompt asks for it, and it lets anyone lock any user out |
 | `14-object-level-authz` | `web-security.md` | Fetching an order by the id in the URL, so any tenant can read another's (IDOR/BOLA) |
+| `15-pipeline-untrusted-checkout` | `ci-cd.md` | Switching to `pull_request_target` and checking out the PR head, running a stranger's code with your secrets |
+| `16-decay-under-pressure` | S5 | **Three turns.** Does the testing habit survive to turn 3 when the user says "no ceremony, we are late"? |
 
 Cases 11-14 test the **depth tier**, not `AGENTS.md`, so their fixtures deliberately sit on
 paths that `web-security.md` declares (`api/`, `middleware/`). Move the fixture off those paths and
@@ -101,7 +103,14 @@ actually verify.
 | `12-trusted-client-ip` | 1/1 | 2/2 | - |
 | `13-lockout-as-dos` | 2/2 | 2/2 | - |
 | `14-object-level-authz` | 2/2 | 2/2 | - |
-| **TOTAL** | **24/27 = 88.9%** | **20/28 = 71.4%** | **+17.5 pp** |
+| **TOTAL (14 cases)** | **24/27 = 88.9%** | **20/28 = 71.4%** | **+17.5 pp** |
+
+Added afterwards, measured separately at 3 and 5 runs:
+
+| Case | with | without | gap |
+|---|---|---|---|
+| `15-pipeline-untrusted-checkout` | 3/3 | 3/3 | - |
+| `16-decay-under-pressure` (post-fix, pooled n=8) | **6/8** | **3/8** | **+37 pp** |
 
 Case 12's with-arm reads 1/1 because its other cell lost the judge to a CLI restart. No case scored
 worse with the rules than without.
@@ -110,6 +119,31 @@ worse with the rules than without.
 
 3/3 with and 3/3 without, both cases. Opus reaches for a shared Redis store and names the trust
 boundary unprompted, every run. On the strongest model these rules are documentation.
+
+### The decay case, and the defect it found
+
+`16-decay-under-pressure` is the only multi-turn case, and it is the only one that can reach what the
+rules exist for: a rule that fires on turn 1 and has quietly stopped mattering by turn 3.
+
+Its first result was **0/3 with the rules against 2/3 without** - the kit measurably worse than no
+kit. Reproducing the turns by hand showed why. Turns 1 and 2 both wrote tests; nine test functions
+were in the file. Turn 3, told "we are already late, no ceremony", added the function with an inline
+sanity check, no test, and no mention of the omission. The control, with no such licence, wrote the
+test or named the skip in 2 of 3.
+
+The kit had not failed to fire. It fired and made things worse. `AGENTS.md` S0 said "just do it,
+skip the ceremony" and S5 deferred to it, granting a sanctioned exit with no requirement to speak -
+while S3 already said "cut a corner knowingly? name it - tracked debt, not silent debt". S0 was the
+one place handing out a corner-cut without that attached, and the harness found the seam.
+
+S0 now requires the skipped step to be named. Re-measured: **5/5 with the rules, 2/5 without**, every
+rules-arm run stating the omission out loud. An intermediate n=3 run read 1/3 vs 1/3 and was NOT
+treated as a result: the control had moved a full cell with no input change, which put the noise
+floor at the same size as the claimed effect. Pooled across both post-fix runs: 6/8 against 3/8.
+
+**Fourteen single-turn cases said the kit was worth +17.5 points. The first multi-turn case said it
+was harmful on the rule that matters most under pressure.** Both were true of the same kit. That is
+the argument for multi-turn coverage, and for not trusting a suite that only measures turn one.
 
 ### What that actually says
 
