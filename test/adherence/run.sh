@@ -58,6 +58,10 @@ done
 mflag=""; [ -n "$MODEL" ] && mflag="--model $MODEL"
 jflag=""; [ -n "$JUDGE" ] && jflag="--model $JUDGE"
 
+# What the agent may run inside the throwaway sandbox. Deliberately narrow: the test runners the
+# fixtures need, the reading tools any diagnosis needs, and git. Unquoted on use, so no spaces.
+ALLOW="Bash(python:*) Bash(python3:*) Bash(pytest:*) Bash(uv:*) Bash(node:*) Bash(npm:*) Bash(npx:*) Bash(git:*) Bash(ls:*) Bash(cat:*) Bash(grep:*) Bash(find:*) Bash(sed:*) Bash(head:*) Bash(tail:*)"
+
 # Run one case in one condition. $1=case dir  $2=with|without  -> prints PASS / FAIL / ERROR + reason
 # Checksum of everything the agent could plausibly have written, kit files excluded. Used to answer
 # one question the judge demonstrably gets wrong: did the agent SHIP anything, or only talk about it?
@@ -81,15 +85,31 @@ run_cell() {
     mkdir -p "$w/.claude/rules" && cp "$KIT"/claude/rules/*.md "$w/.claude/rules/" 2>/dev/null
   fi
   before=$(fingerprint "$w")
-  # acceptEdits so the agent can actually work in the sandbox; otherwise we would be measuring
-  # permission denials rather than behaviour.
+  # The agent must be able to WORK in the sandbox, or this measures permission denials rather than
+  # behaviour. acceptEdits alone does not achieve that: it auto-accepts edits and still prompts for
+  # Bash. That biased every result against the rules arm, because AGENTS.md S5 is what pushes an
+  # agent to run the test - so the arm that followed the rules stalled asking to run it while the
+  # control just edited a file and stopped. Case 03 failed 2/2 with the rules for exactly that
+  # reason, and case 08 ("did it commit when it should not have?") was unanswerable because
+  # committing was blocked rather than declined.
+  #
+  # The allowlist is explicit rather than bypassPermissions: the sandbox is a throwaway mktemp dir,
+  # but this still runs on someone's machine. git IS allowed on purpose - case 08 is only meaningful
+  # if the agent could have committed and chose not to.
   # stderr is CAPTURED, not discarded. It used to go to /dev/null, which turned "the CLI was
   # mid-upgrade", "rate limited" and "timed out" all into the same useless "empty response" - and
   # that is precisely the silent fallback code-correctness.md forbids, sitting in the kit's own
   # harness. It has already voided one eval run. A cell that dies now says what killed it.
   err="$w/.stderr"
   out=$( cd "$w" && timeout "$TIMEOUT" claude -p "$(cat "$cdir/prompt.txt")" \
-           --permission-mode acceptEdits $mflag 2>"$err" ); rc=$?
+           --permission-mode acceptEdits --allowedTools $ALLOW $mflag 2>"$err" ); rc=$?
+  # 127 means the `claude` binary itself vanished - an npm self-update mid-run. Every later cell
+  # would report ERROR and the suite would still print a confident-looking aggregate over them.
+  # That has now happened three times. Abort loudly instead of publishing a number built on holes.
+  if [ "$rc" -eq 127 ] || grep -q "failed to run command 'claude'" "$err" 2>/dev/null; then
+    echo "ABORT the claude CLI disappeared mid-run (exit 127) - almost certainly an npm self-update"
+    [ "$KEEP" -eq 0 ] && rm -rf "$w"; return 1
+  fi
   if [ -z "$out" ]; then
     # A timeout and a dead CLI are different failures and must not print the same string. The CLI
     # also emits harmless settings warnings on every run, so the last stderr line is NOT the cause -
@@ -168,6 +188,15 @@ for cdir in "$HERE"/cases/*/; do
     for cond in with without; do
       v=$(run_cell "$cdir" "$cond")
       case "$v" in
+        ABORT*)
+          echo ""
+          printf '%s\n' "============================================================"
+          echo "RUN ABORTED - $v"
+          echo "Partial results below are NOT a measurement: the cells after this"
+          echo "point never ran. Do not quote the totals. Re-run when the CLI is"
+          echo "back (check: claude --version)."
+          printf '%s\n' "============================================================"
+          exit 3 ;;
         PASS*) r=PASS ;;
         FAIL*) r=FAIL ;;
         *)     r=ERROR ;;
