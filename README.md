@@ -514,6 +514,15 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
   the current value; if another tool owns it, merge the kit's hooks into that directory.
 - **Attribution fixes the message, not the author identity.** Keep your own `user.name` / `user.email` in
   git config. It's a *known-bot* denylist, so a brand-new tool's trailer may need adding.
+- **The rules are guidance, and guidance is probabilistic.** The guards above hold regardless of context
+  because nothing has to remember them. The ~88 behavioural rules are different, and the honest number is
+  measured rather than claimed: on Sonnet, **88.9% compliance on the rules that have a test case (24/27),
+  against 71.4% with no kit loaded (20/28)** - a +17.5 point effect, with no case scoring worse with the
+  rules than without. On Opus the tested rules show no gap at all; it already does those things unprompted.
+  Roughly four fifths of the guidance layer has no test case, so absence of a case is not evidence a rule
+  works. Every figure is a one-shot prompt: adherence decay across a long session, which is the case the
+  rules exist for, is not measured by anything here. Method, per-case tables and the instrument's own
+  defect history are in [`test/adherence/README.md`](test/adherence/README.md).
 
 ## Inspired by
 
