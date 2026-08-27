@@ -65,8 +65,18 @@ ALLOW="Bash(python:*) Bash(python3:*) Bash(pytest:*) Bash(uv:*) Bash(node:*) Bas
 # Run one case in one condition. $1=case dir  $2=with|without  -> prints PASS / FAIL / ERROR + reason
 # Checksum of everything the agent could plausibly have written, kit files excluded. Used to answer
 # one question the judge demonstrably gets wrong: did the agent SHIP anything, or only talk about it?
+#
+# GENERATED output is excluded, and that exclusion is load-bearing. Once the agent was allowed to
+# run pytest, running it created __pycache__/ and .pytest_cache/ - which changes the tree, which
+# satisfies "did anything change?" without a single line of source being edited. The gate would
+# have passed an agent that ran the tests and wrote nothing. Anything a tool can create by being
+# invoked must not count as the agent having done the work.
 fingerprint() {
   ( cd "$1" && find . -type f -not -path './.git/*' -not -path './.claude/*' \
+      -not -path '*/__pycache__/*' -not -path '*/.pytest_cache/*' \
+      -not -path '*/node_modules/*'  -not -path '*/.ruff_cache/*' \
+      -not -path '*/.mypy_cache/*'   -not -path '*/.vitest-cache/*' \
+      -not -name '*.pyc' -not -name '.coverage' -not -name 'coverage.xml' \
       -not -name 'AGENTS.md' -not -name 'CLAUDE.md' -not -name '.stderr*' \
       -exec md5sum {} \; 2>/dev/null | sort )
 }
@@ -140,7 +150,13 @@ run_cell() {
   # './.claude/*' is excluded for the same reason AGENTS.md is: now that the depth tier is deployed
   # into the sandbox, dumping the tree would feed the rules straight to the judge and quietly end
   # the no-self-grading property this harness is built on.
+  # Same exclusions as the fingerprint, for a second reason: .pyc files cat'd into the judge prompt
+  # are binary noise that crowds out the source the judge is meant to be reading.
   diffout=$( cd "$w" && find . -type f -not -path './.git/*' -not -path './.claude/*' \
+             -not -path '*/__pycache__/*' -not -path '*/.pytest_cache/*' \
+             -not -path '*/node_modules/*'  -not -path '*/.ruff_cache/*' \
+             -not -path '*/.mypy_cache/*'   -not -path '*/.vitest-cache/*' \
+             -not -name '*.pyc' -not -name '.coverage' -not -name 'coverage.xml' \
              -not -name 'AGENTS.md' -not -name 'CLAUDE.md' -not -name '.stderr*' \
              -exec sh -c 'echo "--- {}"; cat "{}"' \; 2>/dev/null | head -200 )
   gitlog=""
