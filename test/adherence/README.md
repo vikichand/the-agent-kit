@@ -127,32 +127,31 @@ credit for what the model already does is the thing this harness exists to preve
 **The kit's measurable value scales inversely with model strength.** It moves Sonnet. It does not
 move Opus on the cases tested.
 
-### What this cannot tell you, and no run of it ever will
-
-- It measures **one-shot `-p` prompts**. Adherence decay across a long session - the case the rules
-  exist for, and what `AGENTS.md` S7 is written about - is structurally unmeasurable here.
-- 14 cases cover roughly 17 of about 88 distinct guidance rules. **Four fifths of the guidance layer
-  has no behavioural evidence of any kind.** Absence of a case is not evidence a rule works.
-- Two runs per cell. This file's own bar for a per-case claim is three, so quote the aggregate.
-- Seven instrument defects were found in one week; four were self-inflicted and two were introduced
-  while fixing another. Every number this harness produced before 2026-08-27 carried at least one.
-
 ## What this does not tell you
 
-Be honest about the limits when quoting any number from it:
+Be honest about the limits when quoting any number from it. These are not boilerplate; each one has
+bitten this harness in the past week.
 
-- **It is noisy.** Model output varies run to run. One run per cell is an anecdote; `--runs 3` or
-  more is the minimum for a claim, and even then the cases are pass/fail, not graded.
-- **The judge can be wrong.** It is a model reading a rubric. Spot-check with `--keep` before
-  trusting a surprising verdict.
-- **It measures a proxy.** Twelve scenarios in throwaway repos are not your codebase under a long
-  session, which is exactly when adherence decays. A rule passing here can still slip at hour three.
-- **The control is imperfect.** "Without rules" still has whatever lives in `~/.claude/CLAUDE.md`
-  and any global rules on the machine running it, so the measured gap is a floor, not a ceiling.
-- **The clock is not neutral.** The "with" arm reads more and does more - it plans, writes a test,
-  verifies - so it is always the slower one. A per-call limit that the control clears and the rules
-  arm does not scores the rules as a failure when what actually happened is that the eval ran out of
-  patience. An `ERROR` line is never evidence about a rule; read it as a lost cell and re-run.
+- **It measures one-shot `-p` prompts.** Adherence decay across a long session - the case the rules
+  exist for, and what `AGENTS.md` S7 is written about - is structurally unmeasurable here, and no
+  amount of extra runs changes that. It needs a different fixture design.
+- **Coverage is the ceiling on any claim.** 14 cases reach roughly 17 of about 88 distinct guidance
+  rules. **Four fifths of the guidance layer has no behavioural evidence of any kind**, and the
+  absence of a case is not evidence that a rule works.
+- **It is noisy.** Output varies run to run. One run per cell is an anecdote; `--runs 3` is the
+  floor for a per-case claim, and even then cells are pass/fail rather than graded. Quote the
+  aggregate.
+- **The judge is a model reading a rubric.** It can be wrong, and it was: it passed cells where the
+  agent wrote nothing at all until a checksum gate was added. Spot-check with `--keep` before
+  believing a surprising verdict.
+- **The control is imperfect.** "Without rules" still carries whatever lives in `~/.claude/CLAUDE.md`
+  and any global rules on the machine, so a measured gap is a floor rather than a ceiling.
+- **`ERROR` is never evidence about a rule.** Read it as a lost cell and re-run. The "with" arm is
+  always the slower one - it plans, tests and verifies - so anything that penalises slowness
+  penalises the rules.
+- **The instrument has a history.** Seven defects found in one week; four self-inflicted, two
+  introduced while fixing another. Every number produced before 2026-08-27 carried at least one of
+  them. Distrust a confident figure from this harness more than a hedged one.
 
 ## Adding a case
 

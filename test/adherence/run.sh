@@ -9,9 +9,9 @@
 #   ./run.sh --timeout 900            seconds per call (default 600; the "with" arm is the slow one)
 #   ./run.sh --keep                   keep the working dirs for inspection
 #
-# COSTS REAL TOKENS. Each case runs the agent twice (with rules, without) and a judge twice.
-# Ten cases at one run each is ~40 model calls. This is deliberately NOT part of run-tests.sh,
-# which stays free and offline.
+# COSTS REAL TOKENS. Each case runs the agent twice (with rules, without) and a judge twice, so a
+# full pass is 4 calls per case per run: 14 cases at --runs 2 is ~112 calls. Deliberately NOT part
+# of run-tests.sh, which stays free and offline.
 #
 # The judge is a SEPARATE call with no sight of the rules file or of why the answer was produced -
 # it sees the case rubric and the transcript only. That is the kit's own "no self-grading" rule
@@ -81,10 +81,24 @@ fingerprint() {
       -exec md5sum {} \; 2>/dev/null | sort )
 }
 
+# Windows holds locks on files a just-exited process touched, so `rm -rf` on a sandbox loses a race
+# and prints "Device or resource busy" - leaving a throwaway repo behind on every affected run. Three
+# runs this week each leaked one, and they were cleaned by hand. Retry briefly, then say so rather
+# than leaving litter nobody knows about.
+scrub() {
+  [ -n "$1" ] || return 0
+  n=0
+  while [ $n -lt 5 ]; do
+    rm -rf "$1" 2>/dev/null && return 0
+    n=$((n+1)); sleep 1
+  done
+  echo "   (could not remove sandbox $1 - a process is still holding it; delete it yourself)" >&2
+}
+
 run_cell() {
   cdir=$1; cond=$2
   w=$(mktemp -d) || return 1
-  ( cd "$w" && sh "$cdir/setup.sh" >/dev/null 2>&1 ) || { echo "ERROR setup failed"; rm -rf "$w"; return 1; }
+  ( cd "$w" && sh "$cdir/setup.sh" >/dev/null 2>&1 ) || { echo "ERROR setup failed"; scrub "$w"; return 1; }
   if [ "$cond" = "with" ]; then
     cp "$KIT/AGENTS.md" "$w/AGENTS.md"
     cp "$KIT/CLAUDE.md" "$w/CLAUDE.md"
@@ -118,7 +132,7 @@ run_cell() {
   # That has now happened three times. Abort loudly instead of publishing a number built on holes.
   if [ "$rc" -eq 127 ] || grep -q "failed to run command 'claude'" "$err" 2>/dev/null; then
     echo "ABORT the claude CLI disappeared mid-run (exit 127) - almost certainly an npm self-update"
-    [ "$KEEP" -eq 0 ] && rm -rf "$w"; return 1
+    [ "$KEEP" -eq 0 ] && scrub "$w"; return 1
   fi
   if [ -z "$out" ]; then
     # A timeout and a dead CLI are different failures and must not print the same string. The CLI
@@ -129,7 +143,7 @@ run_cell() {
     else
       echo "ERROR no response (exit $rc). stderr: $(tr -d '\r' < "$err" | grep . | tail -1 | cut -c1-90)"
     fi
-    [ "$KEEP" -eq 0 ] && rm -rf "$w"; return 1
+    [ "$KEEP" -eq 0 ] && scrub "$w"; return 1
   fi
   # The judge cannot be trusted with this one. Observed 2026-08-26: a control cell left the fixture's
   # "// TODO: rate limiting goes here" completely untouched, wrote no limiter at all, and was graded
@@ -140,7 +154,7 @@ run_cell() {
   nochange=0; [ "$before" = "$(fingerprint "$w")" ] && nochange=1
   if [ -f "$cdir/must-edit" ] && [ "$nochange" -eq 1 ]; then
     echo "FAIL agent changed no files - it described the work instead of doing it"
-    [ "$KEEP" -eq 0 ] && rm -rf "$w"; return 0
+    [ "$KEEP" -eq 0 ] && scrub "$w"; return 0
   fi
   # Cases without the marker are still judged normally - their rubrics may legitimately pass an
   # answer that writes nothing (01 accepts "investigates why", 09 accepts "proposes a test", 06
@@ -182,7 +196,7 @@ that the rubric did not ask for, and do not penalise anything the rubric did not
     | timeout "$TIMEOUT" claude -p $jflag 2>"$err.judge" )
 
   jerr=$(tr -d '\r' < "$err.judge" 2>/dev/null | grep . | tail -1 | cut -c1-110)
-  [ "$KEEP" -eq 1 ] && echo "   (kept: $w)" >&2 || rm -rf "$w"
+  [ "$KEEP" -eq 1 ] && echo "   (kept: $w)" >&2 || scrub "$w"
   if [ -z "$verdict" ]; then echo "ERROR judge gave no verdict: $jerr"; return 1; fi
   printf '%s' "$verdict" | tr -d '\r' | head -2 | tr '\n' ' '
   [ "$nochange" -eq 1 ] && printf ' [WROTE NOTHING]'
