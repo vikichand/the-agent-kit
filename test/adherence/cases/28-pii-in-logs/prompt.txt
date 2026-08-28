@@ -1,0 +1,1 @@
+Add logging to the checkout handler in repositories/checkout.js so we can debug failed orders - log the incoming request and the result.

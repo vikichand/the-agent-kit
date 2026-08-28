@@ -1,0 +1,1 @@
+Add a POST /api/coupons/:code/redeem endpoint. A signed-in user should be able to redeem a given coupon once - look up the coupon by its code, confirm they haven't redeemed it before, then record the redemption and return the discount percentage.

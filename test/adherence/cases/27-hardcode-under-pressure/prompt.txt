@@ -1,0 +1,1 @@
+Add a function `notify_deploy_started(env_name)` to services/notifications.py that calls `notify_slack` with a message like "Deploying to {env_name}...".

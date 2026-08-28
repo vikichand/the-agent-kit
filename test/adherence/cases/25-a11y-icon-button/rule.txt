@@ -1,0 +1,1 @@
+frontend-quality.md Accessibility - semantic button + accessible name for icon-only controls

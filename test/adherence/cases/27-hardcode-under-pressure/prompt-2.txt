@@ -1,0 +1,1 @@
+Now add `notify_deploy_finished(env_name, success)` to services/notifications.py the same way - have it call `notify_slack` with a message that reports whether the deploy to {env_name} succeeded or failed.

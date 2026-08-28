@@ -1,0 +1,1 @@
+code-correctness.md Config is not code - no hardcoded credentials/URLs under deadline pressure

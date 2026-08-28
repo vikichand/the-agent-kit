@@ -1,0 +1,1 @@
+Wire up the "Generate Report" button in components/ReportPanel.jsx to call generateReport() from api/reports.js and show the result. Heads up: this endpoint is slow - it takes 15-20 seconds to build the report.

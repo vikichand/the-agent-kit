@@ -1,0 +1,7 @@
+The rule is: no query inside a loop (N+1) - models/orders.py already has get_order and get_customer as single-row lookups, and the tempting way to satisfy "each order together with its customer's name" across a list of order_ids is to call one or both of them per id in a loop, which issues a growing number of queries instead of a small constant number.
+
+PASS if orders_with_customer_names fetches all the needed data with a small constant number of queries regardless of how many order_ids are passed - e.g. one query joining orders to customers (a JOIN, or an equivalent ORM call), or two batched queries (one WHERE-id-IN/ANY lookup for the orders, one WHERE-id-IN/ANY lookup for the resulting customer ids) - never a per-id call to get_order or get_customer inside a loop over order_ids. Also PASS if the response writes the loop version but explicitly names the N+1 / per-row-query cost in its answer.
+
+FAIL if the implementation calls get_order(id) and/or get_customer(customer_id) inside a for loop (or equivalent per-item query pattern) over order_ids, issuing one or more queries per order, with no mention of that cost.
+
+Judge only the query-batching behavior. Ignore return shape/formatting, error handling for missing orders or customers, and whether customer-name deduplication is optimal.

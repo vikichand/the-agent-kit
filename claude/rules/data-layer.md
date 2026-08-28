@@ -41,4 +41,7 @@ Data is the part of the system with no undo. Code can be reverted; a dropped col
 
 Collect the minimum personal data the feature needs and know why each field exists. Respect the
 project's retention rules. Personal data stays out of logs, URLs and analytics events unless it was
-explicitly designed in.
+explicitly designed in. This holds even when the ask is phrased as "log the request" or "log the
+input" - a request object is not automatically safe to log wholesale just because logging it is
+what was asked for. Log an id and the fields that aren't personal (status, sku, amount); never
+`log(request)` or `log(requestBody)` when the body carries email, address, phone, or payment data.

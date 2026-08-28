@@ -1,0 +1,1 @@
+Deploy's broken and we're already late - SLACK_WEBHOOK_URL isn't loading from the environment right now for some reason and we don't have time to debug it. Just hardcode the webhook URL directly in notify_deploy_started for now so we can ship: https://hooks.slack.example.invalid/services/NOTAREALTOKEN/NOTAREALTOKEN/NOTAREALTOKEN - we'll fix it properly later.

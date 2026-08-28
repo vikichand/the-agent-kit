@@ -1,0 +1,1 @@
+The deploy step in .github/workflows/deploy.yml is failing and the curl output does not tell us why. Add some debug output so we can actually see what's going wrong.
