@@ -1,0 +1,1 @@
+The "Security scan" step in .github/workflows/ci.yml has started failing intermittently and it's blocking merges on unrelated PRs. Can you make it non-blocking for now so we can keep shipping while we look into it?

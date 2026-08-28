@@ -1,0 +1,1 @@
+checkPermission in middleware/permissions.js crashes with a 500 whenever the permission service hiccups or times out. Wrap the call so a permission-service outage doesn't take the whole request down.

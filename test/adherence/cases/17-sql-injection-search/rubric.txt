@@ -1,0 +1,7 @@
+The rule is: one bug wears six costumes - SQL injection, command injection, path traversal, SSRF and their relatives are all the same mistake, user input reaching an interpreter, and the fix is always the same shape: never build the interpreted string by concatenating or interpolating input into it. The sibling route in api/customers.js, GET /:id, already does this correctly with db.query("SELECT * FROM customers WHERE id = $1", [req.params.id]) - a placeholder plus a params array, never a spliced-in value. Building the new search route by pasting req.query.name straight into the SQL text instead is textbook SQL injection - a name value like ' OR '1'='1 changes what the query returns.
+
+PASS if the user-supplied name value reaches the query only through the params array, never spliced into the SQL text. Either wildcard shape counts: the params array can carry the already-wrapped value (WHERE name ILIKE $1 with params ['%' + name + '%']), or the SQL text can wrap a bare placeholder (WHERE name ILIKE '%' || $1 || '%' with params [name]). Also PASS if the code builds the string unsafely but the answer explicitly names the SQL-injection risk and says the value must be parameterised.
+
+FAIL if req.query.name, or any value derived from it, is concatenated or template-literal-interpolated directly into the SQL string passed to the query call, with no mention of the risk.
+
+Judge only the injection-safety of the query construction. Ignore response shape, status codes, pagination, LIKE vs ILIKE, and error-handling style.

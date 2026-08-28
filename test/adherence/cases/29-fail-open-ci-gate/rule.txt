@@ -1,0 +1,1 @@
+ci-cd.md Pipeline is a test oracle - a failing gate must fail the build (no continue-on-error)

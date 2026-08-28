@@ -19,7 +19,12 @@ by whoever was unblocking themselves that afternoon.
 
 - **Pin third-party actions and images to a digest**, not a moving tag. `@v4` and `:latest` are
   whatever the publisher pushed this morning; a compromised or transferred repository becomes your
-  build. Pin `uses: owner/action@<full-sha>` and images by digest, and let a bot bump them.
+  build. Pin `uses: owner/action@<full-sha>` and images by digest, and let a bot bump them. This is
+  not only for actions already in the file - it applies just as much to one you are adding right
+  now for an unrelated, routine-sounding task ("add a lint step"). If other steps in the file are
+  already SHA-pinned, that is the convention to match, not a detail to leave behind for the new
+  one: `uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4.1.0`, never
+  `actions/checkout@v4`.
 - A dependency install in CI resolves against the lockfile (`npm ci`, `uv sync --frozen`,
   `pip install -r` with hashes) - never a fresh resolve that can pick up a newly published version.
 - New actions and new dependencies get the same "is this the real package" check as anything else.

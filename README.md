@@ -515,14 +515,19 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
 - **Attribution fixes the message, not the author identity.** Keep your own `user.name` / `user.email` in
   git config. It's a *known-bot* denylist, so a brand-new tool's trailer may need adding.
 - **The rules are guidance, and guidance is probabilistic.** The guards above hold regardless of context
-  because nothing has to remember them. The ~88 behavioural rules are different, and the honest number is
-  measured rather than claimed: on Sonnet, **88.9% compliance on the rules that have a test case (24/27),
-  against 71.4% with no kit loaded (20/28)** - a +17.5 point effect, with no case scoring worse with the
-  rules than without. On Opus the tested rules show no gap at all; it already does those things unprompted.
-  Roughly four fifths of the guidance layer has no test case, so absence of a case is not evidence a rule
-  works. Every figure is a one-shot prompt: adherence decay across a long session, which is the case the
-  rules exist for, is not measured by anything here. Method, per-case tables and the instrument's own
-  defect history are in [`test/adherence/README.md`](test/adherence/README.md).
+  because nothing has to remember them. The behavioural rules are different, and the honest number is
+  measured rather than claimed: on Sonnet, **88.9% compliance on the rules in the original 14-case suite
+  (24/27), against 71.4% with no kit loaded (20/28)** - a +17.5 point effect, with no case scoring worse
+  with the rules than without. On Opus the tested rules show no gap at all; it already does those things
+  unprompted. A second batch of 14 cases closed most of the depth tier's remaining blind spots (20 of 29
+  distinct rule-file sections now have a dedicated case, up from 8): 3 showed a clean gap, 8 showed Sonnet
+  already doing the right thing unprompted, 2 turned out to be about task completion rather than code
+  safety, and one - pinning a CI action to a commit SHA - failed with the rules present in both arms and
+  needs an enforced check, not better wording, which is now a named open item. The remaining rule-file
+  sections without a case, and the `AGENTS.md` bullets a one-shot diff-graded case structurally cannot
+  reach at all (a plan surviving pressure, decay across a long session, proof in a real browser), are
+  listed by name rather than folded into one fraction. Method, the full per-case tables, and that list
+  are in [`test/adherence/README.md`](test/adherence/README.md).
 
 ## Inspired by
 
