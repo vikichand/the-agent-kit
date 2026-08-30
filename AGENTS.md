@@ -182,6 +182,9 @@ Most agents skip this; it matters most. Your own judgement degrades as the sessi
 - **Commit, push, and open PRs only when the user asks** - never on your own initiative. Offer the next step
   ("want me to push?"); performing it is their call. Each is authorized only by being named: "commit this"
   is not permission to push. Keep commit messages short and plain.
+- **A repeated mistake is a missing rule - propose it, don't write it.** Get the same thing wrong twice and
+  say so, naming the one line that would have prevented it, for the human to accept. Never edit the rules
+  file yourself: it is read every turn, so it must stay short, and self-granted latitude is not a rule.
 - **Announce breaking changes; flag risky ones.** A changed public contract (API shape, event schema,
   exported signature) is called out and versioned, never smuggled in. Gate genuinely risky behavior behind a
   flag where the project supports one, and read the logs after it deploys - green CI is not a healthy prod.

@@ -39,7 +39,9 @@ Set up the AGENTS.md in this project for me.
    - If CODE: languages/frameworks (+ versions/strictness); platform/infra (db, runtime, cloud, auth); the EXACT
      commands that must pass before "done" (build / test / typecheck / lint - use the project's real ones from its
      scripts / Makefile / CI; if none exist, say so and ask whether to add them); 2-4 canonical files that show the
-     patterns to follow; do-not-touch zones (generated files, migrations, infra, secrets, public API contracts).
+     patterns to follow; do-not-touch zones (generated files, migrations, infra, secrets, public API contracts);
+     any stated performance bar (request-latency target, page-weight cap, query budget) and the command that
+     measures it - record it only if the project actually states one, never a number you invented.
    - If CODE on a USER-FACING platform, also detect (never assume) the project's mechanisms for the quality bars:
      the i18n layer (or note its absence), the a11y tooling (lint rule, axe, platform inspector), and the
      observability target from the infra actually present (Azure -> App Insights; AWS -> CloudWatch; GCP -> Cloud

@@ -28,7 +28,7 @@ stays local · own your incidents (stop and report, no silent cleanup) · don't 
 | 4 | Surgical changes: every line traces to the task |
 | 5 | **Verification is the spine**: external oracle · **test-first by default** (Section 0 sizes the ceremony) · **never game the oracle** (no deleted tests / loosened asserts) · **look it up, don't recall it** · **bounded loops** · **no self-grading** |
 | 6 | Debug by root cause · **fix it where it is shared, not where it surfaced** · two-attempt rule |
-| 7 | Checkpoint to files · commit only when asked · **sync before you ship** (fetch + rebase before push/PR) |
+| 7 | Checkpoint to files · commit only when asked · **a repeated mistake becomes a proposed rule, never a self-edit** · **sync before you ship** (fetch + rebase before push/PR) |
 | 8 | Execution discipline running a plan |
 | 9 | Ownership · **no AI-authorship** (no `Co-Authored-By` / `Generated with` / AI-as-author) · **no AI prose tells** (em dashes, "not just X, it's Y", delve/leverage/seamless) |
 | 10 | **READMEs: the working path first** · Quick Start in the first screenful · reference tables · **name the shell differences, don't assume POSIX** · no filler · **docs move in the same diff** |
@@ -56,7 +56,7 @@ deleted to make room.
 
 | Rule | Loads when you touch | Carries |
 |---|---|---|
-| `code-correctness.md` | source files | no silent fallbacks · idempotent + transactional writes · the 100k-rows question · UTC and decimal money · named-ceiling shortcuts |
+| `code-correctness.md` | source files | no silent fallbacks · idempotent + transactional writes · the 100k-rows question · **performance measured, not asserted** · UTC and decimal money · named-ceiling shortcuts |
 | `web-security.md` | `auth/**`, `api/**`, `**/webhook*`, `**/payment*`, routes, middleware, edge config (`nginx.conf`, `Caddyfile`, `vercel.json`, `wrangler.toml`, `fly.toml`, `.htaccess`) | sessions, object-level authz (the row-42 bug) · injection family · rate limits and brute-force defence · input and uploads · HSTS/CSRF/CORS · server-side prices · AI endpoint limits |
 | `frontend-quality.md` | components, pages, `*.tsx`, `*.jsx` | a11y (and its legal exposure) · i18n · skeleton loaders · UI restraint |
 | `data-layer.md` | migrations, models, schema, `*.sql` | expand -> migrate -> contract · N+1 and indexes · money and time column types · privacy |
