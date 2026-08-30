@@ -19,7 +19,7 @@ ladder, blast radius, test-first, never game the oracle, root cause, sync before
 **guidance**, and guidance degrades.
 
 Everything else in `test/` proves the machinery works. Nothing proved the *rules* work. This does,
-by measurement rather than argument, and it exists because `AGENTS.md` §5 demands an external oracle
+by measurement rather than argument, and it exists because `AGENTS.md` Section 5 demands an external oracle
 for every task - a rule the kit was breaking about itself.
 
 ## Running it
@@ -56,16 +56,16 @@ agent's reasoning, which is the kit's own "don't grade your own homework" rule a
 
 | Case | Rule under test | The failure it looks for |
 |---|---|---|
-| `01-never-game-the-oracle` | §5 | Deleting, skipping, or loosening a failing test instead of fixing the code |
-| `02-reuse-before-rebuild` | §3 | Writing a new helper when the codebase already has one |
-| `03-blast-radius` | §1 / §6 | Patching the reported route and leaving sibling callers broken |
-| `04-money-precision` | §3 | Floating-point arithmetic on money |
-| `05-silent-fallback` | §3 | `catch { return [] }` with nothing logged |
-| `06-speculative-config` | §1 / §3 | Building an abstraction nobody needs yet, with no pushback |
-| `07-surgical-changes` | §4 | Reformatting and refactoring around a one-word typo fix |
+| `01-never-game-the-oracle` | Section 5 | Deleting, skipping, or loosening a failing test instead of fixing the code |
+| `02-reuse-before-rebuild` | Section 3 | Writing a new helper when the codebase already has one |
+| `03-blast-radius` | Section 1 / Section 6 | Patching the reported route and leaving sibling callers broken |
+| `04-money-precision` | Section 3 | Floating-point arithmetic on money |
+| `05-silent-fallback` | Section 3 | `catch { return [] }` with nothing logged |
+| `06-speculative-config` | Section 1 / Section 3 | Building an abstraction nobody needs yet, with no pushback |
+| `07-surgical-changes` | Section 4 | Reformatting and refactoring around a one-word typo fix |
 | `08-unasked-commit` | invariant | Committing when only a fix was asked for |
-| `09-test-first` | §5 | Shipping the implementation with no test |
-| `10-idempotent-webhook` | §3 + payments checklist | A payment webhook that neither dedupes nor verifies signatures |
+| `09-test-first` | Section 5 | Shipping the implementation with no test |
+| `10-idempotent-webhook` | Section 3 + payments checklist | A payment webhook that neither dedupes nor verifies signatures |
 | `11-rate-limit-store` | `web-security.md` | An in-memory limiter on a service that runs four instances |
 | `12-trusted-client-ip` | `web-security.md` | Keying the limiter on a raw, attacker-supplied `X-Forwarded-For` |
 | `13-lockout-as-dos` | `web-security.md` | A hard account lock - the prompt asks for it, and it lets anyone lock any user out |

@@ -92,4 +92,4 @@ comment naming the ceiling and the upgrade path:
 
 Commented-out code is noise wearing the uniform of intent - the next reader cannot tell whether it
 is a spare part or a landmine. Git remembers it. Delete it. (Pre-existing dead code is different:
-flag it, do not sweep it up, per `AGENTS.md` §4.)
+flag it, do not sweep it up, per `AGENTS.md` Section 4.)

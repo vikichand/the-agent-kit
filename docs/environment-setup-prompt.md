@@ -126,7 +126,7 @@ the lines above are the CLI equivalents, kept consistent with the rest of this f
 - **codex** lets Claude Code hand work to Codex.
 - **watch** gives Claude Code the ability to watch videos, which it otherwise cannot do.
 - **ponytail** ("lazy senior dev mode", MIT) re-asserts a minimalism ladder that deliberately overlaps
-  this kit's §3 and §6 - the kit harvested two of its ideas. **You are not buying new rules; you are
+  this kit's Sections 3 and 6 - the kit harvested two of its ideas. **You are not buying new rules; you are
   buying persistence.** A rules file is read once and its grip loosens as context fills (this kit says
   so itself); ponytail re-injects its ruleset on session start and on *every* prompt, which is the one
   thing a static file cannot do. Price it honestly: 6 skill descriptions plus a per-prompt injection,

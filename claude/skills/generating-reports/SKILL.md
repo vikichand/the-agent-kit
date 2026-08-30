@@ -17,7 +17,7 @@ two-thirds more tokens. So: both formats, one direction of authority.
 
 ## The rule
 
-For any plan, review, audit, or report of substance (§0 sizing applies - a three-line answer needs
+For any plan, review, audit, or report of substance (Section 0 sizing applies - a three-line answer needs
 none of this):
 
 1. **Write the markdown file first.** It is the source of truth and the only file that gets edited.
@@ -46,7 +46,7 @@ Offer the human the HTML path when you finish ("open plan.html to review"). Exec
 - **Checkboxes are execution state.** `- [ ]` / `- [x]` per step, and you tick them as you complete
   work, so the file is restart-safe: a fresh session reads the plan and knows exactly what remains.
 - **An acceptance-criteria block per step or per plan** - the checkable definition of done, phrased
-  so a test or command can verify it (§5's external oracle, applied to planning).
+  so a test or command can verify it (Section 5's external oracle, applied to planning).
 - Git is the audit trail: the plan file is committed alongside the work when the human asks for
   commits, so `git diff` on the plan shows scope drift in human-readable terms.
 
@@ -70,9 +70,9 @@ Offer the human the HTML path when you finish ("open plan.html to review"). Exec
 - **Follow the project's declared style guide** from `PROJECT-CONFIG`; absent one, Google's
   developer documentation style guide is the default for developer-facing prose. Declaring a
   standard matters more than which one.
-- **Commit messages follow the kit's own discipline** (§7: why over what, no attribution trailers).
+- **Commit messages follow the kit's own discipline** (Section 7: why over what, no attribution trailers).
   Conventional Commits is *not* imposed: adopt it only where the project already uses it and
   enforces it with tooling - agents default to it out of habit, and unenforced type prefixes decay
   into noise.
-- `AGENTS.md` §9 and §10 still govern: no AI prose tells, working path first, tables for what people
+- `AGENTS.md` Sections 9 and 10 still govern: no AI prose tells, working path first, tables for what people
   scan for.

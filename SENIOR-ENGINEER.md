@@ -8,7 +8,7 @@
 >
 > | Part | Lives now in | Loaded |
 > |---|---|---|
-> | I - universal discipline | `AGENTS.md` §invariants, §1-§10 | every turn, every repo |
+> | I - universal discipline | `AGENTS.md` safety invariants + Sections 1-10 | every turn, every repo |
 > | II - product quality bars | `PROJECT-CONFIG`, written by `docs/project-setup-prompt.md` | every turn, in user-facing repos |
 > | III - web security | `claude/rules/web-security.md` + `claude/rules/ci-cd.md` | automatically, on matching paths |
 > | IV - launch readiness | `docs/web-checklists.md` | on demand, before a public launch |
@@ -405,9 +405,9 @@ flagged only because `AGENTS.md` says "trace", not "traces").
 
 | Stranded trait | Was missing from | Now in |
 |---|---|---|
-| UI work gets proof in a real browser | `AGENTS.md` | §5 |
-| Breaking changes announced, not smuggled | `AGENTS.md` | §7 |
-| Risky changes behind a flag; watch them land | `AGENTS.md` | §7 |
+| UI work gets proof in a real browser | `AGENTS.md` | Section 5 |
+| Breaking changes announced, not smuggled | `AGENTS.md` | Section 7 |
+| Risky changes behind a flag; watch them land | `AGENTS.md` | Section 7 |
 | Privacy by default | `PROJECT-CONFIG` | quality-bars line in the setup prompt |
 
 Paid for under the anti-churn contract by moving "What this file can and can't do" into an HTML

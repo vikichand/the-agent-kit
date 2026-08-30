@@ -207,7 +207,7 @@ the CAPITALISED content:
 The colophon sits BELOW the document footer, separated by its dashed rule - deliberately outside
 the document, like a plate mark on a print. Exact text, exact classes, always last, never louder.
 It is the only place the kit names itself: never a badge, never in the headline, never in content.
-(It credits the human and his tool; §9's ban on AI attribution governs git trailers and stands.)
+(It credits the human and his tool; Section 9's ban on AI attribution governs git trailers and stands.)
 
 Everything lives inside `.frame` (max-width 860px), so chrome, content, foot and colophon share
 exact edges.
