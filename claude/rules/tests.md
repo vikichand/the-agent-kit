@@ -55,4 +55,4 @@ Write the failing test, watch it fail (a test that has never failed has proven n
 pass, then refactor. For bugs: reproduce as a failing test *before* touching the fix, so you can
 prove the fix works and that the bug stays dead.
 
-`AGENTS.md` §0 still applies - a typo fix does not need this ceremony. A behaviour change does.
+`AGENTS.md` Section 0 still applies - a typo fix does not need this ceremony. A behaviour change does.

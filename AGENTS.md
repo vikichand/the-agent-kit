@@ -89,7 +89,7 @@ This gate decides whether the rest applies. Get it right and none of this adds f
   this?"), or have a fresh agent in a clean context review it - a clean slate catches mistakes that the context
   which wrote the plan is too invested to see.
 - **Say what is out of scope.** A plan that names what it will *not* touch bounds exploration as much as the
-  steps bound the work - scope creep in an agent shows up as unrequested "improvements" (§4).
+  steps bound the work - scope creep in an agent shows up as unrequested "improvements" (Section 4).
 - **Reads parallelise; writes do not.** Fan out freely for investigation - audits, surveys, finding every
   caller. Split *writing* only across slices that are genuinely independent, and only after the shared
   surface (interfaces, types, schemas, file ownership) is frozen: the failure is conflicting implicit
@@ -147,7 +147,7 @@ Most agents skip this; it matters most. Your own judgement degrades as the sessi
   criteria let them run autonomously; weak ones ("make it work") force you to babysit every step.
 - **Bound any loop you leave running.** Before iterating unattended, fix the boundary: an attempt or time
   budget and an escalation trigger. Stop when the criteria pass, when gains stop justifying the cost, or when
-  the same failure repeats without a new strategy - then hand it back to the human (§6's two-attempt rule,
+  the same failure repeats without a new strategy - then hand it back to the human (Section 6's two-attempt rule,
   generalized).
 - **Don't grade your own homework.** A builder's self-assessment is not verification. When output is judged
   rather than tested (design, prose, UX), have a fresh-context critic compare it against a concrete reference
@@ -195,7 +195,7 @@ Most agents skip this; it matters most. Your own judgement degrades as the sessi
 ## 8. Execution discipline when running a plan
 
 - Work the plan top to bottom. **Don't stop to check in between steps** unless you're genuinely blocked, the spec
-  is ambiguous, or you're done. (Not a contradiction of §1: that rule governs *before* you start, this one governs
+  is ambiguous, or you're done. (Not a contradiction of Section 1: that rule governs *before* you start, this one governs
   *during*. Ambiguity you discover mid-plan still stops you.)
 - **Verify each step before the next** (Section 5 applies per step, not just at the end).
 - Narrate at most one short line between actions - the diffs and test results are the record, not commentary.
@@ -215,7 +215,9 @@ does it too, in every README, comment, commit body, and PR description. The loud
 models reach for it far more readily than people do. Use ` - `, a comma, or two sentences instead. Also out: "it's not just
 X, it's Y", filler openers ("In today's fast-paced..."), hedges ("it's worth noting that"), *delve / leverage /
 seamless / robust / comprehensive*, emoji headings, and bolding every third phrase. Vary sentence length; let
-some be short. This governs prose you write - never the project's own code style (that's §3).
+some be short. **Write symbols out in words**: "Section 4", not the section sign; "and", not an ampersand in
+prose; "number", not a hash. A reader should never have to decode a glyph. This governs prose you write -
+never the project's own code style (that's Section 3).
 
 ## 10. READMEs and docs: the working path first
 

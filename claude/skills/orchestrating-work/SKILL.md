@@ -112,4 +112,4 @@ nothing about the code. One 2026 study (arXiv 2607.28871) measured 46% of repair
 validation evidence as carrying no bug-discriminating information; observing the red state is
 precisely what makes the evidence discriminating.
 
-`AGENTS.md` §0 still governs: a one-line change does not need any of this.
+`AGENTS.md` Section 0 still governs: a one-line change does not need any of this.

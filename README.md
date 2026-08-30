@@ -1,7 +1,16 @@
 # the-agent-kit
 
-Rules and guardrails that make coding agents behave. One install, wired for both
-[Claude Code](https://claude.com/claude-code) and [Codex](https://developers.openai.com/codex).
+**Rules and guardrails that get a coding agent working like a senior engineer instead of an eager
+intern.** One install, wired for both [Claude Code](https://claude.com/claude-code) and
+[Codex](https://developers.openai.com/codex).
+
+A capable model already writes decent code. What it does not do by default is behave like someone
+senior: read before it writes, ask what breaks downstream, push back on a bad instruction, test first
+and refuse to fake a green run, fix the cause rather than the symptom, and stop at what you asked for.
+That is a behaviour gap, not a capability gap, and it is what this kit closes. The traits it installs,
+with the reasoning and sources behind each, are in
+[`SENIOR-ENGINEER.md`](SENIOR-ENGINEER.md); how well they actually hold up under test is
+[measured, not asserted](#limits).
 
 ## Quick Start
 
@@ -236,7 +245,8 @@ the expected verdict.
 
 ## What you get
 
-Two things, one install.
+Two halves, one install: rules the agent follows, and guards that do not depend on it remembering
+them. The rules arrive in three tiers, each paid for only when it applies.
 
 **The rules** - a tight `AGENTS.md` that gets an agent working like a senior engineer instead of an
 eager intern: reuse what the codebase already has rather than rebuilding it, know the blast radius
@@ -248,6 +258,9 @@ observability, audit logs.
 **The depth tier** - longer, situational rules that load only when the agent opens a file they apply
 to, so security rules arrive on API code and accessibility rules on components, at no cost the rest of
 the time.
+
+**The task tier** - two skills that load on what you are *doing* rather than which file you opened:
+splitting work across subagents, and writing a plan or report a human will act on.
 
 **The guards** - hooks at the **git layer** (reorder-proof, covering Claude Code, Codex, plain `git`,
 and any MCP tool that shells out to `git`) plus the **tool layer**, a fast prompt-time veto. Full map
@@ -297,8 +310,8 @@ These are *behaviours, not style*. The kit imposes no framework, formatter, or h
 your project's conventions; project opinion lives in the per-project block instead. Several rules come
 straight from the people in [Inspired by](#inspired-by), noted there by section.
 
-**§9 covers prose as well as commits.** A `Co-Authored-By` trailer isn't the only thing that marks work as
-machine-made; the writing does it too. So §9 bans the tells in anything the agent writes (READMEs, comments,
+**Section 9 covers prose as well as commits.** A `Co-Authored-By` trailer isn't the only thing that marks work as
+machine-made; the writing does it too. So Section 9 bans the tells in anything the agent writes (READMEs, comments,
 commit bodies, PR descriptions): **em dashes** above all, plus "it's not just X, it's Y", filler openers,
 hedges, *delve / leverage / seamless / robust*, emoji headings, and bolding every third phrase. It governs
 what the agent *writes*, never your project's code style.
@@ -331,7 +344,7 @@ way is organisation with no context saving at all.
 ### The task tier: skills
 
 A third trigger, for guidance keyed to *what you are doing* rather than which file you opened. Only the
-skill's one-line description sits in context; the body loads when a task matches.
+skill's one-line description sits in context; the body loads when a task matches. Two ship:
 
 **`orchestrating-work`** fires when a task looks decomposable, or when you ask to parallelise or use
 subagents. Its spine is the rule every credible source agrees on - **reads parallelise, writes do
@@ -340,12 +353,17 @@ sequential integration, and an orchestrator-worker split where the lead keeps de
 contract and the final review while workers execute already-complete specs. Multi-agent runs cost
 roughly 15x the tokens of a chat, so it also says plainly when *not* to fan out.
 
+**`generating-reports`** fires on a plan, review, audit, status report, or any document a human will
+read and act on. It carries the dual-format rule - markdown as the agent-readable source of truth,
+plus a self-contained styled HTML render for human review - the structure that keeps a plan
+machine-executable, and the prose standards from Section 9, so a report does not arrive wearing the tells.
+
 ### The guards: what's enforced, and where
 
 | Guard | Claude Code | Codex |
 |---|---|---|
 | **Rules** | `CLAUDE.md`, a one-line `@AGENTS.md` import | `AGENTS.md`, the file itself |
-| **add / commit / push** | permission rules **ask every time** (ask outranks a mis-clicked "don't ask again"); force/`--no-verify` **denied** | tool hook **denies** (you push) |
+| **commit / push / open a PR** | runs **only when your message that turn asked for it**, once; otherwise the tool hook **asks**. Force/`--no-verify`/`pr merge` **denied or always asked**, grant or not | tool hook **denies** (you push) |
 | **force / delete to `main`** | git `pre-push` blocks it | git `pre-push` (same file) |
 | **secrets in a commit** | git `pre-commit` blocks staged secrets | same file |
 | **destructive cmds** (`rm -rf`, `reset --hard`, `curl\|sh`) | tool hook **asks** | tool hook **denies** |
@@ -424,13 +442,17 @@ The full senior-engineer trait ledger behind these bars, with rationale and sour
 
 ## What each guard does
 
-**command-guard** (`hooks/command-guard.py`, tool layer) is a PreToolUse hook, `--decision ask` on Claude
-Code / `--decision deny` on Codex. A **best-effort prompt-time catch, not a boundary**: a text parser
+**command-guard** (`hooks/command-guard.py`, tool layer) runs as a PreToolUse hook, `--decision ask` on
+Claude Code / `--decision deny` on Codex. A **best-effort prompt-time catch, not a boundary**: a text parser
 can't fully replicate git + shell semantics, so `bash -c`, `eval`, `$(...)`, aliases, and unusual-but-valid
 git syntax slip past. It flags the hook-disable vectors (`--no-verify`, `core.hooksPath` via `-c`,
 `--config-env`, `GIT_CONFIG_*`), direct `.git/config` writes, force/delete push, and destructive commands
 (`rm -rf`, `git reset --hard`, `git clean`, `git branch -D`, `curl | sh`). It flags only the *force* form
 of a branch delete: plain `git branch -d` already refuses on unmerged work, so gating it would be noise.
+On Claude Code the same file also runs as a **`UserPromptSubmit`** hook (`--event userprompt`), where it
+reads your message and records which git-writes you authorized for that turn - the grant described below.
+A chained command takes the most restrictive verdict across its segments (deny > ask > allow), so a
+granted operation can never carry an ungranted one through with it.
 
 **pre-push** (git layer) refuses **force / non-fast-forward / delete** to a protected branch (`main`,
 `master`, `release/*`). Git runs it itself, so it's reorder-proof. Override: `AGENT_KIT_ALLOW_FORCE=1`.
@@ -487,7 +509,7 @@ Four config choices are deliberate, because the obvious "more locked down" setti
 ```bash
 ./install.sh --check                     # doctor: interpreter, guard firing, per-hook status, rules files
 sh test/run-tests.sh                     # git-layer hooks + doctor, end-to-end
-python3 test/command_guard_cases.py      # command-guard corpus (136 cases: guard + grants + intent)
+python3 test/command_guard_cases.py      # command-guard corpus (145 cases: guard + grants + intent)
 sh test/adherence/run.sh                 # do the SOFT rules actually fire? (costs tokens)
 ```
 
@@ -545,22 +567,22 @@ The rules stand on the public work of people who've thought hard about coding wi
 **Inspirations, not endorsements**: none of them have seen or endorsed this kit.
 
 Links are given only where the source was fetched and checked. Where a claim is corroborated by reporting
-but the primary link could not be verified, it is attributed by talk and date instead of deep-linked, per §5.
+but the primary link could not be verified, it is attributed by talk and date instead of deep-linked, per Section 5.
 
-- **Andrej Karpathy**: **§0, §4, §5.** From his *AI Startup School* talk (Y Combinator, June 2025) and
+- **Andrej Karpathy**: **Sections 0, 4, 5.** From his *AI Startup School* talk (Y Combinator, June 2025) and
   surrounding writing: keep AI "on a leash" with incremental, auditable changes, because a huge diff just
   moves the bottleneck to the human verifying it. He describes himself as still being that bottleneck. That
-  is why §5 demands an oracle and §4 insists the diff stays small and reviewable.
-- **[Matt Pocock](https://github.com/mattpocock/skills)**: **§1, §2.** His skills push the agent to interview
+  is why Section 5 demands an oracle and Section 4 insists the diff stays small and reviewable.
+- **[Matt Pocock](https://github.com/mattpocock/skills)**: **Sections 1, 2.** His skills push the agent to interview
   you *before* it opens an editor, and to write down a project's real vocabulary so it stops inventing
-  domain names. §1's grill mode and the `PROJECT-CONFIG` block are the same idea in a smaller form.
-- **[Boris Cherny](https://howborisusesclaudecode.com/)** (creator of Claude Code): **§5.** *Give the agent a
+  domain names. Section 1's grill mode and the `PROJECT-CONFIG` block are the same idea in a smaller form.
+- **[Boris Cherny](https://howborisusesclaudecode.com/)** (creator of Claude Code): **Section 5.** *Give the agent a
   way to verify its work*, and it multiplies the quality of the result.
 - **[Simon Willison](https://simonwillison.net/2025/Mar/11/using-llms-for-code/)** (coined "vibe
-  engineering"): **§5.** *"If you haven't seen it run, it's not a working system."*
-- **[Kent Beck](https://simonwillison.net/2025/Dec/16/kent-beck/)** (created TDD): **§5.** *Augmented*
-  coding: move faster with AI while keeping quality. The test-first cycle in §5 is his.
-- **[ponytail](https://github.com/DietrichGebert/ponytail)** (MIT): **§3, §6.** Its "lazy senior dev" framing
+  engineering"): **Section 5.** *"If you haven't seen it run, it's not a working system."*
+- **[Kent Beck](https://simonwillison.net/2025/Dec/16/kent-beck/)** (created TDD): **Section 5.** *Augmented*
+  coding: move faster with AI while keeping quality. The test-first cycle in Section 5 is his.
+- **[ponytail](https://github.com/DietrichGebert/ponytail)** (MIT): **Sections 3, 6.** Its "lazy senior dev" framing
   sharpened two rules here - stopping at the first rung of a reuse ladder, and marking a deliberate shortcut
   with the ceiling it carries. The wording in this kit is its own; the thinking was better for having read theirs.
 - Supporting data: Google's **[DORA 2025](https://dora.dev/)** (AI *amplifies* existing practices) and a

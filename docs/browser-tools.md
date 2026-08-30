@@ -55,7 +55,7 @@ Playwright: behaviour is the acceptance test.
 - **One primary tool per finding.** One tool, plus at most one confirming check. Not parallel
   investigations in both.
 - **A screenshot is not a measurement.** Do not eyeball two renderings through either MCP and report
-  a similarity judgement. If the project has a scoring script, the score is the evidence (§5).
+  a similarity judgement. If the project has a scoring script, the score is the evidence (Section 5).
 - **A skill that prescribes its own browser tooling wins inside that skill.** This rule governs
   everything outside one.
 - **Build and compile questions do not go to a browser at all.** They go to the build command or the
