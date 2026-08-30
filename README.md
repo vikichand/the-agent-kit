@@ -447,13 +447,23 @@ rather than silently rewritten.
 
 **Tool config** (`claude/settings.json`, `codex/config.toml`, `codex/hooks.json`) is printed by
 `--global` for you to merge. On Claude Code it kills the native attribution trailer
-(`attribution.commit/pr:""`), asks on `git push` and on secret-file reads (a visible prompt naming the
-file - precaution without a hard stop), and denies `--no-verify`/force and
+(`attribution.commit/pr:""`); asks before `git commit`, `git push`, and `gh pr create` *unless your own
+message that turn asked for it* (a one-time, turn-scoped grant, below); asks on secret-file reads (a
+visible prompt naming the file - precaution without a hard stop); and denies `--no-verify`/force and
 writes to `.git/hooks`, `.git/config`, and `.claude/settings.json`. It also **asks** before an edit to
 `AGENTS.md` / `CLAUDE.md`, since those now carry the same authority as the settings file. On Codex it sets
 `approval_policy=on-request` and `sandbox_mode=workspace-write`; `codex/hooks.json` wires the deny-mode hook.
 
-Three config choices are deliberate, because the obvious "more locked down" setting makes the agent worse:
+Four config choices are deliberate, because the obvious "more locked down" setting makes the agent worse:
+
+- **git writes are authorized by your request, once.** The agent never commits, pushes, or opens a PR on
+  its own initiative. When you ask ("commit this", "push it", "open a PR"), a `UserPromptSubmit` hook reads
+  your *own* words - a hook the agent cannot write to - and lets exactly those operations through for that
+  one turn; your next message resets the grant. Ask for nothing and every git write prompts, and that prompt
+  is the agent asking you. A grant is per-operation ("commit this" is not permission to push) and never
+  covers force-push, `--no-verify`, or `gh pr merge`. Detection is conservative and falls back to the prompt,
+  so a missed phrasing costs one click, never a silent push. Codex (deny-mode) ignores grants: it commits
+  freely and leaves pushing to you, unchanged.
 
 - **Secret files ask; they are not walled off.** Reading `.env` / keys / credential stores prompts with
   the exact file named, instead of a hard deny. Real workflows need it ("push my local env vars to the
@@ -477,7 +487,7 @@ Three config choices are deliberate, because the obvious "more locked down" sett
 ```bash
 ./install.sh --check                     # doctor: interpreter, guard firing, per-hook status, rules files
 sh test/run-tests.sh                     # git-layer hooks + doctor, end-to-end
-python3 test/command_guard_cases.py      # command-guard corpus (96 cases)
+python3 test/command_guard_cases.py      # command-guard corpus (136 cases: guard + grants + intent)
 sh test/adherence/run.sh                 # do the SOFT rules actually fire? (costs tokens)
 ```
 
