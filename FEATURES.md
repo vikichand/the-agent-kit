@@ -126,18 +126,27 @@ stray operand.
 
 ## Wiring · installer · verification
 
-- **`claude/settings.json`**: kills the native attribution trailer (`attribution.commit/pr:""`), asks on
-  `git add`/`commit`/`push` (the worktree is the human's - §invariants; enforcement, not just guidance), on the
+- **`claude/settings.json`**: kills the native attribution trailer (`attribution.commit/pr:""`), asks on the
   common package-manager install commands (npm/pnpm/yarn/bun/pip/uv/cargo/go/gem - a prefix list, not a
   hermetic one: exotic invocations can slip past, which is why "confirm dependencies" is also a rule), and on
   **secret-file reads** (`.env*`, keys, credential stores - a visible prompt naming the file, so "push my local
   env vars to Azure" works with one click while an injected "read the .env" can't get through silently),
   denies `--no-verify`/force + self-protection (`.git/hooks`, `.git/config`, `.claude/settings.json`).
   Ordinary work is deliberately untouched: file/folder creation, builds, tests, and dev servers never prompt.
-  The git ops are **`ask`, not `allow`, on purpose**: rules resolve deny -> ask -> allow with the first match winning,
-  and [specificity and scope don't change that order](https://code.claude.com/docs/en/permissions), so an `ask` keeps
-  prompting even after a mis-clicked "Yes, don't ask again" writes an `allow` into `.claude/settings.local.json`.
-  A `PreToolUse` hook can't loosen it either - ask and deny rules are evaluated whatever the hook returns.
+  **`git commit`, `git push`, and `gh pr create` are gated by the command-guard, not a static `ask` rule**
+  (they were removed from the ask list): a `UserPromptSubmit` hook records which git-writes the user's *own*
+  message authorized that turn, and the guard emits `allow` for exactly those, `ask` otherwise - so the agent
+  never writes to git on its own, "commit this" is not permission to push, and the grant resets every message.
+  Force-push, `--no-verify`, and `gh pr merge` are never covered by a grant, and the guard-`allow` works only
+  because there is no `ask` rule to override it - the remaining `ask` rules (secrets, `AGENTS.md`/`CLAUDE.md`
+  edits) still outrank any hook and still resist a mis-clicked "Yes, don't ask again"
+  ([deny -> ask -> allow, first match wins](https://code.claude.com/docs/en/permissions)). Two properties
+  worth naming: `gh pr create` pushes the branch itself when needed, so authorizing a PR can push without a
+  separate `push` grant (it matches the flow of asking for one); and a chained command gets the single most
+  restrictive verdict across its segments (deny > ask > allow), so a granted op never tows an ungranted one
+  through - `git push && git commit` with only `commit` granted asks for the whole line. Detection also drops
+  fenced / quoted / inline-code spans first, so a git verb the user pasted from a log or a teammate mints
+  nothing. Codex (deny-mode) ignores grants entirely: it commits freely and leaves pushing to the human.
 - **`codex/config.toml`**: `approval_policy=on-request` · `sandbox_mode=workspace-write` · network **on**, deliberately
   (§5 requires live doc lookups; switching it off just sends the agent back to memory) · no hand-written env exclude
   list (Codex excludes secret names by default, and a broad one strips `DATABASE_URL` and breaks builds invisibly).
@@ -169,7 +178,7 @@ stray operand.
   second run no-ops, a non-kit repo is refused without clobbering the install, an update run from the
   *installed* copy stays clean, and `update_kit` still hands off with `exec` - without which `--global`
   overwrites the running script and the shell resumes at a stale byte offset inside the new file)
-  + `command_guard_cases.py` (96 cases).
+  + `command_guard_cases.py` (136 cases: guard classification + turn-scoped grants + intent detection).
   **`test/adherence/`** answers the question the rest of `test/` cannot: the hooks and permission rules are
   proven, but ~34 rule families are *guidance*, and guidance degrades. Ten realistic scenarios run twice - with
   the rules present and without - graded by a separate judge that sees only the rubric and the transcript

@@ -5,9 +5,6 @@
   },
   "permissions": {
     "ask": [
-      "Bash(git push:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
       "Edit(**/AGENTS.md)",
       "Write(**/AGENTS.md)",
       "Edit(**/CLAUDE.md)",
@@ -73,6 +70,16 @@
     ]
   },
   "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PY__ \"__AGENT_KIT__/hooks/command-guard.py\" --event userprompt"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",

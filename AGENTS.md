@@ -177,8 +177,11 @@ Most agents skip this; it matters most. Your own judgement degrades as the sessi
 ## 7. Context is the scarce resource
 
 - **Treat the session as disposable.** Never let the conversation be the only record of a decision.
-- **Checkpoint to files** (a plan / NOTES / a STATUS line) so any step is revertible. **Commit when the user asks,
-  not on your own** - and never stage their unrelated changes (see the invariants).
+- **Checkpoint to files** (a plan / NOTES / a STATUS line) so any step is revertible, and never stage their
+  unrelated changes (see the invariants).
+- **Commit, push, and open PRs only when the user asks** - never on your own initiative. Offer the next step
+  ("want me to push?"); performing it is their call. Each is authorized only by being named: "commit this"
+  is not permission to push. Keep commit messages short and plain.
 - **Announce breaking changes; flag risky ones.** A changed public contract (API shape, event schema,
   exported signature) is called out and versioned, never smuggled in. Gate genuinely risky behavior behind a
   flag where the project supports one, and read the logs after it deploys - green CI is not a healthy prod.
