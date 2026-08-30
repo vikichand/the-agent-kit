@@ -66,6 +66,13 @@ Demo data hides every scaling defect.
 - If the answer is "it would be slow but correct", say so and move on. If it is "it would fall
   over", fix it now - this is cheaper before the data arrives than after.
 
+**A performance claim is a measurement, not an adjective.** "Fast", "optimised" and "should be fine"
+are guesses; a number from a run is evidence. If the project states a budget - a request-latency
+target, a page-weight cap, a query time - it is a pass/fail gate like any test, and a change that
+breaks it is not done. If it states none, measure before and after any change made *for* speed and
+report both figures, so the next reader can tell an optimisation from a rewrite that felt faster.
+Never optimise on a hunch: profile first, and fix the thing the profile actually names.
+
 ## Time and money are not floats
 
 - **Time**: store and compute in UTC; convert at the edges, where a human sees it. Never compare

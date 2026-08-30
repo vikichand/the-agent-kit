@@ -308,7 +308,7 @@ On top of that, eleven working rules:
 | 4 | **Surgical changes**: every changed line traces to the task | drive-by edits, unreviewable diffs |
 | 5 | **Verification is the spine**: external oracle, test-first by default, never game the oracle, verify claims against live docs | "looks right" shipped as done; a failing test quietly deleted |
 | 6 | **Root-cause debugging** · fix the shared function · two-attempt rule | symptom patches that leave sibling callers broken |
-| 7 | **Checkpoint to files** · commit only when asked · sync before you ship | decisions lost with the session; PRs against stale HEAD |
+| 7 | **Checkpoint to files** · commit only when asked · **a repeated mistake becomes a proposed rule, never a self-edit** · sync before you ship | decisions lost with the session; a rules file growing by accretion; PRs against stale HEAD |
 | 8 | **Execution discipline**: work the plan top to bottom | stopping to chat between every step |
 | 9 | **Ownership**: no AI authorship, no AI prose tells | `Co-Authored-By: Claude` in your history; em dashes and "delve" in your docs |
 | 10 | **READMEs: the working path first** · docs move in the same diff | the README you'd otherwise be scrolling; stale `.env.example` |
@@ -332,7 +332,7 @@ matches, and nothing at all otherwise.
 
 | Rule | Loads when the agent touches | Carries |
 |---|---|---|
-| `code-correctness.md` | source files | no silent fallbacks · idempotent, transactional writes · "what happens at 100k rows" · UTC and decimal money · named-ceiling shortcuts |
+| `code-correctness.md` | source files | no silent fallbacks · idempotent, transactional writes · "what happens at 100k rows" · **performance is measured, not asserted** · UTC and decimal money · named-ceiling shortcuts |
 | `web-security.md` | `auth/**`, `api/**`, `**/webhook*`, `**/payment*`, routes, middleware, edge config (`nginx.conf`, `Caddyfile`, `vercel.json`, `wrangler.toml`, `fly.toml`, `.htaccess`) | sessions, object-level authz (the row-42 bug) · injection family · rate limits that survive a second instance · uploads · HSTS/CSRF/CORS · server-side prices · limits on AI endpoints |
 | `frontend-quality.md` | components, pages, `*.tsx`, `*.jsx` | accessibility (and its legal exposure) · i18n · skeleton loaders · UI restraint |
 | `data-layer.md` | migrations, models, schema, `*.sql` | expand -> migrate -> contract · N+1 and indexes · money and time column types · privacy |
