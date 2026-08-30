@@ -48,15 +48,26 @@ Change nothing outside the files named above, and summarise what you did at the 
 ```text
 Update the-agent-kit for me.
 
-1. Run `~/.the-agent-kit/install.sh --update`. It reports old -> new, or says it is already current.
+1. If `~/.the-agent-kit/install.sh` exists, run `~/.the-agent-kit/install.sh --update`. It reports
+   old -> new, or says it is already current. If that path does NOT exist (an old install, or one
+   done by cloning), download install.sh from the repo into a temp directory outside this project,
+   run `sh install.sh --update` from there, and delete it afterwards - that bootstraps the same
+   result from any starting state, however old.
 2. From this project's root, run `~/.the-agent-kit/install.sh --update-rules`. That refreshes the
    universal rules and keeps my PROJECT-CONFIG block.
 3. Show me `git diff AGENTS.md`. An update replaces anything hand-edited OUTSIDE the
    PROJECT-CONFIG markers, so I want to see what moved.
-4. Run `~/.the-agent-kit/install.sh --check` and show me the output.
-
-If the settings snippets changed, tell me what changed and wait for my go-ahead before touching
-~/.claude/settings.json.
+4. Compare the Claude snippet the installer just printed against my ~/.claude/settings.json and
+   report BOTH directions: what to ADD, and what the kit no longer ships that I should REMOVE. A
+   leftover `ask` rule silently overrides a newer hook and the feature just never fires, with no
+   error - so a stale entry is not harmless.
+   You are NOT allowed to edit that file: the kit denies it so an agent cannot rewrite its own
+   permissions. Instead write the corrected version to a scratch file, show me the diff, confirm it
+   still parses as JSON, and give me one command to copy it into place. Keep every hook and rule
+   that is mine rather than the kit's.
+5. Run `~/.the-agent-kit/install.sh --check` and show me the output.
+6. Remind me to restart Claude Code: hooks are loaded at startup, so a new one does nothing until
+   the session is restarted.
 ```
 
 ### Option B: run it yourself
@@ -198,18 +209,14 @@ git clone https://github.com/vikichand/the-agent-kit.git && cd the-agent-kit && 
 
 ### Updating
 
-The same command you installed with, now living in the installed copy - nothing to re-clone:
-
-```bash
-~/.the-agent-kit/install.sh --update                 # machine-wide; run it from anywhere
-cd /path/to/project && ~/.the-agent-kit/install.sh --update-rules
-```
-
-`--update` reports `old -> new` with the commits between, does nothing when you are already current,
-and refuses to overwrite your install if the download is not the kit. `--update-rules` replaces a
-project's universal rules while **preserving its `PROJECT-CONFIG` block**, which is exactly why you
-should never hand-copy a new `AGENTS.md` over the old one. Scope differs: `--update` is machine-wide
-and ignores your working directory; `--update-rules` and `--check` act on the repo you are standing in.
+The commands are in [Quick Start](#option-b-run-it-yourself). What they guarantee: `--update` reports
+`old -> new` with the commits between, does nothing when you are already current, and refuses to
+overwrite your install if the download is not the kit. `--update-rules` replaces a project's universal
+rules while **preserving its `PROJECT-CONFIG` block**, which is why you should never hand-copy a new
+`AGENTS.md` over the old one. Scope differs: `--update` is machine-wide and ignores your working
+directory; `--update-rules` and `--check` act on the repo you are standing in. Settings snippets are
+never written for you - the installer prints them, and merging is yours, including removing anything
+the kit no longer ships.
 
 ### Also worth having
 
