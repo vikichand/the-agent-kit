@@ -88,6 +88,10 @@ Two halves, two destinies:
   upgrade path. Tracked debt is a decision; silent debt is a trap.
 - **Delete, don't comment out.** [NEW] Dead code in comments is noise with authority; git remembers.
   (Flag pre-existing dead code rather than sweeping it - S4's surgical rule still holds.)
+- **Comments say why, not what.** [NEW - inspired by Sanglard's agent.md] A comment earns its place only
+  by saying what the code can't: the constraint, the trap, the reason for the odd choice. Never narrate a
+  line, never annotate code you didn't touch. A stale or obvious comment misleads the next reader, human
+  or agent, more than no comment would - fewer and truer is the target, not zero.
 
 ## 3. Verification - the senior's definition of "done"
 
@@ -333,6 +337,7 @@ Per-platform checklists get written when a real project needs them, not speculat
 | Query in a loop, fetch-all, no limit | I.2 100k-rows question |
 | Timezone-naive datetime, float money | I.2 time and money |
 | Commented-out code left behind | I.2 delete, don't comment out |
+| `// increment i` on every third line | I.2 comments say why, not what |
 | Deletes or weakens a failing test | I.3 never game the oracle |
 | "Done" without running it | I.3 run before claiming |
 | PR against stale HEAD | I.4 sync before ship |

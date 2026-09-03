@@ -269,11 +269,12 @@ bitten this harness in the past week.
   rule-file line as one flat pool and reported four fifths of it uncased - true as arithmetic, but
   the pool mixed things a one-shot diff-graded case can reach with things it structurally cannot, so
   the number could never be closed by writing more cases. Split properly:
-  - The **depth-tier rule files** are the part built to be reached this way: 29 distinct rule
+  - The **depth-tier rule files** are the part built to be reached this way: 30 distinct rule
     subsections across `code-correctness.md`, `data-layer.md`, `frontend-quality.md`, `tests.md`,
-    `web-security.md`, and `ci-cd.md`. **20 of the 29 now have a dedicated case** (up from 8 before
-    cases 17-30). The other 9 are named, not silently dropped: `code-correctness.md`'s
-    "delete, do not comment out"; `data-layer.md`'s database-constraint half of "Correctness";
+    `web-security.md`, and `ci-cd.md`. **20 of the 30 now have a dedicated case** (up from 8 before
+    cases 17-30). The other 10 are named, not silently dropped: `code-correctness.md`'s
+    "delete, do not comment out" and "comments say why, not what" (added after the second batch, and
+    a natural next case: count narration comments in the with-rules arm against control); `data-layer.md`'s database-constraint half of "Correctness";
     `frontend-quality.md`'s Internationalisation and Restraint sections; `web-security.md`'s
     Platform section and the server-side-pricing half of Money; `tests.md`'s "test behaviour, not
     implementation" and "the edges are where the value is". Each is lower damage or noisier to
