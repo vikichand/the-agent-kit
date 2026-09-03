@@ -54,7 +54,8 @@ Update the-agent-kit for me.
    run `sh install.sh --update` from there, and delete it afterwards - that bootstraps the same
    result from any starting state, however old.
 2. From this project's root, run `~/.the-agent-kit/install.sh --update-rules`. That refreshes the
-   universal rules and keeps my PROJECT-CONFIG block.
+   universal rules and keeps my PROJECT-CONFIG block. Step 1 does not reach any project on its own:
+   every other repo that has the kit needs this same step, run from inside it.
 3. Show me `git diff AGENTS.md`. An update replaces anything hand-edited OUTSIDE the
    PROJECT-CONFIG markers, so I want to see what moved.
 4. Compare the Claude snippet the installer just printed against my ~/.claude/settings.json and
@@ -87,6 +88,10 @@ cd /path/to/project && ~/.the-agent-kit/install.sh    # per project
 ~/.the-agent-kit/install.sh --update                            # machine-wide, run from anywhere
 cd /path/to/project && ~/.the-agent-kit/install.sh --update-rules   # keeps your PROJECT-CONFIG
 ```
+
+The first line updates the guards, which are machine-wide, and the copy in `~/.the-agent-kit`. It
+changes nothing inside any project: a repo keeps the rules it was given until you run the second line
+from inside it, so repeat that line in every project that has the kit.
 
 Two things neither option can skip. **Merge the settings snippets** that line 2 prints, or the tool
 guard does nothing ([step 3](#3-merge-the-printed-settings-snippets)). And **run the per-project
@@ -178,7 +183,9 @@ cd /path/to/project && ~/.the-agent-kit/install.sh --extension
 from a project's own `.claude/rules/`. So global rules give you the universal floor everywhere but
 none of the depth tier. `--extension` still installs the depth tier into the project, which is why
 it is in the command above. Global rules also stay on your machine, so cloud agents, CI and
-teammates see only what is committed in the repo.
+teammates see only what is committed in the repo. And the global copy is a paste, so `--update`
+does not refresh it: after an update, delete the old block from the global file and run the `cat`
+again. The depth tier in each project still updates through `--update-rules`.
 
 ### Check it worked
 
@@ -214,7 +221,10 @@ The commands are in [Quick Start](#option-b-run-it-yourself). What they guarante
 overwrite your install if the download is not the kit. `--update-rules` replaces a project's universal
 rules while **preserving its `PROJECT-CONFIG` block**, which is why you should never hand-copy a new
 `AGENTS.md` over the old one. Scope differs: `--update` is machine-wide and ignores your working
-directory; `--update-rules` and `--check` act on the repo you are standing in. Settings snippets are
+directory; `--update-rules` and `--check` act on the repo you are standing in. The two are not one
+step in disguise: a new rule in the kit reaches a project **only** when `--update-rules` runs inside
+that project, so after a machine-wide update every repo still carries its old rules until you visit
+it. Settings snippets are
 never written for you - the installer prints them, and merging is yours, including removing anything
 the kit no longer ships.
 
