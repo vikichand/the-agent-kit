@@ -332,7 +332,7 @@ matches, and nothing at all otherwise.
 
 | Rule | Loads when the agent touches | Carries |
 |---|---|---|
-| `code-correctness.md` | source files | no silent fallbacks · idempotent, transactional writes · "what happens at 100k rows" · **performance is measured, not asserted** · UTC and decimal money · named-ceiling shortcuts |
+| `code-correctness.md` | source files | no silent fallbacks · idempotent, transactional writes · "what happens at 100k rows" · **performance is measured, not asserted** · UTC and decimal money · named-ceiling shortcuts · **comments say why, not what** |
 | `web-security.md` | `auth/**`, `api/**`, `**/webhook*`, `**/payment*`, routes, middleware, edge config (`nginx.conf`, `Caddyfile`, `vercel.json`, `wrangler.toml`, `fly.toml`, `.htaccess`) | sessions, object-level authz (the row-42 bug) · injection family · rate limits that survive a second instance · uploads · HSTS/CSRF/CORS · server-side prices · limits on AI endpoints |
 | `frontend-quality.md` | components, pages, `*.tsx`, `*.jsx` | accessibility (and its legal exposure) · i18n · skeleton loaders · UI restraint |
 | `data-layer.md` | migrations, models, schema, `*.sql` | expand -> migrate -> contract · N+1 and indexes · money and time column types · privacy |
@@ -558,7 +558,7 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
   measured rather than claimed: on Sonnet, **88.9% compliance on the rules in the original 14-case suite
   (24/27), against 71.4% with no kit loaded (20/28)** - a +17.5 point effect, with no case scoring worse
   with the rules than without. On Opus the tested rules show no gap at all; it already does those things
-  unprompted. A second batch of 14 cases closed most of the depth tier's remaining blind spots (20 of 29
+  unprompted. A second batch of 14 cases closed most of the depth tier's remaining blind spots (20 of 30
   distinct rule-file sections now have a dedicated case, up from 8): 3 showed a clean gap, 8 showed Sonnet
   already doing the right thing unprompted, 2 turned out to be about task completion rather than code
   safety, and one - pinning a CI action to a commit SHA - failed with the rules present in both arms and
@@ -592,6 +592,9 @@ but the primary link could not be verified, it is attributed by talk and date in
 - **[ponytail](https://github.com/DietrichGebert/ponytail)** (MIT): **Sections 3, 6.** Its "lazy senior dev" framing
   sharpened two rules here - stopping at the first rung of a reuse ladder, and marking a deliberate shortcut
   with the ceiling it carries. The wording in this kit is its own; the thinking was better for having read theirs.
+- **[Fabien Sanglard](https://fabiensanglard.net/agent.md/index.html)**: **Section 3.** His `agent.md` keeps
+  comments small, on the why, and off any code the agent didn't touch. The comment rule here is that, plus one
+  finding from research on how models read comments: a stale or obvious one misleads more than none.
 - Supporting data: Google's **[DORA 2025](https://dora.dev/)** (AI *amplifies* existing practices) and a
   Dec 2025 UC San Diego / Cornell study ([arXiv:2512.14012](https://arxiv.org/abs/2512.14012)):
   professional developers don't vibe, they control.

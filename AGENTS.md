@@ -115,8 +115,10 @@ This gate decides whether the rest applies. Get it right and none of this adds f
   bounded. Multi-step writes are transactional; webhooks and retries fire twice, so handlers survive replay. Ask
   what happens at 100k rows (no N+1 queries, no unbounded fetch). UTC internally, decimal for money. Schema changes
   stage (expand -> migrate -> contract) and are never destructive without a human decision.
-- **Cut a corner knowingly? Name it.** A deliberate shortcut (naive heuristic, O(n^2) scan) gets a comment naming
-  the ceiling and the upgrade path - tracked debt, not silent debt.
+- **Comments say why, not what.** A comment earns its place only by saying what the code can't - the constraint,
+  the trap, the reason for the odd choice. Cut a corner knowingly? Name it: a deliberate shortcut (naive heuristic,
+  O(n^2) scan) gets a comment naming the ceiling and the upgrade path - tracked debt, not silent debt. Never narrate
+  a line: an obvious comment is noise today and a lie once the line changes, and the next reader, human or agent, believes it.
 - **Copied code carries its license.** Check compatibility, keep the notice. Reimplementing ideas or studying
   reference projects is normal work; the check triggers only when their code lands in your tree.
 

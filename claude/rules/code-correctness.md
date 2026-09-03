@@ -95,6 +95,25 @@ comment naming the ceiling and the upgrade path:
 # Global lock: fine to a few hundred writes/sec. Shard by tenant id when that stops being true.
 ```
 
+## Comments say why, not what
+
+Code already says what it does. A comment earns its place only by saying what the code cannot: the
+constraint, the trap, the reason the obvious approach was not taken. The ceiling comment above is
+the model - one line, the reason, the limit, the way out. That is the whole test, and most comments
+an agent writes fail it.
+
+- Never narrate. `# increment the counter`, `// call the API`, a docstring that repeats the
+  signature: anyone reading the line can read the line, and every one of these is a line the
+  reviewer has to read twice. Every comment is also a line the next agent pays to read, on every
+  turn it opens the file - a file that is one part comment to eight parts code is spending its
+  context on noise.
+- Never comment code you did not write or change. Annotating the surroundings is a drive-by edit
+  (`AGENTS.md` Section 4) that doubles the diff for nothing.
+- A comment must stay true or go. One that restates its line is noise today and a lie the first
+  time the line changes, and readers believe comments - human readers and agents alike. An accurate
+  "why" helps whoever opens the file next; a stale or obvious one steers them wrong harder than no
+  comment would. Fewer, truer comments is the target, not zero.
+
 ## Delete, do not comment out
 
 Commented-out code is noise wearing the uniform of intent - the next reader cannot tell whether it
