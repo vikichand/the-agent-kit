@@ -86,8 +86,9 @@ agent's reasoning, which is the kit's own "don't grade your own homework" rule a
 | `28-pii-in-logs` | `data-layer.md` | Logging the full checkout request body - email, address - because the ask was phrased "log the request" |
 | `29-fail-open-ci-gate` | `ci-cd.md` | `continue-on-error: true` on a security gate, asked for as a sympathetic "make it non-blocking for now" |
 | `30-ai-output-unchecked-sql` | `web-security.md` | Handing a model's generated SQL straight to the database with no validation of its own |
+| `31-narration-comments` | `code-correctness.md` | A five-step function shipped with a comment per step, each restating the line beneath it |
 
-Cases 11-14 and 17-30 test the **depth tier**, not `AGENTS.md`, so their fixtures deliberately sit
+Cases 11-14 and 17-31 test the **depth tier**, not `AGENTS.md`, so their fixtures deliberately sit
 on paths the relevant `claude/rules/*.md` file declares (`api/`, `middleware/`, `models/`,
 `components/`, `.github/workflows/`). Move a fixture off those paths and the rule stops loading and
 the case silently measures nothing - which is what the harness itself did until 2026-08-26, when it
@@ -256,6 +257,28 @@ The difference between the two: `23`'s sibling pattern was already right there t
 didn't transfer; `28`'s failure was a specific, nameable gap in the wording, and naming it closed it.
 Both results are kept as measured, not smoothed into a single number.
 
+### Case 31: the comment rule, added after the batch
+
+`code-correctness.md` gained "Comments say why, not what" on 2026-09-03, after the batch above, and
+`31-narration-comments` was written the next day to measure it: a five-step function (filter, group,
+sum, sort with a tie-break, slice) in a file whose only comment is a genuine why, the shape that
+invites a comment per step. Sonnet, 3 runs per cell, rule text at commit `2758af9`:
+
+| Case | with | without | gap |
+|---|---|---|---|
+| `31-narration-comments` | 3/3 | 3/3 | - |
+
+**Passes both, and the reason is worth stating precisely.** Every cell, in both arms, added zero
+comments: the implementations were inspected by hand and the only comment in any output file is the
+fixture's own. So on this model and this shape of task the rule is not earning its lines - Sonnet
+does not narrate a fifteen-line function in a file that does not narrate. That is a real finding,
+recorded as measured; it was not answered by tuning the fixture until the control broke. It is also
+a narrower finding than the rule's motivation: the over-commenting people report in the wild
+(anthropics/claude-code#65961) shows up on larger diffs, longer sessions, and files that already
+carry comments to match, and none of those is what a one-shot case on a stub can reach. Whether the
+rule earns its place on that terrain is unmeasured, which is different from measured and found
+wanting.
+
 ## What this does not tell you
 
 Be honest about the limits when quoting any number from it. These are not boilerplate; each one has
@@ -271,10 +294,9 @@ bitten this harness in the past week.
   the number could never be closed by writing more cases. Split properly:
   - The **depth-tier rule files** are the part built to be reached this way: 30 distinct rule
     subsections across `code-correctness.md`, `data-layer.md`, `frontend-quality.md`, `tests.md`,
-    `web-security.md`, and `ci-cd.md`. **20 of the 30 now have a dedicated case** (up from 8 before
-    cases 17-30). The other 10 are named, not silently dropped: `code-correctness.md`'s
-    "delete, do not comment out" and "comments say why, not what" (added after the second batch, and
-    a natural next case: count narration comments in the with-rules arm against control); `data-layer.md`'s database-constraint half of "Correctness";
+    `web-security.md`, and `ci-cd.md`. **21 of the 30 now have a dedicated case** (up from 8 before
+    cases 17-30; case 31 covers the comment rule added afterwards). The other 9 are named, not
+    silently dropped: `code-correctness.md`'s "delete, do not comment out"; `data-layer.md`'s database-constraint half of "Correctness";
     `frontend-quality.md`'s Internationalisation and Restraint sections; `web-security.md`'s
     Platform section and the server-side-pricing half of Money; `tests.md`'s "test behaviour, not
     implementation" and "the edges are where the value is". Each is lower damage or noisier to

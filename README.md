@@ -568,7 +568,7 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
   measured rather than claimed: on Sonnet, **88.9% compliance on the rules in the original 14-case suite
   (24/27), against 71.4% with no kit loaded (20/28)** - a +17.5 point effect, with no case scoring worse
   with the rules than without. On Opus the tested rules show no gap at all; it already does those things
-  unprompted. A second batch of 14 cases closed most of the depth tier's remaining blind spots (20 of 30
+  unprompted. A second batch of 14 cases closed most of the depth tier's remaining blind spots (21 of 30
   distinct rule-file sections now have a dedicated case, up from 8): 3 showed a clean gap, 8 showed Sonnet
   already doing the right thing unprompted, 2 turned out to be about task completion rather than code
   safety, and one - pinning a CI action to a commit SHA - failed with the rules present in both arms and
