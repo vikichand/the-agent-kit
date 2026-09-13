@@ -150,9 +150,11 @@ Step 1 printed two blocks. Without them the tool-layer guard does nothing.
 cd /path/to/project && ~/.the-agent-kit/install.sh
 ```
 
-That writes three things: `AGENTS.md` (the rules), a one-line `CLAUDE.md` that imports it, and
+That writes four things: `AGENTS.md` (the rules), a one-line `CLAUDE.md` that imports it,
 `.claude/rules/` - deeper rules that load only when the agent opens a matching file, so security
-rules arrive on API code and accessibility rules on components, and cost nothing the rest of the time.
+rules arrive on API code and accessibility rules on components, and cost nothing the rest of the time -
+and the skills, to `.claude/skills/` for Claude Code and `.agents/skills/` for Codex, where four of
+those deeper rules also land as task-matched skills.
 
 ### 5. Run the setup prompt, once per project
 
@@ -220,7 +222,9 @@ The commands are in [Quick Start](#option-b-run-it-yourself). What they guarante
 `old -> new` with the commits between, does nothing when you are already current, and refuses to
 overwrite your install if the download is not the kit. `--update-rules` replaces a project's universal
 rules while **preserving its `PROJECT-CONFIG` block**, which is why you should never hand-copy a new
-`AGENTS.md` over the old one. Scope differs: `--update` is machine-wide and ignores your working
+`AGENTS.md` over the old one. It also refreshes every kit-owned file in `.claude/rules/`,
+`.claude/skills/` and `.agents/skills/`, so the Claude and Codex copies of a skill cannot drift apart.
+Scope differs: `--update` is machine-wide and ignores your working
 directory; `--update-rules` and `--check` act on the repo you are standing in. The two are not one
 step in disguise: a new rule in the kit reaches a project **only** when `--update-rules` runs inside
 that project, so after a machine-wide update every repo still carries its old rules until you visit
@@ -278,6 +282,19 @@ the time.
 
 **The task tier** - two skills that load on what you are *doing* rather than which file you opened:
 splitting work across subagents, and writing a plan or report a human will act on.
+
+**Which tool gets what.** The content is one set of markdown files; the *routing* differs per tool,
+and the installer is the adapter between them:
+
+| Layer | Claude Code | Codex |
+|---|---|---|
+| Floor (`AGENTS.md`) | via the one-line `CLAUDE.md` import | read directly |
+| Depth tier (6 rules) | `.claude/rules/`, loads by file path | 4 of 6 as `.agents/skills/`, loads by task match; the 2 path-shaped ones (`code-correctness`, `tests`) don't port and stay one-liners in the floor |
+| Task tier (2 skills) | `.claude/skills/` | `.agents/skills/`, same files |
+| Git-layer guards | yes | yes |
+| Tool-layer guard | `ask` | `deny` |
+| Turn-scoped git grants | yes | no (deny mode; you push) |
+| Measured | 31 cases, Sonnet | 2 cases so far, see [Limits](#limits) |
 
 **The guards** - hooks at the **git layer** (reorder-proof, covering Claude Code, Codex, plain `git`,
 and any MCP tool that shells out to `git`) plus the **tool layer**, a fast prompt-time veto. Full map
@@ -358,6 +375,20 @@ still gets the complete floor from `AGENTS.md`, so this degrades rather than for
 `@import` is deliberately **not** used for this: imports expand at launch, so splitting a file that
 way is organisation with no context saving at all.
 
+**On Codex the same rules arrive as skills.** Codex has no path-scoped rules; what it has is skills,
+which keep only a name and description in context and load the body when the task matches. So the
+installer writes four of the six rule files into `.agents/skills/` with their `paths:` frontmatter
+swapped for a task description: web security fires on "add a login endpoint", the data layer on "write
+a migration", and so on. The body is byte-identical to the rule, generated from the one source, and
+`--update-rules` regenerates it. Two rules don't port, and it's better to say so than to fake it:
+`code-correctness.md` applies to any source file and `tests.md` to any test file, and the only honest
+description for either is "use when writing code", which fires always or never. Codex gets their
+one-line versions in `AGENTS.md`. Appending them to `AGENTS.md` in full was rejected on arithmetic:
+the floor is 21 KB and the depth tier 23 KB, and Codex truncates the chain at 32 KiB. Codex's nested
+`AGENTS.md` files were rejected too: they load by working directory, not by file touched, so they
+are not a port of path-scoped rules however they look. `.agents/skills/` is not read by Claude Code,
+so nothing double-loads.
+
 ### The task tier: skills
 
 A third trigger, for guidance keyed to *what you are doing* rather than which file you opened. Only the
@@ -400,7 +431,7 @@ Quick Start covers the usual path. The installer has six modes:
 |---|---|---|
 | `--update` | machine | Fetch the latest kit into `~/.the-agent-kit`, then run `--global`. Needs no kit beside it, so one downloaded `install.sh` bootstraps everything. |
 | `--global` | machine | Git hooks for every repo via `core.hooksPath`; **prints** the tool-guard snippets to merge. |
-| *(none)* | project | Full rules - `AGENTS.md` plus a `CLAUDE.md` that imports it - and this repo's git hooks. |
+| *(none)* | project | Full rules - `AGENTS.md` plus a `CLAUDE.md` that imports it - the depth tier and skills for both tools (`.claude/` and `.agents/skills/`), and this repo's git hooks. |
 | `--extension` | project | Project block only, for when the universal rules already live in your global files, so nothing is duplicated into context. |
 | `--update-rules` | project | Replace the universal rules, keep `PROJECT-CONFIG` byte-for-byte. |
 | `--check` | project | Doctor: interpreter, guard firing, per-hook identity, rules-file size and wiring. |
@@ -577,6 +608,13 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
   reach at all (a plan surviving pressure, decay across a long session, proof in a real browser), are
   listed by name rather than folded into one fraction. Method, the full per-case tables, and that list
   are in [`test/adherence/README.md`](test/adherence/README.md).
+- **On Codex, two cases measured, both pass with and without the kit.** The harness gained a Codex
+  arm with the skills port, and the first two cases run (object-level authorization, personal data in
+  logs) came back 3/3 in both arms: Codex's default model already does what those rules ask, on
+  prompts where Sonnet needed the rule. The same transcripts show the ported skill body was loaded in
+  a third of the with-arm cells, so even the passes are mostly the floor plus the model's defaults.
+  The port is deployed and discoverable; whether it changes Codex's behaviour anywhere is, as of this
+  writing, unmeasured beyond those two cases and should be read that way.
 
 ## Inspired by
 
