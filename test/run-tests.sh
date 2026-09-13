@@ -361,6 +361,37 @@ else
   done
   [ -z "$missing" ] && pass "U12 every path the installer prints still exists after it exits" \
                     || bad "U12 installer printed vanished path(s):$missing"
+  # U13: a fresh install gives Codex its lazy tier - the two skills plus the four domain-shaped rules
+  # as .agents/skills - and NOT the two path-shaped rules, which have no honest task trigger.
+  u=$(mktemp -d) && (cd "$u" && git init -q && sh "$KIT/install.sh" >/dev/null 2>&1)
+  m=""
+  for s in generating-reports orchestrating-work web-security data-layer frontend-quality ci-cd; do
+    [ -f "$u/.agents/skills/$s/SKILL.md" ] || m="$m $s"
+  done
+  x=""
+  for s in code-correctness tests; do [ -e "$u/.agents/skills/$s" ] && x="$x $s"; done
+  [ -z "$m" ] && [ -z "$x" ] && pass "U13 fresh install ships 6 Codex skills and withholds the 2 path-shaped rules" \
+    || bad "U13 Codex skills wrong - missing:[$m] wrongly ported:[$x]"
+  # U14: a generated skill is the rule with its frontmatter swapped - name + description present,
+  # `paths:` gone, body byte-identical to the rule's body. Anything else is a fork, not an adapter.
+  g="$u/.agents/skills/web-security/SKILL.md"
+  body_g=$(awk 'fm<2 && /^---$/ {fm++; next} fm>=2 {print}' "$g")
+  body_r=$(awk 'fm<2 && /^---$/ {fm++; next} fm>=2 {print}' "$KIT/claude/rules/web-security.md")
+  [ "$(sed -n 2p "$g")" = "name: web-security" ] && sed -n 3p "$g" | grep -q '^description: Use when' \
+    && ! grep -q '^paths:' "$g" && [ "$body_g" = "$body_r" ] \
+    && pass "U14 generated Codex skill = rule body + skill frontmatter, no paths:" \
+    || bad "U14 generated Codex skill drifts from its rule (frontmatter or body)"
+  rm -rf "$u"
+  # U15: --update-rules brings an old project's Codex tier up too - deploys it when absent, and
+  # regenerates a generated skill whose text drifted from the rule it came from.
+  u=$(mktemp -d) && (cd "$u" && git init -q && cp "$KIT/AGENTS.md" . && printf '@AGENTS.md\n' > CLAUDE.md \
+      && mkdir -p .agents/skills/data-layer && printf 'stale old content\n' > .agents/skills/data-layer/SKILL.md \
+      && sh "$KIT/install.sh" --update-rules >/dev/null 2>&1)
+  [ -f "$u/.agents/skills/web-security/SKILL.md" ] && ! grep -q 'stale old content' "$u/.agents/skills/data-layer/SKILL.md" \
+    && grep -q '^name: data-layer' "$u/.agents/skills/data-layer/SKILL.md" \
+    && pass "U15 --update-rules deploys and refreshes the Codex skills" \
+    || bad "U15 --update-rules left the Codex skills missing or stale"
+  rm -rf "$u"
   # U9: the structural guard U8 cannot be. update_kit must END by exec-ing the downloaded installer -
   # exec replaces the process, so not one more byte is read from the file --global is overwriting.
   # Any refactor that turns this back into a plain call reintroduces the corruption, silently.

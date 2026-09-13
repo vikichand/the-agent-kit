@@ -48,8 +48,9 @@ These are hard lines. Section 0's "skip the ceremony" scales down *planning*, ne
 
 <!-- DEPTH TIER: this file is the always-on floor. Longer, situation-specific rules live in
      .claude/rules/*.md with `paths:` frontmatter and load ONLY when a matching file is opened -
-     measured at zero context cost until they match. Read by Claude Code, VS Code Copilot and Cline;
-     other tools ignore that folder and still get everything in this file. -->
+     measured at zero context cost until they match. Read by Claude Code, VS Code Copilot and Cline.
+     Codex reads .agents/skills instead: four of the six rules ship there as task-matched skills; every
+     other tool ignores both folders and still gets everything in this file. -->
 
 ## 0. Size the task before doing anything else
 

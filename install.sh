@@ -131,6 +131,69 @@ install_skills() {  # $1 = repo root. Task-shaped guidance: only the description
   done
 }
 
+codex_skill_desc() {  # $1 = rule basename without .md -> the Codex skill description, or "" if not ported.
+  # Codex has no path-scoped rules. It loads a skill when the TASK matches its description, keeping
+  # only name + description in context until then, which is the closest thing it has to a rule that
+  # costs nothing until it applies. Four of the six depth files are domain-shaped and get an honest
+  # trigger below. code-correctness (any source file) and tests (any test file) are path-shaped: the
+  # only true description is "use when writing code", which fires always or never, so they are NOT
+  # ported - Codex gets their one-line versions from AGENTS.md and nothing more. Routing lives here,
+  # in the adapter; the rule text stays single-sourced in claude/rules/.
+  case "$1" in
+    web-security)     printf '%s' "Use when adding or changing auth, sessions, API routes, middleware, webhooks, payments, uploads, rate limits, CORS, CSRF, security headers, or edge config (nginx, Caddy, vercel.json, wrangler.toml, fly.toml) - the server-side security defaults a senior engineer applies without being asked." ;;
+    data-layer)       printf '%s' "Use when writing or changing migrations, models, schema, SQL, or anything that reads or stores data - staged schema changes, N+1 queries and indexes, money and time column types, and keeping personal data out of logs." ;;
+    frontend-quality) printf '%s' "Use when building or changing user-facing UI: components, pages, screens, forms - accessibility, internationalisation, loading states, and restraint in visual polish." ;;
+    ci-cd)            printf '%s' "Use when editing CI or delivery config: GitHub workflows, Dockerfiles, GitLab CI, Jenkinsfiles, Azure pipelines - pinned actions, least-privilege tokens, untrusted checkouts, secrets in logs, and gates that fail closed." ;;
+    *)                printf '' ;;
+  esac
+}
+
+rule_to_skill() {  # $1 = rule file  $2 = skill name  $3 = description  -> SKILL.md on stdout
+  # Swap the `paths:` frontmatter for skill frontmatter; the body is byte-identical to the rule's.
+  printf -- '---\nname: %s\ndescription: %s\n---\n' "$2" "$3"
+  awk 'NR==1 && $0!="---" {all=1} all {print; next} fm<2 && /^---$/ {fm++; next} fm>=2 {print}' "$1"
+}
+
+install_codex_skills() {  # $1 = repo root. Everything Codex can load lazily, in the dir it reads for that.
+  # .agents/skills is discovered by Codex from the repo root down (no trust prompt, unlike
+  # .codex/skills) and is NOT read by Claude Code, so nothing here double-loads on Claude.
+  ssrc=""; [ -d "$KIT/claude/skills" ] && ssrc="$KIT/claude/skills"
+  [ -z "$ssrc" ] && [ -d "$KIT/skills" ] && ssrc="$KIT/skills"
+  rsrc=""; [ -d "$KIT/claude/rules" ] && rsrc="$KIT/claude/rules"
+  [ -z "$rsrc" ] && [ -d "$KIT/rules" ] && rsrc="$KIT/rules"
+  [ -n "$ssrc$rsrc" ] || return 0
+  if [ -n "$ssrc" ]; then
+    for sd in "$ssrc"/*/; do
+      [ -d "$sd" ] || continue
+      b=$(basename "$sd")
+      if [ -e "$1/.agents/skills/$b/SKILL.md" ]; then
+        say "  = .agents/skills/$b already exists - left untouched."
+      else
+        mkdir -p "$1/.agents/skills/$b"
+        cp "$sd"*.md "$1/.agents/skills/$b/" 2>/dev/null || cp "$sd/SKILL.md" "$1/.agents/skills/$b/SKILL.md"
+        say "  + wrote .agents/skills/$b (Codex: loads when a task matches it)"
+      fi
+    done
+  fi
+  skipped=""
+  if [ -n "$rsrc" ]; then
+    for r in "$rsrc"/*.md; do
+      [ -e "$r" ] || continue
+      n=$(basename "$r" .md); d=$(codex_skill_desc "$n")
+      if [ -z "$d" ]; then skipped="$skipped $n"; continue; fi
+      if [ -e "$1/.agents/skills/$n/SKILL.md" ]; then
+        say "  = .agents/skills/$n already exists - left untouched."
+      else
+        mkdir -p "$1/.agents/skills/$n"
+        rule_to_skill "$r" "$n" "$d" > "$1/.agents/skills/$n/SKILL.md"
+        say "  + wrote .agents/skills/$n (Codex: the $n rule, matched by task instead of by path)"
+      fi
+    done
+  fi
+  [ -n "$skipped" ] && say "  = not ported to Codex skills:$skipped - path-shaped (any source / test file), no honest task trigger; Codex has their one-line versions in AGENTS.md."
+  return 0
+}
+
 install_project() {   # self-contained: full rules + git hooks
   root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
   say "Installing FULL rules + git hooks into: $root"
@@ -143,6 +206,7 @@ install_project() {   # self-contained: full rules + git hooks
   else write_claude_importer "$root/CLAUDE.md"; say "  + wrote CLAUDE.md (imports AGENTS.md - single source of truth)"; fi
   install_path_rules "$root"
   install_skills "$root"
+  install_codex_skills "$root"
   install_git_hooks "$root"
   hr
   say "Tool-layer guard is machine-wide - run once:  ./install.sh --global   then:  ./install.sh --check"
@@ -161,6 +225,7 @@ install_extension() { # lean: project-config stub + git hooks
   else write_claude_importer "$root/CLAUDE.md"; say "  + wrote CLAUDE.md (imports AGENTS.md)"; fi
   install_path_rules "$root"
   install_skills "$root"
+  install_codex_skills "$root"
   install_git_hooks "$root"
 }
 
@@ -307,7 +372,26 @@ refresh_kit_owned() {  # $1 = repo root. Kit-NAMED rules and skills are kit-owne
         elif [ ! -e "$tgt" ] && [ -d "$1/.claude/skills/$b" ]; then
           cp "$sf" "$tgt"; say "  + added .claude/skills/$b/$fn (new kit file)"
         fi
+        # The Codex copy of the same skill is kit-owned on the same terms.
+        ctgt="$1/.agents/skills/$b/$fn"
+        if [ -e "$ctgt" ] && ! cmp -s "$sf" "$ctgt"; then
+          cp -f "$sf" "$ctgt"; say "  ~ refreshed .agents/skills/$b/$fn (kit-owned)"
+        elif [ ! -e "$ctgt" ] && [ -d "$1/.agents/skills/$b" ]; then
+          cp "$sf" "$ctgt"; say "  + added .agents/skills/$b/$fn (new kit file)"
+        fi
       done
+    done
+  fi
+  # Generated Codex skills: regenerate from the current rule text and replace on any difference, so a
+  # fix to web-security.md reaches Codex projects too, not only Claude ones.
+  if [ -n "$src" ]; then
+    for r in "$src"/*.md; do
+      [ -e "$r" ] || continue
+      n=$(basename "$r" .md); d=$(codex_skill_desc "$n"); [ -n "$d" ] || continue
+      tgt="$1/.agents/skills/$n/SKILL.md"; [ -e "$tgt" ] || continue
+      tmp="$tgt.refresh.tmp"; rule_to_skill "$r" "$n" "$d" > "$tmp"
+      if cmp -s "$tmp" "$tgt"; then rm -f "$tmp"
+      else mv -f "$tmp" "$tgt"; say "  ~ refreshed .agents/skills/$n/SKILL.md (kit-owned; regenerated from $n.md)"; fi
     done
   fi
 }
@@ -357,6 +441,7 @@ update_rules() {  # refresh the universal rules in this repo's AGENTS.md, preser
   refresh_kit_owned "$root"
   install_path_rules "$root"
   install_skills "$root"
+  install_codex_skills "$root"
 }
 
 doctor() {
@@ -478,6 +563,11 @@ doctor() {
   # and a green exit over red text is false confidence.
   [ "$dfail" -eq 0 ] || exit 1
 }
+
+# Library mode: the adherence harness sources this file for install_codex_skills, so the Codex arm
+# of the eval is built by the same code as a real install and the two cannot drift. Nothing below
+# this line runs when sourced that way.
+if [ "${AGENT_KIT_LIB:-0}" = 1 ]; then return 0 2>/dev/null || exit 0; fi
 
 USAGE="Usage: ./install.sh [--extension | --global | --update | --update-rules | --check]"
 case "$MODE" in

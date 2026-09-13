@@ -8,6 +8,9 @@
 #   ./run.sh --judge-model opus       model doing the grading
 #   ./run.sh --timeout 900            seconds per call (default 600; the "with" arm is the slow one)
 #   ./run.sh --keep                   keep the working dirs for inspection
+#   ./run.sh --tool codex             run the agent under Codex instead of Claude Code (the judge stays
+#                                     Claude). The "with" arm then carries what a Codex install gets:
+#                                     AGENTS.md plus .agents/skills, built by the installer's own code.
 #
 # COSTS REAL TOKENS. Each case runs the agent twice (with rules, without) and a judge twice, so a
 # full pass is 4 calls per case per run: 14 cases at --runs 2 is ~112 calls. Deliberately NOT part
@@ -20,7 +23,7 @@ set -u
 
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 KIT=$(CDPATH= cd -- "$HERE/../.." && pwd)
-RUNS=1; ONLY=""; MODEL=""; JUDGE=""; KEEP=0
+RUNS=1; ONLY=""; MODEL=""; JUDGE=""; KEEP=0; TOOL="claude"
 # 300s was the original budget and it silently biased the eval AGAINST the rules: the "with" arm
 # reads AGENTS.md and the depth tier, so it plans, writes a test and verifies, which takes longer
 # than the control arm that just writes the code. Cells died on the clock and were scored as
@@ -34,18 +37,34 @@ while [ $# -gt 0 ]; do
     --judge-model) JUDGE="$2"; shift 2 ;;
     --timeout)     TIMEOUT="$2"; shift 2 ;;
     --keep)        KEEP=1; shift ;;
-    -h|--help)     sed -n '2,18p' "$0"; exit 0 ;;
+    --tool)        TOOL="$2"; shift 2 ;;
+    -h|--help)     sed -n '2,21p' "$0"; exit 0 ;;
     *) echo "unknown option: $1"; exit 2 ;;
   esac
 done
 
+# The judge is always Claude, so `claude` is required whichever tool is under test.
 command -v claude >/dev/null 2>&1 || { echo "FAIL: the 'claude' CLI is not on PATH."; exit 2; }
+case "$TOOL" in
+  claude) ;;
+  codex)  command -v codex >/dev/null 2>&1 || { echo "FAIL: --tool codex but the 'codex' CLI is not on PATH."; exit 2; } ;;
+  *)      echo "FAIL: --tool must be claude or codex (got '$TOOL')."; exit 2 ;;
+esac
 [ -f "$KIT/AGENTS.md" ] || { echo "FAIL: $KIT/AGENTS.md not found."; exit 2; }
+# Source the installer as a library: the Codex "with" arm is deployed by install_codex_skills, the
+# same function a real install runs. The installer sets -e (this script deliberately does not) and
+# derives KIT from $0, which under sourcing is THIS script - so KIT is restored afterwards.
+_kit=$KIT; AGENT_KIT_LIB=1 . "$KIT/install.sh"; set +e; KIT=$_kit
 
 # The control arm is only as clean as the machine it runs on. Global memory (~/.claude/CLAUDE.md,
 # ~/.codex/AGENTS.md) loads in BOTH arms, so if it already carries engineering conventions, the
 # "without" run is not ruleless and the measured gap is a FLOOR, not the kit's absolute value.
-for gm in "$HOME/.claude/CLAUDE.md" "$HOME/.codex/AGENTS.md"; do
+gms="$HOME/.claude/CLAUDE.md $HOME/.codex/AGENTS.md"
+# Under Codex the user's hooks load too (the kit's deny-mode guard among them), so the control arm
+# is not hookless either. Named, not silenced. config.toml - and with it the plugins and their
+# skills - is NOT in this list because the Codex arm runs with --ignore-user-config (see run_cell).
+[ "$TOOL" = codex ] && gms="$gms $HOME/.codex/hooks.json"
+for gm in $gms; do
   if [ -s "$gm" ]; then
     echo "WARNING: $gm ($(grep -c . "$gm") non-blank lines) loads in BOTH arms."
     echo "         Whatever it already tells the agent is present in the 'without' control, so the"
@@ -71,8 +90,12 @@ ALLOW="Bash(python:*) Bash(python3:*) Bash(pytest:*) Bash(uv:*) Bash(node:*) Bas
 # satisfies "did anything change?" without a single line of source being edited. The gate would
 # have passed an agent that ran the tests and wrote nothing. Anything a tool can create by being
 # invoked must not count as the agent having done the work.
+# './.agents/*' and './.codex/*' are excluded for the same reason './.claude/*' is: the Codex arm
+# deploys the rule text there as skills, and counting it would pass the must-edit gate on nothing
+# and (below) feed the rules straight to the judge.
 fingerprint() {
   ( cd "$1" && find . -type f -not -path './.git/*' -not -path './.claude/*' \
+      -not -path './.agents/*' -not -path './.codex/*' \
       -not -path '*/__pycache__/*' -not -path '*/.pytest_cache/*' \
       -not -path '*/node_modules/*'  -not -path '*/.ruff_cache/*' \
       -not -path '*/.mypy_cache/*'   -not -path '*/.vitest-cache/*' \
@@ -92,6 +115,30 @@ newsid() {
     case "$id" in
       ????????-????-????-????-????????????) printf '%s' "$id"; return 0 ;;
     esac
+  done
+  return 1
+}
+
+# Codex under --json emits one event per line. Two things are needed from that stream: the thread
+# id from turn 1 (so later turns resume THIS conversation and no other), and the agent's messages,
+# which are what the judge reads as "what the agent said". Same python fallback as newsid.
+codex_field() {  # $1 = events file  $2 = thread|messages
+  for p in python python3; do
+    r=$("$p" - "$1" "$2" <<'PY' 2>/dev/null
+import json, sys
+want = sys.argv[2]; out = []
+for line in open(sys.argv[1], encoding="utf-8", errors="replace"):
+    try: e = json.loads(line)
+    except ValueError: continue
+    if want == "thread" and e.get("type") == "thread.started":
+        print(e.get("thread_id", "")); break
+    if want == "messages" and e.get("type") == "item.completed":
+        it = e.get("item") or {}
+        if it.get("type") == "agent_message": out.append(it.get("text", ""))
+if want == "messages": print("\n".join(out))
+PY
+) || continue
+    printf '%s' "$r"; return 0
   done
   return 1
 }
@@ -116,12 +163,18 @@ run_cell() {
   ( cd "$w" && sh "$cdir/setup.sh" >/dev/null 2>&1 ) || { echo "ERROR setup failed"; scrub "$w"; return 1; }
   if [ "$cond" = "with" ]; then
     cp "$KIT/AGENTS.md" "$w/AGENTS.md"
-    cp "$KIT/CLAUDE.md" "$w/CLAUDE.md"
-    # The depth tier is most of the kit's content and until 2026-08-26 it was never deployed here,
-    # so every earlier run measured AGENTS.md alone - no path-scoped rule had ever been under test.
-    # Cases whose fixture sits on a matching path (api/, auth/, middleware/...) need these present,
-    # and the arm is only faithful to a real install with them.
-    mkdir -p "$w/.claude/rules" && cp "$KIT"/claude/rules/*.md "$w/.claude/rules/" 2>/dev/null
+    if [ "$TOOL" = codex ]; then
+      # What a Codex install actually gets: the floor, plus the depth tier as task-matched skills in
+      # .agents/skills (four of six rules; see install_codex_skills). No .claude/ - Codex never reads it.
+      install_codex_skills "$w" >/dev/null 2>&1
+    else
+      cp "$KIT/CLAUDE.md" "$w/CLAUDE.md"
+      # The depth tier is most of the kit's content and until 2026-08-26 it was never deployed here,
+      # so every earlier run measured AGENTS.md alone - no path-scoped rule had ever been under test.
+      # Cases whose fixture sits on a matching path (api/, auth/, middleware/...) need these present,
+      # and the arm is only faithful to a real install with them.
+      mkdir -p "$w/.claude/rules" && cp "$KIT"/claude/rules/*.md "$w/.claude/rules/" 2>/dev/null
+    fi
   fi
   before=$(fingerprint "$w")
   # The agent must be able to WORK in the sandbox, or this measures permission denials rather than
@@ -146,31 +199,70 @@ run_cell() {
   # is still holding on turn 3, which is when adherence actually decays and when the rules matter
   # most. A case with only prompt.txt behaves exactly as before.
   sid=$(newsid) || sid=""
+  tid=""
   out=""; rc=0; turn=0
   for pf in "$cdir/prompt.txt" "$cdir/prompt-2.txt" "$cdir/prompt-3.txt" "$cdir/prompt-4.txt"; do
     [ -f "$pf" ] || continue
     turn=$((turn + 1))
-    if [ "$turn" -eq 1 ]; then
-      sflag=""; [ -n "$sid" ] && sflag="--session-id $sid"
+    if [ "$TOOL" = codex ]; then
+      # Headless Codex: workspace-write sandbox, never ask (an approval prompt in a non-interactive
+      # run is a hang, and a denied escalation is the same outcome as Claude's allowlist), stdin
+      # closed so it cannot wait on a terminal. Events go to a .stderr-prefixed file, which the
+      # fingerprint already ignores. --ephemeral is deliberately NOT used: it disables session
+      # recording, and turn 2 needs `codex exec resume <thread id>`.
+      #
+      # --ignore-user-config, in BOTH arms, is what makes the Codex arm measure the kit and not the
+      # machine. Observed 2026-09-12, first attempt: 12 of 12 cells across two cases "changed no
+      # files" - the user's Codex home carried a plugin whose skill tells the agent to present a
+      # design for approval before editing, so every headless cell stopped to ask a question no one
+      # could answer. That is not a Codex result and not a kit result. The Claude arm has no
+      # equivalent switch, which is why it prints the both-arms WARNING instead.
+      #
+      # Second attempt, same day, same 12 of 12: with the home config gone, Codex's DEFAULT Windows
+      # sandbox rejected every process launch ("CreateProcess ... Rejected"), so the agent could not
+      # even read the fixture and stopped to ask for permissions. The user's config had been
+      # carrying `[windows] sandbox = "elevated"`; on Windows that one key is passed back in.
+      wflag=""
+      case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) wflag='-c windows.sandbox="elevated"' ;; esac
+      ev="$w/.stderr.codex-turn$turn.jsonl"
+      if [ "$turn" -eq 1 ]; then
+        ( cd "$w" && timeout "$TIMEOUT" codex exec -C "$w" --skip-git-repo-check --ignore-user-config $wflag \
+            -s workspace-write -c 'approval_policy="never"' --json $mflag "$(cat "$pf")" \
+            </dev/null >"$ev" 2>>"$err" ); rc=$?
+        tid=$(codex_field "$ev" thread)
+      else
+        [ -n "$tid" ] || { echo "ERROR cannot resume: turn 1 produced no Codex thread id"; \
+                           [ "$KEEP" -eq 0 ] && scrub "$w"; return 1; }
+        # `resume` takes no -s/-C, so the sandbox mode is restated as a config override: without it
+        # a later turn could fall back to read-only and fail the must-edit gate for no real reason.
+        ( cd "$w" && timeout "$TIMEOUT" codex exec resume "$tid" --skip-git-repo-check --ignore-user-config $wflag \
+            -c 'sandbox_mode="workspace-write"' -c 'approval_policy="never"' --json "$(cat "$pf")" \
+            </dev/null >"$ev" 2>>"$err" ); rc=$?
+      fi
+      tout=$(codex_field "$ev" messages)
     else
-      # Without a usable id there is no honest way to continue; stop rather than silently run the
-      # later turns as fresh conversations, which would look like a multi-turn result and not be one.
-      [ -n "$sid" ] || { echo "ERROR cannot resume: no usable session id (python missing?)"; \
-                         [ "$KEEP" -eq 0 ] && scrub "$w"; return 1; }
-      sflag="--resume $sid"
+      if [ "$turn" -eq 1 ]; then
+        sflag=""; [ -n "$sid" ] && sflag="--session-id $sid"
+      else
+        # Without a usable id there is no honest way to continue; stop rather than silently run the
+        # later turns as fresh conversations, which would look like a multi-turn result and not be one.
+        [ -n "$sid" ] || { echo "ERROR cannot resume: no usable session id (python missing?)"; \
+                           [ "$KEEP" -eq 0 ] && scrub "$w"; return 1; }
+        sflag="--resume $sid"
+      fi
+      tout=$( cd "$w" && timeout "$TIMEOUT" claude -p "$(cat "$pf")" \
+                --permission-mode acceptEdits --allowedTools $ALLOW $sflag $mflag 2>>"$err" ); rc=$?
     fi
-    tout=$( cd "$w" && timeout "$TIMEOUT" claude -p "$(cat "$pf")" \
-              --permission-mode acceptEdits --allowedTools $ALLOW $sflag $mflag 2>>"$err" ); rc=$?
     [ "$rc" -eq 127 ] && break
     out="$out
 === TURN $turn - the user asked: $(cat "$pf")
 $tout"
   done
-  # 127 means the `claude` binary itself vanished - an npm self-update mid-run. Every later cell
+  # 127 means the CLI binary itself vanished - an npm self-update mid-run. Every later cell
   # would report ERROR and the suite would still print a confident-looking aggregate over them.
   # That has now happened three times. Abort loudly instead of publishing a number built on holes.
-  if [ "$rc" -eq 127 ] || grep -q "failed to run command 'claude'" "$err" 2>/dev/null; then
-    echo "ABORT the claude CLI disappeared mid-run (exit 127) - almost certainly an npm self-update"
+  if [ "$rc" -eq 127 ] || grep -q "failed to run command '$TOOL'" "$err" 2>/dev/null; then
+    echo "ABORT the $TOOL CLI disappeared mid-run (exit 127) - almost certainly an npm self-update"
     [ "$KEEP" -eq 0 ] && scrub "$w"; return 1
   fi
   if [ -z "$out" ]; then
@@ -193,7 +285,9 @@ $tout"
   nochange=0; [ "$before" = "$(fingerprint "$w")" ] && nochange=1
   if [ -f "$cdir/must-edit" ] && [ "$nochange" -eq 1 ]; then
     echo "FAIL agent changed no files - it described the work instead of doing it"
-    [ "$KEEP" -eq 0 ] && scrub "$w"; return 0
+    # A no-change cell is exactly the one worth opening under --keep, so say where it is.
+    [ "$KEEP" -eq 1 ] && echo "   (kept: $w)" >&2 || scrub "$w"
+    return 0
   fi
   # Cases without the marker are still judged normally - their rubrics may legitimately pass an
   # answer that writes nothing (01 accepts "investigates why", 09 accepts "proposes a test", 06
@@ -206,6 +300,7 @@ $tout"
   # Same exclusions as the fingerprint, for a second reason: .pyc files cat'd into the judge prompt
   # are binary noise that crowds out the source the judge is meant to be reading.
   diffout=$( cd "$w" && find . -type f -not -path './.git/*' -not -path './.claude/*' \
+             -not -path './.agents/*' -not -path './.codex/*' \
              -not -path '*/__pycache__/*' -not -path '*/.pytest_cache/*' \
              -not -path '*/node_modules/*'  -not -path '*/.ruff_cache/*' \
              -not -path '*/.mypy_cache/*'   -not -path '*/.vitest-cache/*' \
@@ -243,7 +338,7 @@ that the rubric did not ask for, and do not penalise anything the rubric did not
 
 printf '%s\n' "------------------------------------------------------------"
 echo "adherence eval - $RUNS run(s) per cell"
-echo "model under test: ${MODEL:-<cli default>}   judge: ${JUDGE:-<cli default>}"
+echo "tool: $TOOL   model under test: ${MODEL:-<cli default>}   judge: claude ${JUDGE:-<cli default>}"
 printf '%s\n' "------------------------------------------------------------"
 
 wp=0; wt=0; op=0; ot=0

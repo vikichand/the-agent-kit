@@ -31,7 +31,16 @@ for every task - a rule the kit was breaking about itself.
 ./run.sh --model sonnet --judge-model opus
 ./run.sh --timeout 900            # seconds per call (default 600)
 ./run.sh --keep                   # keep the working dirs to inspect what the agent actually did
+./run.sh --tool codex             # the agent under test is Codex; the judge stays Claude
 ```
+
+Under `--tool codex` the "with" arm carries what a Codex install gets - `AGENTS.md` plus
+`.agents/skills/`, deployed by the installer's own `install_codex_skills` so the harness and a real
+install cannot drift - and the agent runs headless in a workspace-write sandbox with approvals set
+to never, which is the same posture as the Claude arm's allowlist. Multi-turn cases resume by the
+thread id Codex reports on turn 1. The `.agents/` and `.codex/` trees are excluded from the must-edit
+fingerprint and from what the judge sees, for the same reason `.claude/` is: otherwise the rule text
+would count as work done and be graded as evidence.
 
 **This costs real tokens** - roughly four model calls per case per run. It is deliberately not part
 of `run-tests.sh`, which stays free, offline, and fast.
@@ -39,7 +48,8 @@ of `run-tests.sh`, which stays free, offline, and fast.
 ## How it works
 
 Each case is a throwaway repo, a realistic prompt, and a rubric. It runs twice: once with
-`AGENTS.md` + `CLAUDE.md` + `.claude/rules/` present, once without. A **separate** judge call grades the
+`AGENTS.md` + `CLAUDE.md` + `.claude/rules/` present (or `AGENTS.md` + `.agents/skills/` under
+`--tool codex`), once without. A **separate** judge call grades the
 transcript plus the resulting files against the rubric alone - it never sees the rules file or the
 agent's reasoning, which is the kit's own "don't grade your own homework" rule applied to itself.
 
@@ -278,6 +288,47 @@ a narrower finding than the rule's motivation: the over-commenting people report
 carry comments to match, and none of those is what a one-shot case on a stub can reach. Whether the
 rule earns its place on that terrain is unmeasured, which is different from measured and found
 wanting.
+
+### The Codex arm: cases 14 and 28
+
+`--tool codex` landed on 2026-09-12 with the Codex skills port, and the two cases whose rule ported
+cleanly were run first: `14` (object-level authorization, from `web-security.md`) and `28` (personal
+data in logs, from `data-layer.md`). Codex CLI 0.151.0, its default model, 3 runs per cell, judge
+Claude, kit at the commit that ships this section:
+
+| Case | with | without | gap |
+|---|---|---|---|
+| `14-object-level-authz` | 3/3 | 3/3 | - |
+| `28-pii-in-logs` | 3/3 | 3/3 | - |
+
+**Passes both, on both.** Every cell wrote code, every cell scoped the order lookup to the caller's
+organisation or kept the email, address and card digits out of the log, and the judge's reasons say
+so in each row. On these two cases Codex's default model already does what the rules ask, which is
+the same reading the table at the top gives: the rule is not earning its lines *here*. Note what `28`
+means in particular: on Sonnet it was the kit's cleanest win (3/3 against 0/3), and on Codex the
+control arm gets it right unaided. The rules are the same file; the effect is a property of the model.
+
+**Whether the skill even loaded is a separate question, and the transcripts answer it.** Codex keeps
+only a skill's name and description in context and loads the body when it decides the task matches.
+Across the six "with" cells, the agent read the `web-security` skill body in two (once per case) and
+opened no kit skill at all in the other four. So a with-arm pass here is mostly a pass on the floor
+plus the model's own defaults, not on the ported rule. That is worth knowing before anyone claims the
+port "works": it is deployed, discoverable (Codex lists all six kit skills in its catalog), and loaded
+about a third of the time on prompts that match its description. Tightening the descriptions is a
+wording question the harness can now answer.
+
+**Two instrument failures came first, and both are in the runner as comments.** The first attempt
+scored 12 of 12 cells "changed no files": the user's Codex home had a plugin whose skill tells the
+agent to present a design for approval before editing, so every headless cell stopped to ask a
+question. That is neither a Codex result nor a kit result, so the Codex arm now runs with
+`--ignore-user-config` in both arms, which the Claude arm has no equivalent for. The second attempt
+scored 12 of 12 the same way for the opposite reason: with the home config gone, Codex's default
+Windows sandbox rejected every process launch and the agent could not read the fixture. The one key
+that had been making it work, `[windows] sandbox = "elevated"`, is passed back in on Windows. That
+is a prerequisite, not a default: on a Windows machine where Codex's elevated sandbox has not been
+set up, the Codex arm will fail in its own new way, and the fix is Codex's sandbox setup, not this
+script. Both failures were caught by opening the kept sandboxes, not by the score, which looked identical in all three
+attempts. A harness that prints 0/3 for three different reasons is why `--keep` exists.
 
 ## What this does not tell you
 
