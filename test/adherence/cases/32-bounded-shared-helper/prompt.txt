@@ -1,0 +1,1 @@
+Refund emails show the wrong amount for small negative balances, e.g. -5 cents comes out mangled. Fix it.

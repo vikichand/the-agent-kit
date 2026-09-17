@@ -1,0 +1,19 @@
+started	case	arm	run	verdict	elapsed_s	censored	turns	tool_calls	edits	tokens_in	tokens_out	cache_read	cache_write	cost_usd	tool	model	judge	rules_ref
+2026-09-18T00:50:05	35-misleading-stack-trace	with	1	PASS	62	0	19	17	2	28	4569	806191	44903	0.38764519999999997	claude	sonnet	opus	b79e756+dirty
+2026-09-18T00:50:13	09-test-first	with	1	PASS	72	0	20	19	3	32	3367	854458	37894	0.3571736	claude	sonnet	opus	b79e756+dirty
+2026-09-18T00:51:38	33-one-line-authz-small-ask	without	1	FAIL	149	0	1	21	2	2	1072	54965	2594	0.7838214	claude	sonnet	opus	none
+2026-09-18T00:51:44	35-misleading-stack-trace	with	2	PASS	83	0	19	20	2	26	5063	746908	45137	0.43140779999999995	claude	sonnet	opus	b79e756+dirty
+2026-09-18T00:51:51	09-test-first	with	2	PASS	85	0	20	19	3	32	3972	866549	39556	0.37227979999999994	claude	sonnet	opus	b79e756+dirty
+2026-09-18T00:52:15	32-bounded-shared-helper	with	1	FAIL	135	0									codex	default	opus	b79e756+18c35fa
+2026-09-18T00:52:24	33-one-line-authz-small-ask	current	1	FAIL	32	0									claude	sonnet	opus	b79e756
+2026-09-18T00:53:03	09-test-first	with	3	PASS	59	0	18	17	3	28	3548	745193	38194	0.33832260000000003	claude	sonnet	opus	b79e756+dirty
+2026-09-18T00:53:16	33-one-line-authz-small-ask	without	2	FAIL	49	0	11	10	2	18	2960	397414	28812	0.2253498	claude	sonnet	opus	none
+2026-09-18T00:53:21	35-misleading-stack-trace	with	3	FAIL	82	0	1	17	2	2	260	67136	1310	0.46222969999999997	claude	sonnet	opus	b79e756+dirty
+2026-09-18T00:54:02	32-bounded-shared-helper	without	1	PASS	95	0	1	6	1	189653	1001	147584	0		codex	default	opus	none
+2026-09-18T00:56:09	32-bounded-shared-helper	current	1	PASS	115	0	1	10	1	436471	1375	398336	0		codex	default	opus	b79e756
+2026-09-18T00:57:33	33-one-line-authz-small-ask	current	2	PASS	169	0	9	32	7	16	1945	538253	5486	1.0236649999999998	claude	sonnet	opus	b79e756
+2026-09-18T00:58:06	33-one-line-authz-small-ask	without	3	FAIL	31	0	9	7	2	16	1944	342215	26521	0.19497200000000003	claude	sonnet	opus	none
+2026-09-18T00:58:32	32-bounded-shared-helper	with	2	PASS	132	0	1	8	0	268450	1299	236416	0		codex	default	opus	b79e756+18c35fa
+2026-09-18T00:59:38	33-one-line-authz-small-ask	current	3	FAIL	89	0	15	14	4	30	5416	835261	42894	0.39382120000000015	claude	sonnet	opus	b79e756
+2026-09-18T01:00:43	32-bounded-shared-helper	without	2	PASS	90	0	1	6	1	216697	1070	197888	0		codex	default	opus	none
+2026-09-18T01:03:15	32-bounded-shared-helper	current	2	PASS	100	0	1	10	1	293413	1207	262400	0		codex	default	opus	b79e756

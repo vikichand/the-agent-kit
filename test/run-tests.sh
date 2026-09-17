@@ -365,12 +365,12 @@ else
   # as .agents/skills - and NOT the two path-shaped rules, which have no honest task trigger.
   u=$(mktemp -d) && (cd "$u" && git init -q && sh "$KIT/install.sh" >/dev/null 2>&1)
   m=""
-  for s in generating-reports orchestrating-work web-security data-layer frontend-quality ci-cd; do
+  for s in generating-reports orchestrating-work writing-docs web-security data-layer frontend-quality ci-cd; do
     [ -f "$u/.agents/skills/$s/SKILL.md" ] || m="$m $s"
   done
   x=""
   for s in code-correctness tests; do [ -e "$u/.agents/skills/$s" ] && x="$x $s"; done
-  [ -z "$m" ] && [ -z "$x" ] && pass "U13 fresh install ships 6 Codex skills and withholds the 2 path-shaped rules" \
+  [ -z "$m" ] && [ -z "$x" ] && pass "U13 fresh install ships 7 Codex skills and withholds the 2 path-shaped rules" \
     || bad "U13 Codex skills wrong - missing:[$m] wrongly ported:[$x]"
   # U14: a generated skill is the rule with its frontmatter swapped - name + description present,
   # `paths:` gone, body byte-identical to the rule's body. Anything else is a fork, not an adapter.

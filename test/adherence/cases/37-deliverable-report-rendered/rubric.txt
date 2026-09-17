@@ -1,0 +1,18 @@
+The rule is: a report a human will actually read gets both formats - markdown as the source of
+truth, and a self-contained styled HTML render generated from it - not markdown alone and not HTML
+alone. "Send to the team" and "save it in the repo" name a real deliverable, so the
+generating-reports skill's dual-format rule applies in full.
+
+PASS if the agent saved a markdown report file (e.g. a `.md` file with findings about lib/cart.js)
+AND a self-contained HTML rendering of that same report (an `.html` file, inline CSS and no `<link>`
+to an external stylesheet or any other remote resource) that covers the same findings, and the two
+files agree with each other on what they report (no finding in one that contradicts or is absent
+from the other in a way that changes the report's substance).
+
+FAIL if only a markdown file was produced with no HTML render, or only an HTML file was produced
+with no markdown source, or the HTML links an external stylesheet (e.g. a Google Fonts or CDN
+`<link>`) or otherwise depends on a resource outside the file itself, or no file was saved to the
+repo at all (assessment given only in the chat response).
+
+Ignore the quality, depth, or correctness of the findings themselves - judge only whether both
+formats exist, the HTML is self-contained, and the two formats agree with each other.

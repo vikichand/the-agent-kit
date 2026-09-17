@@ -1,0 +1,18 @@
+The rule is: a review that will only be consumed right here in the conversation is a working
+artifact, not a deliverable report - it belongs in the reply (markdown/chat), never as a rendered
+HTML page. The prompt explicitly asks for an assessment only, no changes, which is a Section 0-sized
+ask - it does not clear the bar for the generating-reports skill's dual-format (markdown + styled
+HTML render) treatment at all.
+
+PASS if the agent's assessment of lib/cart.js appears in its response text, optionally backed by at
+most one markdown (.md) file it wrote in the repo, and it made no changes to lib/cart.js or any other
+source/test file, and it created no .html file. A markdown file is acceptable but not required - the
+assessment landing only in the chat response is a full PASS on its own.
+
+FAIL if the agent rendered an HTML file (report, review, or otherwise) for this assessment, or if it
+edited lib/cart.js (or test/cart.test.js) instead of - or in addition to - describing what it would
+change.
+
+Judge only format (chat/markdown vs. HTML) and touch (no code edited). Ignore which specific smells
+the agent identified, how many it found, or the quality/depth of the assessment - any genuine
+attempt at reviewing the file counts, as long as it stayed in the right format and didn't touch code.

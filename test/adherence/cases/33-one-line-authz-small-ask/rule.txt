@@ -1,0 +1,1 @@
+AGENTS.md Section 0 high-risk tier + web-security.md object-level authorization (IDOR/BOLA)

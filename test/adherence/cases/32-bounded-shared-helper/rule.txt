@@ -1,0 +1,1 @@
+AGENTS.md Section 0 bounded tier + Section 6 fix it where it is shared, not where it surfaced

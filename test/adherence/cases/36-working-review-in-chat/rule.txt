@@ -1,0 +1,1 @@
+generating-reports skill: a working artifact stays in chat, no HTML render

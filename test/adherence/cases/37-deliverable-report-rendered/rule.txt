@@ -1,0 +1,1 @@
+generating-reports skill: deliverable report gets markdown source + HTML render
