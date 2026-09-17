@@ -97,7 +97,7 @@ Two halves, two destinies:
 
 - **TDD: the test comes first.** [covered S5 - "prefer test-first"; candidate for hardening to the
   default] Write the failing test that defines the behavior, watch it fail, make it pass, refactor.
-  Bugs reproduce as a failing test before the fix is touched.
+  For bugs: run an existing reproducing test, or add one; observe failure before fixing, then success.
 - **Never game the oracle.** [partial - S5 bans self-grading; the specific cheats aren't named]
   Under pressure agents delete failing tests, loosen assertions, mock the thing under test, or
   hardcode expected values. A red test is information, not an obstacle. A genuinely wrong test gets
@@ -105,8 +105,8 @@ Two halves, two destinies:
 - **Test behavior, not implementation.** [NEW] Assert what the caller observes, not internal call
   counts. Happy-path-only is junior; the edges (empty, null, duplicate, concurrent, huge, malformed,
   unauthorized) are where seniors earn the title.
-- **Look it up, don't recall it.** [covered S5 + context7 rule] Training data lags; verify library and
-  API behavior against current docs before asserting it.
+- **Verify facts against the version in use.** [covered S5 + context7 rule] Training data lags; verify
+  library and API behavior against current docs before asserting it.
 - **Run it before claiming it.** [covered S5] "Looks right" is not done; state how you verified.
 - **UI work gets end-to-end proof in a real browser.** [partial - `docs/browser-tools.md` has the
   tool-choice rule; making e2e part of "done" is new] Drive the flow with the Playwright MCP, inspect
@@ -436,3 +436,60 @@ review, field-observed agent failure modes, Vik's brain dumps (2026-08-18: web s
 auth-page hardening, UI polish, launch/SEO readiness), and a comparison against a colleague's
 workspace-guardrails CLAUDE.md (2026-08-19: boundaries, IP, incident conduct). MIT (c) 2026
 Vikash Chand._
+
+---
+
+# Decision record: the 2026-09-18 performance pass
+
+Kept here so a future session does not re-litigate it. The purpose did not change: the agent still
+reads first, names the blast radius, proves with an external oracle, tests first, never games the
+oracle, fixes the cause, keeps the diff surgical, and commits only when asked. What changed is the
+ceremony around those, and the evidence for changing it.
+
+**What changed and why**
+
+- **Section 0 sizes by risk and proof, not by file count** (mechanical / bounded / high-risk tiers,
+  each naming what may be skipped and the narrowest sufficient oracle). The old gate sent everything
+  past a typo into the full plan-test-verify loop. Ponytail's field-tested sentence supplied the
+  bounded oracle: one runnable check, the smallest thing that fails if the logic breaks.
+- **Dated procedure removed, proof kept.** Anthropic's Prompting Claude Opus 5 guide names explicit
+  verification instructions and "use a subagent to verify" as over-verification to remove, "with no
+  loss in quality", and its own `/claude-api prompt-audit` flagged four such lines in the kit: the
+  plan pressure-test with a fresh agent, the narration cap, the four-step debugging script, the
+  "actually search" booster. Each is now scoped or gone; the re-run audit reports zero High findings.
+- **Look-ups scoped** to unfamiliar, uncertain or version-sensitive facts; verified repo usage is a
+  source. The Context7 rule matches.
+- **Checkpoints carry user-stated constraints.** Two 2026 papers (arXiv 2606.22528, 2609.11024)
+  measure constraints dropped at compaction as the point where agents lose control (violations from
+  0% to 30-59%; loss-of-control 87% vs 0% with constraints preserved). The project CLAUDE.md is
+  re-injected by Claude Code after compaction; a constraint stated only in conversation is not, so
+  it is written to the checkpoint file.
+- **Reports**: a deliverable a human reads keeps Markdown plus the styled HTML render; a working
+  plan or review stays Markdown. The render and its 25 KB design file were the largest avoidable load.
+- **Prose and README standards moved to the `writing-docs` skill** (loaded for documentation, README
+  and commit-message work); Section 9 keeps two lines. A file-size study (arXiv 2605.10039) found no
+  detectable adherence effect of file size or position, so the 200-line target is a context-cost
+  budget, not a cliff; the floor is 192 effective lines.
+- **Delegation bounded**: at most two workers, one layer, model and effort named on every dispatch,
+  never a subagent to verify the agent's own work (Anthropic's guidance verbatim). Claude Code and
+  Codex both expose the caps as settings; the optional performance profile sets them.
+- **Depth rules scoped to the requested change**; the frontend rule no longer fires on Next.js API
+  routes; the data rule separates preparing a migration from executing a rollout.
+- **Harness**: three arms, per-cell telemetry, trace assertions, provider-error detection, an
+  acceptance contract (`test/adherence/README.md`). The first measurement is partial and recorded as
+  such.
+
+**Deliberately not done**: a compact-time digest hook (redundant on Claude Code); Excuse/Reality
+tables (upstream evidence is n of about 10); a debt-marker harvester; guard-startup tuning (about
+1.5 s per 30 calls, and it touches the enforced layer); cheap-lead model routing by default (Cherny's
+counter-position, Lenny's Podcast 2026-02-19: a cheaper model often costs more tokens to finish;
+Anthropic's effort guidance and CodeRabbit's benchmark say lower effort on a capable model holds
+quality, so the profile keeps a capable lead at medium effort and is an experiment).
+
+**Sources**: Anthropic, Prompting Claude Opus 5; Claude Code memory, hooks, model-config, sub-agents
+and fast-mode docs; Anthropic, Demystifying evals for AI agents (2026-01-09); OpenAI, Rethinking
+skills and prompts for GPT-6 Astra (2026-09-11); OpenAI models page and Codex subagents doc;
+CodeRabbit, Claude Opus 5 benchmarks for AI code review; arXiv 2602.11988, 2601.20404, 2605.10039,
+2606.22528, 2609.11024, 2605.18583, 2607.28871; obra/superpowers 6.x release notes;
+DietrichGebert/ponytail `skills/ponytail/SKILL.md`; the reviews by GPT-6 Astra (Codex CLI 0.154.0)
+and Claude Fable 5.1 that produced the program.

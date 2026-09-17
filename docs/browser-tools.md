@@ -8,10 +8,11 @@ Both are browser MCPs, so an agent with both installed will pick one arbitrarily
 choose. This is the rule that makes the choice deliberate.
 
 **Neither subsumes the other, so running both is correct.** But the popular shorthand ("Playwright
-drives, DevTools inspects") is out of date and will send you to the wrong tool. Chrome DevTools MCP
-ships 52 tools including 10 input-automation tools (`click`, `hover`, `fill`, `fill_form`, `drag`,
-`press_key`, `type_text`, `upload_file`), a `wait_for` tool, and `take_snapshot`, which is explicitly
-built from the accessibility tree. It drives a page perfectly well.
+drives, DevTools inspects") is out of date and will send you to the wrong tool. The Chrome DevTools
+MCP reference lists 58 tools, of which about 29 load by default, including 10 input-automation tools
+(`click`, `hover`, `fill`, `fill_form`, `drag`, `press_key`, `type_text`, `upload_file`), a `wait_for`
+tool, and `take_snapshot`, which is explicitly built from the accessibility tree. It drives a page
+perfectly well.
 
 ## What each one can do that the other genuinely cannot
 
@@ -19,12 +20,16 @@ built from the accessibility tree. It drives a page perfectly well.
 |---|---|
 | **Performance traces with Core Web Vitals** (`performance_start_trace`, `performance_analyze_insight`) covering LCP, INP, CLS | **Non-Chromium engines**: `--browser firefox`, `--browser webkit` |
 | `lighthouse_audit` | `browser_generate_locator`, for emitting real test code (`--caps=testing`) |
-| 12 heap-snapshot / memory tools | |
+| 13 heap-snapshot / memory tools, 12 of which need `--memoryDebugging=true` | |
 | Chrome extension install and inspection | |
-| Per-request network detail (`get_network_request`) | |
 
 Playwright MCP does have `browser_start_tracing` (behind `--caps=devtools`), but that records a
 Playwright debug trace, not a Chrome performance profile. It will not give you Core Web Vitals.
+
+**Per-request network detail is no longer DevTools-only.** Playwright's core `browser_network_request`
+returns the full detail (headers and body) of a single request, so this is a shared capability, not a
+row in either "only" column. Both MCPs also expose WebMCP tools now (`browser_webmcp_list` /
+`browser_webmcp_call` on Playwright), so that is shared too.
 
 ## Pick by the question
 
@@ -37,7 +42,7 @@ Playwright debug trace, not a Chrome performance profile. It will not give you C
 | What computed styles does this element actually have? | **DevTools** |
 | Why did that request fail, redirect, or return the wrong body? | **DevTools** |
 | What is the console emitting? | **DevTools** |
-| Is something leaking memory? | **DevTools** (only option) |
+| Is something leaking memory? | **DevTools** (only option, and only once installed with `--memoryDebugging=true`; the heap-snapshot tools are otherwise absent) |
 
 ## Sequencing
 
@@ -63,5 +68,6 @@ Playwright: behaviour is the acceptance test.
 
 ---
 
-*Verified against the Chrome DevTools MCP tool reference and the Playwright MCP CLI reference,
-2026-08-06. Both move quickly: re-check the tool lists before relying on a "only X can do this" claim.*
+*Verified against the Chrome DevTools MCP tool reference (1.9.0) and the Playwright MCP CLI reference
+(0.0.81), 2026-09-17. Both move quickly: re-check the tool lists before relying on a "only X can do
+this" claim.*

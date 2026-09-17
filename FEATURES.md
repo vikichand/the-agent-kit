@@ -21,17 +21,17 @@ stays local · own your incidents (stop and report, no silent cleanup) · don't 
 
 | # | Enforces |
 |---|---|
-| 0 | Size the task: scale ceremony to the job |
-| 1 | Read-first · no silent assumptions · **blast radius before the first edit** · push back, voice trade-offs · **grill mode** |
-| 2 | Plan non-trivial work as verifiable steps; pressure-test it; **name what's out of scope** |
+| 0 | Size by risk and proof: mechanical / bounded / high-risk tiers scale the ceremony |
+| 1 | Read-first · no silent assumptions · **blast radius before the first edit** · push back, voice trade-offs · **resolve material ambiguity** · **grill mode** |
+| 2 | Plan non-trivial work as verifiable steps; check a high-risk plan against its failure modes; **name what's out of scope** |
 | 3 | Simplicity · YAGNI/DRY · **reuse ladder** · match the codebase · **senior correctness defaults** (no silent fallbacks, idempotent handlers, the 100k-rows question, UTC + decimal money, staged migrations) · **named-ceiling shortcuts** · **copied code carries its license** |
 | 4 | Surgical changes: every line traces to the task |
-| 5 | **Verification is the spine**: external oracle · **test-first by default** (Section 0 sizes the ceremony) · **never game the oracle** (no deleted tests / loosened asserts) · **look it up, don't recall it** · **bounded loops** · **no self-grading** |
+| 5 | **Verification is the spine**: external oracle · **test-first by default** (Section 0 sizes the ceremony) · **never game the oracle** (no deleted tests / loosened asserts) · **verify facts against the version in use** · **bounded loops** · **independent judgment for high-risk judged work** |
 | 6 | Debug by root cause · **fix it where it is shared, not where it surfaced** · two-attempt rule |
-| 7 | Checkpoint to files · commit only when asked · **a repeated mistake becomes a proposed rule, never a self-edit** · **sync before you ship** (fetch + rebase before push/PR) |
-| 8 | Execution discipline running a plan |
-| 9 | Ownership · **no AI-authorship** (no `Co-Authored-By` / `Generated with` / AI-as-author) · **no AI prose tells** (em dashes, "not just X, it's Y", delve/leverage/seamless) |
-| 10 | **READMEs: the working path first** · Quick Start in the first screenful · reference tables · **name the shell differences, don't assume POSIX** · no filler · **docs move in the same diff** |
+| 7 | Checkpoint long work and every user-stated constraint · commit only when asked · **a repeated mistake becomes a proposed rule, never a self-edit** · **sync before you ship** (fetch + rebase before push/PR) |
+| 8 | Execution discipline running a plan · **run the checks correctness needs** · state the action, report findings, finish with the outcome |
+| 9 | Ownership · **no AI-authorship** (no `Co-Authored-By` / `Generated with` / AI-as-author) · **no AI prose tells** (em dashes, delve/leverage/seamless; full standard in the writing-docs skill) |
+| 10 | **Documentation**: load the writing-docs skill for READMEs, reports and commit messages (working path first, runnable command up top, command surfaces as tables, shell differences named) · **docs move in the same diff** |
 
 **Project-setup block**: a setup prompt ([`docs/project-setup-prompt.md`](docs/project-setup-prompt.md))
 classifies the repo (CODE / AGENT / BOTH), its **platform** (web / mobile / desktop / TV / CLI / library /
@@ -88,16 +88,19 @@ the same SKILL.md format, so the installer writes each skill to `.claude/skills/
   file ownership, worktree isolation, sequential integration with scoped tests, and the
   orchestrator-worker split - the lead keeps decomposition, the contract and the final review; workers
   execute specs that are already complete. **Route by how completely a slice is specified, never by
-  budget alone**, and a worker that meets ambiguity escalates instead of guessing. The economics are
-  documented, not folklore: weekly limits are one shared pool that models drain at very different rates,
-  and Anthropic's own cost guidance says to give simple subagent tasks `model: haiku` - so delegation is
-  also how a subscription stretches the week.
+  budget alone**, and a worker that meets ambiguity escalates instead of guessing. **Delegate only when
+  expected parallel progress exceeds startup and integration cost**, name the model and effort on every
+  dispatch, and cap fan-out at two workers active and one delegation layer - workers do not spawn
+  workers. The economics are documented, not folklore: weekly limits are one shared pool that models
+  drain at very different rates, and Anthropic's own cost guidance says to give simple subagent tasks
+  `model: haiku` - so delegation is also how a subscription stretches the week.
 
   It also names the setting that silently breaks the intent: `worktree.baseRef` defaults to `fresh`,
   which branches workers from the **remote default branch** rather than your in-progress work. The
   kit's `claude/settings.json` now sets `"worktree": {"baseRef": "head"}`.
 
-- **`generating-reports`** - the dual-format rule for anything a human reviews: **markdown is the
+- **`generating-reports`** - the dual-format rule for a **deliverable**: a report, audit, plan or
+  review a human will read, or one asked to be saved. For that case only: **markdown is the
   source of truth** (frontmatter, stable step IDs, checkboxes as execution state, acceptance-criteria
   blocks - labelled kit convention, since no formal spec exists), rendered alongside as **one
   self-contained HTML file** for the human, styled per the skill's `design.md`: editorial pixel-tech -
@@ -108,8 +111,16 @@ the same SKILL.md format, so the installer writes each skill to `.claude/skills/
   invented. Authority
   flows one way: the HTML is disposable, decisions land in the .md. This is the synthesis position of
   the 2026 "HTML is the new Markdown" debate - render for the human, keep markdown canonical for
-  diffs, co-editing and tokens. Also carries the prose standards: Diataxis for docs structure, the
-  project's declared style guide, and a deliberate NON-mandate of Conventional Commits.
+  diffs, co-editing and tokens. A **working artifact** - a plan or review the agent itself consumes, or
+  one that lives only in the conversation - stays markdown-only, no render. Also carries the prose
+  standards: Diataxis for docs structure, the project's declared style guide, and a deliberate
+  NON-mandate of Conventional Commits.
+
+- **`writing-docs`** - the prose and README standards for anything a human reads: no AI tells (em
+  dashes, filler openers and hedges, *delve / leverage / seamless / robust / comprehensive*, emoji
+  headings), symbols written out in words, and the README order - working path first, a runnable
+  command in the first screenful, every command surface as a table, shell differences named. Fires on
+  documentation, README, commit-message and PR-description work; ships to both tools' skills folders.
 
 Honest labelling inside the skill: the contract-freeze pattern and the verify-RED gate are
 **well-reasoned practice, not measured results**, and it says so rather than inventing authority.
@@ -156,7 +167,7 @@ stray operand.
   fenced / quoted / inline-code spans first, so a git verb the user pasted from a log or a teammate mints
   nothing. Codex (deny-mode) ignores grants entirely: it commits freely and leaves pushing to the human.
 - **`codex/config.toml`**: `approval_policy=on-request` · `sandbox_mode=workspace-write` · network **on**, deliberately
-  (Section 5 requires live doc lookups; switching it off just sends the agent back to memory) · no hand-written env exclude
+  (Section 5 requires verifying facts against the version in use; switching it off just sends the agent back to memory) · no hand-written env exclude
   list (Codex excludes secret names by default, and a broad one strips `DATABASE_URL` and breaks builds invisibly).
   **`codex/hooks.json`** wires the deny-mode hook.
 - **`install.sh`**: six modes, default (full rules) · `--extension` (lean, extends global) · `--global` (machine-wide) ·
@@ -190,7 +201,7 @@ stray operand.
   **`test/adherence/`** answers the question the rest of `test/` cannot: the hooks and permission rules are
   proven, but ~34 rule families are *guidance*, and guidance degrades. Ten realistic scenarios run twice - with
   the rules present and without - graded by a separate judge that sees only the rubric and the transcript
-  (Section 5's no-self-grading, applied to the kit itself). **Read the gap, not the score:** passing both ways means
+  (Section 5's independent judgment for high-risk judged work, applied to the kit itself). **Read the gap, not the score:** passing both ways means
   the rule is not earning its lines; failing both means it is too compressed to fire or needs enforcement
   rather than better wording. Costs real tokens, so it is deliberately outside `run-tests.sh`.
   **`.devcontainer/`**: an isolated-container starting point.
