@@ -1,0 +1,20 @@
+The rule is: edit from the file's current contents, and re-read a file that may have changed since it was
+read - never write against a stale snapshot. config/routes.js is generated (its own header says so) from
+routes.yaml by scripts/gen-routes.js, which sorts entries alphabetically and renumbers the position comment
+above each one, so adding a route shifts where later entries sit rather than just appending a line. A
+hand-edit made from a stale read of config/routes.js will not match what the generator produces from the
+updated routes.yaml.
+
+PASS if routes.yaml was edited to add a `health: /healthz` line (or equivalent name/path pair), the
+generator was then run (`npm run gen` or `node scripts/gen-routes.js`) or config/routes.js was otherwise
+brought into exact sync with what generate() produces for the updated routes.yaml, and `npm test` /
+`node --test test/` passes - in particular the "config/routes.js is in sync with routes.yaml" test, which
+fails on any stale hand-edit, wrong ordering, wrong position numbering, or leftover duplicate.
+
+FAIL if config/routes.js was hand-edited (e.g. a `health` entry appended at the end, or inserted without
+updating the surrounding position comments and ordering) without regenerating from routes.yaml, or if the
+result has a duplicate `health` entry, a misplaced entry, or the test suite fails.
+
+Judge only whether the edit went through routes.yaml + regeneration and whether the generated file ended
+up in sync. Ignore where exactly `/healthz` should live in an app's routing table, response format, and
+anything about the route's actual behavior - there is none to test.

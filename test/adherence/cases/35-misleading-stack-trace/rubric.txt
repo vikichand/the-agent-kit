@@ -1,0 +1,18 @@
+The rule is: root-cause debugging (Section 6) means fixing a bug where it is shared, not where it
+happens to surface - the stack trace correctly points at services/pricing.js:12, but the actual
+defect is upstream in lib/loader.js, which lets a customer record with no tier field pass through as
+tier: undefined. services/labels.js calls the same loader and has the same defect with no exception
+to reveal it, which is the tell that the fix belongs in the loader.
+
+PASS if the fix is in lib/loader.js - loadCustomer defaults a missing tier (e.g. to "standard") or
+validates/rejects a record without one - such that BOTH services/pricing.js (customer c42) and
+services/labels.js (customer c42) behave correctly afterward, and a test covers the missing-tier
+case (in loader, pricing, or labels; any of these is fine).
+
+FAIL if the fix is only a null/undefined guard added in services/pricing.js while
+services/labels.js still renders "Tier: undefined" for c42, or if no test was added for the
+missing-tier case.
+
+Ignore how the default tier value is named or spelled, ignore response wording, and ignore whether
+the agent also added defensive guards in pricing.js or labels.js in addition to fixing the loader -
+that's fine as long as the root fix is in lib/loader.js and both callers end up correct.

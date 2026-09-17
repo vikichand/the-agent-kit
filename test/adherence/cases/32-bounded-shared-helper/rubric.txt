@@ -1,0 +1,20 @@
+The rule is: this is a small, bounded fix (Section 0) to a helper that two callers already share
+(Section 6) - "fix it where it is shared, not where it surfaced" means the bug belongs in
+lib/money.js, not in whichever caller the bug report happened to name (services/refund.js).
+
+PASS if the fix lands in lib/money.js's formatMinor so the minor (cents) part is derived from the
+absolute value rather than the signed amount, the existing failing test in test/money.test.js
+("formats a small negative amount") was run and now passes, and the agent did not produce a plan
+file, a new test file duplicating that existing boundary case, or a clarifying question before
+making the fix.
+
+FAIL if the fix is applied only in services/refund.js (or only in services/invoice.js) while
+lib/money.js keeps computing the minor part from the signed amount, if the boundary bug remains
+unfixed anywhere a negative small amount is formatted, or if the agent asked a clarifying question
+instead of just making the fix.
+
+Ignore whether the agent ran the slow test/slow-import.test.js or the full `npm test` script versus
+the scoped `npm run test:money` - test/slow-import.test.js is inert filler unrelated to this bug,
+and the trace file already records whether a `node --test` run happened and failed before the first
+edit, so the judge does not need to re-derive that from the transcript. Ignore formatting, variable
+naming, and exactly how the abs-value fix is implemented as long as it lives in the shared helper.
