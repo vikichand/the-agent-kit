@@ -447,6 +447,11 @@ update_rules() {  # refresh the universal rules in this repo's AGENTS.md, preser
 doctor() {
   dfail=0
   hr; say "the-agent-kit --check (doctor)"
+  # The compatibility tuple: a measurement or a bug report means nothing without the tool versions.
+  for cli in claude codex; do
+    v=$($cli --version 2>/dev/null | head -1)
+    [ -n "$v" ] && say "  OK:   $cli = $v" || say "  NOTE: $cli not on PATH"
+  done
   py=$(detect_py)
   if [ -z "$py" ]; then
     dfail=1; say "  FAIL: no working python (python3/python/py). On Windows 'python3' is often a no-op Store stub."

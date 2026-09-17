@@ -1,0 +1,8 @@
+{
+  "_comment": "the-agent-kit OPTIONAL performance profile (experiment, see enhancements-plan.md 5.7). Merge by hand into ~/.claude/settings.json; never installed by default. Lead model stays whatever your plan gives you (fable where available); effort medium is the setting under test; the two caps bound delegation.",
+  "effortLevel": "medium",
+  "env": {
+    "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": "2",
+    "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "1"
+  }
+}

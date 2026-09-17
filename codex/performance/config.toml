@@ -1,0 +1,15 @@
+# the-agent-kit OPTIONAL performance profile for Codex (experiment, see enhancements-plan.md 5.7).
+# Merge by hand into ~/.codex/config.toml; never installed by default. Every key below is in the
+# Codex configuration reference (learn.chatgpt.com/docs/config-file/config-reference and
+# docs/agent-configuration/subagents). Copy the role files from codex/performance/agents/ into
+# ~/.codex/agents/ (personal, not trust-gated) or .codex/agents/ (project, trust-gated).
+
+model = "gpt-6-astra"              # the lead: the most capable model your plan provides
+model_reasoning_effort = "medium"  # the setting under test; raise per task, not globally
+
+[agents]
+enabled = true
+default_subagent_model = "gpt-5.6-terra"
+default_subagent_reasoning_effort = "medium"
+max_concurrent_threads_per_session = 2   # excludes the primary thread; no documented depth key,
+                                         # so nesting is bounded by the orchestration rule instead
