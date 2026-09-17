@@ -1,6 +1,6 @@
 ---
 name: generating-reports
-description: Use when producing a plan, review, audit, status report, comparison, or any document a human will read and act on - covers the dual-format rule (markdown as the agent-readable source of truth, a self-contained styled HTML render for human review), the structure that makes a plan machine-executable, and the documentation and prose standards to follow. Also use when asked to write a report, write up findings, plan this feature, or document something.
+description: Use when asked to write a report, audit, review, plan or status document that a human will read, or to save one to the repo - covers the dual-format rule for deliverables (markdown as the source of truth, a self-contained styled HTML render for human review), the structure that makes a plan machine-executable, and when a plan or review is a working artifact that stays markdown-only. Also use when asked to write up findings or plan this feature as a document.
 ---
 
 # Reports and plans: markdown for agents, HTML for humans
@@ -17,25 +17,21 @@ two-thirds more tokens. So: both formats, one direction of authority.
 
 ## The rule
 
-For any plan, review, audit, or report of substance (Section 0 sizing applies - a three-line answer needs
-none of this):
+Two kinds of output, and the reader decides which:
 
-1. **Write the markdown file first.** It is the source of truth and the only file that gets edited.
-2. **Render a self-contained HTML view of it** beside the markdown, dated:
-   `plan.md` -> `2026-08-24-plan.html`. Style and structure it per [design.md](design.md) in this
-   folder - it carries the tokens, the page anatomy, the per-report-type section skeletons, and the
-   restraint rules. Light theme is the default; the toggle stamps dark.
-   The markdown is never optional and never extra work - it is written FIRST and the HTML is
-   rendered from it. A report the human reads once and closes still leaves the .md behind as the
-   diffable record, at zero added cost. Never invert this by writing the HTML first, and never ask
-   whether to "also" produce the markdown - there is nothing to also produce; it is the source.
-3. **Authority flows one way.** The HTML is generated *from* the markdown and is disposable -
-   regenerate it after any change. Decisions, edits, and review feedback land in the `.md`, never
-   only in the HTML. If the human marks up the rendered view, carry every change back into the
-   markdown before acting on it.
+- **A deliverable** - a report, audit, plan or review that a human will read, or that was asked to be
+  saved: write the markdown first as the source of truth, then render the self-contained HTML view
+  beside it, dated (`plan.md` -> `2026-08-24-plan.html`), styled and structured per
+  [design.md](design.md) in this folder. Authority flows one way: the HTML is generated *from* the
+  markdown and is disposable; decisions, edits and review feedback land in the `.md`.
+- **A working artifact** - a plan or review that you yourself consume during the task, or that lives
+  only in the conversation: markdown only, no render, and do not load design.md. Section 0 sizing
+  applies; a three-line answer needs no file at all.
 
-Offer the human the HTML path when you finish ("open plan.html to review"). Execution requests
-("do the plan", "fix what the review found") always run from the markdown.
+When in doubt, ask in one clause whether the reader is a human. Match detail to the reader's decision;
+omit redundant summaries, filler sections and boilerplate. Offer the human the HTML path when a
+deliverable is done ("open plan.html to review"). Execution requests ("do the plan", "fix what the
+review found") always run from the markdown.
 
 ## Agent-consumable markdown (kit convention - converging practice, no formal spec exists)
 
@@ -74,5 +70,5 @@ Offer the human the HTML path when you finish ("open plan.html to review"). Exec
   Conventional Commits is *not* imposed: adopt it only where the project already uses it and
   enforces it with tooling - agents default to it out of habit, and unenforced type prefixes decay
   into noise.
-- `AGENTS.md` Sections 9 and 10 still govern: no AI prose tells, working path first, tables for what people
+- the `writing-docs` skill still governs: no AI prose tells, working path first, tables for what people
   scan for.

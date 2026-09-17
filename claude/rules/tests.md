@@ -51,8 +51,10 @@ Happy-path-only coverage is junior work. The cases that earn their keep:
 
 ## Test-first is the default for behaviour changes
 
-Write the failing test, watch it fail (a test that has never failed has proven nothing), make it
-pass, then refactor. For bugs: reproduce as a failing test *before* touching the fix, so you can
-prove the fix works and that the bug stays dead.
+Run an existing failing test, or write one; watch it fail (a test that has never failed has proven
+nothing), make it pass, then refactor. For bugs: an existing reproducing test satisfies this; add one
+only where the changed behaviour has no coverage, so you can prove the fix works and that the bug
+stays dead.
 
-`AGENTS.md` Section 0 still applies - a typo fix does not need this ceremony. A behaviour change does.
+`AGENTS.md` Section 0 sets the ceremony - a mechanical change needs none of this; a behaviour change
+keeps test-first, and one reproducing test is enough.

@@ -72,7 +72,9 @@ Use this shape for the block (include the CODE part, the AGENT part, or both, de
 **Stack:** ...
 **Platform / intent:** <web | mobile | desktop | TV | CLI | library | service> - <production | prototype>
 **Infra:** ...
-**Must pass before "done":** `<build>` / `<test>` / `<typecheck>` / `<lint>`
+**Must pass before "done":** `<build>` / `<test>` / `<typecheck>` / `<lint>` - the release gates. During
+iteration, run the narrowest check that proves the change (one test file, the typecheck); the full set
+runs before "done" and before a commit or PR.
 **Follow these patterns:** <canonical files>
 **Careful zones / do-not-touch:** ...
 

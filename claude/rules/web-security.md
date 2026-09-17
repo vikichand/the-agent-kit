@@ -25,6 +25,10 @@ paths:
 The classic failure is precise: the happy path ships and the login page becomes the softest target
 in the application. Treat this as the default shape of the work, not hardening scheduled for later.
 
+Apply these requirements to the behaviour within the requested change; loading this rule does not
+authorize unrelated product-wide work. A pre-existing gap that makes the requested change unsafe is
+escalated, not silently built.
+
 ## Sessions and authorization
 
 - Session tokens in `httpOnly` + `Secure` + `SameSite` cookies. Never `localStorage` - any XSS then
