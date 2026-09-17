@@ -12,6 +12,12 @@ paths:
 # You are touching the data layer
 
 Data is the part of the system with no undo. Code can be reverted; a dropped column cannot.
+Scale to the project's declared intent: in a production app these are part of done; in a prototype,
+note the debt aloud and keep moving rather than blocking.
+
+Apply these requirements to the behaviour within the requested change; loading this rule does not
+authorize unrelated product-wide work. A pre-existing gap that makes the requested change unsafe is
+escalated, not silently built.
 
 ## Migrations respect the data
 
@@ -21,6 +27,9 @@ Data is the part of the system with no undo. Code can be reverted; a dropped col
 - Never destructive without an explicit human decision. An agent that "fixes" a column by dropping
   it is the nightmare scenario, and it is not hypothetical.
 - Long-running changes on a live table need the lock behaviour thought through before they run.
+- Preparing and testing a migration is the agent's job; executing a production rollout or backfill is a
+  deploy step that needs the human's go, with the compatibility check, representative data and the
+  rollback path stated first.
 
 ## Queries
 

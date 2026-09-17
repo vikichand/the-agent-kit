@@ -2,7 +2,8 @@
 paths:
   - "**/components/**"
   - "**/pages/**"
-  - "**/app/**"
+  - "**/app/**/page.*"
+  - "**/app/**/layout.*"
   - "**/views/**"
   - "**/*.tsx"
   - "**/*.jsx"
@@ -16,6 +17,10 @@ paths:
 A feature that fails these is unfinished, not "done minus extras". Scale to the project's declared
 intent: in a production app these are part of done; in a prototype, note the debt aloud and keep
 moving rather than blocking.
+
+Apply these requirements to the behaviour within the requested change; loading this rule does not
+authorize unrelated product-wide work. A pre-existing gap that makes the requested change unsafe is
+escalated, not silently built.
 
 ## Accessibility
 
