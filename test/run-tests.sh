@@ -392,6 +392,16 @@ else
     && pass "U15 --update-rules deploys and refreshes the Codex skills" \
     || bad "U15 --update-rules left the Codex skills missing or stale"
   rm -rf "$u"
+  # U16: --global run twice must leave ONE flat skills tree in the share. `cp -r src dest` with dest
+  # present copies INTO it, so the second run nested skills/skills/ and left the top level stale -
+  # every skill added after the first install was silently missing from projects updated afterwards
+  # (observed on a real machine 2026-09-18). The optional performance profile must ship too.
+  g=$(mktemp -d) && HOME="$g" sh "$KIT/install.sh" --global >/dev/null 2>&1 && HOME="$g" sh "$KIT/install.sh" --global >/dev/null 2>&1
+  want=$(ls -d "$KIT"/claude/skills/*/ | wc -l | tr -d ' '); got=$(ls -d "$g"/.the-agent-kit/skills/*/ 2>/dev/null | wc -l | tr -d ' ')
+  [ ! -d "$g/.the-agent-kit/skills/skills" ] && [ "$got" = "$want" ] && [ -f "$g/.the-agent-kit/claude/performance/settings.json" ] \
+    && pass "U16 --global twice keeps one flat skills tree ($got skills) and ships the performance profile" \
+    || bad "U16 --global left a nested or stale skills tree ($got of $want, nested=$([ -d "$g/.the-agent-kit/skills/skills" ] && echo yes || echo no))"
+  rm -rf "$g"
   # U9: the structural guard U8 cannot be. update_kit must END by exec-ing the downloaded installer -
   # exec replaces the process, so not one more byte is read from the file --global is overwriting.
   # Any refactor that turns this back into a plain call reintroduces the corruption, silently.

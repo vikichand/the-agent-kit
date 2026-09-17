@@ -251,8 +251,17 @@ install_global() {
   cp "$KIT/docs/"*.md "$share/docs/" 2>/dev/null || true
   mkdir -p "$share/rules"
   cp "$KIT/claude/rules/"*.md "$share/rules/" 2>/dev/null || cp "$KIT/rules/"*.md "$share/rules/" 2>/dev/null || true
-  if [ -d "$KIT/claude/skills" ]; then cp -r "$KIT/claude/skills" "$share/skills" 2>/dev/null || true
-  elif [ -d "$KIT/skills" ]; then cp -r "$KIT/skills" "$share/skills" 2>/dev/null || true; fi
+  # Replace the share's skills wholesale. `cp -r src dest` with dest already present copies INTO it,
+  # which on the second --update left a nested skills/skills/ and a stale top level: projects updated
+  # from that copy silently missed every skill added after the first install (observed 2026-09-18).
+  rm -rf "$share/skills"; mkdir -p "$share/skills"
+  if [ -d "$KIT/claude/skills" ]; then cp -r "$KIT/claude/skills/." "$share/skills/" 2>/dev/null || true
+  elif [ -d "$KIT/skills" ]; then cp -r "$KIT/skills/." "$share/skills/" 2>/dev/null || true; fi
+  # The optional performance profile ships in the share too, so the README's paths exist after --update.
+  for pd in claude/performance codex/performance; do
+    rm -rf "$share/$pd"
+    [ -d "$KIT/$pd" ] && mkdir -p "$share/$pd" && cp -r "$KIT/$pd/." "$share/$pd/" 2>/dev/null
+  done
   chmod +x "$share/hooks/"* "$share/git-hooks/"* "$share/install.sh"
   # Stamp the source commit so --update can tell "already current" from "a month behind", and show
   # you what actually changed. Absent (or "unknown") when installed from a non-git copy - not fatal.
