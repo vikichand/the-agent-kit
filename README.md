@@ -153,8 +153,8 @@ cd /path/to/project && ~/.the-agent-kit/install.sh
 That writes four things: `AGENTS.md` (the rules), a one-line `CLAUDE.md` that imports it,
 `.claude/rules/` - deeper rules that load only when the agent opens a matching file, so security
 rules arrive on API code and accessibility rules on components, and cost nothing the rest of the time -
-and the skills, to `.claude/skills/` for Claude Code and `.agents/skills/` for Codex, where four of
-those deeper rules also land as task-matched skills.
+and the skills (including `writing-docs`), to `.claude/skills/` for Claude Code and `.agents/skills/`
+for Codex, where four of those deeper rules also land as task-matched skills.
 
 ### 5. Run the setup prompt, once per project
 
@@ -280,8 +280,9 @@ observability, audit logs.
 to, so security rules arrive on API code and accessibility rules on components, at no cost the rest of
 the time.
 
-**The task tier** - two skills that load on what you are *doing* rather than which file you opened:
-splitting work across subagents, and writing a plan or report a human will act on.
+**The task tier** - three skills that load on what you are *doing* rather than which file you opened:
+splitting work across subagents, writing a plan or report a human will act on, and documentation and
+commit-message prose.
 
 **Which tool gets what.** The content is one set of markdown files; the *routing* differs per tool,
 and the installer is the adapter between them:
@@ -290,7 +291,7 @@ and the installer is the adapter between them:
 |---|---|---|
 | Floor (`AGENTS.md`) | via the one-line `CLAUDE.md` import | read directly |
 | Depth tier (6 rules) | `.claude/rules/`, loads by file path | 4 of 6 as `.agents/skills/`, loads by task match; the 2 path-shaped ones (`code-correctness`, `tests`) don't port and stay one-liners in the floor |
-| Task tier (2 skills) | `.claude/skills/` | `.agents/skills/`, same files |
+| Task tier (3 skills) | `.claude/skills/` | `.agents/skills/`, same files |
 | Git-layer guards | yes | yes |
 | Tool-layer guard | `ask` | `deny` |
 | Turn-scoped git grants | yes | no (deny mode; you push) |
@@ -328,27 +329,28 @@ On top of that, eleven working rules:
 
 | # | Enforces | Kills |
 |---|---|---|
-| 0 | **Size the task**: scale ceremony to the job | process theatre on a typo; winging a migration |
-| 1 | **Read first · no silent assumptions · blast radius before editing · push back** · **grill mode** on request | confident wrong builds off a guessed reading |
-| 2 | **Plan non-trivial work** as verifiable steps, then pressure-test it | plans nobody can check |
+| 0 | **Size by risk and proof**: mechanical / bounded / high-risk tiers scale the ceremony | process theatre on a typo; winging a migration |
+| 1 | **Read first · no silent assumptions · blast radius before editing · push back · resolve material ambiguity** · **grill mode** on request | confident wrong builds off a guessed reading |
+| 2 | **Plan non-trivial work** as verifiable steps; check a high-risk plan against its failure modes | plans nobody can check |
 | 3 | **Simplicity · YAGNI / DRY · the reuse ladder · senior correctness defaults · match the codebase** | speculative abstraction; silent fallbacks, float money, N+1 queries |
 | 4 | **Surgical changes**: every changed line traces to the task | drive-by edits, unreviewable diffs |
-| 5 | **Verification is the spine**: external oracle, test-first by default, never game the oracle, verify claims against live docs | "looks right" shipped as done; a failing test quietly deleted |
+| 5 | **Verification is the spine**: external oracle, test-first by default, never game the oracle, verify facts against the version in use | "looks right" shipped as done; a failing test quietly deleted |
 | 6 | **Root-cause debugging** · fix the shared function · two-attempt rule | symptom patches that leave sibling callers broken |
-| 7 | **Checkpoint to files** · commit only when asked · **a repeated mistake becomes a proposed rule, never a self-edit** · sync before you ship | decisions lost with the session; a rules file growing by accretion; PRs against stale HEAD |
-| 8 | **Execution discipline**: work the plan top to bottom | stopping to chat between every step |
+| 7 | **Checkpoint long work and every constraint the user states** · commit only when asked · **a repeated mistake becomes a proposed rule, never a self-edit** · sync before you ship | decisions lost with the session; a rules file growing by accretion; PRs against stale HEAD |
+| 8 | **Execution discipline**: work the plan top to bottom · run the checks correctness needs · state the action, report findings, finish with the outcome | stopping to chat between every step |
 | 9 | **Ownership**: no AI authorship, no AI prose tells | `Co-Authored-By: Claude` in your history; em dashes and "delve" in your docs |
-| 10 | **READMEs: the working path first** · docs move in the same diff | the README you'd otherwise be scrolling; stale `.env.example` |
+| 10 | **Documentation**: load the writing-docs skill for READMEs, reports and commit messages · docs move in the same diff | the README you'd otherwise be scrolling; stale `.env.example` |
 
 These are *behaviours, not style*. The kit imposes no framework, formatter, or house style, so it can't fight
 your project's conventions; project opinion lives in the per-project block instead. Several rules come
 straight from the people in [Inspired by](#inspired-by), noted there by section.
 
-**Section 9 covers prose as well as commits.** A `Co-Authored-By` trailer isn't the only thing that marks work as
-machine-made; the writing does it too. So Section 9 bans the tells in anything the agent writes (READMEs, comments,
-commit bodies, PR descriptions): **em dashes** above all, plus "it's not just X, it's Y", filler openers,
-hedges, *delve / leverage / seamless / robust*, emoji headings, and bolding every third phrase. It governs
-what the agent *writes*, never your project's code style.
+**Section 9 keeps a two-line prose rule; the full standard is the `writing-docs` skill (Section 10).** A
+`Co-Authored-By` trailer isn't the only thing that marks work as machine-made; the writing does it too. Section 9
+always bans **em dashes** and the AI-vocabulary words (*delve / leverage / seamless / robust / comprehensive*);
+the skill adds the rest - "it's not just X, it's Y", filler openers, hedges, emoji headings, bolding every third
+phrase - and loads only when you're writing prose. It governs what the agent *writes*, never your project's code
+style.
 
 ### The depth tier: rules that cost nothing until they apply
 
@@ -392,19 +394,35 @@ so nothing double-loads.
 ### The task tier: skills
 
 A third trigger, for guidance keyed to *what you are doing* rather than which file you opened. Only the
-skill's one-line description sits in context; the body loads when a task matches. Two ship:
+skill's one-line description sits in context; the body loads when a task matches. Three ship:
 
 **`orchestrating-work`** fires when a task looks decomposable, or when you ask to parallelise or use
 subagents. Its spine is the rule every credible source agrees on - **reads parallelise, writes do
 not** - plus freezing shared contracts before fan-out, one owner per file, worktree isolation,
 sequential integration, and an orchestrator-worker split where the lead keeps decomposition, the
-contract and the final review while workers execute already-complete specs. Multi-agent runs cost
-roughly 15x the tokens of a chat, so it also says plainly when *not* to fan out.
+contract and the final review while workers execute already-complete specs. Delegate only when the
+expected parallel progress is worth the startup and integration cost, name the model and effort on
+every dispatch, and keep at most two workers active and one delegation layer - workers do not spawn
+workers.
 
-**`generating-reports`** fires on a plan, review, audit, status report, or any document a human will
-read and act on. It carries the dual-format rule - markdown as the agent-readable source of truth,
-plus a self-contained styled HTML render for human review - the structure that keeps a plan
-machine-executable, and the prose standards from Section 9, so a report does not arrive wearing the tells.
+**`generating-reports`** fires on a deliverable - a report, audit, plan or review a human will read,
+or one asked to be saved. It carries the dual-format rule for that case only - markdown as the source
+of truth, plus a self-contained styled HTML render for human review - and the structure that keeps a
+plan machine-executable. A working plan or review the agent itself consumes, or one that lives only in
+the conversation, stays markdown-only.
+
+**`writing-docs`** fires on documentation, README, commit-message, or PR-description work. It carries
+the full version of Section 9's two-line prose rule and the README order: working path first, a
+runnable command in the first screenful, every command surface as a table, shell differences named.
+
+### Optional: the performance profile
+
+`claude/performance/` and `codex/performance/` hold an experimental routing profile: effort level
+medium, subagent caps (`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS=2`,
+`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`), and three agent roles - `bounded-reader` (a small model for
+scoped lookups), `implementer` (a fully specified slice), `reviewer` (independent judgment on
+high-risk work). It is never installed by default and its effect is unmeasured; see
+[`enhancements-plan.md`](enhancements-plan.md) Section 5.7 before using it.
 
 ### The guards: what's enforced, and where
 
@@ -543,8 +561,8 @@ Four config choices are deliberate, because the obvious "more locked down" setti
   `.env.*`, so `.env.example` / `.env.sample` stay silently readable - they carry no secrets and are
   exactly how an agent learns what configuration a project expects. (`settings.json` is JSON and cannot
   hold comments, so the reasoning lives here.)
-- **Codex keeps network access on.** The rules require checking library and API behaviour against live
-  docs rather than recalling it. Switching the sandbox off the network does not make the agent safer, it
+- **Codex keeps network access on.** The rules require verifying library and API behaviour against the
+  version in use rather than recalling it. Switching the sandbox off the network does not make the agent safer, it
   makes it fall back on training data. Anthropic's own guidance notes that when two instructions conflict,
   the model may pick one arbitrarily, so the kit does not ship that conflict. Set it `false` when reviewing
   untrusted code and expect doc lookups to fail loudly.
@@ -605,7 +623,7 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
   safety, and one - pinning a CI action to a commit SHA - failed with the rules present in both arms and
   needs an enforced check, not better wording, which is now a named open item. The remaining rule-file
   sections without a case, and the `AGENTS.md` bullets a one-shot diff-graded case structurally cannot
-  reach at all (a plan surviving pressure, decay across a long session, proof in a real browser), are
+  reach at all (a high-risk plan checked against its failure modes, decay across a long session, proof in a real browser), are
   listed by name rather than folded into one fraction. Method, the full per-case tables, and that list
   are in [`test/adherence/README.md`](test/adherence/README.md).
 - **On Codex, two cases measured, both pass with and without the kit.** The harness gained a Codex

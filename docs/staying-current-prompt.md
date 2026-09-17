@@ -41,9 +41,15 @@ with AI coding agents. Check today's date first and prefer sources from the last
 4. **Anti-churn contract.** The default verdict is CURRENT with no changes. Propose at most five
    changes per run, ranked. Every proposed `AGENTS.md` addition must name an existing line to cut
    or shorten in exchange (the file is read on every turn; growth is a cost, see "Meant to grow,
-   kept tight"). No style rewrites, no reorganizations, no synonym swaps.
+   kept tight"). No style rewrites, no reorganizations, no synonym swaps. This is a quarterly run:
+   investigate changed dependencies and observed failures, not a whole-industry survey.
 5. **Propose, never edit.** Report findings with exact proposed diffs and stop. Do not change any
    file until I approve each item individually.
+6. **Maintenance gate.** On a supported model-generation change, run the vendor prompt audit
+   (`/claude-api prompt-audit` in Claude Code) and evaluate proposed edits on each supported target.
+   An audit finding is a hypothesis, not authorization to remove a protected behaviour. Add
+   compaction recovery instructions only for a reproduced retention failure; do not duplicate
+   instructions the tool already restores.
 
 ### Step 1: Baseline
 
