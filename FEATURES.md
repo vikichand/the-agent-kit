@@ -133,7 +133,7 @@ Honest labelling inside the skill: the contract-freeze pattern and the verify-RE
   (AWS · OpenAI/Stripe · GitHub · Slack · Google · private-key · JWT), no dependency; `gitleaks` too if present. Fail-closed; never prints the secret.
 - **`pre-push`** refuses force / non-fast-forward / delete to `main`·`master`·`release/*`. Override: `AGENT_KIT_ALLOW_FORCE=1`.
 - **`commit-msg`** strips AI-authorship trailers (matched by bot *address*, so a human named "Claude" is safe);
-  keeps your body, real co-authors, and `Claude-Session:` links. Fail-closed if stripping empties the message.
+  also strips `Claude-Session:` and other agent session-link trailers; keeps your body and real co-authors. Fail-closed if stripping empties the message.
 
 **Tool layer**: `command-guard.py`, a PreToolUse hook (**ask** on Claude Code / **deny** on Codex).
 A **best-effort prompt nudge, not a boundary.** Flags hook-disable vectors (`--no-verify`, CLI `core.hooksPath`),

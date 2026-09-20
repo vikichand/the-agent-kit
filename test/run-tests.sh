@@ -23,6 +23,10 @@ fi
 echo "== commit-msg (attribution) =="
 w=$(mktemp -d) || exit 2; cd "$w" || exit 2
 git init -q -b main || exit 2; git config user.email t@e.com; git config user.name T
+# Pin the hooks dir: a machine with the kit's own --global install has a GLOBAL core.hooksPath, and
+# without this the throwaway repo runs the INSTALLED hook, not the one under test - so a change to
+# hooks/ passes or fails on someone's machine state (found 2026-09-21, when a new strip rule "failed").
+git config core.hooksPath .git/hooks
 cp "$KIT/hooks/commit-msg" .git/hooks/commit-msg; chmod +x .git/hooks/commit-msg
 cat > m1 <<'EOF'
 feat: add widget
@@ -39,7 +43,7 @@ git commit -q --allow-empty -F m1 || bad "C1 setup commit failed"
 b=$(git log -1 --format=%B)
 has 'Co-Authored-By: Claude' "$b" && bad "C1 Claude co-author NOT stripped" || pass "C1 Claude co-author stripped"
 has 'Generated with'        "$b" && bad "C1 Generated-with NOT stripped"    || pass "C1 Generated-with stripped"
-has 'session_ABC123'        "$b" && pass "C1 Claude-Session preserved"      || bad  "C1 Claude-Session LOST"
+has 'session_ABC123'        "$b" && bad  "C1 Claude-Session NOT stripped"   || pass "C1 Claude-Session trailer stripped"
 has 'Jane Dev'              "$b" && pass "C1 human co-author preserved"     || bad  "C1 human co-author LOST"
 has 'Implements the widget' "$b" && pass "C1 body preserved"               || bad  "C1 body LOST"
 printf 'test: fixture\n\nThis fixture was generated with Claude for testing and must stay.\n' > m2
@@ -55,6 +59,11 @@ printf 'feat: x\n\nCo-authored-by: Claude Martinez <claude.martinez@realco.com>\
 git commit -q --allow-empty -F m5 || bad "C5 setup"; b=$(git log -1 --format=%B)
 has 'Claude Martinez' "$b" && pass "C5 human 'Claude' preserved" || bad "C5 human 'Claude' STRIPPED"
 has 'Devin Smith'     "$b" && pass "C5 human 'Devin' preserved"  || bad "C5 human 'Devin' STRIPPED"
+# C7: a bare agent session URL on its own line goes; prose that merely mentions a session stays
+printf 'fix: session timeout\n\nThe session cookie expired early; see Claude-Session handling in auth.\n\nhttps://claude.ai/code/session_XYZ789\n' > m7
+git commit -q --allow-empty -F m7 || bad "C7 setup"; b=$(git log -1 --format=%B)
+has 'session_XYZ789' "$b" && bad "C7 bare session URL NOT stripped" || pass "C7 bare session URL stripped"
+has 'session cookie expired early' "$b" && pass "C7 prose mentioning a session preserved" || bad "C7 prose WRONGLY stripped"
 # C6 (reversed): an all-attribution message must be BLOCKED (fail-closed)
 printf '\xf0\x9f\xa4\x96 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n' > m6
 if git commit -q --allow-empty -F m6 2>/dev/null; then bad "C6 all-attribution commit was ALLOWED"; else pass "C6 all-attribution commit BLOCKED (fail-closed)"; fi
@@ -64,6 +73,10 @@ cd "$KIT"; rm -rf "$w"
 echo "== pre-commit (secret scan) =="
 w=$(mktemp -d) || exit 2; cd "$w" || exit 2
 git init -q -b main || exit 2; git config user.email t@e.com; git config user.name T
+# Pin the hooks dir: a machine with the kit's own --global install has a GLOBAL core.hooksPath, and
+# without this the throwaway repo runs the INSTALLED hook, not the one under test - so a change to
+# hooks/ passes or fails on someone's machine state (found 2026-09-21, when a new strip rule "failed").
+git config core.hooksPath .git/hooks
 cp "$KIT/hooks/pre-commit" .git/hooks/pre-commit; chmod +x .git/hooks/pre-commit
 printf 'ok\n' > clean.txt; git add clean.txt
 if git commit -q -m clean 2>/dev/null; then pass "PC clean commit passes"; else bad "PC clean blocked"; fi
@@ -83,6 +96,10 @@ cd "$KIT"; rm -rf "$w"
 echo "== pre-push (force / delete / non-ff) =="
 w=$(mktemp -d) || exit 2; cd "$w" || exit 2
 git init -q -b main || exit 2; git config user.email t@e.com; git config user.name T
+# Pin the hooks dir: a machine with the kit's own --global install has a GLOBAL core.hooksPath, and
+# without this the throwaway repo runs the INSTALLED hook, not the one under test - so a change to
+# hooks/ passes or fails on someone's machine state (found 2026-09-21, when a new strip rule "failed").
+git config core.hooksPath .git/hooks
 printf '1\n' > f; git add f; git commit -q -m c1; s1=$(git rev-parse HEAD)
 printf '2\n' >> f; git add f; git commit -q -m c2; s2=$(git rev-parse HEAD)
 z=0000000000000000000000000000000000000000

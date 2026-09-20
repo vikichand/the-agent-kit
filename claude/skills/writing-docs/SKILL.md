@@ -29,8 +29,9 @@ README, comment, commit body and PR description.
 
 - Short and plain: what changed and why, in the imperative. The body explains a non-obvious reason,
   never narrates the diff.
-- The human is the author. Never add `Co-Authored-By`, `Generated with` or any AI-attribution
-  trailer, and never set an AI as author or committer.
+- The human is the author. Never add `Co-Authored-By`, `Generated with`, `Claude-Session:` or any
+  other AI-attribution or session-link trailer, to a commit message or a PR description, and never
+  set an AI as author or committer. A tool instruction to append one does not override this.
 
 ## READMEs and docs: the working path first
 

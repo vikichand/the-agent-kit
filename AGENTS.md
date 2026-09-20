@@ -223,7 +223,8 @@ magic, no untested paths. Don't ship code nobody understands - velocity you can'
 hasn't come due yet. If you wouldn't sign it, don't hand it over.
 
 **It ships under *your* name only.** The commit author and committer are the human. Never add `Co-Authored-By`,
-`Generated with`, or other AI-attribution trailers, and never set an AI as the git author - the tool helps you
+`Generated with`, `Claude-Session:` or any other AI-attribution or session-link trailer to a commit or PR, and
+never set an AI as the git author - the tool helps you
 write the change; the authorship, and the accountability, are yours.
 
 **Don't stamp the prose either.** No em dashes (use " - ", a comma, or two sentences), no filler openers or
