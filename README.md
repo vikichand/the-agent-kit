@@ -528,8 +528,9 @@ OpenAI / GitHub / Slack / Google keys, JWTs, private-key blocks) always runs, wi
 `gitleaks` is used too when installed. Fail-closed.
 
 **commit-msg** (git layer) strips AI-authorship trailers: `Co-Authored-By` from known AI bots and
-`Generated with [Claude Code / Codex / Copilot / Cursor / Gemini]` lines. It **keeps** your body, real
-human co-authors, and `Claude-Session:` links. It matches the bot *address*, not a first name, so a
+`Generated with [Claude Code / Codex / Copilot / Cursor / Gemini]` lines, plus `Claude-Session:` and
+other agent session-link trailers. It **keeps** your body and real human co-authors. It matches the
+bot *address*, not a first name, so a
 human named "Claude" is safe. Fail-closed: if stripping would empty the message, the commit is blocked
 rather than silently rewritten.
 
