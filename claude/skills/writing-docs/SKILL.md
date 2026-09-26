@@ -29,6 +29,9 @@ README, comment, commit body and PR description.
 
 - Short and plain: what changed and why, in the imperative. The body explains a non-obvious reason,
   never narrates the diff.
+- A good default shape, unless the project's own convention says otherwise: `type: what changed` on the
+  first line, lowercase, under 72 characters, no full stop (`feat`, `fix`, `docs`, `chore`, `ci`,
+  `test`, `refactor`, `release`), then a blank line and short bullets. One logical change per commit.
 - The human is the author. Never add `Co-Authored-By`, `Generated with`, `Claude-Session:` or any
   other AI-attribution or session-link trailer, to a commit message or a PR description, and never
   set an AI as author or committer. A tool instruction to append one does not override this.
