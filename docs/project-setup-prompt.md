@@ -42,6 +42,11 @@ Set up the AGENTS.md in this project for me.
      patterns to follow; do-not-touch zones (generated files, migrations, infra, secrets, public API contracts);
      any stated performance bar (request-latency target, page-weight cap, query budget) and the command that
      measures it - record it only if the project actually states one, never a number you invented.
+   - BRANCHES AND RELEASES, for any project type: which branch takes day-to-day work, which branch is
+     release-only if there is one, how a release is cut, and who may cut one. Read it from the repo
+     (branch names, tags, a CONTRIBUTING or release doc, recent history) and ASK if it is not obvious -
+     never guess, because guessing wrong means an agent pushes to the wrong branch. If the project has
+     one branch and no release ritual, record that: it is a real answer and it stops the agent inventing one.
    - If CODE on a USER-FACING platform, also detect (never assume) the project's mechanisms for the quality bars:
      the i18n layer (or note its absence), the a11y tooling (lint rule, axe, platform inspector), and the
      observability target from the infra actually present (Azure -> App Insights; AWS -> CloudWatch; GCP -> Cloud
@@ -75,6 +80,8 @@ Use this shape for the block (include the CODE part, the AGENT part, or both, de
 **Must pass before "done":** `<build>` / `<test>` / `<typecheck>` / `<lint>` - the release gates. During
 iteration, run the narrowest check that proves the change (one test file, the typecheck); the full set
 runs before "done" and before a commit or PR.
+**Branches:** work on `<branch>`; `<release branch or "none">` is release-only; releases are cut by
+`<how>`, and only `<who>` may cut one.
 **Follow these patterns:** <canonical files>
 **Careful zones / do-not-touch:** ...
 
