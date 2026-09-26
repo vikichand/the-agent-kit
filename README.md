@@ -666,6 +666,17 @@ but the primary link could not be verified, it is attributed by talk and date in
   Dec 2025 UC San Diego / Cornell study ([arXiv:2512.14012](https://arxiv.org/abs/2512.14012)):
   professional developers don't vibe, they control.
 
+## Contributing
+
+Two branches. **`develop`** takes all day-to-day work, one small commit per change. **`main`** holds
+releases only: one squashed commit per release, tagged `vX.Y.Z`, so its history reads as a list of
+releases. The install commands above fetch from `main`, so what you install is the last release rather
+than the tip of development, and `--update` follows the same path.
+
+The full process, the commit-message convention, and how a release is cut are in
+[`docs/branches-and-releases.md`](docs/branches-and-releases.md). Changes go in
+[`CHANGELOG.md`](CHANGELOG.md) under `## [Unreleased]`, in the same commit as the change.
+
 ## License
 
 MIT (c) 2026 Vikash Chand
