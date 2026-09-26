@@ -108,6 +108,10 @@ pp "refs/heads/main $s2 refs/heads/main $s1" && pass "PP fast-forward allowed"  
 pp "refs/heads/main $s1 refs/heads/main $s2" && bad "PP force/non-ff allowed"    || pass "PP force/non-ff blocked"
 pp "x $z refs/heads/main $s2"                && bad "PP delete allowed"          || pass "PP delete blocked"
 pp "refs/heads/feat $s1 refs/heads/feat $s2" && pass "PP feature-branch allowed" || bad "PP feature blocked"
+# PP5: CREATING a branch sends an all-zero remote sha. That must be allowed, or the release flow
+# (which creates `main` from an orphan commit the first time) cannot push at all. Untested until
+# 2026-09-26, when it became load-bearing.
+pp "refs/heads/main $s2 refs/heads/main $z"   && pass "PP new-branch push allowed"  || bad "PP new-branch push BLOCKED"
 cd "$KIT"; rm -rf "$w"
 
 # ---------- install.sh --check (doctor) ----------
