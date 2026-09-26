@@ -9,6 +9,18 @@ fail=0
 pass() { printf 'PASS: %s\n' "$1"; }
 bad()  { printf 'FAIL: %s\n' "$1"; fail=1; }
 has()  { printf '%s\n' "$2" | grep -qi -- "$1"; }
+# The kit's AGENTS.md carries the kit REPO's own PROJECT-CONFIG block, so a fixture that needs the
+# shipped template (empty block) must be built the way a fresh install builds it, not by copying the
+# file. Before 2026-09-26 these fixtures used `cp` plus a sed on the placeholder sentence; once the
+# block was filled the sed silently became a no-op and two tests went green without testing anything.
+# Built by a REAL fresh install into a throwaway repo, then copied out: that tests the artifact the
+# installer actually ships. (Sourcing install.sh as a library does not work inside a subshell - its
+# library-mode guard falls through to `exit`, which ends the subshell before anything is written.)
+kit_rules() {  # $1 = target path
+  t=$(mktemp -d) || return 1
+  ( cd "$t" && git init -q && sh "$KIT/install.sh" >/dev/null 2>&1 )
+  cp "$t/AGENTS.md" "$1"; rm -rf "$t"
+}
 
 # ---------- command-guard (tool layer) ----------
 echo "== command-guard (tool layer) =="
@@ -171,14 +183,23 @@ has 'SILENTLY truncates' "$d" && pass "D7 oversize AGENTS.md flagged" || bad "D7
 
 # The real rules file: an unfilled PROJECT-CONFIG means the agent guesses this project's commands,
 # which is the kit's single largest hallucination surface. It must be called out, not left silent.
-cp "$KIT/AGENTS.md" AGENTS.md; printf '@AGENTS.md\n' > CLAUDE.md
+kit_rules AGENTS.md; printf '@AGENTS.md\n' > CLAUDE.md
 d=$(sh "$KIT/install.sh" --check 2>&1)
 has 'PROJECT-CONFIG is still the empty placeholder' "$d" \
   && pass "D9 unfilled PROJECT-CONFIG warned" || bad "D9 unfilled PROJECT-CONFIG NOT warned"
 has 'effective lines' "$d" && pass "D10 effective line count reported" || bad "D10 effective line count NOT reported"
+# D10b: the count must include the PROJECT-CONFIG block. The markers are one-line comments, and a
+# naive comment strip opened a range at START and closed it at END, hiding the project's config from
+# the budget. Insert a known number of lines in the block and assert the count moves by that much.
+c0=$(sh "$KIT/install.sh" --check 2>&1 | sed -n 's/.*AGENTS.md \([0-9][0-9]*\) effective lines.*/\1/p')
+awk '/PROJECT-CONFIG:START/ { print; print "x1"; print "x2"; print "x3"; next } { print }' AGENTS.md > A3 && mv A3 AGENTS.md
+c1=$(sh "$KIT/install.sh" --check 2>&1 | sed -n 's/.*AGENTS.md \([0-9][0-9]*\) effective lines.*/\1/p')
+[ -n "$c0" ] && [ "$c1" = "$((c0 + 3))" ] \
+  && pass "D10b project-block lines are counted against the budget ($c0 -> $c1)" \
+  || bad "D10b project-block lines are NOT counted ($c0 -> $c1, expected $((c0 + 3)))"
 
 # False-positive control: once it IS filled, the warning must go silent.
-sed 's/Not configured yet\. Run the setup prompt (the-agent-kit docs\/project-setup-prompt.md) to fill this in\./Build: make all  Test: make test  Lint: make lint/' AGENTS.md > A2 && mv A2 AGENTS.md
+sed 's/Not configured yet\..*fill this in\./Build: make all  Test: make test  Lint: make lint/' AGENTS.md > A2 && mv A2 AGENTS.md
 d=$(sh "$KIT/install.sh" --check 2>&1)
 has 'PROJECT-CONFIG is still the empty placeholder' "$d" \
   && bad "D11 filled PROJECT-CONFIG still warned (false positive)" || pass "D11 filled PROJECT-CONFIG is silent"
@@ -189,10 +210,13 @@ echo "== install.sh --update-rules =="
 w=$(mktemp -d) || exit 2; cd "$w" || exit 2
 git init -q -b main || exit 2
 # U1: stale rules + a FILLED block -> rules refreshed, the block survives byte-for-byte
-sed 's/## 0\. Size the task before doing anything else/## 0. OLD STALE HEADING/' "$KIT/AGENTS.md" > AGENTS.md
-sed 's/Not configured yet\. Run the setup prompt (the-agent-kit docs\/project-setup-prompt.md) to fill this in\./Build: make all  Test: make test/' AGENTS.md > A2 && mv A2 AGENTS.md
+kit_rules A0
+{ head -1 A0; echo "STALE-RULES-MARKER"; tail -n +2 A0; } > AGENTS.md; rm -f A0
+sed 's/Not configured yet\..*fill this in\./Build: make all  Test: make test/' AGENTS.md > A2 && mv A2 AGENTS.md
+grep -q 'Build: make all' AGENTS.md || bad "U1 setup: the placeholder sed did not fire"
+grep -q 'STALE-RULES-MARKER' AGENTS.md || bad "U1 setup: the stale marker was not inserted"
 sh "$KIT/install.sh" --update-rules >/dev/null 2>&1 || bad "U1 --update-rules exited non-zero"
-grep -q 'OLD STALE HEADING' AGENTS.md && bad "U1 stale rules NOT replaced" || pass "U1 stale rules replaced with the kit's"
+grep -q 'STALE-RULES-MARKER' AGENTS.md && bad "U1 stale rules NOT replaced" || pass "U1 stale rules replaced with the kit's"
 grep -q 'Build: make all' AGENTS.md && pass "U1 filled PROJECT-CONFIG preserved" || bad "U1 filled PROJECT-CONFIG LOST"
 # U2: no markers -> refuse and change nothing (fail-closed: can't tell project config from rules)
 printf 'my own rules, no markers\n' > AGENTS.md
@@ -412,6 +436,14 @@ else
     && grep -q '^name: data-layer' "$u/.agents/skills/data-layer/SKILL.md" \
     && pass "U15 --update-rules deploys and refreshes the Codex skills" \
     || bad "U15 --update-rules left the Codex skills missing or stale"
+  rm -rf "$u"
+  # U17: a fresh project install must get an EMPTY project block, never the kit repo's own config.
+  # The kit's AGENTS.md is both this repo's rules file and the template shipped to projects; `cp`
+  # would have leaked "work on develop, main is release-only" into everyone's repo.
+  u=$(mktemp -d) && (cd "$u" && git init -q && sh "$KIT/install.sh" >/dev/null 2>&1)
+  if grep -q 'fill this in' "$u/AGENTS.md" 2>/dev/null && ! grep -q 'the-agent-kit (rules and guardrails' "$u/AGENTS.md" 2>/dev/null; then
+    pass "U17 fresh install gets an empty PROJECT-CONFIG, not the kit's own"
+  else bad "U17 fresh install inherited the kit repo's PROJECT-CONFIG"; fi
   rm -rf "$u"
   # U16: --global run twice must leave ONE flat skills tree in the share. `cp -r src dest` with dest
   # present copies INTO it, so the second run nested skills/skills/ and left the top level stale -

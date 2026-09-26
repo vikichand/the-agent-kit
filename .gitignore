@@ -1,3 +1,9 @@
+# Working notes and plan documents: local to the owner's machine, never committed. The repo's own
+# committed documentation is README.md, CHANGELOG.md, SENIOR-ENGINEER.md, FEATURES.md and docs/.
+lessons.md
+enhancements-plan.md
+enhancements.md
+
 # OS / editor junk
 .DS_Store
 Thumbs.db

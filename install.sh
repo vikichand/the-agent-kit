@@ -78,6 +78,22 @@ write_stub() {  # $1 = target file
 STUB
 }
 
+write_rules() {  # $1 = target AGENTS.md - the kit's rules with an EMPTY project block
+  # Never `cp` AGENTS.md: this repo fills its OWN PROJECT-CONFIG block (branches, gates, careful
+  # zones), and copying it verbatim would ship the kit's project config into every project that
+  # installs it. The rules above the markers are the floor; what sits between them belongs to the
+  # project. --update-rules already swaps the kit's block for the target's, so only a fresh install
+  # needed fixing.
+  awk '
+    /PROJECT-CONFIG:START/ { skip = 1
+      print "<!-- PROJECT-CONFIG:START -->"
+      print "<!-- Not configured yet. Run the setup prompt (the-agent-kit docs/project-setup-prompt.md) to fill this in. -->"
+      print "<!-- PROJECT-CONFIG:END -->" }
+    !skip { print }
+    /PROJECT-CONFIG:END/   { skip = 0 }
+  ' "$KIT/AGENTS.md" > "$1"
+}
+
 write_claude_importer() {  # $1 = target CLAUDE.md - imports AGENTS.md instead of duplicating it
   cat > "$1" <<'IMP'
 <!-- Claude Code reads CLAUDE.md, not AGENTS.md, so this file imports the rules instead of copying them.
@@ -201,7 +217,7 @@ install_project() {   # self-contained: full rules + git hooks
   # reads CLAUDE.md only, so CLAUDE.md IMPORTS AGENTS.md rather than duplicating it - one source of
   # truth, no drift. (Anthropic's documented pattern; a symlink also works but needs admin on Windows.)
   if [ -e "$root/AGENTS.md" ]; then say "  = AGENTS.md already exists - left untouched."
-  else cp "$KIT/AGENTS.md" "$root/AGENTS.md"; say "  + wrote AGENTS.md (full rules + empty project block)"; fi
+  else write_rules "$root/AGENTS.md"; say "  + wrote AGENTS.md (full rules + empty project block)"; fi
   if [ -e "$root/CLAUDE.md" ]; then say "  = CLAUDE.md already exists - left untouched."
   else write_claude_importer "$root/CLAUDE.md"; say "  + wrote CLAUDE.md (imports AGENTS.md - single source of truth)"; fi
   install_path_rules "$root"
@@ -526,7 +542,12 @@ doctor() {
     # Claude Code docs, Memory > Write effective instructions: "target under 200 lines per CLAUDE.md
     # file. Longer files consume more context and reduce adherence." Block-level HTML comments are
     # stripped before Claude's context, so they are excluded from this count.
-    al=$(sed '/<!--/,/-->/d' AGENTS.md 2>/dev/null | grep -c . || true)
+    # Delete self-closed one-line comments FIRST, then true multi-line comment ranges. Order is
+    # load-bearing: `<!-- PROJECT-CONFIG:START -->` holds both delimiters, so a bare `/<!--/,/-->/d`
+    # opened a range there and closed it at `<!-- PROJECT-CONFIG:END -->`, silently excluding the
+    # project's whole config from the budget it is supposed to be counted against. That under-reported
+    # this repo by 7 lines and every filled install by the size of its block (found 2026-09-26).
+    al=$(sed -e '/^[[:space:]]*<!--.*-->[[:space:]]*$/d' -e '/<!--/,/-->/d' AGENTS.md 2>/dev/null | grep -c . || true)
     case "$al" in ''|*[!0-9]*) al=-1 ;; esac
     if [ "$al" -lt 0 ]; then
       :
