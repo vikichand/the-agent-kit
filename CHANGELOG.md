@@ -11,6 +11,20 @@ one squashed commit on `main`, tagged, with that version's section below as its 
 
 ## [Unreleased]
 
+### Added
+
+- This repository records its own branch model, gates and careful zones in the project block of
+  `AGENTS.md`, so an agent working on the kit knows to push to `develop` and never to `main` without
+  being told. The per-project setup prompt asks every project the same question.
+
+### Fixed
+
+- A fresh install no longer inherits this repository's own project block. `install.sh` writes the
+  rules with an empty block instead of copying `AGENTS.md` verbatim.
+- `install.sh --check` counts the project block against the 200-line budget. It had been treating the
+  block's `PROJECT-CONFIG` markers as one long comment and excluding everything between them, so it
+  under-reported every filled install by the size of its block.
+
 ## [1.0.0] - 2026-09-26
 
 First release. Everything below is what a fresh install gives you.
