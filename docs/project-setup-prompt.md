@@ -47,6 +47,9 @@ Set up the AGENTS.md in this project for me.
      (branch names, tags, a CONTRIBUTING or release doc, recent history) and ASK if it is not obvious -
      never guess, because guessing wrong means an agent pushes to the wrong branch. If the project has
      one branch and no release ritual, record that: it is a real answer and it stops the agent inventing one.
+     If a branch is release-only, ALSO write the marker line shown in the block below. The kit's pre-push hook
+     reads it and refuses any push to that branch that is not a release, so the rule is enforced, not just
+     stated. Write no marker for a single-branch project.
    - If CODE on a USER-FACING platform, also detect (never assume) the project's mechanisms for the quality bars:
      the i18n layer (or note its absence), the a11y tooling (lint rule, axe, platform inspector), and the
      observability target from the infra actually present (Azure -> App Insights; AWS -> CloudWatch; GCP -> Cloud
@@ -82,6 +85,7 @@ iteration, run the narrowest check that proves the change (one test file, the ty
 runs before "done" and before a commit or PR.
 **Branches:** work on `<branch>`; `<release branch or "none">` is release-only; releases are cut by
 `<how>`, and only `<who>` may cut one.
+<!-- agent-kit: release-branch=<release branch> -->   (ONLY when a branch is release-only; omit otherwise)
 **Follow these patterns:** <canonical files>
 **Careful zones / do-not-touch:** ...
 

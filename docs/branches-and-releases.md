@@ -14,8 +14,12 @@ for your own projects: the shape below is what the per-project setup prompt asks
   history reads as a list of releases, not as a record of how the work happened.
 - `main` moves only when a release is cut. Never commit to it directly, never merge `develop` into it
   with a merge commit, never cherry-pick into it.
-- Never rebase `develop` onto `main`, and never force-push either branch. The kit's own `pre-push`
-  hook refuses force, delete and non-fast-forward pushes to `main`, so this is enforced, not just asked.
+- Never rebase `develop` onto `main`, and never force-push either branch.
+- **Both are enforced, not just asked.** The project block in `AGENTS.md` carries the marker
+  `<!-- agent-kit: release-branch=main -->`, and the kit's `pre-push` hook refuses any push to `main`
+  that is not a release: a plain fast-forward, a creation, a force, a delete. A release push carries
+  `AGENT_KIT_RELEASE=1`, and the agent's tool guard asks you before every command that sets it, so a
+  chat request can never cut a release on its own.
 - The install commands in `README.md` fetch from `main`, so **what users install is the last release**,
   not the tip of development. That is deliberate. `install.sh --update` follows the same path.
 
@@ -36,7 +40,7 @@ for your own projects: the shape below is what the per-project setup prompt asks
    git commit -F release-message.txt         # "the-agent-kit X.Y.Z" + that version's CHANGELOG section
    git diff develop main --stat              # must print nothing
    git tag vX.Y.Z
-   git push origin main vX.Y.Z
+   AGENT_KIT_RELEASE=1 git push origin main vX.Y.Z   # the only push main ever accepts
    git switch develop
    ```
 
@@ -90,5 +94,6 @@ measurement that grades a change to the rules.
 The kit does not impose a branch model, because most repositories do not need two branches. What it
 does is ask: the per-project setup prompt records which branch takes day-to-day work, which branch is
 release-only if any, how a release is cut, and who may cut one. That lands in your `PROJECT-CONFIG`
-block, where it costs nothing on every turn and the agent reads it before it pushes anything. Copy the
-sections above into your own `docs/` if you want the long form.
+block, where the agent reads it before it pushes anything. If a branch is release-only, the prompt also
+writes the marker line, and from then on the pre-push hook enforces it in that repo. Copy the sections
+above into your own `docs/` if you want the long form.

@@ -131,7 +131,11 @@ Honest labelling inside the skill: the contract-freeze pattern and the verify-RE
 
 - **`pre-commit`** blocks a commit that stages a secret. Seven built-in high-signal patterns
   (AWS · OpenAI/Stripe · GitHub · Slack · Google · private-key · JWT), no dependency; `gitleaks` too if present. Fail-closed; never prints the secret.
+  Also blocks a GitHub Actions step pinned to a floating tag (`@v4`, `@main`) on the workflow lines you add;
+  `# pin-exempt: <reason>` for the rare step that cannot be pinned.
 - **`pre-push`** refuses force / non-fast-forward / delete to `main`·`master`·`release/*`. Override: `AGENT_KIT_ALLOW_FORCE=1`.
+  A branch a project marks release-only (`<!-- agent-kit: release-branch=main -->` in its block) refuses **every**
+  push that is not a release (`AGENT_KIT_RELEASE=1`); tags and the work branch are unaffected.
 - **`commit-msg`** strips AI-authorship trailers (matched by bot *address*, so a human named "Claude" is safe);
   also strips `Claude-Session:` and other agent session-link trailers; keeps your body and real co-authors. Fail-closed if stripping empties the message.
 
@@ -142,6 +146,10 @@ direct `.git/config` / `GIT_CONFIG_GLOBAL` writes, force/delete push, and destru
 `rm -rf` on regenerable build output (`node_modules`, `dist`, `.next`, `__pycache__`, ...) stays **silent**, so the
 prompt keeps meaning something; the allowlist fails closed on globs, `..`, absolute/`~`/drive paths, and any
 stray operand.
+
+**Session start**: `kit-check.py`, a SessionStart hook. One line when a newer release is on `main` (checked at
+most daily) or when this project's rules differ from the installed kit; silent otherwise; never updates anything
+itself. Off with `AGENT_KIT_NO_UPDATE_CHECK=1`.
 
 ## Wiring · installer · verification
 

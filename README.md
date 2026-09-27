@@ -232,6 +232,28 @@ it. Settings snippets are
 never written for you - the installer prints them, and merging is yours, including removing anything
 the kit no longer ships.
 
+**Why projects hold a copy at all.** Keeping the rules in each repo, rather than pointing every project
+at one machine-wide file, is deliberate: teammates, CI and cloud agents see only what is committed, and
+neither tool can import a file outside the repo portably. The cost is that a project's copy can fall
+behind. The session-start check below is what tells you when it has.
+
+### Staying current without remembering to
+
+When a session starts, the kit checks two things and says nothing unless one needs you:
+
+- **A newer release is on `main`.** One `git ls-remote` to GitHub, no clone and no download, at most
+  once a day with a 3-second limit; the answer is cached so the rest of that day's sessions need no
+  network. You see one line: the installed and latest versions, and the command to run.
+- **This project's rules differ from your installed kit.** Compared locally, every session. You see one
+  line telling you to run `--update-rules` here. It is silent in the kit's own repo, whose rules are the
+  source, and for an `--extension` stub, whose rules live globally.
+
+It **never updates anything itself**: running downloaded code at session start, unasked, is exactly the
+supply-chain shape the kit's rules forbid, so it only tells you what to run. It exits cleanly on every
+error, so an offline machine or a broken check never blocks a session, and when everything is current
+it prints nothing, so it costs no context. It ships in the Claude and Codex snippets as a `SessionStart`
+hook (`hooks/kit-check.py`). To switch it off, set `AGENT_KIT_NO_UPDATE_CHECK=1`.
+
 ### Also worth having
 
 [**the-ultimate-gitignore-ai**](https://github.com/vikichand/the-ultimate-gitignore-ai) as the
@@ -522,10 +544,20 @@ granted operation can never carry an ungranted one through with it.
 
 **pre-push** (git layer) refuses **force / non-fast-forward / delete** to a protected branch (`main`,
 `master`, `release/*`). Git runs it itself, so it's reorder-proof. Override: `AGENT_KIT_ALLOW_FORCE=1`.
+A project that keeps a branch for releases only marks it in its `AGENTS.md` project block with
+`<!-- agent-kit: release-branch=main -->` (the setup prompt writes it), and from then on **any** push to
+that branch is refused unless it carries `AGENT_KIT_RELEASE=1`: a plain fast-forward, a creation, all of
+it. Tags and the work branch are never affected. The tool guard asks before every command that sets
+either override, and no chat request covers one, so a release stays your act.
 
 **pre-commit** (git layer) **blocks a commit that stages a secret.** A built-in high-signal scan (AWS /
 OpenAI / GitHub / Slack / Google keys, JWTs, private-key blocks) always runs, with no dependency, and
-`gitleaks` is used too when installed. Fail-closed.
+`gitleaks` is used too when installed. Fail-closed. It also **blocks a GitHub Actions step pinned to a
+floating tag or branch** (`@v4`, `@main`) in a workflow file: a tag can be moved to different code after
+you reviewed it, a full commit SHA cannot. Only lines you add are checked, so an old unpinned step never
+blocks an unrelated commit; local actions and digest-pinned images pass, and a line that genuinely
+cannot be pinned says why with `# pin-exempt: <reason>`. The eval showed the rule does not fire from
+wording alone, which is why it is enforced here rather than asked for.
 
 **commit-msg** (git layer) strips AI-authorship trailers: `Co-Authored-By` from known AI bots and
 `Generated with [Claude Code / Codex / Copilot / Cursor / Gemini]` lines, plus `Claude-Session:` and
@@ -670,7 +702,7 @@ but the primary link could not be verified, it is attributed by talk and date in
 
 Two branches. **`develop`** takes all day-to-day work, one small commit per change. **`main`** holds
 releases only: one squashed commit per release, tagged `vX.Y.Z`, so its history reads as a list of
-releases. The install commands above fetch from `main`, so what you install is the last release rather
+releases. The pre-push hook enforces that: `main` accepts only a push carrying `AGENT_KIT_RELEASE=1`. The install commands above fetch from `main`, so what you install is the last release rather
 than the tip of development, and `--update` follows the same path.
 
 The full process, the commit-message convention, and how a release is cut are in
