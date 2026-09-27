@@ -1,5 +1,5 @@
 #!/bin/sh
-# pre-commit hook: block commits that stage obvious secrets.
+# pre-commit hook: block commits that stage obvious secrets, or GitHub Actions pinned to a floating tag.
 #
 # Runs at the GIT layer, so it protects Claude Code, Codex, plain `git`, AND MCP-driven commits
 # alike - the one enforcement point below the tool layer. Fail-CLOSED: a detected secret blocks
@@ -31,12 +31,35 @@ if command -v gitleaks >/dev/null 2>&1; then
   - gitleaks detected a secret in staged content"
 fi
 
+# GitHub Actions pinned to a FLOATING ref. A tag or branch (`@v4`, `@main`) can be moved to point at
+# different code after you reviewed it; a 40-hex commit SHA cannot. ci-cd.md says so, and the adherence
+# eval showed the rule does not fire from wording alone: case 23 failed with the rules present in two
+# separate measurements, the model writing `@v7` beside sibling steps already pinned to a SHA. So it is
+# enforced here. Only ADDED lines are checked, so an old unpinned step you did not touch never blocks
+# an unrelated commit. Allowed: a full SHA, a local action (`./...`), an image pinned by digest
+# (`docker://...@sha256:...`), and any line that says why it cannot be pinned: `# pin-exempt: <reason>`.
+floating=$(git diff --cached --no-color -U0 --diff-filter=ACMRT -- '.github/workflows/*.yml' '.github/workflows/*.yaml' 2>/dev/null \
+  | grep -E '^\+' | grep -vE '^\+\+\+' | tr -d '\r' | sed 's/^+//' \
+  | grep -vE '^[[:space:]]*#' | grep -v 'pin-exempt:' \
+  | sed -n 's/^[[:space:]-]*uses:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]#]*\).*/\1/p' \
+  | grep -vE '^\./' | grep -vE '@[0-9a-f]{40}$' | grep -vE '^docker://[^@]*@sha256:[0-9a-f]{64}$')
+
+rc=0
 if [ -n "$hits" ]; then
   { echo "the-agent-kit pre-commit: possible secret(s) in staged changes - commit BLOCKED:"
     printf '%s\n' "$hits"
     echo "Move it to an env var / secrets manager and unstage the file. If you are CERTAIN this is a"
     echo "false positive, 'git commit --no-verify' bypasses - but that also skips every other check."
   } >&2
-  exit 1
+  rc=1
 fi
-exit 0
+if [ -n "$floating" ]; then
+  { echo "the-agent-kit pre-commit: GitHub Actions pinned to a floating tag or branch - commit BLOCKED:"
+    printf '%s\n' "$floating" | sed 's/^/  - /'
+    echo "Pin each to the full commit SHA of the release you reviewed, keeping the tag as a comment:"
+    echo "    uses: actions/checkout@<40-hex sha>  # v4"
+    echo "If one genuinely cannot be pinned, say why on the same line:  # pin-exempt: <reason>"
+  } >&2
+  rc=1
+fi
+exit $rc

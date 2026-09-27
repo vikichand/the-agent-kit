@@ -258,9 +258,13 @@ install_global() {
   # Copy the WHOLE kit, not just the hooks, so the clone you ran this from becomes disposable.
   # git-hooks/ is the core.hooksPath target (those three only); hooks/ is the full set, which is
   # what the relocated install.sh compares against in --check and copies from per project.
-  for h in command-guard.py commit-msg pre-commit pre-push; do cp "$KIT/hooks/$h" "$share/hooks/$h"; done
+  for h in command-guard.py kit-check.py commit-msg pre-commit pre-push; do cp "$KIT/hooks/$h" "$share/hooks/$h"; done
   for h in commit-msg pre-commit pre-push; do cp "$KIT/hooks/$h" "$share/git-hooks/$h"; done
-  cp "$KIT/AGENTS.md" "$KIT/CLAUDE.md" "$KIT/install.sh" "$share/"
+  # AGENTS.md goes through write_rules, never cp: this repo's file carries its OWN project block, and
+  # the share is what --update-rules and the "prefer the rules global" append both read. A cp here put
+  # this repo's branch rules into every user's global rules (Q3, found 2026-09-26 before it shipped).
+  write_rules "$share/AGENTS.md"
+  cp "$KIT/CLAUDE.md" "$KIT/install.sh" "$share/"
   # The installer prints these as merge snippets, so the relocated copy must carry them too.
   cp "$KIT/claude/settings.json" "$share/claude/" 2>/dev/null || true
   cp "$KIT/codex/config.toml" "$KIT/codex/hooks.json" "$share/codex/" 2>/dev/null || true
@@ -499,6 +503,15 @@ doctor() {
   for h in commit-msg pre-commit pre-push; do
     if [ -x "$KIT/hooks/$h" ]; then say "  OK:   hooks/$h present + executable"; else say "  WARN: hooks/$h missing or not executable"; fi
   done
+  # The session-start check is optional (it is wired only if you merged the SessionStart snippet), so
+  # its absence is a NOTE, and opting out is reported as a choice rather than a fault.
+  if [ ! -f "$KIT/hooks/kit-check.py" ]; then
+    say "  NOTE: hooks/kit-check.py not in this kit copy - the session-start update check is unavailable"
+  elif [ "${AGENT_KIT_NO_UPDATE_CHECK:-}" = 1 ]; then
+    say "  NOTE: session-start update check is switched off (AGENT_KIT_NO_UPDATE_CHECK=1)"
+  else
+    say "  OK:   hooks/kit-check.py present (session-start update check; wired if you merged SessionStart)"
+  fi
   hd=$(git_hooks_dir "$(pwd)")
   if [ -z "$hd" ]; then
     say "  NOTE: not a git repo - no git-layer hooks to check here."
@@ -561,6 +574,11 @@ doctor() {
     if grep -q 'PROJECT-CONFIG:START' AGENTS.md 2>/dev/null && grep -q 'fill this in' AGENTS.md 2>/dev/null; then
       say "  WARN: PROJECT-CONFIG is still the empty placeholder. Without it the agent GUESSES this project's"
       say "        build / test / lint commands. Fill it via docs/project-setup-prompt.md - biggest win available."
+    elif grep -q 'PROJECT-CONFIG:START' AGENTS.md 2>/dev/null && ! grep -q '^\*\*Branches:\*\*' AGENTS.md 2>/dev/null; then
+      # A block filled before 2026-09-26 has no branch model, and --update-rules keeps the block byte for
+      # byte, so without this the gap is invisible: the agent guesses which branch takes work.
+      say "  WARN: this project's block has no **Branches:** line, so the agent guesses which branch takes work"
+      say "        and whether one is release-only. Re-run docs/project-setup-prompt.md to add it."
     fi
     # The depth tier. It is invisible by design - it loads only on matching paths - so if it silently
     # failed to install, nothing else would ever say so. The doctor is the only place that can.
