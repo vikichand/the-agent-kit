@@ -102,6 +102,29 @@ sec() { printf '%s\n' "$2" > "$1"; git add "$1"
 sec s1 "AKIA""IOSFODNN7EXAMPLE"             'AWS key'
 sec s2 "sk-""abcdefghijklmnopqrstuvwx12345" 'sk- key'
 sec s3 "-----BEGIN RSA PRIVATE"" KEY-----"  'private key'
+# PC-A: GitHub Actions pinned to a floating ref are blocked; SHA, local, digest and exempt pass; and an
+# UNCHANGED floating line never blocks a commit that only touches another line.
+mkdir -p .github/workflows
+S40=0123456789abcdef0123456789abcdef01234567
+D64=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+wfc() { printf 'jobs:\n  x:\n    steps:\n%s\n' "$1" > .github/workflows/ci.yml; git add .github/workflows/ci.yml
+  if git commit -q -m wf 2>/dev/null; then r=0; else r=1; git reset -q >/dev/null 2>&1; fi; return $r; }
+wfc "      - uses: actions/checkout@v4"                      && bad "PC-A1 floating tag committed"      || pass "PC-A1 floating tag blocked"
+wfc "      - uses: github/super-linter@main"                 && bad "PC-A2 floating branch committed"   || pass "PC-A2 floating branch blocked"
+wfc "      - uses: actions/checkout@$S40  # v4"              && pass "PC-A3 SHA-pinned action passes"   || bad "PC-A3 SHA-pinned action BLOCKED"
+wfc "      - uses: ./.github/actions/build"                   && pass "PC-A4 local action passes"        || bad "PC-A4 local action BLOCKED"
+wfc "      - uses: docker://alpine@sha256:$D64"               && pass "PC-A5 digest-pinned image passes" || bad "PC-A5 digest-pinned image BLOCKED"
+wfc "      - uses: docker://alpine:3.20"                      && bad "PC-A6 floating image committed"    || pass "PC-A6 floating image blocked"
+wfc "      - uses: acme/internal@main  # pin-exempt: our own repo" && pass "PC-A7 pin-exempt line passes" || bad "PC-A7 pin-exempt line BLOCKED"
+# PC-A8: an existing floating step is left alone when an unrelated line changes
+printf 'jobs:\n  x:\n    steps:\n      - uses: old/thing@v1  # pin-exempt: seeding\n' > .github/workflows/ci.yml
+git add .github/workflows/ci.yml; git commit -q -m seed 2>/dev/null
+sed 's/  # pin-exempt: seeding//' .github/workflows/ci.yml > c2 && mv c2 .github/workflows/ci.yml
+mv .git/hooks/pre-commit .git/hooks/pre-commit.off   # an old repo's state, committed before the kit existed
+git commit -qam 'seed an unpinned step, as an old repo would have' >/dev/null 2>&1
+mv .git/hooks/pre-commit.off .git/hooks/pre-commit
+printf '      - uses: actions/checkout@%s  # v4\n' "$S40" >> .github/workflows/ci.yml; git add .github/workflows/ci.yml
+if git commit -q -m touch 2>/dev/null; then pass "PC-A8 an untouched old floating step does not block"; else bad "PC-A8 an untouched old floating step BLOCKED an unrelated commit"; git reset -q; fi
 cd "$KIT"; rm -rf "$w"
 
 # ---------- pre-push (force / delete / non-ff to a protected branch) ----------
@@ -124,7 +147,67 @@ pp "refs/heads/feat $s1 refs/heads/feat $s2" && pass "PP feature-branch allowed"
 # (which creates `main` from an orphan commit the first time) cannot push at all. Untested until
 # 2026-09-26, when it became load-bearing.
 pp "refs/heads/main $s2 refs/heads/main $z"   && pass "PP new-branch push allowed"  || bad "PP new-branch push BLOCKED"
+# PP6-PP10: a release-only branch marked in the PUSHED commit's AGENTS.md. Every push to it is refused -
+# a plain fast-forward and a creation included - unless AGENT_KIT_RELEASE=1; other branches and tags pass.
+printf '# rules
+<!-- PROJECT-CONFIG:START -->
+<!-- agent-kit: release-branch=main -->
+<!-- PROJECT-CONFIG:END -->
+' > AGENTS.md
+git add AGENTS.md; git commit -q -m c3; s3=$(git rev-parse HEAD)
+pp "refs/heads/main $s3 refs/heads/main $s2"     && bad "PP6 plain push to a release-only branch ALLOWED" || pass "PP6 plain push to a release-only branch refused"
+pp "refs/heads/main $s3 refs/heads/main $z"      && bad "PP7 creating a release-only branch ALLOWED"      || pass "PP7 creating a release-only branch refused"
+( printf '%s
+' "refs/heads/main $s3 refs/heads/main $s2" | AGENT_KIT_RELEASE=1 sh "$KIT/hooks/pre-push" 2>/dev/null )                                                  && pass "PP8 release push with AGENT_KIT_RELEASE=1 allowed" || bad "PP8 release push with the flag BLOCKED"
+pp "refs/heads/develop $s3 refs/heads/develop $s2" && pass "PP9 the work branch is unaffected"            || bad "PP9 the work branch BLOCKED"
+pp "refs/tags/v1.0.0 $s3 refs/tags/v1.0.0 $z"    && pass "PP10 a release tag is never refused"            || bad "PP10 a release tag BLOCKED"
+# PP11: a push cannot exempt itself by deleting the marker - the branch's current tip still carries it.
+git checkout -q -b nomark; printf '# rules\n' > AGENTS.md; git commit -q -am c4; s4=$(git rev-parse HEAD)
+pp "refs/heads/main $s4 refs/heads/main $s3"     && bad "PP11 a push that removes the marker ALLOWED"    || pass "PP11 a push that removes the marker is still refused"
 cd "$KIT"; rm -rf "$w"
+
+# ---------- kit-check.py (session-start update check) ----------
+# Silent when everything is current; one line per actionable item; never updates anything; exits 0 on
+# every path. A local bare repo stands in for GitHub through AGENT_KIT_REPO, so nothing here needs a
+# network, and a fake HOME stands in for the machine-wide share.
+echo "== kit-check.py (session-start update check) =="
+if [ -n "$PY" ]; then
+  k=$(mktemp -d) || exit 2
+  git init -q -b main "$k/src" && ( cd "$k/src" && git -c user.email=t@e.com -c user.name=T commit -q --allow-empty -m r1 )
+  latest=$(git -C "$k/src" rev-parse HEAD)
+  mkdir -p "$k/home/.the-agent-kit"
+  printf '# rules v2\n<!-- PROJECT-CONFIG:START -->\n<!-- PROJECT-CONFIG:END -->\n' > "$k/home/.the-agent-kit/AGENTS.md"
+  git init -q "$k/proj"
+  # Python on Windows reads USERPROFILE and native paths, so /tmp-style paths from this shell must be
+  # converted, or the check would silently look in the wrong place and every test would pass empty.
+  wp() { cygpath -m "$1" 2>/dev/null || printf '%s' "$1"; }
+  KH=$(wp "$k/home"); KS=$(wp "$k/src"); KN=$(wp "$k/nowhere")
+  kc() {  # $1 = cwd for the session -> stdout of the check
+    printf '{"cwd":"%s","source":"startup"}' "$(wp "$1")" | HOME="$KH" USERPROFILE="$KH" AGENT_KIT_REPO="$KS" $PY "$KIT/hooks/kit-check.py" 2>/dev/null
+  }
+  printf '%s\n' "$(printf '%s' "$latest" | cut -c1-7)" > "$k/home/.the-agent-kit/.kit-version"
+  o=$(kc "$k/proj"); [ -z "$o" ] && pass "K1 current kit, no rules file: silent" || bad "K1 spoke when current: $o"
+  rm -f "$k/home/.the-agent-kit/.update-check"; printf 'abc1234\n' > "$k/home/.the-agent-kit/.kit-version"
+  o=$(kc "$k/proj"); has 'install.sh --update' "$o" && pass "K2 behind: one line naming --update" || bad "K2 did not report a newer release"
+  o=$(HOME="$KH" USERPROFILE="$KH" AGENT_KIT_REPO="$KN" $PY "$KIT/hooks/kit-check.py" </dev/null 2>/dev/null)
+  has 'install.sh --update' "$o" && pass "K3 same-day answer comes from the cache, no network" || bad "K3 cache not used"
+  rm -f "$k/home/.the-agent-kit/.update-check"
+  o=$(printf '{}' | HOME="$KH" USERPROFILE="$KH" AGENT_KIT_REPO="$KN" $PY "$KIT/hooks/kit-check.py" 2>/dev/null); rc=$?
+  [ -z "$o" ] && [ "$rc" = 0 ] && pass "K4 unreachable repo: silent, exit 0" || bad "K4 unreachable repo not silent (rc=$rc): $o"
+  o=$(printf '{}' | AGENT_KIT_NO_UPDATE_CHECK=1 HOME="$KH" USERPROFILE="$KH" AGENT_KIT_REPO="$KS" $PY "$KIT/hooks/kit-check.py" 2>/dev/null)
+  [ -z "$o" ] && pass "K5 AGENT_KIT_NO_UPDATE_CHECK=1: silent" || bad "K5 opt-out ignored"
+  printf '%s\n' "$(printf '%s' "$latest" | cut -c1-7)" > "$k/home/.the-agent-kit/.kit-version"
+  printf '# rules v1 (old)\n<!-- PROJECT-CONFIG:START -->\nmine\n<!-- PROJECT-CONFIG:END -->\n' > "$k/proj/AGENTS.md"
+  o=$(kc "$k/proj"); has 'install.sh --update-rules' "$o" && pass "K6 project rules differ: one line naming --update-rules" || bad "K6 stale project rules not reported"
+  printf '# rules v2\n<!-- PROJECT-CONFIG:START -->\nmine\n<!-- PROJECT-CONFIG:END -->\n' > "$k/proj/AGENTS.md"
+  o=$(kc "$k/proj"); [ -z "$o" ] && pass "K7 project rules current (own block differs): silent" || bad "K7 spoke about a current project: $o"
+  printf '<!-- The universal rules live in your global files -->\n<!-- PROJECT-CONFIG:START -->\n<!-- PROJECT-CONFIG:END -->\n' > "$k/proj/AGENTS.md"
+  o=$(kc "$k/proj"); [ -z "$o" ] && pass "K8 --extension stub: silent" || bad "K8 nagged an extension stub"
+  o=$(kc "$KIT"); has 'update-rules' "$o" && bad "K9 told the kit's own repo to overwrite its rules" || pass "K9 the kit's own repo is never told to --update-rules"
+  rm -rf "$k"
+else
+  bad "no python - kit-check.py NOT tested"
+fi
 
 # ---------- install.sh --check (doctor) ----------
 # The doctor must report what is ACTUALLY live. Existence of a file in the hook slot is not enough:
@@ -203,6 +286,12 @@ sed 's/Not configured yet\..*fill this in\./Build: make all  Test: make test  Li
 d=$(sh "$KIT/install.sh" --check 2>&1)
 has 'PROJECT-CONFIG is still the empty placeholder' "$d" \
   && bad "D11 filled PROJECT-CONFIG still warned (false positive)" || pass "D11 filled PROJECT-CONFIG is silent"
+# D12: a block filled without a Branches line (every install before 2026-09-26) is flagged; with one, silent.
+has 'no \*\*Branches:\*\* line' "$d" && pass "D12 filled block without Branches warned" || bad "D12 missing Branches line NOT warned"
+awk '{ print } /PROJECT-CONFIG:START/ { print "**Branches:** work on `main`; none is release-only." }' AGENTS.md > A2 && mv A2 AGENTS.md
+grep -q '^\*\*Branches:\*\*' AGENTS.md || bad "D12b setup: the Branches line was not inserted"
+d=$(sh "$KIT/install.sh" --check 2>&1)
+has 'no \*\*Branches:\*\* line' "$d" && bad "D12b Branches warning still shown (false positive)" || pass "D12b block with a Branches line is silent"
 cd "$KIT"; rm -rf "$w"
 
 # ---------- install.sh --update-rules ----------
@@ -437,6 +526,14 @@ else
     && pass "U15 --update-rules deploys and refreshes the Codex skills" \
     || bad "U15 --update-rules left the Codex skills missing or stale"
   rm -rf "$u"
+  # U18: the machine-wide share must hold the rules with an EMPTY block too. The README tells users who
+  # prefer global rules to append the share's AGENTS.md to ~/.claude/CLAUDE.md, so a leak here would put
+  # this repo's branch rules into every project they own.
+  g=$(mktemp -d) && HOME="$g" sh "$KIT/install.sh" --global >/dev/null 2>&1
+  if grep -q 'fill this in' "$g/.the-agent-kit/AGENTS.md" 2>/dev/null && ! grep -q 'the-agent-kit (rules and guardrails' "$g/.the-agent-kit/AGENTS.md" 2>/dev/null; then
+    pass "U18 the machine-wide share gets an empty PROJECT-CONFIG, not the kit's own"
+  else bad "U18 the machine-wide share inherited the kit repo's PROJECT-CONFIG"; fi
+  rm -rf "$g"
   # U17: a fresh project install must get an EMPTY project block, never the kit repo's own config.
   # The kit's AGENTS.md is both this repo's rules file and the template shipped to projects; `cp`
   # would have leaked "work on develop, main is release-only" into everyone's repo.
@@ -463,6 +560,19 @@ else
     || bad  "U9 update_kit no longer execs - it will read the file --global just overwrote"
 fi
 cd "$KIT"; rm -rf "$w"
+
+# H1-H5: the eval harness's own oracles. Both were silently wrong until 2026-09-27: provider errors
+# scored as ordinary FAILs, and a red-then-fix run scored as "edited before any failing test".
+# The functions are lifted out of run.sh so the checks run offline, with no agent and no tokens.
+(
+  eval "$(sed -n '/^events_error() {/,/^}/p;/^trace_check() {/,/^}/p' "$KIT/test/adherence/run.sh")"
+  hf="$KIT/test/adherence/harness-fixtures"; spec='red-before-edit: (node --test|npm test)'
+  case "$(events_error "$hf/codex-usage-limit.jsonl" codex)" in *"usage limit"*) pass "H1 codex usage limit read as a provider error" ;; *) bad "H1 codex usage limit NOT detected" ;; esac
+  case "$(events_error "$hf/claude-session-limit.jsonl" claude)" in *"session limit"*) pass "H2 claude session limit read as a provider error" ;; *) bad "H2 claude session limit NOT detected" ;; esac
+  case "$(trace_check "$hf/claude-red-then-edit.jsonl" claude "$spec")" in OK*) pass "H3 red run then source edit passes the trace" ;; *) bad "H3 red-then-edit FAILED the trace" ;; esac
+  case "$(trace_check "$hf/claude-edit-after-green.jsonl" claude "$spec")" in FAIL*) pass "H4 edit after a green run ('# fail 0') fails the trace" ;; *) bad "H4 edit after a green run PASSED the trace" ;; esac
+  case "$(trace_check "$hf/codex-piped-red.jsonl" codex "$spec")" in OK*) pass "H5 codex piped red run (exit 0) is read as red" ;; *) bad "H5 codex piped red run read as green" ;; esac
+) | tee "$w.h"; grep -q '^FAIL' "$w.h" 2>/dev/null && fail=1; rm -f "$w.h"
 
 echo "---"
 [ "$fail" -eq 0 ] && echo "ALL PASS" || echo "FAILURES PRESENT"

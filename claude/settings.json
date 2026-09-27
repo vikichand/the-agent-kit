@@ -90,6 +90,18 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PY__ \"__AGENT_KIT__/hooks/kit-check.py\"",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   },
   "worktree": {
