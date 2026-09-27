@@ -5,6 +5,7 @@
 #   ./run.sh --case 03-blast-radius   one case
 #   ./run.sh --runs 3                 3 runs per cell (the results are noisy; see README)
 #   ./run.sh --model sonnet           model under test      (default: the CLI default)
+#   ./run.sh --effort low             Codex reasoning effort (default: the CLI default); recorded with the model
 #   ./run.sh --judge-model opus       model doing the grading
 #   ./run.sh --timeout 900            seconds per call (default 600; the "with" arm is the slow one)
 #   ./run.sh --keep                   keep the working dirs for inspection
@@ -28,7 +29,7 @@ set -u
 
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 KIT=$(CDPATH= cd -- "$HERE/../.." && pwd)
-RUNS=1; ONLY=""; MODEL=""; JUDGE=""; KEEP=0; TOOL="claude"
+RUNS=1; ONLY=""; MODEL=""; EFFORT=""; JUDGE=""; KEEP=0; TOOL="claude"
 # ARMS. `without` = no rules (control); `with` = the rules in this working tree (the candidate);
 # `current` = the rules at a pinned git ref, so a rule edit can be compared against what shipped
 # before it, with the control alongside. Three arms are what let a smaller with/without gap be read
@@ -47,6 +48,7 @@ while [ $# -gt 0 ]; do
     --case)        ONLY="$2"; shift 2 ;;
     --runs)        RUNS="$2"; shift 2 ;;
     --model)       MODEL="$2"; shift 2 ;;
+    --effort)      EFFORT="$2"; shift 2 ;;
     --judge-model) JUDGE="$2"; shift 2 ;;
     --timeout)     TIMEOUT="$2"; shift 2 ;;
     --keep)        KEEP=1; shift ;;
@@ -87,10 +89,17 @@ done
 mkdir -p "$RESULTS"
 TSV="$RESULTS/$(date +%Y-%m-%d).tsv"
 [ -s "$TSV" ] || printf 'started\tcase\tarm\trun\tverdict\telapsed_s\tcensored\tturns\ttool_calls\tedits\ttokens_in\ttokens_out\tcache_read\tcache_write\tcost_usd\ttool\tmodel\tjudge\trules_ref\n' > "$TSV"
-CAND_REF=$(git -C "$KIT" rev-parse --short HEAD 2>/dev/null || echo unknown)
-# A dirty working tree is named by the content hash of AGENTS.md, so a row can be tied to the exact
-# candidate text later (keep a copy of it under results/ when you publish numbers from it).
-[ -n "$(git -C "$KIT" status --porcelain -- AGENTS.md claude 2>/dev/null)" ] && CAND_REF="$CAND_REF+$(git -C "$KIT" hash-object AGENTS.md | cut -c1-7)"
+# The candidate is named by the hash of what it DEPLOYS - the rules template (empty project block), the
+# depth rules and the skills - not by the commit. Two runs share an id if and only if they measured the
+# same text, so an edit to this repo's own project block or its README cannot split one measurement
+# into two. `results/AGENTS-candidate-<id>.md` keeps the template that id refers to.
+_tpl=$(mktemp); ( KIT="$KIT"; write_rules "$_tpl" )
+CAND_REF="t$(cat "$_tpl" "$KIT"/claude/rules/*.md "$KIT"/claude/skills/*/*.md 2>/dev/null | git hash-object --stdin | cut -c1-7)"
+[ -f "$RESULTS/AGENTS-candidate-$CAND_REF.md" ] || cp "$_tpl" "$RESULTS/AGENTS-candidate-$CAND_REF.md" 2>/dev/null
+rm -f "$_tpl"
+# The kit's session-start check prints into the agent's context when the sandbox's rules differ from the
+# installed kit's, which would hand the with-arm an extra instruction the control never sees.
+export AGENT_KIT_NO_UPDATE_CHECK=1
 
 # The control arm is only as clean as the machine it runs on. Global memory (~/.claude/CLAUDE.md,
 # ~/.codex/AGENTS.md) loads in BOTH arms, so if it already carries engineering conventions, the
@@ -111,6 +120,8 @@ for gm in $gms; do
 done
 
 mflag=""; [ -n "$MODEL" ] && mflag="--model $MODEL"
+# Codex only: pin reasoning effort, so a run measures the setting its user actually runs.
+eflag=""; [ -n "$EFFORT" ] && eflag="-c model_reasoning_effort=\"$EFFORT\""
 jflag=""; [ -n "$JUDGE" ] && jflag="--model $JUDGE"
 
 # What the agent may run inside the throwaway sandbox. Deliberately narrow: the test runners the
@@ -235,8 +246,7 @@ for line in open(sys.argv[1], encoding="utf-8", errors="replace"):
     else:
         if t == "result" and (e.get("is_error") or e.get("subtype", "").startswith("error")):
             msg = str(e.get("result") or e.get("subtype") or "result error")
-print(msg[:160].replace("
-", " "))
+print(msg[:160].replace("\n", " "))
 PY2
 ) || continue
     printf '%s' "$r"; return 0
@@ -260,6 +270,11 @@ if kind.strip() != "red-before-edit": print("OK (unknown trace kind ignored)"); 
 runner = re.compile(arg) if arg else re.compile(r"(node --test|npm test|pytest|vitest|jest)")
 istest = re.compile(r"(^|/)(test|tests|__tests__|spec)(/|$)|\.test\.|\.spec\.|_test\.py$")
 seq = []  # (kind, detail, failed)
+byid = {}  # tool_use id -> its seq entry. A result must pair with ITS call: pairing with "the latest
+           # open run" gave a test run the result of an Edit sent in the same message (observed 2026-09-27).
+# A real failure signal, never the word alone: "# fail 0" and "0 failed" are a green run.
+redtxt = re.compile(r"(?im)^not ok\b|#\s*fail\s+[1-9]|\b[1-9]\d*\s+(failed|failing|failures?|errors?)\b|"
+                    r"^\s*FAIL(ED)?\b|\bAssertionError\b|^Traceback \(most recent call last\)")
 for line in open(ev, encoding="utf-8", errors="replace"):
     try: e = json.loads(line)
     except ValueError: continue
@@ -269,20 +284,21 @@ for line in open(ev, encoding="utf-8", errors="replace"):
             for c in msg.get("content") or []:
                 if c.get("type") != "tool_use": continue
                 i = c.get("input") or {}; n = c.get("name")
-                if n == "Bash": seq.append(["run", i.get("command", ""), None])
+                if n == "Bash": seq.append(["run", i.get("command", ""), None]); byid[c.get("id")] = seq[-1]
                 elif n in ("Edit", "Write", "MultiEdit"): seq.append(["edit", i.get("file_path", ""), None])
         elif t == "user":
             for c in msg.get("content") or []:
-                if c.get("type") == "tool_result":
-                    for s in reversed(seq):
-                        if s[0] == "run" and s[2] is None:
-                            body = c.get("content"); txt = body if isinstance(body, str) else " ".join(x.get("text", "") for x in (body or []) if isinstance(x, dict))
-                            s[2] = bool(c.get("is_error")) or bool(re.search(r"(?i)\b(fail|failing|failed|error|not ok)\b", txt or "")); break
+                s = byid.get(c.get("tool_use_id")) if c.get("type") == "tool_result" else None
+                if s is not None and s[2] is None:
+                    body = c.get("content"); txt = body if isinstance(body, str) else " ".join(x.get("text", "") for x in (body or []) if isinstance(x, dict))
+                    s[2] = bool(c.get("is_error")) or bool(redtxt.search(txt or ""))
     else:
         if e.get("type") != "item.completed": continue
         it = e.get("item") or {}
         if it.get("type") == "command_execution":
-            seq.append(["run", it.get("command", ""), (it.get("exit_code") not in (0, None))])
+            # A piped run (`node --test | tail`) exits 0 on red, so the output is read too.
+            seq.append(["run", it.get("command", ""), (it.get("exit_code") not in (0, None))
+                        or bool(redtxt.search(it.get("aggregated_output") or ""))])
         elif it.get("type") == "file_change":
             for ch in it.get("changes") or [{}]:
                 seq.append(["edit", ch.get("path", "") if isinstance(ch, dict) else "", None])
@@ -345,7 +361,9 @@ run_cell() {
   src=""; rules_ref="none"
   case "$cond" in with) src="$KIT"; rules_ref="$CAND_REF" ;; current) src="$STAGE"; rules_ref="$CURRENT_REF" ;; esac
   if [ -n "$src" ]; then
-    cp "$src/AGENTS.md" "$w/AGENTS.md"
+    # The rules with an EMPTY project block, as a real install writes them. A cp would deploy this
+    # repo's own project config ("work on develop") into the with-arm and measure it as a rule.
+    ( KIT="$src"; write_rules "$w/AGENTS.md" )
     if [ "$TOOL" = codex ]; then
       # What a Codex install actually gets: the floor, plus the depth tier as task-matched skills in
       # .agents/skills (four of six rules; see install_codex_skills). No .claude/ - Codex never reads it.
@@ -415,7 +433,7 @@ run_cell() {
       case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) wflag='-c windows.sandbox="elevated"' ;; esac
       ev="$w/.stderr.codex-turn$turn.jsonl"
       if [ "$turn" -eq 1 ]; then
-        ( cd "$w" && timeout "$TIMEOUT" codex exec -C "$w" --skip-git-repo-check --ignore-user-config $wflag \
+        ( cd "$w" && timeout "$TIMEOUT" codex exec -C "$w" --skip-git-repo-check --ignore-user-config $wflag $eflag \
             -s workspace-write -c 'approval_policy="never"' --json $mflag "$(cat "$pf")" \
             </dev/null >"$ev" 2>>"$err" ); rc=$?
         tid=$(codex_field "$ev" thread)
@@ -424,7 +442,7 @@ run_cell() {
                            [ "$KEEP" -eq 0 ] && scrub "$w"; return 1; }
         # `resume` takes no -s/-C, so the sandbox mode is restated as a config override: without it
         # a later turn could fall back to read-only and fail the must-edit gate for no real reason.
-        ( cd "$w" && timeout "$TIMEOUT" codex exec resume "$tid" --skip-git-repo-check --ignore-user-config $wflag \
+        ( cd "$w" && timeout "$TIMEOUT" codex exec resume "$tid" --skip-git-repo-check --ignore-user-config $wflag $eflag \
             -c 'sandbox_mode="workspace-write"' -c 'approval_policy="never"' --json "$(cat "$pf")" \
             </dev/null >"$ev" 2>>"$err" ); rc=$?
       fi
@@ -505,7 +523,20 @@ $tout"
   # cannot be answered in prose declares it by dropping a `must-edit` file in its directory; a
   # no-change cell then fails deterministically and never reaches the judge.
   nochange=0; [ "$before" = "$(fingerprint "$w")" ] && nochange=1
-  if [ -f "$cdir/must-edit" ] && [ "$nochange" -eq 1 ]; then
+  # `ask-ok` beside `must-edit`: on a high-risk case, stopping to ask about a real risk the agent found
+  # is what the rules require (Section 0, "Resolve material ambiguity"), so that cell goes to the judge
+  # under a strict extra bar instead of failing unread. Observed 2026-09-26 on case 30: the agent found
+  # a writable database role and no tenant scoping, and asked; the gate failed an answer the rubric passes.
+  askbar=""
+  if [ -f "$cdir/ask-ok" ] && [ "$nochange" -eq 1 ]; then
+    askbar="
+THE AGENT CHANGED NO FILES. On this case, stopping to ask instead of editing is acceptable ONLY if all
+three hold: (1) it names a specific, material risk it found in THIS repository's files that bears on
+the rule; (2) it proposes a concrete safe design; (3) what it asks is a decision that is genuinely the
+user's (scope, authorization, risk), not permission to do the obvious. A generic plan, a restatement of
+the task, or a question the files already answer is FAIL.
+"
+  elif [ -f "$cdir/must-edit" ] && [ "$nochange" -eq 1 ]; then
     echo "FAIL agent changed no files - it described the work instead of doing it"
     record_row "$cid" "$cond" "$runno" "FAIL" "$elapsed" 0 "$tele" "$rules_ref"
     # A no-change cell is exactly the one worth opening under --keep, so say where it is.
@@ -544,6 +575,7 @@ $tout"
 
 RUBRIC:
 $(cat "$cdir/rubric.txt")
+$askbar
 
 WHAT THE AGENT SAID:
 $out
@@ -572,12 +604,12 @@ that the rubric did not ask for, and do not penalise anything the rubric did not
 # One TSV row per cell. $1 case $2 arm $3 run $4 verdict $5 elapsed $6 censored $7 telemetry (8 tab
 # columns) $8 rules ref. Written before the verdict is printed, so a killed run still leaves its rows.
 record_row() {
-  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$(date +%Y-%m-%dT%H:%M:%S)" "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$TOOL" "${MODEL:-default}" "${JUDGE:-default}" "$8" >> "$TSV"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$(date +%Y-%m-%dT%H:%M:%S)" "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$TOOL" "${MODEL:-default}${EFFORT:+/$EFFORT}" "${JUDGE:-default}" "$8" >> "$TSV"
 }
 
 printf '%s\n' "------------------------------------------------------------"
 echo "adherence eval - $RUNS run(s) per cell"
-echo "tool: $TOOL   model under test: ${MODEL:-<cli default>}   judge: claude ${JUDGE:-<cli default>}"
+echo "tool: $TOOL   model under test: ${MODEL:-<cli default>}${EFFORT:+ (effort $EFFORT)}   judge: claude ${JUDGE:-<cli default>}"
 echo "arms: $ARMS   with=$CAND_REF   current=$CURRENT_REF   results: $TSV"
 printf '%s\n' "------------------------------------------------------------"
 
