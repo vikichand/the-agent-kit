@@ -16,6 +16,18 @@ one squashed commit on `main`, tagged, with that version's section below as its 
 - This repository records its own branch model, gates and careful zones in the project block of
   `AGENTS.md`, so an agent working on the kit knows to push to `develop` and never to `main` without
   being told. The per-project setup prompt asks every project the same question.
+- **Release-only branches are enforced.** A project marks one in its block with
+  `<!-- agent-kit: release-branch=main -->`, and the pre-push hook then refuses every push to it that is
+  not a release (`AGENT_KIT_RELEASE=1`), including a push that deletes the marker on its way in. The
+  tool guard asks before any command that sets that flag or the force override, however the name is
+  quoted, and no chat request covers either.
+- **GitHub Actions pinned to a floating tag are blocked at commit time.** The eval showed the rule does
+  not fire from wording alone; the pre-commit hook now checks the workflow lines you add.
+- **A session-start check** tells you when a newer release is on `main` and when a project's rules
+  differ from your installed kit. Silent when everything is current, at most one network call a day,
+  never updates anything itself. Opt out with `AGENT_KIT_NO_UPDATE_CHECK=1`.
+- `install.sh --check` warns when a project's block has no Branches line, so installs set up before this
+  release find out.
 
 ### Fixed
 
@@ -24,6 +36,24 @@ one squashed commit on `main`, tagged, with that version's section below as its 
 - `install.sh --check` counts the project block against the 200-line budget. It had been treating the
   block's `PROJECT-CONFIG` markers as one long comment and excluding everything between them, so it
   under-reported every filled install by the size of its block.
+- The machine-wide copy of the rules no longer carries this repository's own project block, which the
+  "prefer the rules global" instructions would have appended to your global rules.
+- The tool guard no longer refuses a commit whose message, written through a heredoc, merely mentions a
+  guarded string such as the hooks-path setting. Only a body that cannot run is skipped: a quoted
+  delimiter, or an unquoted one with no command substitution in it. Every other heredoc is still
+  scanned as code.
+- The eval harness records usage-limit and auth failures as ERROR again. A syntax error in its
+  detector had been scoring every one as an ordinary failure since the harness gained the check.
+- Eval cases 09, 10 and 11 no longer fail for asking before adding a dependency: their fixtures now
+  declare the client libraries the task needs (case 09 uses the standard library's unittest), so
+  they measure what their rubric grades.
+- The eval harness's test-first check reads each run's own result. It had been pairing a test run
+  with the result of an edit sent in the same message, and counting "# fail 0" as a failure, so a
+  genuine red-then-fix run could score as "edited before any failing test" and a green-then-edit run
+  could pass. On Codex a piped test run is now read from its output, not only its exit code. Five
+  offline checks in the free suite now cover the harness's own oracles.
+- A high-risk eval case can accept a grounded stop-and-ask (`ask-ok` marker): the no-edit answer is
+  judged under a strict bar instead of failing unread. Cases 30 and 33 carry it.
 
 ## [1.0.0] - 2026-09-26
 
