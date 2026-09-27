@@ -40,6 +40,9 @@ HOOKSPATH_DENY = "core.hooksPath is being set - that points git's hooks elsewher
 NOVERIFY_DENY  = "`--no-verify` skips the git guard hooks (secret scan, attribution, push guard). Blocked."
 FORCE_DENY     = "force/delete push is blocked - it rewrites or removes remote history. Use the pre-push override only if truly intended."
 GITCFG_DENY    = "writing git config directly (.git/config or GIT_CONFIG_GLOBAL/SYSTEM) can disable the guard hooks - review carefully."
+OVERRIDE_ASK   = ("this sets a guard override (AGENT_KIT_RELEASE / AGENT_KIT_ALLOW_FORCE): it lets a push through the "
+                  "pre-push hook that it would otherwise refuse. A chat request never covers it - approve only if "
+                  "you are cutting a release or meant to force this push.")
 
 GIT_GLOBAL_VALUE = ("-c", "-C", "--git-dir", "--work-tree", "--namespace", "--super-prefix",
                     "--config-env", "--attr-source")   # git globals that consume the NEXT token as a value
@@ -342,6 +345,29 @@ def classify(tokens, decision, grants=frozenset()):
     return None
 
 
+# A heredoc that feeds `git commit -F -` or `git tag -F -` IS the commit message: prose that git stores
+# and never runs. Tokenizing it as commands made a message that merely MENTIONED core.hooksPath get
+# refused (observed 2026-09-21), and a body line reading "git push --force" would have been classified as
+# a force push. Only the message form is stripped: `sh <<EOF`, `python <<EOF` and every other heredoc is
+# code and keeps being scanned, and a real command after the terminator is scanned as usual.
+# An UNQUOTED delimiter still expands the body, so `$(...)` and backticks in it run: such a body is
+# stripped only when it has neither. A quoted delimiter ('EOF' or "EOF") makes the body inert.
+_MSG_HEREDOC = re.compile(
+    r"(\bgit\b[^\n]*?\b(?:commit|tag)\b[^\n]*?(?:-F\s*-(?=\s|$)|--file[=\s]-(?=\s|$))[^\n]*?"
+    r"<<(-?)\s*(['\"]?)(\w+)\3[^\n]*\n)"          # 1: the header line, 2: '-' for <<-, 3: quote, 4: delimiter
+    r"(.*?)"                                         # 5: the body
+    r"(^\t*\4[ \t]*$)",                            # 6: the terminator (<<- may indent it with tabs)
+    re.S | re.M)
+
+
+def strip_message_heredocs(cmd):
+    def strip(m):
+        if not m.group(3) and ("$(" in m.group(5) or "`" in m.group(5)):
+            return m.group(0)
+        return m.group(1) + m.group(6)
+    return _MSG_HEREDOC.sub(strip, cmd)
+
+
 def split_ops(cmd):
     """Split a command line into segments on shell operators (&& || ; | & newline) that sit OUTSIDE
     quotes. Best-effort, like the rest of this file, but quote-aware so a metacharacter INSIDE a
@@ -400,8 +426,16 @@ def main():
     cmd = data.get("tool_input", {}).get("command", "")
     if not cmd:
         sys.exit(0)
+    cmd = strip_message_heredocs(cmd)   # a commit message is data, not commands (see _MSG_HEREDOC)
     # Grants only exist in Claude ask-mode; Codex (deny) never consults them.
     grants = load_grants(data.get("session_id") or "") if args.decision == "ask" else frozenset()
+
+    # The pre-push overrides. Asked every time, never covered by a grant: a release push to a
+    # release-only branch, or a forced push, is the owner's act, not something a chat request authorizes.
+    # Matched with quotes and backslashes removed: A""GENT_KIT_RELEASE=1 is the same assignment to the shell.
+    if re.search(r"(?:^|[\s;&|(])(?:export\s+)?AGENT_KIT_(?:RELEASE|ALLOW_FORCE)\s*=",
+                 re.sub(r"[\"'\\]", "", cmd)):
+        emit(args.decision, OVERRIDE_ASK)
 
     if re.search(r"\|\s*(sudo\s+)?(ba|z)?sh\b", cmd, re.IGNORECASE):   # curl ... | sh / SH / bash / BASH
         emit(args.decision, "piping a download straight into a shell (curl | sh) runs unreviewed code.")
