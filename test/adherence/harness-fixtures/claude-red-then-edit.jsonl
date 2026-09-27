@@ -1,0 +1,4 @@
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"C:\\w\\test\\refund.test.js"}},{"type":"tool_use","id":"t2","name":"Bash","input":{"command":"node --test test/refund.test.js 2>&1 | tail -40"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"The file has been updated successfully."}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t2","content":"not ok 2 - renders -5 cents\n# fail 2"}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t3","name":"Edit","input":{"file_path":"C:\\w\\lib\\money.js"}}]}}

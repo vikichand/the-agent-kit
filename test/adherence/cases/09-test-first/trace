@@ -1,1 +1,1 @@
-red-before-edit: (pytest|python -m pytest|python3 -m pytest)
+red-before-edit: (pytest|unittest)
