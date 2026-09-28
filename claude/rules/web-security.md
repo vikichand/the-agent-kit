@@ -72,7 +72,7 @@ the wrong one:
   anything expensive. Over the limit is `429` with `Retry-After`, logged as a security event.
 
 Volumetric abuse and IP blocking belong at the edge, not in application code - by the time your
-middleware runs you have already paid to receive the request. See `docs/web-checklists.md`.
+middleware runs you have already paid to receive the request. See `~/.the-agent-kit/docs/web-checklists.md`.
 
 ## Input and uploads
 

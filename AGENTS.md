@@ -255,7 +255,7 @@ out in words ("Section 4", "and", "number"). This governs prose you write, never
 ## Project setup
 
 The rules above are the universal floor. To make this file sharp for *this* project, run the setup prompt in
-`docs/project-setup-prompt.md`: it works out whether this is a code project or a research/agent project, reads your repo
+`~/.the-agent-kit/docs/project-setup-prompt.md`: it works out whether this is a code project or a research/agent project, reads your repo
 (or asks a few questions if it's greenfield), and writes a tailored block between the markers below - your stack and
 the exact checks that define "done" for code, or the sources and evidence bar for research/agent work. It edits only
 between the markers; everything above stays exactly as it is. Re-run it any time the project changes.

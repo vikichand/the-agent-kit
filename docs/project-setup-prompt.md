@@ -95,7 +95,7 @@ strings); observability (<detected target>, structured logs, no PII); audit log 
 privacy (collect the minimum personal data, keep PII out of logs / URLs / analytics); skeleton loaders on
 data views; no redundant explainer text under headings.
 <!-- WEB only: -->
-**Checklists:** preparing a public launch -> open <kit>/docs/web-checklists.md (launch readiness).
+**Checklists:** preparing a public launch -> open ~/.the-agent-kit/docs/web-checklists.md (launch readiness).
 Security rules need no pointer: on Claude Code .claude/rules/web-security.md self-loads on auth / api /
 webhook / payment paths and on edge config (nginx, Caddy, vercel.json, wrangler.toml, fly.toml,
 .htaccess); on Codex the same rules are the web-security skill in .agents/skills, matched by task.
