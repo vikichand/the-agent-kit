@@ -42,7 +42,7 @@ to intent: part of "done" in production, flag-don't-block in a prototype. Securi
 [`docs/web-checklists.md`](docs/web-checklists.md) now carries launch readiness only, opened when a public
 launch is being prepared. A CLI never carries HSTS rules in its context. Universal rules
 are the floor; the block is the per-project multiplier. The full trait ledger and rationale live in
-[`SENIOR-ENGINEER.md`](SENIOR-ENGINEER.md).
+[`docs/senior-engineer.md`](docs/senior-engineer.md).
 
 ## The depth tier: `claude/rules/*.md` (path-scoped, free until they match)
 

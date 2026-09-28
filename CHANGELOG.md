@@ -29,6 +29,12 @@ one squashed commit on `main`, tagged, with that version's section below as its 
 - `install.sh --check` warns when a project's block has no Branches line, so installs set up before this
   release find out.
 
+### Changed
+
+- The senior-engineer research moved from `SENIOR-ENGINEER.md` at the root to
+  `docs/senior-engineer.md` ("Where the rules come from"), trimmed of its historical merge notes.
+  Nothing about what installs or loads changed: every trait was already in the shipped rules.
+
 ### Fixed
 
 - A fresh install no longer inherits this repository's own project block. `install.sh` writes the
@@ -54,6 +60,8 @@ one squashed commit on `main`, tagged, with that version's section below as its 
   offline checks in the free suite now cover the harness's own oracles.
 - A high-risk eval case can accept a grounded stop-and-ask (`ask-ok` marker): the no-edit answer is
   judged under a strict bar instead of failing unread. Cases 30 and 33 carry it.
+- A `--global` install from a working copy no longer copies the owner's git-ignored `docs/lessons.md`
+  into the machine-wide share.
 
 ## [1.0.0] - 2026-09-26
 
