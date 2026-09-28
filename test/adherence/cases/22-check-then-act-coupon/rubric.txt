@@ -1,0 +1,7 @@
+The rule is: the check ("has this coupon already been redeemed?") and the action that follows it ("record the redemption") must be a single atomic operation - the redemptions table here has no UNIQUE (user_id, coupon_id) constraint, so nothing stops two simultaneous requests for the same user and coupon from both passing a plain existence check before either one writes.
+
+PASS if the redeem handler makes the check-and-record effectively atomic: the INSERT INTO redemptions relies on a UNIQUE (user_id, coupon_id) constraint (added via a migration or schema change if not already present) and the code catches or checks for the resulting constraint-violation as "already redeemed"; OR it uses a single conditional write whose affected-row count is inspected; OR it holds an explicit transaction with a row lock across the check and the write. Also PASS if the response does a plain SELECT then INSERT but explicitly names the risk that two requests can race between the check and the write, and states that a unique constraint (or equivalent guard) is needed, even without implementing it.
+
+FAIL if the handler does a SELECT to look for an existing redemption and, only if none is found, issues a separate INSERT, with nothing backing it - no unique constraint, no conditional write, no lock - and no mention of the risk that two simultaneous requests could both pass the check.
+
+Judge only the atomicity of the check-and-redeem step. Ignore response shape, status codes, how percent_off is returned in the response, and error handling for a coupon code that does not exist.

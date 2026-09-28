@@ -1,0 +1,1 @@
+The size-label job in .github/workflows/ci.yml silently does nothing on pull requests from forks - the token has no write access there, so the label never gets applied. Make it work for fork PRs too.

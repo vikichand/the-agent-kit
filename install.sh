@@ -5,6 +5,9 @@
 #                             imports it, so nothing is duplicated) + git hooks in THIS repo
 #   ./install.sh --extension  per-project (extends global): project-config stub + git hooks
 #   ./install.sh --global     machine-wide: git hooks via core.hooksPath + printed tool snippets
+#   ./install.sh --update     pull the latest kit from GitHub into ~/.the-agent-kit (no clone needed)
+#   ./install.sh --update-rules  refresh THIS repo's AGENTS.md to the kit's current rules; the
+#                             project's PROJECT-CONFIG block is preserved byte-for-byte
 #   ./install.sh --check      doctor: verify the interpreter resolves and the guard actually fires
 #
 # Safe by design: never overwrites an existing CLAUDE.md / AGENTS.md / git hook, and never blindly
@@ -14,6 +17,8 @@ set -eu
 
 KIT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 MODE="${1:-project}"
+# Where --update pulls from. Overridable so a fork (or the test suite) can point elsewhere.
+KIT_REPO="${AGENT_KIT_REPO:-https://github.com/vikichand/the-agent-kit.git}"
 
 say() { printf '%s\n' "$*"; }
 hr()  { printf '%s\n' "------------------------------------------------------------"; }
@@ -68,9 +73,25 @@ write_stub() {  # $1 = target file
      here - do NOT copy the universal rules in (that would double them in context). -->
 
 <!-- PROJECT-CONFIG:START -->
-<!-- Run the-agent-kit's docs/project-setup-prompt.md to fill this in (~15-30 lines, one screen). -->
+<!-- Run the setup prompt (~/.the-agent-kit/docs/project-setup-prompt.md) to fill this in (~15-30 lines, one screen). -->
 <!-- PROJECT-CONFIG:END -->
 STUB
+}
+
+write_rules() {  # $1 = target AGENTS.md - the kit's rules with an EMPTY project block
+  # Never `cp` AGENTS.md: this repo fills its OWN PROJECT-CONFIG block (branches, gates, careful
+  # zones), and copying it verbatim would ship the kit's project config into every project that
+  # installs it. The rules above the markers are the floor; what sits between them belongs to the
+  # project. --update-rules already swaps the kit's block for the target's, so only a fresh install
+  # needed fixing.
+  awk '
+    /PROJECT-CONFIG:START/ { skip = 1
+      print "<!-- PROJECT-CONFIG:START -->"
+      print "<!-- Not configured yet. Run the setup prompt (~/.the-agent-kit/docs/project-setup-prompt.md) to fill this in. -->"
+      print "<!-- PROJECT-CONFIG:END -->" }
+    !skip { print }
+    /PROJECT-CONFIG:END/   { skip = 0 }
+  ' "$KIT/AGENTS.md" > "$1"
 }
 
 write_claude_importer() {  # $1 = target CLAUDE.md - imports AGENTS.md instead of duplicating it
@@ -81,6 +102,114 @@ write_claude_importer() {  # $1 = target CLAUDE.md - imports AGENTS.md instead o
 IMP
 }
 
+install_path_rules() {  # $1 = repo root. Path-scoped rules: the deep tier, free until a path matches.
+  # These load ONLY when the agent opens a file matching their `paths:` globs. Measured on a 53 KiB
+  # rule: 65,347 tokens of context with it present and not matching, versus 65,510 with no rule file
+  # at all - i.e. free. The same file costs its full size the moment a path matches, which is the
+  # point. `paths:` is read by Claude Code, VS Code Copilot and Cline; other tools ignore the folder
+  # and still get the full universal floor from AGENTS.md.
+  # Two possible homes: claude/rules in the repo, rules/ in the relocated ~/.the-agent-kit copy.
+  src=""
+  [ -d "$KIT/claude/rules" ] && src="$KIT/claude/rules"
+  [ -z "$src" ] && [ -d "$KIT/rules" ] && src="$KIT/rules"
+  [ -n "$src" ] || return 0
+  mkdir -p "$1/.claude/rules"
+  for r in "$src/"*.md; do
+    [ -e "$r" ] || continue
+    b=$(basename "$r")
+    if [ -e "$1/.claude/rules/$b" ]; then
+      say "  = .claude/rules/$b already exists - left untouched."
+    else
+      cp "$r" "$1/.claude/rules/$b"; say "  + wrote .claude/rules/$b (loads only on matching paths)"
+    fi
+  done
+}
+
+install_skills() {  # $1 = repo root. Task-shaped guidance: only the description sits in context.
+  # Skills are matched against the TASK, not against file paths, which is why orchestration lives here
+  # rather than in .claude/rules (path-triggered) or AGENTS.md (always-on and budget-capped).
+  src=""
+  [ -d "$KIT/claude/skills" ] && src="$KIT/claude/skills"
+  [ -z "$src" ] && [ -d "$KIT/skills" ] && src="$KIT/skills"
+  [ -n "$src" ] || return 0
+  for sd in "$src"/*/; do
+    [ -d "$sd" ] || continue
+    b=$(basename "$sd")
+    if [ -e "$1/.claude/skills/$b/SKILL.md" ]; then
+      say "  = .claude/skills/$b already exists - left untouched."
+    else
+      mkdir -p "$1/.claude/skills/$b"
+      # The whole folder, not just SKILL.md - skills may carry reference files (a design.md, a
+      # template) that the body points at, and a skill deployed without them is silently broken.
+      cp "$sd"*.md "$1/.claude/skills/$b/" 2>/dev/null || cp "$sd/SKILL.md" "$1/.claude/skills/$b/SKILL.md"
+      say "  + wrote .claude/skills/$b (loads when a task matches it)"
+    fi
+  done
+}
+
+codex_skill_desc() {  # $1 = rule basename without .md -> the Codex skill description, or "" if not ported.
+  # Codex has no path-scoped rules. It loads a skill when the TASK matches its description, keeping
+  # only name + description in context until then, which is the closest thing it has to a rule that
+  # costs nothing until it applies. Four of the six depth files are domain-shaped and get an honest
+  # trigger below. code-correctness (any source file) and tests (any test file) are path-shaped: the
+  # only true description is "use when writing code", which fires always or never, so they are NOT
+  # ported - Codex gets their one-line versions from AGENTS.md and nothing more. Routing lives here,
+  # in the adapter; the rule text stays single-sourced in claude/rules/.
+  case "$1" in
+    web-security)     printf '%s' "Use when adding or changing auth, sessions, API routes, middleware, webhooks, payments, uploads, rate limits, CORS, CSRF, security headers, or edge config (nginx, Caddy, vercel.json, wrangler.toml, fly.toml) - the server-side security defaults a senior engineer applies without being asked." ;;
+    data-layer)       printf '%s' "Use when writing or changing migrations, models, schema, SQL, or anything that reads or stores data - staged schema changes, N+1 queries and indexes, money and time column types, and keeping personal data out of logs." ;;
+    frontend-quality) printf '%s' "Use when building or changing user-facing UI: components, pages, screens, forms - accessibility, internationalisation, loading states, and restraint in visual polish." ;;
+    ci-cd)            printf '%s' "Use when editing CI or delivery config: GitHub workflows, Dockerfiles, GitLab CI, Jenkinsfiles, Azure pipelines - pinned actions, least-privilege tokens, untrusted checkouts, secrets in logs, and gates that fail closed." ;;
+    *)                printf '' ;;
+  esac
+}
+
+rule_to_skill() {  # $1 = rule file  $2 = skill name  $3 = description  -> SKILL.md on stdout
+  # Swap the `paths:` frontmatter for skill frontmatter; the body is byte-identical to the rule's.
+  printf -- '---\nname: %s\ndescription: %s\n---\n' "$2" "$3"
+  awk 'NR==1 && $0!="---" {all=1} all {print; next} fm<2 && /^---$/ {fm++; next} fm>=2 {print}' "$1"
+}
+
+install_codex_skills() {  # $1 = repo root. Everything Codex can load lazily, in the dir it reads for that.
+  # .agents/skills is discovered by Codex from the repo root down (no trust prompt, unlike
+  # .codex/skills) and is NOT read by Claude Code, so nothing here double-loads on Claude.
+  ssrc=""; [ -d "$KIT/claude/skills" ] && ssrc="$KIT/claude/skills"
+  [ -z "$ssrc" ] && [ -d "$KIT/skills" ] && ssrc="$KIT/skills"
+  rsrc=""; [ -d "$KIT/claude/rules" ] && rsrc="$KIT/claude/rules"
+  [ -z "$rsrc" ] && [ -d "$KIT/rules" ] && rsrc="$KIT/rules"
+  [ -n "$ssrc$rsrc" ] || return 0
+  if [ -n "$ssrc" ]; then
+    for sd in "$ssrc"/*/; do
+      [ -d "$sd" ] || continue
+      b=$(basename "$sd")
+      if [ -e "$1/.agents/skills/$b/SKILL.md" ]; then
+        say "  = .agents/skills/$b already exists - left untouched."
+      else
+        mkdir -p "$1/.agents/skills/$b"
+        cp "$sd"*.md "$1/.agents/skills/$b/" 2>/dev/null || cp "$sd/SKILL.md" "$1/.agents/skills/$b/SKILL.md"
+        say "  + wrote .agents/skills/$b (Codex: loads when a task matches it)"
+      fi
+    done
+  fi
+  skipped=""
+  if [ -n "$rsrc" ]; then
+    for r in "$rsrc"/*.md; do
+      [ -e "$r" ] || continue
+      n=$(basename "$r" .md); d=$(codex_skill_desc "$n")
+      if [ -z "$d" ]; then skipped="$skipped $n"; continue; fi
+      if [ -e "$1/.agents/skills/$n/SKILL.md" ]; then
+        say "  = .agents/skills/$n already exists - left untouched."
+      else
+        mkdir -p "$1/.agents/skills/$n"
+        rule_to_skill "$r" "$n" "$d" > "$1/.agents/skills/$n/SKILL.md"
+        say "  + wrote .agents/skills/$n (Codex: the $n rule, matched by task instead of by path)"
+      fi
+    done
+  fi
+  [ -n "$skipped" ] && say "  = not ported to Codex skills:$skipped - path-shaped (any source / test file), no honest task trigger; Codex has their one-line versions in AGENTS.md."
+  return 0
+}
+
 install_project() {   # self-contained: full rules + git hooks
   root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
   say "Installing FULL rules + git hooks into: $root"
@@ -88,9 +217,12 @@ install_project() {   # self-contained: full rules + git hooks
   # reads CLAUDE.md only, so CLAUDE.md IMPORTS AGENTS.md rather than duplicating it - one source of
   # truth, no drift. (Anthropic's documented pattern; a symlink also works but needs admin on Windows.)
   if [ -e "$root/AGENTS.md" ]; then say "  = AGENTS.md already exists - left untouched."
-  else cp "$KIT/AGENTS.md" "$root/AGENTS.md"; say "  + wrote AGENTS.md (full rules + empty project block)"; fi
+  else write_rules "$root/AGENTS.md"; say "  + wrote AGENTS.md (full rules + empty project block)"; fi
   if [ -e "$root/CLAUDE.md" ]; then say "  = CLAUDE.md already exists - left untouched."
   else write_claude_importer "$root/CLAUDE.md"; say "  + wrote CLAUDE.md (imports AGENTS.md - single source of truth)"; fi
+  install_path_rules "$root"
+  install_skills "$root"
+  install_codex_skills "$root"
   install_git_hooks "$root"
   hr
   say "Tool-layer guard is machine-wide - run once:  ./install.sh --global   then:  ./install.sh --check"
@@ -107,20 +239,57 @@ install_extension() { # lean: project-config stub + git hooks
   else write_stub "$root/AGENTS.md"; say "  + wrote AGENTS.md (project-config stub; extends your global rules)"; fi
   if [ -e "$root/CLAUDE.md" ]; then say "  = CLAUDE.md already exists - left untouched."
   else write_claude_importer "$root/CLAUDE.md"; say "  + wrote CLAUDE.md (imports AGENTS.md)"; fi
+  install_path_rules "$root"
+  install_skills "$root"
+  install_codex_skills "$root"
   install_git_hooks "$root"
 }
 
 install_global() {
   share="$HOME/.the-agent-kit"
-  mkdir -p "$share/hooks" "$share/git-hooks" "$share/docs"
+  # Running the installed copy's own --global would copy every file onto itself and die under
+  # set -e ("are the same file"). Refreshing the share is --update's job.
+  if [ "$KIT" = "$share" ]; then
+    say "This IS the installed copy - nothing to copy onto itself. To refresh it from GitHub:"
+    say "    $share/install.sh --update"
+    return 0
+  fi
+  mkdir -p "$share/hooks" "$share/git-hooks" "$share/docs" "$share/claude" "$share/codex"
   # Copy the WHOLE kit, not just the hooks, so the clone you ran this from becomes disposable.
   # git-hooks/ is the core.hooksPath target (those three only); hooks/ is the full set, which is
   # what the relocated install.sh compares against in --check and copies from per project.
-  for h in command-guard.py commit-msg pre-commit pre-push; do cp "$KIT/hooks/$h" "$share/hooks/$h"; done
+  for h in command-guard.py kit-check.py commit-msg pre-commit pre-push; do cp "$KIT/hooks/$h" "$share/hooks/$h"; done
   for h in commit-msg pre-commit pre-push; do cp "$KIT/hooks/$h" "$share/git-hooks/$h"; done
-  cp "$KIT/AGENTS.md" "$KIT/CLAUDE.md" "$KIT/install.sh" "$share/"
+  # The recommended-tools list is the user's once seeded: never overwritten, so a declined item stays declined.
+  [ -f "$share/recommended.json" ] || cp "$KIT/hooks/recommended.json" "$share/recommended.json" 2>/dev/null || true
+  # AGENTS.md goes through write_rules, never cp: this repo's file carries its OWN project block, and
+  # the share is what --update-rules and the "prefer the rules global" append both read. A cp here put
+  # this repo's branch rules into every user's global rules (Q3, found 2026-09-26 before it shipped).
+  write_rules "$share/AGENTS.md"
+  cp "$KIT/CLAUDE.md" "$KIT/install.sh" "$share/"
+  # The installer prints these as merge snippets, so the relocated copy must carry them too.
+  cp "$KIT/claude/settings.json" "$share/claude/" 2>/dev/null || true
+  cp "$KIT/codex/config.toml" "$KIT/codex/hooks.json" "$share/codex/" 2>/dev/null || true
   cp "$KIT/docs/"*.md "$share/docs/" 2>/dev/null || true
+  rm -f "$share/docs/lessons.md" "$share/docs/my-skills-and-plugins.md"   # the owner's private, git-ignored notes; not the kit's
+  mkdir -p "$share/rules"
+  cp "$KIT/claude/rules/"*.md "$share/rules/" 2>/dev/null || cp "$KIT/rules/"*.md "$share/rules/" 2>/dev/null || true
+  # Replace the share's skills wholesale. `cp -r src dest` with dest already present copies INTO it,
+  # which on the second --update left a nested skills/skills/ and a stale top level: projects updated
+  # from that copy silently missed every skill added after the first install (observed 2026-09-18).
+  rm -rf "$share/skills"; mkdir -p "$share/skills"
+  if [ -d "$KIT/claude/skills" ]; then cp -r "$KIT/claude/skills/." "$share/skills/" 2>/dev/null || true
+  elif [ -d "$KIT/skills" ]; then cp -r "$KIT/skills/." "$share/skills/" 2>/dev/null || true; fi
+  # The optional performance profile ships in the share too, so the README's paths exist after --update.
+  for pd in claude/performance codex/performance; do
+    rm -rf "$share/$pd"
+    [ -d "$KIT/$pd" ] && mkdir -p "$share/$pd" && cp -r "$KIT/$pd/." "$share/$pd/" 2>/dev/null
+  done
   chmod +x "$share/hooks/"* "$share/git-hooks/"* "$share/install.sh"
+  # Stamp the source commit so --update can tell "already current" from "a month behind", and show
+  # you what actually changed. Absent (or "unknown") when installed from a non-git copy - not fatal.
+  ver=$( (cd "$KIT" && git rev-parse --short HEAD 2>/dev/null) || true )
+  printf '%s\n' "${ver:-unknown}" > "$share/.kit-version"
   say "Copied the kit to $share (rules + hooks + installer + docs)"
   say "  -> $share is now self-contained: the clone you ran this from can be deleted."
 
@@ -140,6 +309,9 @@ install_global() {
     say "  A global core.hooksPath makes git use ONLY that dir for EVERY repo, SHADOWING any repo's own"
     say "  .git/hooks (Husky, a secret scanner, ...). If you rely on those, prefer the per-project install."
     say "  To enable globally anyway:   git config --global core.hooksPath \"$share/git-hooks\""
+    say "  Run that in a NORMAL terminal, not inside an agent session: this kit denies"
+    say "  'git config core.hooksPath' so an agent cannot point git away from the hooks,"
+    say "  and that denial applies to you too while you are in one."
   fi
 
   hr
@@ -153,35 +325,196 @@ install_global() {
   cat "$KIT/codex/config.toml"
 
   hr
-  say "The tool guard is NOT active until you merge the snippet(s) above - then verify:  ./install.sh --check"
+  # $share, never $KIT. Under --update, $KIT is a temp clone this run deletes on its way out, so a
+  # command printed with that path is already broken by the time anyone reads it. $share is where
+  # the kit actually lives afterwards.
+  say "The tool guard is NOT active until you merge the snippet(s) above - then verify:"
+  say "    $share/install.sh --check"
   say "Optional global rules (lets projects stay lean via --extension), review the merge first:"
-  say "    cat \"$KIT/AGENTS.md\" >> ~/.claude/CLAUDE.md   ;   cat \"$KIT/AGENTS.md\" >> ~/.codex/AGENTS.md"
+  say "    cat \"$share/AGENTS.md\" >> ~/.claude/CLAUDE.md   ;   cat \"$share/AGENTS.md\" >> ~/.codex/AGENTS.md"
+}
+
+update_kit() {  # refresh ~/.the-agent-kit from GitHub, so the clone stays disposable
+  share="$HOME/.the-agent-kit"
+  command -v git >/dev/null 2>&1 || { say "  ! git not found - cannot update. Install git, or re-clone by hand."; exit 2; }
+  [ -n "${AGENT_KIT_REPO:-}" ] && say "  ! AGENT_KIT_REPO override active - updating from $KIT_REPO, NOT the official repo."
+  old=$(cat "$share/.kit-version" 2>/dev/null || printf 'unknown')
+  tmp=$(mktemp -d) || exit 2
+  say "Fetching the latest kit from $KIT_REPO"
+  if ! git clone --quiet --depth 50 "$KIT_REPO" "$tmp/kit" 2>/dev/null; then
+    rm -rf "$tmp"; say "  ! clone failed (offline, or the repo moved) - NOTHING was changed."; exit 2
+  fi
+  # Never overwrite a working install from a surprise payload: prove the download is actually the kit
+  # before it touches anything. A moved/renamed/hijacked repo fails here instead of half-installing.
+  for f in install.sh AGENTS.md hooks/command-guard.py hooks/pre-commit; do
+    [ -f "$tmp/kit/$f" ] || { rm -rf "$tmp"; say "  ! downloaded tree has no $f - that is not the kit. NOTHING was changed."; exit 2; }
+  done
+  new=$( (cd "$tmp/kit" && git rev-parse --short HEAD 2>/dev/null) || printf 'unknown' )
+  if [ "$old" = "$new" ] && [ "$old" != "unknown" ]; then
+    rm -rf "$tmp"; say "  = already at $new - nothing to update."; return 0
+  fi
+  say "  $old -> $new"
+  # Shallow clones may not reach `old`, so this is best-effort context, never a gate.
+  (cd "$tmp/kit" && git log --oneline "$old..$new" 2>/dev/null | sed 's/^/    /') || true
+  hr
+  # Run the DOWNLOADED installer, not this one: a newer kit can ship files an older installer does
+  # not know to copy. It is code from the network, which is why the identity check above runs first.
+  #
+  # exec, and nothing after it, is load-bearing. You are usually running $share/install.sh, which
+  # --global is about to overwrite - and sh reads a script lazily by byte offset, so a shell that
+  # kept going here would resume at a stale offset inside the NEW file and execute whatever fragment
+  # of a line landed there ("sac: command not found", observed). exec replaces this process, so not
+  # one more byte is read from the file being replaced. Keep the tail below inside the handoff.
+  exec sh -c '
+    sh "$1/install.sh" --global || exit $?
+    rm -rf "$2"
+    printf "%s\n" "------------------------------------------------------------"
+    printf "%s\n" "Machine-wide guards + ~/.the-agent-kit are now current. Then, per project:"
+    printf "%s\n" "    ~/.the-agent-kit/install.sh --update-rules     # new rules in, your PROJECT-CONFIG kept"
+  ' _ "$tmp/kit" "$tmp"
+}
+
+refresh_kit_owned() {  # $1 = repo root. Kit-NAMED rules and skills are kit-owned: a fix to
+  # web-security.md must reach installed projects, or every update silently under-delivers.
+  # Files under other names are the user's and are never touched.
+  src=""
+  [ -d "$KIT/claude/rules" ] && src="$KIT/claude/rules"
+  [ -z "$src" ] && [ -d "$KIT/rules" ] && src="$KIT/rules"
+  if [ -n "$src" ]; then
+    for r in "$src"/*.md; do
+      [ -e "$r" ] || continue
+      b=$(basename "$r"); tgt="$1/.claude/rules/$b"
+      if [ -e "$tgt" ] && ! cmp -s "$r" "$tgt"; then
+        cp -f "$r" "$tgt"; say "  ~ refreshed .claude/rules/$b (kit-owned; local edits to kit-named files are replaced)"
+      fi
+    done
+  fi
+  ssrc=""
+  [ -d "$KIT/claude/skills" ] && ssrc="$KIT/claude/skills"
+  [ -z "$ssrc" ] && [ -d "$KIT/skills" ] && ssrc="$KIT/skills"
+  if [ -n "$ssrc" ]; then
+    for sd in "$ssrc"/*/; do
+      [ -d "$sd" ] || continue
+      b=$(basename "$sd")
+      for sf in "$sd"*.md; do
+        [ -e "$sf" ] || continue
+        fn=$(basename "$sf"); tgt="$1/.claude/skills/$b/$fn"
+        if [ -e "$tgt" ] && ! cmp -s "$sf" "$tgt"; then
+          cp -f "$sf" "$tgt"; say "  ~ refreshed .claude/skills/$b/$fn (kit-owned)"
+        elif [ ! -e "$tgt" ] && [ -d "$1/.claude/skills/$b" ]; then
+          cp "$sf" "$tgt"; say "  + added .claude/skills/$b/$fn (new kit file)"
+        fi
+        # The Codex copy of the same skill is kit-owned on the same terms.
+        ctgt="$1/.agents/skills/$b/$fn"
+        if [ -e "$ctgt" ] && ! cmp -s "$sf" "$ctgt"; then
+          cp -f "$sf" "$ctgt"; say "  ~ refreshed .agents/skills/$b/$fn (kit-owned)"
+        elif [ ! -e "$ctgt" ] && [ -d "$1/.agents/skills/$b" ]; then
+          cp "$sf" "$ctgt"; say "  + added .agents/skills/$b/$fn (new kit file)"
+        fi
+      done
+    done
+  fi
+  # Generated Codex skills: regenerate from the current rule text and replace on any difference, so a
+  # fix to web-security.md reaches Codex projects too, not only Claude ones.
+  if [ -n "$src" ]; then
+    for r in "$src"/*.md; do
+      [ -e "$r" ] || continue
+      n=$(basename "$r" .md); d=$(codex_skill_desc "$n"); [ -n "$d" ] || continue
+      tgt="$1/.agents/skills/$n/SKILL.md"; [ -e "$tgt" ] || continue
+      tmp="$tgt.refresh.tmp"; rule_to_skill "$r" "$n" "$d" > "$tmp"
+      if cmp -s "$tmp" "$tgt"; then rm -f "$tmp"
+      else mv -f "$tmp" "$tgt"; say "  ~ refreshed .agents/skills/$n/SKILL.md (kit-owned; regenerated from $n.md)"; fi
+    done
+  fi
+}
+
+update_rules() {  # refresh the universal rules in this repo's AGENTS.md, preserving its PROJECT-CONFIG block
+  root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+  tgt="$root/AGENTS.md"
+  if [ ! -e "$tgt" ]; then
+    say "  ! no AGENTS.md in $root - nothing to update. Run './install.sh' to install the rules first."
+    exit 2
+  fi
+  # An --extension stub carries no universal rules on purpose - they live in the global files.
+  if grep -q 'universal rules live in your global' "$tgt" 2>/dev/null; then
+    say "  = this AGENTS.md is an --extension stub: the universal rules live in your GLOBAL files"
+    say "    (~/.claude/CLAUDE.md / ~/.codex/AGENTS.md) - update those; this file only holds project config."
+    exit 0
+  fi
+  # Fail closed without both markers: there is no way to tell project config from rules, so replace nothing.
+  if ! grep -q 'PROJECT-CONFIG:START' "$tgt" 2>/dev/null || ! grep -q 'PROJECT-CONFIG:END' "$tgt" 2>/dev/null; then
+    say "  ! $tgt has no PROJECT-CONFIG markers - refusing to guess which part is yours."
+    say "    Add the markers (see the kit's AGENTS.md) or update the file by hand."
+    exit 2
+  fi
+  tmp="$tgt.update-rules.tmp"
+  # Pass 1 saves the project's block (markers inclusive); pass 2 prints the kit's current rules with
+  # the kit's placeholder block swapped for the saved one.
+  awk '
+    NR==FNR { if (/PROJECT-CONFIG:START/) c=1
+              if (c) blk = blk $0 ORS
+              if (/PROJECT-CONFIG:END/)  c=0
+              next }
+    /PROJECT-CONFIG:START/ { skip=1; printf "%s", blk }
+    !skip { print }
+    /PROJECT-CONFIG:END/   { skip=0 }
+  ' "$tgt" "$KIT/AGENTS.md" > "$tmp"
+  if [ ! -s "$tmp" ]; then rm -f "$tmp"; say "  ! update produced an empty file - aborted, nothing changed."; exit 2; fi
+  if cmp -s "$tmp" "$tgt"; then
+    rm -f "$tmp"; say "  = AGENTS.md already carries the current rules - nothing to do."
+  else
+    mv "$tmp" "$tgt"
+    say "  + updated the universal rules in $tgt - your PROJECT-CONFIG block is untouched."
+    say "    Anything else hand-edited OUTSIDE the markers was replaced; review:  git diff AGENTS.md"
+  fi
+  # Bringing a project up to date has to mean the WHOLE kit, not just this one file. A project set up
+  # before the depth tier existed has no .claude/rules, and updating only AGENTS.md would leave it
+  # silently missing every path-scoped rule while reporting success.
+  refresh_kit_owned "$root"
+  install_path_rules "$root"
+  install_skills "$root"
+  install_codex_skills "$root"
 }
 
 doctor() {
+  dfail=0
   hr; say "the-agent-kit --check (doctor)"
+  # The compatibility tuple: a measurement or a bug report means nothing without the tool versions.
+  for cli in claude codex; do
+    v=$($cli --version 2>/dev/null | head -1)
+    [ -n "$v" ] && say "  OK:   $cli = $v" || say "  NOTE: $cli not on PATH"
+  done
   py=$(detect_py)
   if [ -z "$py" ]; then
-    say "  FAIL: no working python (python3/python/py). On Windows 'python3' is often a no-op Store stub."
+    dfail=1; say "  FAIL: no working python (python3/python/py). On Windows 'python3' is often a no-op Store stub."
     say "        -> the tool-layer command-guard will NOT run. Install Python 3."
   else
     say "  OK:   python = $py"
     d=$(printf '%s' '{"tool_input":{"command":"git push"}}'         | $py "$KIT/hooks/command-guard.py" --decision ask 2>/dev/null)
-    case "$d" in *'"ask"'*)  say "  OK:   command-guard fires on 'git push'" ;; *) say "  FAIL: command-guard emitted no decision for 'git push'" ;; esac
+    case "$d" in *'"ask"'*)  say "  OK:   command-guard fires on 'git push'" ;; *) dfail=1; say "  FAIL: command-guard emitted no decision for 'git push'" ;; esac
     f=$(printf '%s' '{"tool_input":{"command":"git push --force"}}' | $py "$KIT/hooks/command-guard.py" --decision ask 2>/dev/null)
-    case "$f" in *'"deny"'*) say "  OK:   force-push is denied" ;; *) say "  FAIL: force-push not denied" ;; esac
+    case "$f" in *'"deny"'*) say "  OK:   force-push is denied" ;; *) dfail=1; say "  FAIL: force-push not denied" ;; esac
     n=$(printf '%s' '{"tool_input":{"command":"git commit -an -m x"}}' | $py "$KIT/hooks/command-guard.py" --decision ask 2>/dev/null)
-    case "$n" in *'"deny"'*) say "  OK:   bundled --no-verify (git commit -an) is denied" ;; *) say "  FAIL: bundled --no-verify (-an) NOT denied" ;; esac
+    case "$n" in *'"deny"'*) say "  OK:   bundled --no-verify (git commit -an) is denied" ;; *) dfail=1; say "  FAIL: bundled --no-verify (-an) NOT denied" ;; esac
     h=$(printf '%s' '{"tool_input":{"command":"git -c core.hooksPath=/x commit -m y"}}' | $py "$KIT/hooks/command-guard.py" --decision ask 2>/dev/null)
-    case "$h" in *'"deny"'*) say "  OK:   -c core.hooksPath override is denied" ;; *) say "  FAIL: -c core.hooksPath NOT denied" ;; esac
+    case "$h" in *'"deny"'*) say "  OK:   -c core.hooksPath override is denied" ;; *) dfail=1; say "  FAIL: -c core.hooksPath NOT denied" ;; esac
     e=$(printf '%s' '{"tool_input":{"command":"nice -n 5 git commit --no-verify -m x"}}' | $py "$KIT/hooks/command-guard.py" --decision ask 2>/dev/null)
-    case "$e" in *'"deny"'*) say "  OK:   wrapper-composed --no-verify is denied" ;; *) say "  FAIL: wrapper-composed --no-verify NOT denied" ;; esac
+    case "$e" in *'"deny"'*) say "  OK:   wrapper-composed --no-verify is denied" ;; *) dfail=1; say "  FAIL: wrapper-composed --no-verify NOT denied" ;; esac
     g=$(printf '%s' '{"tool_input":{"command":"printf x >> .git/config"}}' | $py "$KIT/hooks/command-guard.py" --decision deny 2>/dev/null)
-    case "$g" in *'"deny"'*) say "  OK:   direct .git/config write is flagged" ;; *) say "  FAIL: direct .git/config write NOT flagged" ;; esac
+    case "$g" in *'"deny"'*) say "  OK:   direct .git/config write is flagged" ;; *) dfail=1; say "  FAIL: direct .git/config write NOT flagged" ;; esac
   fi
   for h in commit-msg pre-commit pre-push; do
     if [ -x "$KIT/hooks/$h" ]; then say "  OK:   hooks/$h present + executable"; else say "  WARN: hooks/$h missing or not executable"; fi
   done
+  # The session-start check is optional (it is wired only if you merged the SessionStart snippet), so
+  # its absence is a NOTE, and opting out is reported as a choice rather than a fault.
+  if [ ! -f "$KIT/hooks/kit-check.py" ]; then
+    say "  NOTE: hooks/kit-check.py not in this kit copy - the session-start update check is unavailable"
+  elif [ "${AGENT_KIT_NO_UPDATE_CHECK:-}" = 1 ]; then
+    say "  NOTE: session-start update check is switched off (AGENT_KIT_NO_UPDATE_CHECK=1)"
+  else
+    say "  OK:   hooks/kit-check.py present (session-start update check; wired if you merged SessionStart)"
+  fi
   hd=$(git_hooks_dir "$(pwd)")
   if [ -z "$hd" ]; then
     say "  NOTE: not a git repo - no git-layer hooks to check here."
@@ -203,7 +536,7 @@ doctor() {
       elif grep -q 'the-agent-kit' "$hd/$h" 2>/dev/null; then
         say "  OK:   $h in $hd calls the kit (shim) - text match only; open it to confirm it still runs."
       else
-        say "  FAIL: $hd/$h is NOT the kit's - that guard is INACTIVE. Merge the kit's $h into it."
+        dfail=1; say "  FAIL: $hd/$h is NOT the kit's - that guard is INACTIVE. Merge the kit's $h into it."
       fi
     done
   fi
@@ -217,7 +550,7 @@ doctor() {
     if [ "$ab" -lt 0 ]; then
       say "  WARN: AGENTS.md exists but could not be read to measure it (permissions? file lock?)."
     elif [ "$ab" -gt 32768 ]; then
-      say "  FAIL: AGENTS.md is $ab bytes - Codex SILENTLY truncates past 32768 (project_doc_max_bytes)."
+      dfail=1; say "  FAIL: AGENTS.md is $ab bytes - Codex SILENTLY truncates past 32768 (project_doc_max_bytes)."
       say "        That cap applies to the COMBINED AGENTS.md chain read root-to-leaf, so nested files count too."
     else
       say "  OK:   AGENTS.md $ab bytes (Codex silently truncates the combined chain past 32768)"
@@ -225,7 +558,12 @@ doctor() {
     # Claude Code docs, Memory > Write effective instructions: "target under 200 lines per CLAUDE.md
     # file. Longer files consume more context and reduce adherence." Block-level HTML comments are
     # stripped before Claude's context, so they are excluded from this count.
-    al=$(sed '/<!--/,/-->/d' AGENTS.md 2>/dev/null | grep -c . || true)
+    # Delete self-closed one-line comments FIRST, then true multi-line comment ranges. Order is
+    # load-bearing: `<!-- PROJECT-CONFIG:START -->` holds both delimiters, so a bare `/<!--/,/-->/d`
+    # opened a range there and closed it at `<!-- PROJECT-CONFIG:END -->`, silently excluding the
+    # project's whole config from the budget it is supposed to be counted against. That under-reported
+    # this repo by 7 lines and every filled install by the size of its block (found 2026-09-26).
+    al=$(sed -e '/^[[:space:]]*<!--.*-->[[:space:]]*$/d' -e '/<!--/,/-->/d' AGENTS.md 2>/dev/null | grep -c . || true)
     case "$al" in ''|*[!0-9]*) al=-1 ;; esac
     if [ "$al" -lt 0 ]; then
       :
@@ -238,7 +576,33 @@ doctor() {
     # placeholder means the agent guesses how to build, test, and verify - so say so loudly.
     if grep -q 'PROJECT-CONFIG:START' AGENTS.md 2>/dev/null && grep -q 'fill this in' AGENTS.md 2>/dev/null; then
       say "  WARN: PROJECT-CONFIG is still the empty placeholder. Without it the agent GUESSES this project's"
-      say "        build / test / lint commands. Fill it via docs/project-setup-prompt.md - biggest win available."
+      say "        build / test / lint commands. Fill it via ~/.the-agent-kit/docs/project-setup-prompt.md - biggest win."
+    elif grep -q 'PROJECT-CONFIG:START' AGENTS.md 2>/dev/null && ! grep -q '^\*\*Branches:\*\*' AGENTS.md 2>/dev/null; then
+      # A block filled before 2026-09-26 has no branch model, and --update-rules keeps the block byte for
+      # byte, so without this the gap is invisible: the agent guesses which branch takes work.
+      say "  WARN: this project's block has no **Branches:** line, so the agent guesses which branch takes work"
+      say "        and whether one is release-only. Re-run ~/.the-agent-kit/docs/project-setup-prompt.md to add it."
+    fi
+    # The depth tier. It is invisible by design - it loads only on matching paths - so if it silently
+    # failed to install, nothing else would ever say so. The doctor is the only place that can.
+    if [ -d .claude/rules ]; then
+      rn=$(ls .claude/rules/*.md 2>/dev/null | wc -l | tr -d ' ')
+      rbad=0
+      for rf in .claude/rules/*.md; do
+        [ -e "$rf" ] || continue
+        grep -q '^paths:' "$rf" 2>/dev/null || rbad=$((rbad+1))
+      done
+      if [ "$rn" -eq 0 ]; then
+        say "  WARN: .claude/rules exists but holds no rules - the depth tier is not installed here."
+      elif [ "$rbad" -gt 0 ]; then
+        say "  WARN: $rbad of $rn rules in .claude/rules lack 'paths:' frontmatter - those load on EVERY"
+        say "        turn instead of only on matching files, which is the opposite of the intent."
+      else
+        say "  OK:   $rn path-scoped rules in .claude/rules (load only on matching paths, free otherwise)"
+      fi
+    else
+      say "  NOTE: no .claude/rules here - the deep conditional rules are not installed. Run ./install.sh"
+      say "        in this repo to add them (they cost nothing until a matching file is opened)."
     fi
     if [ -e CLAUDE.md ]; then
       if grep -q '@AGENTS.md' CLAUDE.md 2>/dev/null; then
@@ -251,13 +615,24 @@ doctor() {
     fi
   fi
   hr
+  # A doctor that prints FAIL and exits 0 is worse than no doctor: CI and scripts read the exit code,
+  # and a green exit over red text is false confidence.
+  [ "$dfail" -eq 0 ] || exit 1
 }
 
+# Library mode: the adherence harness sources this file for install_codex_skills, so the Codex arm
+# of the eval is built by the same code as a real install and the two cannot drift. Nothing below
+# this line runs when sourced that way.
+if [ "${AGENT_KIT_LIB:-0}" = 1 ]; then return 0 2>/dev/null || exit 0; fi
+
+USAGE="Usage: ./install.sh [--extension | --global | --update | --update-rules | --check]"
 case "$MODE" in
-  --global|global)        install_global ;;
-  --extension|extension)  install_extension ;;
-  --check|check|doctor)   doctor ;;
-  ""|project|--project)   install_project ;;
-  -h|--help)              say "Usage: ./install.sh [--extension | --global | --check]" ;;
-  *) say "Unknown mode: $MODE"; say "Usage: ./install.sh [--extension | --global | --check]"; exit 2 ;;
+  --global|global)              install_global ;;
+  --extension|extension)        install_extension ;;
+  --update|update)              update_kit ;;
+  --update-rules|update-rules)  update_rules ;;
+  --check|check|doctor)         doctor ;;
+  ""|project|--project)         install_project ;;
+  -h|--help)                    say "$USAGE" ;;
+  *) say "Unknown mode: $MODE"; say "$USAGE"; exit 2 ;;
 esac

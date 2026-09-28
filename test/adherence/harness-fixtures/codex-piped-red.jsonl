@@ -1,0 +1,2 @@
+{"type":"item.completed","item":{"type":"command_execution","command":"node --test 2>&1 | tail -5","exit_code":0,"aggregated_output":"not ok 1 - small negatives\n# fail 1"}}
+{"type":"item.completed","item":{"type":"file_change","changes":[{"path":"C:/w/lib/money.js"}]}}

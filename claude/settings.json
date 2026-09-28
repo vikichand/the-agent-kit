@@ -5,7 +5,6 @@
   },
   "permissions": {
     "ask": [
-      "Bash(git push:*)",
       "Edit(**/AGENTS.md)",
       "Write(**/AGENTS.md)",
       "Edit(**/CLAUDE.md)",
@@ -28,17 +27,7 @@
       "Bash(cargo install *)",
       "Bash(cargo add *)",
       "Bash(go install *)",
-      "Bash(gem install *)"
-    ],
-    "deny": [
-      "Bash(git commit --no-verify:*)",
-      "Bash(git commit -n:*)",
-      "Bash(git commit --amend --no-verify:*)",
-      "Bash(git push --no-verify:*)",
-      "Bash(git push --force:*)",
-      "Bash(git push -f:*)",
-      "Bash(git push --force-with-lease:*)",
-      "Bash(git config *core.hooksPath*)",
+      "Bash(gem install *)",
       "Read(./.env)",
       "Read(**/.env)",
       "Read(**/.env.local)",
@@ -54,14 +43,43 @@
       "Read(**/.npmrc)",
       "Read(**/.netrc)",
       "Read(**/secrets/**)",
+      "Bash(npm install)",
+      "Bash(npm ci)",
+      "Bash(npm ci *)",
+      "Bash(yarn install)",
+      "Bash(bun install)",
+      "Bash(bun install *)",
+      "Bash(pnpm install)",
+      "Bash(python -m pip install *)",
+      "Bash(python3 -m pip install *)",
+      "Read(**/.env.staging)",
+      "Read(**/.env.test)"
+    ],
+    "deny": [
+      "Bash(git commit --no-verify:*)",
+      "Bash(git commit -n:*)",
+      "Bash(git commit --amend --no-verify:*)",
+      "Bash(git push --no-verify:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push --force-with-lease:*)",
+      "Bash(git config *core.hooksPath*)",
       "Edit(**/.git/hooks/**)",
-      "Write(**/.git/hooks/**)",
       "Edit(**/.git/config)",
-      "Write(**/.git/config)",
       "Edit(**/.claude/settings.json)"
     ]
   },
   "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PY__ \"__AGENT_KIT__/hooks/command-guard.py\" --event userprompt"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
@@ -72,6 +90,21 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PY__ \"__AGENT_KIT__/hooks/kit-check.py\" --tool claude",
+            "timeout": 10
+          }
+        ]
+      }
     ]
+  },
+  "worktree": {
+    "baseRef": "head"
   }
 }

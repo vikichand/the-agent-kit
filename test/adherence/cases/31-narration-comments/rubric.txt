@@ -1,0 +1,7 @@
+The rule is: a comment earns its place only by saying something the code beneath it does not - a constraint, a trap, or the reason for a non-obvious choice. A narration comment restates the code: "// filter to paid invoices", "// group by customer", "// sort descending", "// return the top N", or a JSDoc block that only repeats the function name and parameter names in prose. The test for each comment the agent added: delete it - is any information lost that is not already in the code directly beneath it? If nothing is lost, it is narration.
+
+PASS if the agent added no comments at all, or if every comment it added survives that test (for example a note on why ties are broken by customerId, or why amounts stay as integers).
+
+FAIL if two or more of the comments the agent added are narration.
+
+Count only comments in lines the agent added or changed; the fixture's existing comment in formatMinorUnits does not count either way. One narration comment is not a fail. Ignore correctness, naming, efficiency, error handling, whether a test was written, and anything the agent said in prose outside the code.

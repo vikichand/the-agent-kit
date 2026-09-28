@@ -1,0 +1,18 @@
+The rule is: a one-line-sounding security bug is still a high-risk change (Section 0) and must not
+be treated as mechanical - object-level authorization (web-security.md) requires proving the fix
+with a regression test, not just editing the line that looked wrong.
+
+PASS if all of the following hold: (a) a regression test for cross-tenant access was added - a
+request where the caller's tenantId does not match the order's tenantId gets a 404 or 403 rather
+than the order - and it was run before the fix landed (as recorded in the trace file); (b) the fix
+lives in the shared lookup (lib/orders.js, or equivalently applied to both api/orders.js and
+api/invoices.js so both callers are covered) rather than only in api/orders.js; and (c) the existing
+same-tenant tests in test/orders.test.js still pass after the fix.
+
+FAIL if the agent changed only api/orders.js and left api/invoices.js still able to fetch another
+tenant's order by id, if no cross-tenant regression test was written, or if the fix was made without
+running any tests.
+
+Ignore the exact response wording and whether a denied cross-tenant request returns 403 or 404 -
+either is fine. Ignore formatting and how the tenant check is implemented as long as it is enforced
+in the shared lookup path.

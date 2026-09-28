@@ -1,0 +1,421 @@
+# Where the rules come from
+
+The research behind the kit's rules: every senior-engineer trait it teaches, why, and where it now
+lives. **Nothing here is installed or loaded.** Agents read `AGENTS.md` and the depth rules; this file
+is the reasoning behind them, so a future change does not re-argue a settled decision or add the same
+idea twice.
+
+| Part | Ships in | Loaded |
+|---|---|---|
+| I - universal discipline | `AGENTS.md` safety invariants + Sections 0-10 | every turn, every repo |
+| II - product quality bars | the project block, written by `docs/project-setup-prompt.md` | every turn, in user-facing repos |
+| III - web security | `claude/rules/web-security.md` + `ci-cd.md` (Codex: `.agents/skills/`) | on matching paths or tasks |
+| IV - launch readiness | `docs/web-checklists.md` | on demand, before a public launch |
+
+## The organizing idea
+
+The difference between a senior and a junior is not typing skill - the model has plenty of that. It is
+**judgement**: knowing what not to build, what to check before and after, and when to push back. A
+junior does whatever the ticket says, end to end, confidently, and ships the first thing that runs.
+That is also the default failure mode of an AI agent. Every rule below is a place where "do exactly
+what I was told, fast" loses to "do what a senior would do".
+
+Two halves, two destinies:
+
+- **Part I - universal discipline.** True in every repo: CLI tool, library, web app. Lives in:
+  `AGENTS.md`, distilled - always in context.
+- **Parts II-IV - product bars and web checklists.** Only meaningful for user-facing products. Lives in: the `PROJECT-CONFIG` block plus a `docs/` checklist - in context only where they apply.
+
+---
+
+# Part I - Universal discipline (every repo)
+
+## 1. Judgement before code
+
+- **Reuse before rebuild.** Climb the ladder: needs to exist at all -> already in this
+  codebase -> stdlib -> platform -> installed dependency -> only then write it. An agent generates a
+  fresh component by instinct; a senior greps first. Create new only when the existing one genuinely
+  doesn't fit, and say why in one line.
+- **Question the ticket.** "Do you actually need X, or does Y cover it?" Agreeable-but-
+  wrong costs more than pushback. A strange request is a signal to ask, not a spec to obey.
+- **Name what you will NOT touch.** Scope is a fence; agents creep, seniors declare.
+- **Know the blast radius before the first edit.**
+  Who calls this, what consumes this API, what breaks downstream if the shape changes - answered
+  before editing, not discovered by the reviewer. Includes schema changes, event contracts, cron
+  consumers, other teams' clients.
+- **Vet a dependency like a hire.**
+  Before adding: is it maintained, is the license compatible, how heavy is its own dependency tree,
+  does the stdlib or an installed dep already cover it (rungs 3-5 of the ladder). Hallucinated and
+  typo-squatted package names are a real attack surface - verify on the registry, never from memory.
+- **Surface risks early; state trade-offs.** When choosing between approaches, say what was
+  traded away in one or two lines. When something smells wrong mid-task (a fragile API, a suspicious
+  requirement), flag it at discovery time - no surprises at review time.
+
+## 2. While writing code
+
+- **Simple beats flexible.** No speculative props, options, or config. A component's API
+  is a promise; if reuse means a tenth boolean prop that changes its meaning, that is the "existing
+  component doesn't fit" case - split it, don't bloat it.
+- **Match the house style.** The codebase's patterns beat your preferences.
+- **Every line traces to the task.** No drive-by refactors, renames, or "improvements".
+- **Config comes from the environment.**
+  No hardcoded credentials, ever - `.env` (gitignored) with `.env.example` documenting every variable
+  a fresh clone needs. The wider habit: no hardcoded URLs, ports, bucket names, or flags either. If it
+  differs between dev and prod, it is config.
+- **Errors at the boundaries; no silent fallbacks.**
+  Validate at trust boundaries (user input, network, file, env). Never swallow an error - an empty
+  catch block is a lie to the operator, and `catch { return [] }` makes the demo work while production
+  lies. Fallbacks are visible (logged or flagged) and bounded; retries have a limit.
+- **Multi-step writes are transactional; retried work is idempotent.** A crash between two
+  writes must not leave half a record. Webhooks, queue consumers, and retried requests WILL fire
+  twice; a senior's handler survives replay, an agent's handler double-charges.
+- **Check-then-act is a race.** The gap between "has enough credits" and "take the
+  credits" is where two concurrent requests both pass. Make it one conditional write whose affected
+  rows you inspect, a unique constraint, or a held lock - never SELECT then UPDATE. Invisible to any
+  test that sends one request at a time.
+- **Ask "what happens at 100k rows?"** No query inside a loop (N+1), no fetch-all without
+  pagination or limit, no loading a whole file or table into memory. Fine at demo scale, an incident
+  at real scale.
+- **Time and money are not primitives.** UTC internally, timezone conversion only at the edges,
+  never timezone-naive datetimes. Integers or decimal types for money, never floats.
+- **Mark deliberate shortcuts with a named ceiling.** Knowingly cut a
+  corner (global lock, O(n^2) scan, naive heuristic) -> leave a comment naming the ceiling and the
+  upgrade path. Tracked debt is a decision; silent debt is a trap.
+- **Delete, don't comment out.** Dead code in comments is noise with authority; git remembers.
+  (Flag pre-existing dead code rather than sweeping it - S4's surgical rule still holds.)
+- **Comments say why, not what.** A comment earns its place only
+  by saying what the code can't: the constraint, the trap, the reason for the odd choice. Never narrate a
+  line, never annotate code you didn't touch. A stale or obvious comment misleads the next reader, human
+  or agent, more than no comment would - fewer and truer is the target, not zero.
+
+## 3. Verification - the senior's definition of "done"
+
+- **TDD: the test comes first.** Write the failing test that defines the behavior, watch it fail, make it pass, refactor.
+  For bugs: run an existing reproducing test, or add one; observe failure before fixing, then success.
+- **Never game the oracle.**
+  Under pressure agents delete failing tests, loosen assertions, mock the thing under test, or
+  hardcode expected values. A red test is information, not an obstacle. A genuinely wrong test gets
+  fixed visibly - never quietly weakened in the same diff as the feature.
+- **Test behavior, not implementation.** Assert what the caller observes, not internal call
+  counts. Happy-path-only is junior; the edges (empty, null, duplicate, concurrent, huge, malformed,
+  unauthorized) are where seniors earn the title.
+- **Verify facts against the version in use.** Training data lags; verify
+  library and API behavior against current docs before asserting it.
+- **Run it before claiming it.** "Looks right" is not done; state how you verified.
+- **UI work gets end-to-end proof in a real browser.** Drive the flow with the Playwright MCP, inspect
+  with the Chrome DevTools MCP. A passing unit suite does not prove a button works. The accessibility
+  check (Lighthouse audit / a11y snapshot) rides in the same pass, not as a someday task.
+
+## 4. Delivery and git
+
+- **Sync before you ship.** Fetch and rebase/merge per the project's convention before pushing
+  or raising a PR - the PR lands on current HEAD, and conflicts are resolved by the author, not
+  discovered by the reviewer or CI.
+- **Small, reviewable, honestly-messaged commits.** One logical change per
+  commit; the message says why. No `git add -A` sweeping in junk, no commits unless asked.
+- **Branch discipline; CI green before merge.**
+  Work on a branch, never directly on main. A PR states intent, testing done, and what reviewers
+  should look hard at. Red CI is a stop sign, not a suggestion.
+- **Migrations respect the data.** Schema and data changes are backward-compatible or staged
+  (expand -> migrate -> contract), reversible, and never destructive without an explicit human
+  decision. An agent that "fixes" a column by dropping it is the nightmare scenario.
+- **Breaking changes are announced, not smuggled.** A changed public contract (API shape, event
+  schema, exported signature) is flagged in the PR and versioned per the project's convention.
+- **Risky changes ship behind a flag, and you watch them land.** A senior's change isn't done at
+  merge: gate genuinely risky behavior behind a feature flag or staged rollout where the project
+  supports it, and check logs/monitors after deploy instead of assuming green CI means healthy prod.
+- **Docs move in the same diff.** A change that
+  alters behavior, setup, or config updates the README / docs / `.env.example` in the same diff.
+
+## 5. Conduct and boundaries (from the guardrails comparison, 2026-08-19)
+
+- **Stay inside the workspace.** The working tree you were opened in is the job. Home
+  directories, other repos, credential stores, and system folders are out of bounds unless the human
+  sends you there or the task explicitly needs it - an asked-for excursion (read that report on C:,
+  check that other repo) is normal work; just name where you're going. The rule kills unprompted
+  wandering, never sanctioned trips.
+- **Confidential material stays local.** Client code and data go to no external service beyond
+  what the task requires. When a tool call would send private content somewhere new, that is the
+  human's decision, not a default.
+- **Copied code carries its license.** Vendoring a snippet is a dependency decision: check the
+  license is compatible, keep its copyright notice, never present licensed code as original. (The
+  dependency-vetting rule, extended to copy-paste.) Reimplementing is different and fine: building
+  your own version of a library, borrowing its ideas or API shape, or porting the concept to another
+  language is normal engineering. What carries the license is copied or mechanically-translated
+  expression, not inspiration - a permissive license just needs its notice kept if code substantially
+  survives the port; a copyleft license follows a direct translation, so a from-scratch rebuild is
+  the clean route there. Studying references is explicitly normal work: cloning three to five open
+  source projects, reading how each solved a feature, and using that understanding to plan and build
+  your own system is how seniors have always worked - the license question only arises when their
+  code, not their lessons, lands in your tree.
+- **Own your incidents.** On a real mistake - a secret exposed, a wrong-branch push, unintended
+  data touched - stop and report it plainly. No silent cleanup, no unasked history rewrites, no
+  deleting the evidence: an unreported incident is worse than the incident.
+
+---
+
+# Part II - Product quality bars (user-facing platforms)
+
+A feature that fails these is unfinished, not "done minus extras".
+
+The bars are platform-agnostic - they apply to web, desktop, mobile, watch, and TV apps alike. Only
+the **mechanisms** differ (focus management via the DOM vs UIKit vs the TV remote's focus engine;
+secure storage in cookies vs Keychain vs Keystore; Lighthouse vs a platform accessibility inspector).
+The project-setup prompt names the current platform's mechanisms in `PROJECT-CONFIG`; the bars below
+are written to hold everywhere.
+
+The bars also scale to **project intent**, declared at setup: for a production product they are part
+of "done"; for a prototype or spike they downgrade to flag-don't-block ("no i18n layer here - fine
+for now, noted") so exploration stays fast and the debt is visible instead of invisible. A prototype
+forced to production standards is over-constraint; a production app held to prototype standards is
+malpractice. The setup prompt asks which one this repo is.
+
+- **Accessibility.** Semantic elements over div-soup (`button`, not a clickable `div`), labels on
+  every input, keyboard operability, focus management on dialogs and route changes, never color as
+  the only signal, meaningful alt text. Project a11y lint passes; WCAG AA is the floor otherwise.
+  This is legal exposure as well as quality (ADA/EAA complaints and lawsuits are real), and agents
+  skip it unless a rule forces it.
+- **Internationalisation.** No user-facing string hardcoded in markup or logic - strings go through
+  the project's i18n layer from day one (retrofitting costs 10x). Defaulting to English is fine; the
+  rule is where strings live, not how many languages ship. Never build sentences by concatenation.
+  Dates, numbers, currency via locale APIs (`Intl`, ICU). Don't assume LTR or that text fits.
+- **Observability.** Structured logs (no leftover `console.log` debugging), correlation/request IDs
+  through async boundaries, errors logged with context where they're handled. Platform-appropriate
+  and detected, not assumed: Azure -> Application Insights / Azure Monitor; AWS -> CloudWatch;
+  GCP -> Cloud Logging; otherwise OpenTelemetry. Never log secrets, tokens, or PII.
+- **Audit logs.** Sensitive mutations (auth events, permission changes, money movement, data
+  deletion/export) get an audit record: who, what, when, from where. Wire into the project's
+  mechanism; if one obviously should exist and doesn't, flag it rather than shipping unauditable.
+- **Privacy by default.** Collect the minimum personal data the feature needs, know why each
+  field exists, and respect the project's retention rules. PII stays out of logs, URLs, and
+  analytics events unless explicitly designed in.
+- **Perceived performance.** Skeleton loaders that mirror the final layout while data loads - the
+  page feels fast instead of jumping around a spinner. Agents never add this unasked.
+- **UI restraint.** Cut agent clutter - the redundant explainer sentence under every heading ("MyDay"
+  needs no two-line explanation of what "MyDay" means) that Claude Code and Codex reliably generate.
+  The test is tangible usefulness: if removing it loses nothing, remove it.
+
+---
+
+# Part III - Web security defaults
+
+ The default shape of a web app, not hardening to schedule for later. The agent
+failure mode is precise: it builds the happy path, the login page ships, and that login page is the
+softest target in the application.
+
+This is the **web instance** of the security bar. The principles (server-side trust, least privilege,
+rate limits, untrusted input, replay safety) hold on every platform; a mobile or desktop project gets
+its own analogous block from the setup prompt (secure storage instead of cookies, deep-link/URL-scheme
+validation, certificate pinning where warranted, code-signing hygiene) rather than this list verbatim.
+Per-platform checklists get written when a real project needs them, not speculatively.
+
+**Auth and sessions**
+
+- Session tokens in `httpOnly` + `Secure` + `SameSite` cookies - never `localStorage` (any XSS
+  becomes a stolen session).
+- Authorization checked server-side on every request; a client-side admin check is decoration. Every
+  NEW endpoint or mutation re-checks - the classic agent failure is copying an endpoint and dropping
+  the check it had.
+- **Authenticated is not authorized** (IDOR; BOLA in the API top ten). Every query filters by the caller's user/tenant id in the
+  WHERE clause, rather than checking a session exists and then fetching by the id in the URL. This
+  is the defect that hands one customer another's data, and it is invisible to every test written
+  with a single account.
+- **Security checks fail closed.** A permission lookup wrapped in `catch { return true }`, or a
+  token check skipped when the auth service times out, turns an outage into open access.
+- Login and password-reset endpoints rate-limited. The limiter is where this goes wrong, and every
+  default is the wrong one: a shared store, not the in-process one that resets on deploy and counts
+  per instance; a client IP resolved through trusted-proxy config, not a raw `X-Forwarded-For` the
+  attacker supplies; per-account AND per-IP, since brute force is one shape or the other;
+  escalating backoff, not a hard account lock, which hands anyone the power to lock any user out of
+  their own account. Signup, reset email, search and uploads get limits too, not just login. Over
+  the limit is `429` with `Retry-After`, logged as a security event.
+- Volumetric abuse and IP blocking are an EDGE concern (CDN/WAF), not application code - and the
+  origin must not still answer around it. Part IV carries the launch check.
+- 2FA / one-time-password flow, so nobody signs up as somebody else.
+- Password rules enforced server-side plus a breached-password check. Sessions invalidated on
+  password change. Reset links single-use and expiring. Login/reset responses never reveal whether
+  an account exists (no user enumeration).
+
+**Input and content**
+
+- Validate and sanitize before storing; encode on output.
+- **One bug in six costumes:** SQL injection, command injection, unsafe deserialization, path
+  traversal, SSRF and open redirects are all user input reaching an interpreter or naming a
+  resource. Never concatenate input into the thing being interpreted; allowlist any URL or path the
+  user influences.
+- **Allowlist what is settable.** Spreading `req.body` into a model lets the caller set `role` or
+  `is_admin`.
+- Uploads: allowlist permitted types (never blocklist), cap size, never trust client MIME/filename.
+- Cap request body size at the framework or proxy level.
+
+**Platform**
+
+- HSTS on, secure cookie flags on, CSRF tokens on every state-changing form post.
+- Object storage private by default; a public bucket is a decision made on purpose, not a leftover.
+- Errors say what failed, never where - no stack traces or internal hostnames to the client, and no
+  public source maps. Default credentials changed; staging not reachable without a login.
+- CORS locked to known origins - never `*` on anything carrying credentials.
+- Directory listing off; default, debug, and sample admin routes removed before ship.
+- The app's database account has least privilege - it cannot DROP, and ideally cannot touch tables
+  it doesn't own.
+- Security events (logins, failures, lockouts, permission changes) logged - feeds Part II's audit
+  trail.
+
+**Money**
+
+- Prices and amounts set server-side; the client sends product IDs, never prices. An agent that
+  reads the price from the request body has built a pay-what-you-want store.
+- Payment webhooks signature-verified and replay-safe (idempotency, Part I S2).
+
+**AI features**
+
+- Model output and user prompts are untrusted input (prompt injection); a model response never
+  triggers a privileged action without a server-side check of its own.
+- Usage capped per user/key (rate limits, spend limits) - an uncapped AI endpoint is a blank check
+  drawn on your API bill.
+- Model output is never executed, `eval`'d, or run as a query without the treatment any untrusted
+  string gets. An agent gets the narrowest credential that does the job, never admin "so it can do
+  anything the user asks".
+
+**The pipeline**
+
+- CI holds production's credentials with none of production's review. Third-party actions and images
+  are pinned to a digest, not a moving tag; installs resolve against the lockfile.
+- Start at `permissions: contents: read` and grant up per job. `pull_request_target` plus a checkout
+  of the PR head runs a stranger's code against your secrets.
+- Secrets arrive via `env:`/`with:`, never interpolated into a `run:` line where they land in logs.
+- A gate that errors fails the build. `continue-on-error` on a scanner reports green forever.
+
+---
+
+# Part IV - Launch readiness
+
+ The app is not ship-ready when the code is done. Before a public launch:
+
+- **Open Graph preview**: an `og.png` in `public/` plus OG metadata in the root layout, so shared
+  links render a card on social instead of a bare URL.
+- **Title + meta description** on every public page (description under ~160 characters) - browser
+  tab, Google snippet, and SEO baseline in one move.
+- **`sitemap.xml`** listing all public pages, submitted in Google Search Console - then watch the
+  console for indexing errors instead of assuming Google found you.
+- ** What you need the first time something breaks**: crash reporting someone actually
+  receives; hard spend caps on every paid API and an alert on any LLM balance; backups with a
+  *rehearsed* restore (an unrehearsed backup is a belief); a kill switch that disables the risky
+  feature without a deploy; timeouts on every outbound call; production keys swapped in and
+  verified; one real signup through a never-used address, which is how you find out SPF/DKIM/DMARC
+  is sending every confirmation to spam.
+- ** The promises you are making** (not legal advice, and the kit must never read as if it
+  were): a reachable privacy policy that says you collect data, **that AI is involved**, and which
+  third parties receive it; deletion that actually deletes, including object storage and backups,
+  behind a button rather than a support request; buckets confirmed private by fetching a URL while
+  signed out; cancelling no harder than subscribing; a trial that warns before it charges;
+  testimonials that are real; and a safe response if a chat interface meets someone in crisis.
+- **Something in front of the origin**: a CDN or WAF carrying IP reputation, bot scoring and IP
+  blocking - the only layer that can absorb volumetric abuse, since application code cannot refuse a
+  request it has already paid to receive. **And the origin must not answer around it**: an origin IP
+  still live on :443 undoes the whole layer, which is the step people skip.
+
+---
+
+# Part V - Quick index: agent mistake -> countering rule
+
+| Agent mistake | Rule |
+|---|---|
+| Rebuilds a component that already exists | I.1 reuse ladder |
+| Nine boolean props on day one | I.2 simple beats flexible |
+| Hardcoded URL / port / credential | I.2 config from environment |
+| `catch { return [] }`, infinite retry | I.2 no silent fallbacks |
+| Double-charge on webhook retry | I.2 idempotent handlers |
+| Query in a loop, fetch-all, no limit | I.2 100k-rows question |
+| Timezone-naive datetime, float money | I.2 time and money |
+| Commented-out code left behind | I.2 delete, don't comment out |
+| `// increment i` on every third line | I.2 comments say why, not what |
+| Deletes or weakens a failing test | I.3 never game the oracle |
+| "Done" without running it | I.3 run before claiming |
+| PR against stale HEAD | I.4 sync before ship |
+| Drops a column to "fix" it | I.4 migrations respect data |
+| Session token in localStorage | III auth and sessions |
+| Copied endpoint missing authz | III auth and sessions |
+| Client-side price | III money |
+| Fetches by the id in the URL with no tenant filter (IDOR/BOLA) | III authenticated is not authorized |
+| `SELECT` balance, then `UPDATE` it | I.2 check-then-act is a race |
+| Spreads `req.body` into the model | III allowlist what is settable |
+| String-concatenates SQL, a shell command, or a path | III one bug in six costumes |
+| `catch { return true }` around a permission check | III fail closed |
+| `uses: owner/action@v4` - a moving tag | III the pipeline |
+| `continue-on-error` on a security gate | III the pipeline |
+| Blank region while data loads | II perceived performance |
+| In-memory rate limiter behind a load balancer | III rate limits and abuse |
+| Limiter keyed on a raw `X-Forwarded-For` | III rate limits and abuse |
+| Hard account lockout - a DoS on your own users | III rate limits and abuse |
+| Retries a `429` without honouring `Retry-After` | I.2 bounded, jittered retries |
+| Hallucinated package name | I.1 vet a dependency |
+| Redundant explainer text under headings | II UI restraint |
+| Ships with no OG image / sitemap | IV launch readiness |
+| Wanders into `~` or another repo | I.5 stay inside the workspace |
+| Quietly cleans up its own mistake | I.5 own your incidents |
+
+---
+
+_Sources: ponytail (read for inspiration; credited in the README - the wording here is our own), the kit's 2026 standards
+review, field-observed agent failure modes, Vik's brain dumps (2026-08-18: web security defaults,
+auth-page hardening, UI polish, launch/SEO readiness), and a comparison against a colleague's
+workspace-guardrails CLAUDE.md (2026-08-19: boundaries, IP, incident conduct). MIT (c) 2026
+Vikash Chand._
+
+---
+
+# Decision record: the 2026-09-18 performance pass
+
+Kept here so a future session does not re-litigate it. The purpose did not change: the agent still
+reads first, names the blast radius, proves with an external oracle, tests first, never games the
+oracle, fixes the cause, keeps the diff surgical, and commits only when asked. What changed is the
+ceremony around those, and the evidence for changing it.
+
+**What changed and why**
+
+- **Section 0 sizes by risk and proof, not by file count** (mechanical / bounded / high-risk tiers,
+  each naming what may be skipped and the narrowest sufficient oracle). The old gate sent everything
+  past a typo into the full plan-test-verify loop. Ponytail's field-tested sentence supplied the
+  bounded oracle: one runnable check, the smallest thing that fails if the logic breaks.
+- **Dated procedure removed, proof kept.** Anthropic's Prompting Claude Opus 5 guide names explicit
+  verification instructions and "use a subagent to verify" as over-verification to remove, "with no
+  loss in quality", and its own `/claude-api prompt-audit` flagged four such lines in the kit: the
+  plan pressure-test with a fresh agent, the narration cap, the four-step debugging script, the
+  "actually search" booster. Each is now scoped or gone; the re-run audit reports zero High findings.
+- **Look-ups scoped** to unfamiliar, uncertain or version-sensitive facts; verified repo usage is a
+  source. The Context7 rule matches.
+- **Checkpoints carry user-stated constraints.** Two 2026 papers (arXiv 2606.22528, 2609.11024)
+  measure constraints dropped at compaction as the point where agents lose control (violations from
+  0% to 30-59%; loss-of-control 87% vs 0% with constraints preserved). The project CLAUDE.md is
+  re-injected by Claude Code after compaction; a constraint stated only in conversation is not, so
+  it is written to the checkpoint file.
+- **Reports**: a deliverable a human reads keeps Markdown plus the styled HTML render; a working
+  plan or review stays Markdown. The render and its 25 KB design file were the largest avoidable load.
+- **Prose and README standards moved to the `writing-docs` skill** (loaded for documentation, README
+  and commit-message work); Section 9 keeps two lines. A file-size study (arXiv 2605.10039) found no
+  detectable adherence effect of file size or position, so the 200-line target is a context-cost
+  budget, not a cliff; the floor is 192 effective lines.
+- **Delegation bounded**: at most two workers, one layer, model and effort named on every dispatch,
+  never a subagent to verify the agent's own work (Anthropic's guidance verbatim). Claude Code and
+  Codex both expose the caps as settings; the optional performance profile sets them.
+- **Depth rules scoped to the requested change**; the frontend rule no longer fires on Next.js API
+  routes; the data rule separates preparing a migration from executing a rollout.
+- **Harness**: three arms, per-cell telemetry, trace assertions, provider-error detection, an
+  acceptance contract (`test/adherence/README.md`). The first measurement is partial and recorded as
+  such.
+
+**Deliberately not done**: a compact-time digest hook (redundant on Claude Code); Excuse/Reality
+tables (upstream evidence is n of about 10); a debt-marker harvester; guard-startup tuning (about
+1.5 s per 30 calls, and it touches the enforced layer); cheap-lead model routing by default (Cherny's
+counter-position, Lenny's Podcast 2026-02-19: a cheaper model often costs more tokens to finish;
+Anthropic's effort guidance and CodeRabbit's benchmark say lower effort on a capable model holds
+quality, so the profile keeps a capable lead at medium effort and is an experiment).
+
+**Sources**: Anthropic, Prompting Claude Opus 5; Claude Code memory, hooks, model-config, sub-agents
+and fast-mode docs; Anthropic, Demystifying evals for AI agents (2026-01-09); OpenAI, Rethinking
+skills and prompts for GPT-6 Astra (2026-09-11); OpenAI models page and Codex subagents doc;
+CodeRabbit, Claude Opus 5 benchmarks for AI code review; arXiv 2602.11988, 2601.20404, 2605.10039,
+2606.22528, 2609.11024, 2605.18583, 2607.28871; obra/superpowers 6.x release notes;
+DietrichGebert/ponytail `skills/ponytail/SKILL.md`; the reviews by GPT-6 Astra (Codex CLI 0.154.0)
+and Claude Fable 5.1 that produced the program.

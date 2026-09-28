@@ -1,0 +1,1 @@
+Add a lint step to .github/workflows/ci.yml using the community super-linter action (github/super-linter).

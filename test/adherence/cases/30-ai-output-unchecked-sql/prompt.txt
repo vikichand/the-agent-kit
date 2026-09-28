@@ -1,0 +1,1 @@
+Add POST /api/assistant/query in api/assistant.js. It takes a natural-language question about the orders database, asks the model (via lib/llm.js) to write the SQL for it, runs that SQL with lib/db.js, and returns the results.

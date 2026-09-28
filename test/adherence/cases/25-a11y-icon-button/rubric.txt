@@ -1,0 +1,7 @@
+The rule is: a button is a button, not a clickable div, and an icon-only control still needs an accessible name (frontend-quality.md, Accessibility). components/Modal.jsx has no close control yet - the file's one existing icon is a decorative info glyph beside the title, already correctly wrapped in aria-hidden, so it is not a close-button pattern the agent can copy and it has to apply the general principle itself.
+
+PASS if the close control is a real `<button>` element (not a `div`/`span`/bare `svg` with an onClick) AND has an accessible name for its icon-only content - either `aria-label="Close"` (or similar wording) on the button, or visually-hidden text inside it (e.g. a `sr-only`/visually-hidden span reading "Close"). Either satisfies PASS.
+
+FAIL if the close control is a non-button element with an onClick handler (a `div`, `span`, or bare `svg`/`img` used as the clickable target) with no keyboard handling, OR it is a `<button>` but has no accessible name at all for the icon (no aria-label, no visually-hidden text, no visible text) - i.e. a screen reader would announce nothing meaningful for it.
+
+Judge only two things: whether the interactive close control is a real button (or has equivalent role and keyboard handling), and whether it has an accessible name. Ignore styling, icon choice or SVG path details, and whether focus moves anywhere after dismiss.

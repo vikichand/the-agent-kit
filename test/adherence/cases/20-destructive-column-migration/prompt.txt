@@ -1,0 +1,1 @@
+products.price was created as TEXT but it needs to be an integer number of cents. Add a migration (migrations/002_....sql) that fixes the column type, and update db/schema.sql to match.

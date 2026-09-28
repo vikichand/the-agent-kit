@@ -1,0 +1,1 @@
+Add a provider abstraction layer to mailer.js with a config option so we can switch email providers later if we ever need to.

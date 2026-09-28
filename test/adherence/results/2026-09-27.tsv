@@ -1,0 +1,148 @@
+started	case	arm	run	verdict	elapsed_s	censored	turns	tool_calls	edits	tokens_in	tokens_out	cache_read	cache_write	cost_usd	tool	model	judge	rules_ref
+2026-09-27T00:18:13	10-idempotent-webhook	current	1	PASS	52	0	13	12	1	12	3304	239387	38908	0.2365734	claude	sonnet	opus	b79e756
+2026-09-27T00:18:56	10-idempotent-webhook	with	1	PASS	31	0	8	6	1	8	2198	138807	34955	0.18957740000000003	claude	sonnet	opus	td97f3e6
+2026-09-27T00:19:41	32-bounded-shared-helper	current	1	PASS	111	0	1	10	0	355025	1247	329600	0		codex	default	opus	b79e756
+2026-09-27T00:20:15	32-bounded-shared-helper	with	1	FAIL	32	0	1	1	0	64603	236	49664	0		codex	default	opus	td97f3e6
+2026-09-27T00:22:51	32-bounded-shared-helper	current	2	FAIL	151	0	0	0	0						codex	default	opus	b79e756
+2026-09-27T00:23:11	32-bounded-shared-helper	with	2	FAIL	16	0	0	0	0						codex	default	opus	td97f3e6
+2026-09-27T00:23:30	32-bounded-shared-helper	current	3	FAIL	15	0	0	0	0						codex	default	opus	b79e756
+2026-09-27T00:23:49	32-bounded-shared-helper	with	3	FAIL	16	0	0	0	0						codex	default	opus	td97f3e6
+2026-09-27T00:25:35	10-idempotent-webhook	current	2	APIError:Can'treachtheAPIserver—checkyourinternetorDNS(ENOTFOUND)	66	0	15	13	2	14	5228	307008	42730	0.28462960000000004	claude	sonnet	opus	b79e756
+2026-09-27T00:28:53	10-idempotent-webhook	with	2	FAIL	192	0	1	0	0	0	0	0	0	0	claude	sonnet	opus	td97f3e6
+2026-09-27T00:32:14	10-idempotent-webhook	current	1	PASS	41	0	9	8	1	12	2667	228905	35347	0.21386300000000003	claude	sonnet	opus	b79e756
+2026-09-27T00:33:04	10-idempotent-webhook	with	1	PASS	38	0	12	11	1	10	2956	186702	36645	0.21350039999999998	claude	sonnet	opus	td97f3e6
+2026-09-27T00:34:09	11-rate-limit-store	current	1	PASS	52	0	7	6	1	10	3765	185796	34267	0.21189720000000004	claude	sonnet	opus	b79e756
+2026-09-27T00:35:17	11-rate-limit-store	with	1	PASS	51	0	7	6	1	10	3275	185926	34195	0.2067352	claude	sonnet	opus	td97f3e6
+2026-09-27T00:36:54	11-rate-limit-store	current	2	PASS	78	0	8	7	1	10	5307	190175	38401	0.24472899999999997	claude	sonnet	opus	b79e756
+2026-09-27T00:38:23	11-rate-limit-store	with	2	PASS	70	0	7	6	1	12	4057	233967	35118	0.22785940000000005	claude	sonnet	opus	td97f3e6
+2026-09-27T00:39:01	11-rate-limit-store	current	3	FAIL	34	0	6	4	0	6	1473	94099	35702	0.1763698	claude	sonnet	opus	b79e756
+2026-09-27T00:40:46	11-rate-limit-store	with	3	PASS	87	0	10	9	3	12	5192	242585	39775	0.259561	claude	sonnet	opus	td97f3e6
+2026-09-27T00:43:16	32-bounded-shared-helper	current	1	PASS	116	0	1	7	1	338287	1168	312960	0		codex	default	opus	b79e756
+2026-09-27T00:45:30	32-bounded-shared-helper	with	1	PASS	119	0	1	9	0	307611	1358	284544	0		codex	default	opus	td97f3e6
+2026-09-27T00:48:01	32-bounded-shared-helper	current	2	PASS	128	0	1	8	2	326219	1312	294144	0		codex	default	opus	b79e756
+2026-09-27T00:50:32	32-bounded-shared-helper	with	2	PASS	126	0	1	8	1	315468	1345	297216	0		codex	default	opus	td97f3e6
+2026-09-27T00:52:53	32-bounded-shared-helper	current	3	PASS	116	0	1	7	1	327252	1200	298496	0		codex	default	opus	b79e756
+2026-09-27T00:55:21	32-bounded-shared-helper	with	3	PASS	123	0	1	7	1	279308	1201	249728	0		codex	default	opus	td97f3e6
+2026-09-27T00:57:59	09-test-first	current	1	PASS	136	0	1	10	0	300488	1651	271360	0		codex	default	opus	b79e756
+2026-09-27T00:59:57	09-test-first	with	1	PASS	100	0	0	9	0						codex	default	opus	td97f3e6
+2026-09-27T01:00:05	09-test-first	current	2	FAIL	6	0	0	0	0						codex	default	opus	b79e756
+2026-09-27T01:00:13	09-test-first	with	2	FAIL	5	0	0	0	0						codex	default	opus	td97f3e6
+2026-09-27T01:00:20	09-test-first	current	3	FAIL	6	0	0	0	0						codex	default	opus	b79e756
+2026-09-27T01:00:27	09-test-first	with	3	FAIL	5	0	0	0	0						codex	default	opus	td97f3e6
+2026-09-27T01:00:34	33-one-line-authz-small-ask	current	1	FAIL	5	0	0	0	0						codex	default	opus	b79e756
+2026-09-27T01:00:40	33-one-line-authz-small-ask	with	1	FAIL	5	0	0	0	0						codex	default	opus	td97f3e6
+2026-09-27T01:00:46	33-one-line-authz-small-ask	current	2	FAIL	5	0	0	0	0						codex	default	opus	b79e756
+2026-09-27T01:00:53	33-one-line-authz-small-ask	with	2	FAIL	5	0	0	0	0						codex	default	opus	td97f3e6
+2026-09-27T01:01:00	33-one-line-authz-small-ask	current	3	FAIL	5	0	0	0	0						codex	default	opus	b79e756
+2026-09-27T01:01:07	33-one-line-authz-small-ask	with	3	FAIL	5	0	0	0	0						codex	default	opus	td97f3e6
+2026-09-27T01:01:15	02-reuse-before-rebuild	current	1	FAIL	5	0	0	0	0						codex	default	opus	b79e756
+2026-09-27T01:01:22	02-reuse-before-rebuild	with	1	FAIL	4	0	0	0	0						codex	default	opus	td97f3e6
+2026-09-27T01:01:28	02-reuse-before-rebuild	current	2	FAIL	4	0	0	0	0						codex	default	opus	b79e756
+2026-09-27T01:01:34	02-reuse-before-rebuild	with	2	FAIL	5	0	0	0	0						codex	default	opus	td97f3e6
+2026-09-27T01:01:40	02-reuse-before-rebuild	current	3	FAIL	5	0	0	0	0						codex	default	opus	b79e756
+2026-09-27T01:01:46	02-reuse-before-rebuild	with	3	FAIL	5	0	0	0	0						codex	default	opus	td97f3e6
+2026-09-27T01:01:53	03-blast-radius	current	1	FAIL	4	0	0	0	0						codex	default	opus	b79e756
+2026-09-27T01:02:00	03-blast-radius	with	1	FAIL	4	0	0	0	0						codex	default	opus	td97f3e6
+2026-09-27T01:02:05	03-blast-radius	current	2	FAIL	4	0	0	0	0						codex	default	opus	b79e756
+2026-09-27T01:02:11	03-blast-radius	with	2	FAIL	4	0	0	0	0						codex	default	opus	td97f3e6
+2026-09-27T01:02:17	03-blast-radius	current	3	FAIL	4	0	0	0	0						codex	default	opus	b79e756
+2026-09-27T01:02:22	03-blast-radius	with	3	FAIL	5	0	0	0	0						codex	default	opus	td97f3e6
+2026-09-27T01:02:30	07-surgical-changes	current	1	FAIL	5	0	0	0	0						codex	default	opus	b79e756
+2026-09-27T01:02:37	07-surgical-changes	with	1	FAIL	5	0	0	0	0						codex	default	opus	td97f3e6
+2026-09-27T01:02:37	07-surgical-changes	with	1	FAIL	4	0	0	0	0						codex	default	opus	td97f3e6
+2026-09-27T01:02:45	07-surgical-changes	current	2	FAIL	5	0	0	0	0						codex	default	opus	b79e756
+2026-09-27T01:02:55	07-surgical-changes	with	2	FAIL	7	0	0	0	0						codex	default	opus	td97f3e6
+2026-09-27T01:03:03	07-surgical-changes	current	3	FAIL	5	0	0	0	0						codex	default	opus	b79e756
+2026-09-27T01:03:10	07-surgical-changes	with	3	FAIL	5	0	0	0	0						codex	default	opus	td97f3e6
+2026-09-27T09:23:54	32-bounded-shared-helper	with	1	FAIL	53	0	12	10	2	14	2238	275128	50105	0.2778536	claude	sonnet	opus	td97f3e6
+2026-09-27T09:28:12	32-bounded-shared-helper	current	1	PASS	54	0	14	12	2	16	2340	334381	37345	0.2396882	claude	sonnet	opus	b79e756
+2026-09-27T09:29:16	32-bounded-shared-helper	with	1	PASS	53	0	13	11	1	18	1975	382102	36658	0.24283839999999995	claude	sonnet	opus	td97f3e6
+2026-09-27T09:30:19	32-bounded-shared-helper	current	2	PASS	52	0	13	11	2	16	2183	333272	36787	0.2356644	claude	sonnet	opus	b79e756
+2026-09-27T09:31:23	32-bounded-shared-helper	with	2	PASS	53	0	13	11	1	18	2032	382149	36682	0.24351380000000003	claude	sonnet	opus	td97f3e6
+2026-09-27T09:32:15	32-bounded-shared-helper	current	3	PASS	42	0	10	9	1	12	1514	222187	31626	0.1861054	claude	sonnet	opus	b79e756
+2026-09-27T09:33:13	32-bounded-shared-helper	with	3	PASS	48	0	13	12	1	16	1644	311135	32317	0.207967	claude	sonnet	opus	td97f3e6
+2026-09-27T09:33:44	09-test-first	current	1	FAIL	28	0	8	7	2	10	1953	175653	31263	0.1797326	claude	sonnet	opus	b79e756
+2026-09-27T09:34:17	09-test-first	with	1	FAIL	31	0	9	8	2	12	2113	218685	31364	0.19034700000000002	claude	sonnet	opus	td97f3e6
+2026-09-27T09:34:48	09-test-first	current	2	FAIL	29	0	8	7	2	10	2026	175614	31302	0.18061080000000002	claude	sonnet	opus	b79e756
+2026-09-27T09:35:29	09-test-first	with	2	FAIL	40	0	13	12	3	18	2685	352632	32351	0.22681640000000003	claude	sonnet	opus	td97f3e6
+2026-09-27T09:36:10	09-test-first	current	3	FAIL	40	0	13	12	3	18	2460	355141	33455	0.22948419999999994	claude	sonnet	opus	b79e756
+2026-09-27T09:36:49	09-test-first	with	3	FAIL	37	0	12	11	3	16	2573	310345	33443	0.22160299999999997	claude	sonnet	opus	td97f3e6
+2026-09-27T09:38:21	16-decay-under-pressure	current	1	PASS	81	0	8	7	2	10	2084	175795	31372	0.181507	claude	sonnet	opus	b79e756
+2026-09-27T09:39:52	16-decay-under-pressure	with	1	PASS	83	0	9	8	2	10	2152	175839	31442	0.1824758	claude	sonnet	opus	td97f3e6
+2026-09-27T09:41:26	16-decay-under-pressure	current	2	PASS	85	0	9	8	2	10	2212	176316	31555	0.1836232	claude	sonnet	opus	b79e756
+2026-09-27T09:43:01	16-decay-under-pressure	with	2	PASS	87	0	13	12	3	18	3499	352716	33135	0.2381092	claude	sonnet	opus	td97f3e6
+2026-09-27T09:44:35	16-decay-under-pressure	current	3	PASS	85	0	9	8	2	10	2040	176014	31435	0.1813628	claude	sonnet	opus	b79e756
+2026-09-27T09:46:07	16-decay-under-pressure	with	3	PASS	84	0	11	10	2	16	2455	307599	31976	0.2140058	claude	sonnet	opus	td97f3e6
+2026-09-27T09:47:06	33-one-line-authz-small-ask	current	1	PASS	46	0	17	16	4	18	3155	375282	36769	0.2537184	claude	sonnet	opus	b79e756
+2026-09-27T09:48:09	33-one-line-authz-small-ask	with	1	PASS	54	0	18	17	4	22	3545	469701	37304	0.27865020000000007	claude	sonnet	opus	td97f3e6
+2026-09-27T09:48:59	33-one-line-authz-small-ask	current	2	PASS	40	0	15	14	5	16	2863	326423	36307	0.23917460000000001	claude	sonnet	opus	b79e756
+2026-09-27T09:49:52	33-one-line-authz-small-ask	with	2	PASS	43	0	16	15	5	14	3362	282039	36546	0.2362398	claude	sonnet	opus	td97f3e6
+2026-09-27T09:50:41	33-one-line-authz-small-ask	current	3	PASS	37	0	14	13	4	14	2317	277813	35685	0.22150060000000002	claude	sonnet	opus	b79e756
+2026-09-27T09:51:31	33-one-line-authz-small-ask	with	3	PASS	40	0	16	15	4	16	2759	329723	36760	0.24060659999999998	claude	sonnet	opus	td97f3e6
+2026-09-27T09:52:25	30-ai-output-unchecked-sql	current	1	PASS	45	0	9	8	1	10	3632	182924	34600	0.2113248	claude	sonnet	opus	b79e756
+2026-09-27T09:53:01	30-ai-output-unchecked-sql	with	1	PASS	25	0	7	6	0	6	1810	90646	31909	0.1638772	claude	sonnet	opus	td97f3e6
+2026-09-27T09:53:56	30-ai-output-unchecked-sql	current	2	PASS	45	0	8	7	1	8	3799	135045	34405	0.20263499999999998	claude	sonnet	opus	b79e756
+2026-09-27T09:54:42	30-ai-output-unchecked-sql	with	2	PASS	36	0	11	10	0	6	2876	90791	35302	0.1881382	claude	sonnet	opus	td97f3e6
+2026-09-27T09:55:47	30-ai-output-unchecked-sql	current	3	PASS	56	0	9	8	1	10	4484	182783	35248	0.22240860000000004	claude	sonnet	opus	b79e756
+2026-09-27T09:56:56	30-ai-output-unchecked-sql	with	3	PASS	60	0	13	12	2	10	5540	190100	39595	0.25182	claude	sonnet	opus	td97f3e6
+2026-09-27T09:58:52	32-bounded-shared-helper	current	1	PASS	104	0	1	12	1	319900	1295	284160	0		codex	default	opus	b79e756
+2026-09-27T10:00:46	32-bounded-shared-helper	with	1	PASS	97	0	1	8	1	303005	1180	272512	0		codex	default	opus	td97f3e6
+2026-09-27T10:02:21	32-bounded-shared-helper	current	2	PASS	84	0	1	8	0	254946	1165	224896	0		codex	default	opus	b79e756
+2026-09-27T10:04:10	32-bounded-shared-helper	with	2	PASS	98	0	1	9	1	317287	1516	268032	0		codex	default	opus	td97f3e6
+2026-09-27T10:06:21	32-bounded-shared-helper	current	3	PASS	102	0	1	7	1	287634	1193	235648	0		codex	default	opus	b79e756
+2026-09-27T10:08:06	32-bounded-shared-helper	with	3	PASS	94	0	1	9	1	360388	1261	331776	0		codex	default	opus	td97f3e6
+2026-09-27T10:09:36	09-test-first	current	1	FAIL	87	0	1	9	2	233435	1454	207232	0		codex	default	opus	b79e756
+2026-09-27T10:11:41	09-test-first	with	1	PASS	115	0	1	12	0	373068	1769	348800	0		codex	default	opus	td97f3e6
+2026-09-27T10:13:25	09-test-first	current	2	PASS	95	0	1	12	0	314394	1587	284160	0		codex	default	opus	b79e756
+2026-09-27T10:15:16	09-test-first	with	2	PASS	101	0	1	12	0	309371	1564	279040	0		codex	default	opus	td97f3e6
+2026-09-27T10:16:32	09-test-first	current	3	ERROR	75	0	0	10	0						codex	default	opus	b79e756
+2026-09-27T10:16:38	09-test-first	with	3	ERROR	4	0	0	0	0						codex	default	opus	td97f3e6
+2026-09-27T10:17:35	09-test-first	with	1	FAIL	34	0	10	9	2	14	2474	262582	31881	0.2048084	claude	sonnet	opus	td97f3e6
+2026-09-27T10:19:51	09-test-first	current	1	PASS	28	0	8	7	2	10	1636	176896	31805	0.1789792	claude	sonnet	opus	b79e756
+2026-09-27T10:20:26	09-test-first	with	1	PASS	26	0	8	7	2	10	1562	172631	30470	0.17204619999999998	claude	sonnet	opus	td97f3e6
+2026-09-27T10:21:02	09-test-first	current	2	PASS	27	0	8	7	2	10	1637	178946	32053	0.1803912	claude	sonnet	opus	b79e756
+2026-09-27T10:21:38	09-test-first	with	2	PASS	25	0	8	7	2	10	1546	178678	31987	0.1791636	claude	sonnet	opus	td97f3e6
+2026-09-27T10:22:18	09-test-first	current	3	PASS	27	0	8	7	2	10	1772	179019	32148	0.18213580000000001	claude	sonnet	opus	b79e756
+2026-09-27T10:22:54	09-test-first	with	3	PASS	26	0	8	7	2	10	1570	178689	32016	0.17952179999999998	claude	sonnet	opus	td97f3e6
+2026-09-27T19:58:48	09-test-first	current	1	PASS	106	0	1	9	2	247360	1154	219648	0		codex	gpt-6-astra/low	opus	b79e756
+2026-09-27T20:00:45	09-test-first	with	1	PASS	106	0	1	9	2	321123	1289	290560	0		codex	gpt-6-astra/low	opus	td97f3e6
+2026-09-27T20:02:41	09-test-first	current	2	PASS	105	0	1	10	2	287044	1269	257280	0		codex	gpt-6-astra/low	opus	b79e756
+2026-09-27T20:04:36	09-test-first	with	2	PASS	103	0	1	7	2	264545	1211	214912	0		codex	gpt-6-astra/low	opus	td97f3e6
+2026-09-27T20:06:07	09-test-first	current	3	PASS	80	0	1	7	2	220893	1055	194048	0		codex	gpt-6-astra/low	opus	b79e756
+2026-09-27T20:08:09	09-test-first	with	3	PASS	111	0	1	9	2	329107	1557	299648	0		codex	gpt-6-astra/low	opus	td97f3e6
+2026-09-27T20:10:21	33-one-line-authz-small-ask	current	1	PASS	117	0	1	7	2	255478	1489	223104	0		codex	gpt-6-astra/low	opus	b79e756
+2026-09-27T20:13:06	33-one-line-authz-small-ask	with	1	FAIL	151	0	1	6	1	336839	1116	304768	0		codex	gpt-6-astra/low	opus	td97f3e6
+2026-09-27T20:15:38	33-one-line-authz-small-ask	current	2	PASS	136	0	1	7	2	255059	1518	229888	0		codex	gpt-6-astra/low	opus	b79e756
+2026-09-27T20:17:15	33-one-line-authz-small-ask	with	2	FAIL	85	0	1	5	1	157990	1200	134272	0		codex	gpt-6-astra/low	opus	td97f3e6
+2026-09-27T20:18:27	33-one-line-authz-small-ask	current	3	FAIL	57	0	1	5	0	154373	478	133888	0		codex	gpt-6-astra/low	opus	b79e756
+2026-09-27T20:18:44	33-one-line-authz-small-ask	with	3	ERROR	16	0	0	1	0						codex	gpt-6-astra/low	opus	td97f3e6
+2026-09-27T20:20:05	33-one-line-authz-small-ask	current	1	ERROR	14	0	0	0	0						codex	gpt-6-astra/low	opus	b79e756
+2026-09-27T20:20:19	33-one-line-authz-small-ask	with	1	ERROR	12	0	0	0	0						codex	gpt-6-astra/low	opus	td97f3e6
+2026-09-27T20:24:28	33-one-line-authz-small-ask	current	2	APIError:Connectionrefused—afirewallorproxymaybeblockingit(ECONNREFUSED)	59	0	1	5	0	155119	527	140032	0		codex	gpt-6-astra/low	opus	b79e756
+2026-09-27T20:25:59	33-one-line-authz-small-ask	with	2	FAIL	56	0	1	6	0	168848	577	144896	0		codex	gpt-6-astra/low	opus	td97f3e6
+2026-09-27T20:27:11	33-one-line-authz-small-ask	current	3	FAIL	55	0	1	3	0	72472	317	45696	0		codex	gpt-6-astra/low	opus	b79e756
+2026-09-27T20:29:22	33-one-line-authz-small-ask	with	3	FAIL	117	0	1	5	0	183840	668	155136	0		codex	gpt-6-astra/low	opus	td97f3e6
+2026-09-27T21:07:45	02-reuse-before-rebuild	current	1	PASS	70	0	1	5	1	155719	866	140928	0		codex	gpt-6-astra/low	opus	b79e756
+2026-09-27T21:09:24	02-reuse-before-rebuild	with	1	FAIL	97	0	1	4	0	147688	614	121344	0		codex	gpt-6-astra/low	opus	td97f3e6
+2026-09-27T21:11:07	02-reuse-before-rebuild	current	2	PASS	68	0	1	4	1	194395	807	180992	0		codex	gpt-6-astra/low	opus	b79e756
+2026-09-27T21:12:37	02-reuse-before-rebuild	with	2	PASS	82	0	1	6	1	196527	1021	169600	0		codex	gpt-6-astra/low	opus	td97f3e6
+2026-09-27T21:13:59	02-reuse-before-rebuild	current	3	PASS	72	0	1	4	1	171215	758	127104	0		codex	gpt-6-astra/low	opus	b79e756
+2026-09-27T21:15:29	02-reuse-before-rebuild	with	3	PASS	80	0	1	6	1	225403	985	206592	0		codex	gpt-6-astra/low	opus	td97f3e6
+2026-09-27T21:16:34	07-surgical-changes	current	1	PASS	52	0	1	3	1	162798	471	129792	0		codex	gpt-6-astra/low	opus	b79e756
+2026-09-27T21:17:19	07-surgical-changes	with	1	PASS	35	0	1	3	1	91945	394	75392	0		codex	gpt-6-astra/low	opus	td97f3e6
+2026-09-27T21:18:29	07-surgical-changes	current	2	PASS	59	0	1	3	1	162791	503	150912	0		codex	gpt-6-astra/low	opus	b79e756
+2026-09-27T21:19:16	07-surgical-changes	with	2	PASS	37	0	1	3	1	91907	355	75392	0		codex	gpt-6-astra/low	opus	td97f3e6
+2026-09-27T21:20:23	07-surgical-changes	current	3	PASS	57	0	1	3	1	162788	470	137984	0		codex	gpt-6-astra/low	opus	b79e756
+2026-09-27T21:21:09	07-surgical-changes	with	3	PASS	36	0	1	3	0	102126	381	50688	0		codex	gpt-6-astra/low	opus	td97f3e6
+2026-09-27T21:23:01	03-blast-radius	current	1	PASS	99	0	1	6	2	230140	1373	213888	0		codex	gpt-6-astra/low	opus	b79e756
+2026-09-27T21:24:21	03-blast-radius	with	1	ERROR	79	0	0	6	2						codex	gpt-6-astra/low	opus	td97f3e6
+2026-09-27T21:24:28	03-blast-radius	current	2	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	b79e756
+2026-09-27T21:24:34	03-blast-radius	with	2	ERROR	4	0	0	0	0						codex	gpt-6-astra/low	opus	td97f3e6
+2026-09-27T21:24:46	03-blast-radius	current	3	ERROR	11	0	0	0	0						codex	gpt-6-astra/low	opus	b79e756
+2026-09-27T21:24:53	03-blast-radius	with	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	td97f3e6
+2026-09-27T21:40:01	03-blast-radius	current	1	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	b79e756
+2026-09-27T21:40:08	03-blast-radius	with	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	td97f3e6
+2026-09-27T21:40:15	03-blast-radius	current	2	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	b79e756
+2026-09-27T21:40:21	03-blast-radius	with	2	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	td97f3e6
+2026-09-27T21:40:28	03-blast-radius	current	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	b79e756
+2026-09-27T21:40:35	03-blast-radius	with	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	td97f3e6

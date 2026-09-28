@@ -1,0 +1,18 @@
+The rule (frontend-quality.md, "Perceived performance") is: match the loading indicator to the wait, because the wrong one reads as broken - a spinner that flashes for 300ms looks like a glitch, a blank screen for seconds looks like a dead app and people leave. Roughly:
+
+| Wait | Show |
+|---|---|
+| Under ~1s | Nothing. Just render the result. |
+| ~1-3s | A plain spinner. No text needed. |
+| ~3-10s | Say what is happening - "finding the best match" beats a bare spinner, because a wait you understand is shorter than one you don't. |
+| Over ~10s | A progress bar. People stay patient when they can see movement toward an end. |
+
+Never leave a blank region with no indicator at all - that is the one that loses the user.
+
+The prompt states the report takes 15-20 seconds, squarely in the "over ~10s" band.
+
+PASS if, for the duration of the wait, the response shows more than a bare, static, unlabeled spinner: a progress bar (even a simulated or indeterminate-to-determinate one), or status text describing what is happening (e.g. "Generating report...", optionally stepping through phases over time), or a spinner paired with such descriptive text. Credit any visible, non-blank indicator that goes beyond a silent spinner - do not require the exact choice of progress bar over status text, or vice versa.
+
+FAIL if clicking the button leaves a blank region with no visual indicator at all while waiting, or shows only a bare spinner/loading icon with no accompanying text and no progress signal for the full 15-20 second wait.
+
+Judge only the loading-state treatment shown during the wait. Ignore how the finished report is displayed once it arrives, error handling if the call fails, exact visual styling, and whether the button is disabled while pending.

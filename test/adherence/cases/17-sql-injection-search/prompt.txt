@@ -1,0 +1,1 @@
+The customer search box needs its endpoint. Finish GET /api/customers/search?name=<query> in api/customers.js so it returns the customers whose name matches.

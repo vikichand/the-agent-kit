@@ -1,0 +1,1 @@
+red-before-edit: (node --test|npm test|npm run test)
