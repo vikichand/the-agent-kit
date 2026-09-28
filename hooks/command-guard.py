@@ -9,6 +9,8 @@ git-writes it authorizes for that turn (see the turn-scoped grant note above cla
 It parses shell text, which can never fully replicate git + GNU option parsing, so it is best-effort
 for EVERYTHING it does - including the two hook-disable vectors below. `bash -c`, `eval`, `$(...)`,
 aliases, MCP tools, and (critically) config written as a FILE rather than a CLI token all slip past.
+So do a flag set by sourcing a file (`. env.sh`) rather than on the command line, and a tool that fakes a
+terminal (`script`, `expect`, `winpty`) to answer an installer's question.
 The REAL boundary is elsewhere and is not optional:
   - git-layer hooks (pre-push, pre-commit, commit-msg) + server-side branch protection;
   - an OS sandbox / container (the only thing that actually contains `rm -rf`, `bash -c`, etc.);
@@ -40,9 +42,9 @@ HOOKSPATH_DENY = "core.hooksPath is being set - that points git's hooks elsewher
 NOVERIFY_DENY  = "`--no-verify` skips the git guard hooks (secret scan, attribution, push guard). Blocked."
 FORCE_DENY     = "force/delete push is blocked - it rewrites or removes remote history. Use the pre-push override only if truly intended."
 GITCFG_DENY    = "writing git config directly (.git/config or GIT_CONFIG_GLOBAL/SYSTEM) can disable the guard hooks - review carefully."
-OVERRIDE_ASK   = ("this sets a guard override (AGENT_KIT_RELEASE / AGENT_KIT_ALLOW_FORCE): it lets a push through the "
-                  "pre-push hook that it would otherwise refuse. A chat request never covers it - approve only if "
-                  "you are cutting a release or meant to force this push.")
+OVERRIDE_ASK   = ("this sets a guard override (AGENT_KIT_RELEASE / AGENT_KIT_ALLOW_FORCE / AGENT_KIT_APPLY): it lets a "
+                  "push through the pre-push hook, or lets the installer write your Claude Code and Codex settings "
+                  "without asking you in a terminal. A chat request never covers it - approve only if you meant it.")
 
 GIT_GLOBAL_VALUE = ("-c", "-C", "--git-dir", "--work-tree", "--namespace", "--super-prefix",
                     "--config-env", "--attr-source")   # git globals that consume the NEXT token as a value
@@ -433,7 +435,7 @@ def main():
     # The pre-push overrides. Asked every time, never covered by a grant: a release push to a
     # release-only branch, or a forced push, is the owner's act, not something a chat request authorizes.
     # Matched with quotes and backslashes removed: A""GENT_KIT_RELEASE=1 is the same assignment to the shell.
-    if re.search(r"(?:^|[\s;&|(])(?:export\s+)?AGENT_KIT_(?:RELEASE|ALLOW_FORCE)\s*=",
+    if re.search(r"(?:^|[\s;&|(])(?:export\s+)?AGENT_KIT_(?:RELEASE|ALLOW_FORCE|APPLY)\s*=",
                  re.sub(r"[\"'\\]", "", cmd)):
         emit(args.decision, OVERRIDE_ASK)
 

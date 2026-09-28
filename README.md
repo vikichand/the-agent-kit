@@ -17,162 +17,123 @@ with the reasoning and sources behind each, are in
 
 ## Quick Start
 
-Two ways in. They end in the same place - pick whichever you prefer.
+You need git, Python 3 and a POSIX shell (on Windows, Git Bash comes with git). Run these in a normal
+terminal, not inside an agent session: the installer asks you a yes/no question there. On PowerShell
+type `curl.exe` instead of `curl`; on CMD use `%USERPROFILE%` for `~` ([Your shell](#your-shell)).
 
-### Option A: hand it to your agent
-
-Paste one of these into Claude Code or Codex **from inside the project you want set up**. Nothing to
-clone, download, or run first.
-
-**Install:**
-
-```text
-Set up the-agent-kit for me - machine-wide first, then in this project.
-
-1. Download https://raw.githubusercontent.com/vikichand/the-agent-kit/main/install.sh into a
-   temporary directory OUTSIDE this project and run `sh install.sh --update` from there. That
-   copies the kit to ~/.the-agent-kit and prints two settings snippets. Delete the download after.
-2. Merge the printed Claude snippet into ~/.claude/settings.json. Create that file if it does not
-   exist. If it does exist, ADD the entries to the existing "permissions" and "hooks" lists rather
-   than replacing them, and keep the file valid JSON. Only touch ~/.codex/config.toml if I use Codex.
-3. From this project's root, run `~/.the-agent-kit/install.sh`.
-4. Run `~/.the-agent-kit/install.sh --check` and show me the output.
-5. You are NOT allowed to turn on the git hooks: the kit denies `git config core.hooksPath` so an
-   agent cannot point git away from them, and that denial applies to you too. Print the exact
-   command and tell me to run it myself in a normal terminal.
-6. Finally, open ~/.the-agent-kit/docs/project-setup-prompt.md and follow the prompt inside it for
-   this project.
-
-Change nothing outside the files named above, and summarise what you did at the end.
-```
-
-**Update, later:**
-
-```text
-Update the-agent-kit for me.
-
-1. If `~/.the-agent-kit/install.sh` exists, run `~/.the-agent-kit/install.sh --update`. It reports
-   old -> new, or says it is already current. If that path does NOT exist (an old install, or one
-   done by cloning), download install.sh from the repo into a temp directory outside this project,
-   run `sh install.sh --update` from there, and delete it afterwards - that bootstraps the same
-   result from any starting state, however old.
-2. From this project's root, run `~/.the-agent-kit/install.sh --update-rules`. That refreshes the
-   universal rules and keeps my PROJECT-CONFIG block. Step 1 does not reach any project on its own:
-   every other repo that has the kit needs this same step, run from inside it.
-3. Show me `git diff AGENTS.md`. An update replaces anything hand-edited OUTSIDE the
-   PROJECT-CONFIG markers, so I want to see what moved.
-4. Compare the Claude snippet the installer just printed against my ~/.claude/settings.json and
-   report BOTH directions: what to ADD, and what the kit no longer ships that I should REMOVE. A
-   leftover `ask` rule silently overrides a newer hook and the feature just never fires, with no
-   error - so a stale entry is not harmless.
-   You are NOT allowed to edit that file: the kit denies it so an agent cannot rewrite its own
-   permissions. Instead write the corrected version to a scratch file, show me the diff, confirm it
-   still parses as JSON, and give me one command to copy it into place. Keep every hook and rule
-   that is mine rather than the kit's.
-5. Run `~/.the-agent-kit/install.sh --check` and show me the output.
-6. Remind me to restart Claude Code: hooks are loaded at startup, so a new one does nothing until
-   the session is restarted.
-```
-
-### Option B: run it yourself
-
-**Install:**
+**1. Set up your machine, once:**
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/vikichand/the-agent-kit/main/install.sh
-sh install.sh --update                                # -> ~/.the-agent-kit, prints 2 snippets
-git config --global core.hooksPath "$HOME/.the-agent-kit/git-hooks"
-cd /path/to/project && ~/.the-agent-kit/install.sh    # per project
+sh install.sh --setup
 ```
 
-**Update, later:**
+It copies the kit to `~/.the-agent-kit`, turns on its git hooks, and adds it to your Claude Code and
+Codex settings. It lists every change and asks before writing anything, and backs your files up first.
+Then delete the downloaded `install.sh` and restart Claude Code and Codex.
+
+**2. Set up each project:**
 
 ```bash
-~/.the-agent-kit/install.sh --update                            # machine-wide, run from anywhere
-cd /path/to/project && ~/.the-agent-kit/install.sh --update-rules   # keeps your PROJECT-CONFIG
+cd /path/to/project
+~/.the-agent-kit/install.sh
 ```
 
-The first line updates the guards, which are machine-wide, and the copy in `~/.the-agent-kit`. It
-changes nothing inside any project: a repo keeps the rules it was given until you run the second line
-from inside it, so repeat that line in every project that has the kit.
+Then paste the prompt from `~/.the-agent-kit/docs/project-setup-prompt.md` into your agent, inside the
+project, once. It records your build and test commands, so the agent stops guessing them.
 
-Two things neither option can skip. **Merge the settings snippets** that line 2 prints, or the tool
-guard does nothing ([step 3](#3-merge-the-printed-settings-snippets)). And **run the per-project
-setup prompt** once ([step 5](#5-run-the-setup-prompt-once-per-project)) - it is the single
-highest-value minute you will spend, because without it the agent guesses your build and test
-commands.
+**3. Check it:**
 
-The `core.hooksPath` line must run in a **normal terminal, not inside an agent session** - the kit
-denies it precisely so an agent cannot disable its own guards.
+```bash
+~/.the-agent-kit/install.sh --check
+```
+
+No `FAIL` means you are done.
+
+### Updating
+
+```bash
+~/.the-agent-kit/install.sh --update          # your machine: the new kit, plus any new settings (asks first)
+~/.the-agent-kit/install.sh --update-rules    # inside each project: the new rules; your project's own block is kept
+```
+
+You do not need to remember: when a session starts, the kit tells you when a new release is out and
+when a project's rules are behind.
+
+## Let your agent do it
+
+Paste this into Claude Code or Codex, **inside the project you want set up**:
+
+```text
+Set up the-agent-kit for me, machine-wide and then in this project.
+
+1. If ~/.the-agent-kit/install.sh exists, run `~/.the-agent-kit/install.sh --update`. Otherwise
+   download https://raw.githubusercontent.com/vikichand/the-agent-kit/main/install.sh into a temporary
+   folder OUTSIDE this project, run `sh install.sh --setup` there, and delete the download.
+2. Show me the settings changes it listed. Only if I say yes, run
+   `AGENT_KIT_APPLY=1 ~/.the-agent-kit/install.sh --setup` to apply them.
+3. From this project's root, run `~/.the-agent-kit/install.sh`, or `~/.the-agent-kit/install.sh
+   --update-rules` if the kit is already here, and then show me `git diff AGENTS.md`.
+4. Follow the prompt in ~/.the-agent-kit/docs/project-setup-prompt.md for this project.
+5. Run `~/.the-agent-kit/install.sh --check`, show me the output, and remind me to restart the agent.
+
+Change nothing outside what these steps name, and summarise what you did at the end.
+```
+
+An agent has no terminal to answer the installer's question, so it lists the changes and stops; step 2
+is your answer. `AGENT_KIT_APPLY=1` is that consent, and once the kit is installed its guard asks you
+before any agent command sets it (on Codex it refuses: run it yourself). An update never applies
+settings on its own, even with that flag set. This makes the obvious routes ask, not every route: an
+agent that fakes a terminal, or writes the file some other way, is outside what a command check can
+see ([Limits](#limits)).
 
 ## Every step, in detail
 
-Five steps. Three set up your machine, two set up each project.
+### What `--setup` does
 
-### 1. Get the kit
+1. **Copies the kit** to `~/.the-agent-kit`: rules, hooks, installer and docs. The download is then
+   disposable. Two steps rather than `curl ... | sh` on purpose: piping unread code into a shell is
+   what the kit's own rules tell an agent never to do.
+2. **Turns on the git hooks** for every repo: the secret scan, the protected-branch check and the
+   AI-attribution stripper. If another tool (Husky, lefthook) already owns git's hooks folder, it
+   leaves that alone and says how to add the kit's hooks next to them
+   ([Coexisting](#coexisting-with-husky-lefthook-or-pre-commit)).
+3. **Adds the kit to your tool settings:**
 
-```bash
-curl -fsSLO https://raw.githubusercontent.com/vikichand/the-agent-kit/main/install.sh
-sh install.sh --update
-```
+   | Tool | File | What is added |
+   |---|---|---|
+   | Claude Code | `~/.claude/settings.json` | the command guard, the session-start check, and the ask and deny rules |
+   | Codex | `~/.codex/hooks.json` | the command guard and the session-start check |
+   | Codex | `~/.codex/config.toml` | approval, sandbox and network settings |
 
-That copies everything to `~/.the-agent-kit`. Two steps rather than `curl … | sh` on purpose: that
-pipes code you have not read into a shell, and the rules in this kit tell an agent never to do it.
-Once it finishes you can delete the downloaded `install.sh` - nothing points back at it.
+   It only adds. A setting you already chose is kept, the kit's own older entries are updated in place,
+   a file it cannot read safely is left untouched, and a tool you do not have is skipped. Each changed
+   file is backed up beside itself as `<file>.bak-agent-kit-<time>`.
 
-### 2. Turn on the git hooks
+Nothing is written until you answer yes. Run it again at any time: when everything is in place it says
+so and changes nothing. Prefer to merge by hand? `install.sh --global` copies the kit and prints the
+snippets instead.
 
-The installer prints this command; it cannot run it for you.
+### What a project gets
 
-```bash
-git config --global core.hooksPath "$HOME/.the-agent-kit/git-hooks"
-```
+`~/.the-agent-kit/install.sh`, run inside a project, writes:
 
-**Run it in a normal terminal, not inside Claude Code.** The kit denies `git config core.hooksPath`
-so an agent cannot quietly point git away from the hooks - and that denial applies to you too while
-you are in an agent session. This is the step that turns on the secret scanner, the force-push
-block, and the AI-attribution stripper, for every repo on the machine. Skip it and the rules still
-work, but almost nothing is enforced.
+- `AGENTS.md`, the rules, with an empty block at the bottom for this project's own settings;
+- a one-line `CLAUDE.md` that imports it, so Claude Code and Codex read the same file;
+- `.claude/rules/`: deeper rules that load only when the agent opens a matching file (security rules on
+  API code, accessibility rules on components), free the rest of the time;
+- the skills, in `.claude/skills/` for Claude Code and `.agents/skills/` for Codex.
 
-Already using Husky or lefthook? They own `core.hooksPath` too - see
-[Coexisting](#coexisting-with-husky-lefthook-or-pre-commit) instead of running the line above.
+It never overwrites an existing `AGENTS.md` or `CLAUDE.md`. `--update-rules` later replaces the
+universal rules and keeps the project's block byte for byte; anything hand-edited outside the block is
+replaced, so check `git diff AGENTS.md` afterwards.
 
-### 3. Merge the printed settings snippets
+### The setup prompt
 
-Step 1 printed two blocks. Without them the tool-layer guard does nothing.
-
-- **No `~/.claude/settings.json` yet?** Save the printed Claude block as that file, as-is.
-- **Already have one?** Copy the `permissions` and `hooks` keys from the block into yours. If you
-  already have those keys, add the entries to the existing lists rather than replacing them - the
-  file is JSON, so mind the commas.
-- Same for `~/.codex/config.toml` if you use Codex. Skip it if you don't.
-
-### 4. Set up a project
-
-```bash
-cd /path/to/project && ~/.the-agent-kit/install.sh
-```
-
-That writes four things: `AGENTS.md` (the rules), a one-line `CLAUDE.md` that imports it,
-`.claude/rules/` - deeper rules that load only when the agent opens a matching file, so security
-rules arrive on API code and accessibility rules on components, and cost nothing the rest of the time -
-and the skills (including `writing-docs`), to `.claude/skills/` for Claude Code and `.agents/skills/`
-for Codex, where four of those deeper rules also land as task-matched skills.
-
-### 5. Run the setup prompt, once per project
-
-This is the highest-value step and takes about a minute. It records **your** build, test and lint
-commands; without it the agent guesses them, which is the single largest hallucination surface the
-kit has.
-
-1. Open [`docs/project-setup-prompt.md`](docs/project-setup-prompt.md) (also at
-   `~/.the-agent-kit/docs/project-setup-prompt.md`).
-2. Copy everything inside the ```` ```text ```` fence - that is the prompt itself.
-3. Start your agent **inside the project** and paste it in.
-4. Answer its questions. It writes the result between the `PROJECT-CONFIG` markers in `AGENTS.md`
-   and shows you the block. Nothing above those markers is touched.
-
-Re-run it whenever the project changes; it replaces the block rather than stacking a second one.
+The highest-value minute you will spend. Open `~/.the-agent-kit/docs/project-setup-prompt.md`, copy
+everything inside the ```` ```text ```` fence, and paste it into your agent inside the project. It
+writes your build, test and lint commands, your branch model and the files to be careful with into the
+project's block in `AGENTS.md`, and shows you the result. Re-run it whenever the project changes.
 
 ### Prefer the rules global instead?
 
@@ -198,12 +159,15 @@ again. The depth tier in each project still updates through `--update-rules`.
 ~/.the-agent-kit/install.sh --check
 ```
 
-Run it inside a project. You want the three git hooks reported as **live**, and the tool guard
-firing. A `WARN` about `PROJECT-CONFIG` is expected until you run the setup prompt.
+Run it inside a project. It reports the git hooks as **live**, the tool guard firing, and your settings
+carrying the kit. A `WARN` about `PROJECT-CONFIG` is expected until you run the setup prompt.
 
-Steps 1-3 are per machine; step 4 is per project. They are independent: machine-only gives you
-enforcement with an agent that has not read the rules, project-only gives the rules with no
-enforcement.
+### Undo
+
+Every settings file `--setup` changed has a backup beside it (`*.bak-agent-kit-<time>`): copy it back.
+To turn the git hooks off: `git config --global --unset core.hooksPath`, run in a normal terminal. The
+kit itself is the `~/.the-agent-kit` folder, and a project's rules are its `AGENTS.md`, `CLAUDE.md`,
+`.claude/` and `.agents/skills/`.
 
 ### Your shell
 
@@ -216,24 +180,17 @@ enforcement.
 **No `curl`?** You never need it - this does the same job with git, which the kit requires anyway:
 
 ```bash
-git clone https://github.com/vikichand/the-agent-kit.git && cd the-agent-kit && ./install.sh --global
+git clone https://github.com/vikichand/the-agent-kit.git && cd the-agent-kit && ./install.sh --setup
 ```
 
-### Updating
+### Updating, in detail
 
-The commands are in [Quick Start](#option-b-run-it-yourself). What they guarantee: `--update` reports
-`old -> new` with the commits between, does nothing when you are already current, and refuses to
-overwrite your install if the download is not the kit. `--update-rules` replaces a project's universal
-rules while **preserving its `PROJECT-CONFIG` block**, which is why you should never hand-copy a new
-`AGENTS.md` over the old one. It also refreshes every kit-owned file in `.claude/rules/`,
-`.claude/skills/` and `.agents/skills/`, so the Claude and Codex copies of a skill cannot drift apart.
-Scope differs: `--update` is machine-wide and ignores your working
-directory; `--update-rules` and `--check` act on the repo you are standing in. The two are not one
-step in disguise: a new rule in the kit reaches a project **only** when `--update-rules` runs inside
-that project, so after a machine-wide update every repo still carries its old rules until you visit
-it. Settings snippets are
-never written for you - the installer prints them, and merging is yours, including removing anything
-the kit no longer ships.
+`--update` downloads the latest release, checks it really is the kit before touching anything, reports
+`old -> new`, and then runs `--setup` from the new copy, so a new hook or setting reaches your settings
+files the same way the first install did: listed, asked, backed up. It changes nothing inside any
+project. `--update-rules` is the per-project half: run it inside each project to bring in the new rules,
+the deeper rules and the skills, with the project's own block kept. `--update` is machine-wide and works
+from any folder; `--update-rules` and `--check` act on the project you are standing in.
 
 **Why projects hold a copy at all.** Keeping the rules in each repo, rather than pointing every project
 at one machine-wide file, is deliberate: teammates, CI and cloud agents see only what is committed, and
@@ -261,7 +218,7 @@ When a session starts, the kit checks three things and says nothing unless one n
 It **never updates or installs anything itself**: running downloaded code at session start, unasked, is exactly the
 supply-chain shape the kit's rules forbid, so it only tells you what to run. It exits cleanly on every
 error, so an offline machine or a broken check never blocks a session, and when everything is current
-it prints nothing, so it costs no context. It ships in the Claude and Codex snippets as a `SessionStart`
+it prints nothing, so it costs no context. `--setup` wires it into Claude Code and Codex as a `SessionStart`
 hook (`hooks/kit-check.py`). To switch it off, set `AGENT_KIT_NO_UPDATE_CHECK=1`.
 
 ### Also worth having
@@ -286,6 +243,9 @@ the expected verdict.
 
 ## Table of Contents
 
+- [Quick Start](#quick-start)
+- [Let your agent do it](#let-your-agent-do-it)
+- [Every step, in detail](#every-step-in-detail)
 - [What you get](#what-you-get)
 - [Features](#features)
 - [Install](#install)
@@ -475,16 +435,17 @@ run under `git` itself, so they survive flag-reordering, `--no-verify`, Codex, a
 
 ## Install
 
-Quick Start covers the usual path. The installer has six modes:
+Quick Start covers the usual path. The installer's modes:
 
 | Mode | Scope | What it does |
 |---|---|---|
-| `--update` | machine | Fetch the latest kit into `~/.the-agent-kit`, then run `--global`. Needs no kit beside it, so one downloaded `install.sh` bootstraps everything. |
-| `--global` | machine | Git hooks for every repo via `core.hooksPath`; **prints** the tool-guard snippets to merge. |
+| `--setup` | machine | Copy the kit to `~/.the-agent-kit`, turn on its git hooks, and add it to your Claude Code and Codex settings: listed, asked, backed up. Safe to re-run. |
+| `--update` | machine | Fetch the latest kit, check it is the kit, then run `--setup` from it. Needs no kit beside it, so one downloaded `install.sh` bootstraps everything. |
+| `--global` | machine | By hand: copy the kit and **print** the settings snippets and the git-hooks command for you to apply. |
 | *(none)* | project | Full rules - `AGENTS.md` plus a `CLAUDE.md` that imports it - the depth tier and skills for both tools (`.claude/` and `.agents/skills/`), and this repo's git hooks. |
 | `--extension` | project | Project block only, for when the universal rules already live in your global files, so nothing is duplicated into context. |
 | `--update-rules` | project | Replace the universal rules, keep `PROJECT-CONFIG` byte-for-byte. |
-| `--check` | project | Doctor: interpreter, guard firing, per-hook identity, rules-file size and wiring. |
+| `--check` | project | Doctor: interpreter, guard firing, per-hook identity, settings wiring, rules-file size. |
 
 > **Merge, don't replace.** If your `settings.json` already has `permissions` or `hooks`, fold these
 > keys into them. Pasting the whole snippet over an existing file wipes what's there.
@@ -576,8 +537,8 @@ bot *address*, not a first name, so a
 human named "Claude" is safe. Fail-closed: if stripping would empty the message, the commit is blocked
 rather than silently rewritten.
 
-**Tool config** (`claude/settings.json`, `codex/config.toml`, `codex/hooks.json`) is printed by
-`--global` for you to merge. On Claude Code it kills the native attribution trailer
+**Tool config** (`claude/settings.json`, `codex/config.toml`, `codex/hooks.json`) is added to your
+settings by `--setup`, or printed by `--global` for you to merge. On Claude Code it kills the native attribution trailer
 (`attribution.commit/pr:""`); asks before `git commit`, `git push`, and `gh pr create` *unless your own
 message that turn asked for it* (a one-time, turn-scoped grant, below); asks on secret-file reads (a
 visible prompt naming the file - precaution without a hard stop); and denies `--no-verify`/force and

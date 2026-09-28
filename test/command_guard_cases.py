@@ -207,6 +207,9 @@ GRANT_CASES = [
     ("AGENT_KIT_RELE''ASE=1 git push origin main",   {"push"},         "ask",  "ask"),
     ("A\\GENT_KIT_RELEASE=1 git push origin main",   {"push"},         "ask",  "ask"),
     ("env AGENT_KIT_RELEASE=1 git push origin main", {"push"},         "ask",  "ask"),
+    # consent for the installer to write the user's settings is the user's, never a grant's
+    ("AGENT_KIT_APPLY=1 sh install.sh --setup",      {"commit", "push"}, "ask", "ask"),
+    ("AGENT_KIT_APPLY=1 ~/.the-agent-kit/install.sh --update", set(),   "deny", "deny"),
     # a heredoc commit with a grant is allowed, whatever its message mentions
     ("git commit -F - <<'EOF'\nfix: x\n\nmentions core.hooksPath\nEOF", {"commit"}, "ask", "allow"),
     # ...but never one whose unquoted body can execute

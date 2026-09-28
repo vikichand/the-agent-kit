@@ -4,15 +4,17 @@
 #   ./install.sh              per-project (self-contained): full rules (AGENTS.md + a CLAUDE.md that
 #                             imports it, so nothing is duplicated) + git hooks in THIS repo
 #   ./install.sh --extension  per-project (extends global): project-config stub + git hooks
-#   ./install.sh --global     machine-wide: git hooks via core.hooksPath + printed tool snippets
-#   ./install.sh --update     pull the latest kit from GitHub into ~/.the-agent-kit (no clone needed)
+#   ./install.sh --setup      machine-wide, all of it: copy the kit to ~/.the-agent-kit, turn on the git
+#                             hooks, and add the kit to your Claude Code and Codex settings (asks first)
+#   ./install.sh --global     machine-wide, by hand: copy the kit and PRINT the snippets to merge yourself
+#   ./install.sh --update     pull the latest kit from GitHub into ~/.the-agent-kit, then run --setup
 #   ./install.sh --update-rules  refresh THIS repo's AGENTS.md to the kit's current rules; the
 #                             project's PROJECT-CONFIG block is preserved byte-for-byte
 #   ./install.sh --check      doctor: verify the interpreter resolves and the guard actually fires
 #
-# Safe by design: never overwrites an existing CLAUDE.md / AGENTS.md / git hook, and never blindly
-# rewrites your tool config - it prints snippets to merge. The tool-layer guard is NOT active until
-# you merge those snippets; run --check to confirm what is actually live.
+# Safe by design: never overwrites an existing CLAUDE.md / AGENTS.md / git hook. Your tool settings are
+# only ever ADDED to, after you say yes, with a backup first; --global prints them for a hand merge
+# instead. Run --check to confirm what is actually live.
 set -eu
 
 KIT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -225,7 +227,7 @@ install_project() {   # self-contained: full rules + git hooks
   install_codex_skills "$root"
   install_git_hooks "$root"
   hr
-  say "Tool-layer guard is machine-wide - run once:  ./install.sh --global   then:  ./install.sh --check"
+  say "Tool-layer guard is machine-wide - run once:  ./install.sh --setup   then:  ./install.sh --check"
 }
 
 install_extension() { # lean: project-config stub + git hooks
@@ -245,16 +247,9 @@ install_extension() { # lean: project-config stub + git hooks
   install_git_hooks "$root"
 }
 
-install_global() {
+copy_share() {  # copy this kit into ~/.the-agent-kit, so the download it came from can be deleted
   share="$HOME/.the-agent-kit"
-  # Running the installed copy's own --global would copy every file onto itself and die under
-  # set -e ("are the same file"). Refreshing the share is --update's job.
-  if [ "$KIT" = "$share" ]; then
-    say "This IS the installed copy - nothing to copy onto itself. To refresh it from GitHub:"
-    say "    $share/install.sh --update"
-    return 0
-  fi
-  mkdir -p "$share/hooks" "$share/git-hooks" "$share/docs" "$share/claude" "$share/codex"
+  mkdir -p "$share/hooks" "$share/git-hooks" "$share/docs" "$share/claude" "$share/codex" "$share/setup"
   # Copy the WHOLE kit, not just the hooks, so the clone you ran this from becomes disposable.
   # git-hooks/ is the core.hooksPath target (those three only); hooks/ is the full set, which is
   # what the relocated install.sh compares against in --check and copies from per project.
@@ -270,6 +265,7 @@ install_global() {
   # The installer prints these as merge snippets, so the relocated copy must carry them too.
   cp "$KIT/claude/settings.json" "$share/claude/" 2>/dev/null || true
   cp "$KIT/codex/config.toml" "$KIT/codex/hooks.json" "$share/codex/" 2>/dev/null || true
+  cp "$KIT/setup/merge-settings.py" "$share/setup/" 2>/dev/null || true
   cp "$KIT/docs/"*.md "$share/docs/" 2>/dev/null || true
   rm -f "$share/docs/lessons.md" "$share/docs/my-skills-and-plugins.md"   # the owner's private, git-ignored notes; not the kit's
   mkdir -p "$share/rules"
@@ -292,6 +288,18 @@ install_global() {
   printf '%s\n' "${ver:-unknown}" > "$share/.kit-version"
   say "Copied the kit to $share (rules + hooks + installer + docs)"
   say "  -> $share is now self-contained: the clone you ran this from can be deleted."
+}
+
+install_global() {  # copy the kit, then PRINT the settings snippets for a hand merge (--setup applies them)
+  share="$HOME/.the-agent-kit"
+  # Running the installed copy's own --global would copy every file onto itself and die under
+  # set -e ("are the same file"). Refreshing the share is --update's job.
+  if [ "$KIT" = "$share" ]; then
+    say "This IS the installed copy - nothing to copy onto itself. To refresh it from GitHub:"
+    say "    $share/install.sh --update"
+    return 0
+  fi
+  copy_share
 
   py=$(detect_py)
   if [ -z "$py" ]; then
@@ -334,6 +342,70 @@ install_global() {
   say "    cat \"$share/AGENTS.md\" >> ~/.claude/CLAUDE.md   ;   cat \"$share/AGENTS.md\" >> ~/.codex/AGENTS.md"
 }
 
+nat() { cygpath -m "$1" 2>/dev/null || printf '%s' "$1"; }   # a path Python and git accept on every OS
+
+merge_settings() {  # $1 = share, $2 = python, then extra flags -> runs the kit's settings merge
+  ms_share=$1; ms_py=$2; shift 2
+  $ms_py "$(nat "$ms_share/setup/merge-settings.py")" --home "$(nat "$HOME")" --share "$(nat "$ms_share")" \
+    --share-cmd "$ms_share" --py "$ms_py" "$@"
+}
+
+confirm() {  # consent to write the user's settings: a terminal answer, or AGENT_KIT_APPLY=1
+  # AGENT_KIT_APPLY is the only way without a terminal, and the kit's tool guard asks the user before any
+  # agent command sets it: an agent cannot rewrite its own permissions without the human saying yes.
+  [ "${AGENT_KIT_APPLY:-}" = 1 ] && return 0
+  # Settings that just arrived with an update are applied only by an answer given after seeing them: in
+  # a terminal, the question below; otherwise a separate --setup, run once the list above has been read.
+  if [ -t 0 ]; then
+    printf 'Apply these changes? [y/N] '
+    read -r ans || ans=""
+    case "$ans" in y|Y|yes|YES|Yes) return 0 ;; esac
+    say "  Nothing changed."
+    return 1
+  fi
+  say "  Nothing changed: there is no terminal to ask you in. To apply the changes listed above, run"
+  say "  $HOME/.the-agent-kit/install.sh --setup in a terminal, or AGENT_KIT_APPLY=1 in front of it."
+  return 1
+}
+
+setup_machine() {  # --setup: everything a machine needs, applied with the user's consent
+  share="$HOME/.the-agent-kit"
+  [ "$KIT" = "$share" ] || copy_share
+  py=$(detect_py)
+  [ -n "$py" ] || { say "  ! no working Python 3 found - the kit's guard and this setup both need it. Install it and re-run."; exit 2; }
+  hr
+  say "SETTINGS - the kit's entries are added to yours; nothing of yours is removed or changed"
+  mrc=0; plan=$(merge_settings "$share" "$py" 2>&1) || mrc=$?
+  [ -n "$plan" ] && say "$plan"
+  [ "$mrc" = 0 ] && [ -z "$plan" ] && say "  already current (or no Claude Code / Codex settings folder found)"
+  say "GIT HOOKS - secret scan, protected branches and attribution stripping, in every repo"
+  want=$(nat "$share/git-hooks"); hp=$(git config --global --get core.hooksPath 2>/dev/null || true); sethooks=0
+  case "$(printf '%s' "$hp" | tr '\\' '/')" in
+    */.the-agent-kit/git-hooks|*/.the-agent-kit/git-hooks/) say "  already on" ;;
+    "") sethooks=1; say "  + turn on: core.hooksPath -> $want"
+        say "    (git then runs the kit's hooks in every repo, instead of each repo's own .git/hooks)" ;;
+    *) say "  left as it is: core.hooksPath is $hp (another tool owns it)."
+       say "  To add the kit's hooks, copy $share/git-hooks/* into that folder." ;;
+  esac
+  hr
+  if [ "$mrc" != 10 ] && [ "$sethooks" = 0 ]; then
+    [ "$mrc" = 1 ] && { say "Fix the file named above (it could not be read safely), then run this again."; exit 1; }
+    say "Already set up: your settings and git hooks carry the kit."
+    return 0
+  fi
+  if confirm; then
+    arc=0
+    [ "$mrc" = 10 ] && { AGENT_KIT_APPLY=1 merge_settings "$share" "$py" --apply >/dev/null 2>&1 || arc=$?; }
+    [ "$sethooks" = 1 ] && git config --global core.hooksPath "$want"
+    [ "$arc" = 0 ] || [ "$mrc" = 1 ] || { say "  ! the settings merge did not finish (exit $arc) - run $share/install.sh --check"; exit 1; }
+    say "Done. Backups of changed files sit beside them as *.bak-agent-kit-<time>."
+    say "Restart Claude Code and Codex: hooks load when a session starts."
+    say "Then in each project:   $share/install.sh     (and run the setup prompt once)"
+  fi
+  [ "$mrc" = 1 ] && exit 1
+  return 0
+}
+
 update_kit() {  # refresh ~/.the-agent-kit from GitHub, so the clone stays disposable
   share="$HOME/.the-agent-kit"
   command -v git >/dev/null 2>&1 || { say "  ! git not found - cannot update. Install git, or re-clone by hand."; exit 2; }
@@ -366,10 +438,10 @@ update_kit() {  # refresh ~/.the-agent-kit from GitHub, so the clone stays dispo
   # of a line landed there ("sac: command not found", observed). exec replaces this process, so not
   # one more byte is read from the file being replaced. Keep the tail below inside the handoff.
   exec sh -c '
-    sh "$1/install.sh" --global || exit $?
+    AGENT_KIT_APPLY= sh "$1/install.sh" --setup || exit $?
     rm -rf "$2"
     printf "%s\n" "------------------------------------------------------------"
-    printf "%s\n" "Machine-wide guards + ~/.the-agent-kit are now current. Then, per project:"
+    printf "%s\n" "The kit in ~/.the-agent-kit is current. Then, in each project:"
     printf "%s\n" "    ~/.the-agent-kit/install.sh --update-rules     # new rules in, your PROJECT-CONFIG kept"
   ' _ "$tmp/kit" "$tmp"
 }
@@ -515,6 +587,17 @@ doctor() {
   else
     say "  OK:   hooks/kit-check.py present (session-start update check; wired if you merged SessionStart)"
   fi
+  # The settings are where the tool guard and the session-start check are wired. Checking the scripts
+  # alone reported all OK on a machine whose Codex had no guard at all (2026-09-29).
+  share="$HOME/.the-agent-kit"
+  if [ -n "$py" ] && [ -f "$share/setup/merge-settings.py" ]; then
+    src=0; m=$(merge_settings "$share" "$py" --check 2>&1) || src=$?
+    case "$src" in
+      0) say "  OK:   $m" ;;
+      10) say "  WARN: $m - run: $share/install.sh --setup" ;;
+      *) say "  WARN: $m" ;;
+    esac
+  fi
   hd=$(git_hooks_dir "$(pwd)")
   if [ -z "$hd" ]; then
     say "  NOTE: not a git repo - no git-layer hooks to check here."
@@ -625,8 +708,9 @@ doctor() {
 # this line runs when sourced that way.
 if [ "${AGENT_KIT_LIB:-0}" = 1 ]; then return 0 2>/dev/null || exit 0; fi
 
-USAGE="Usage: ./install.sh [--extension | --global | --update | --update-rules | --check]"
+USAGE="Usage: ./install.sh [--setup | --update | --update-rules | --check | --extension | --global]"
 case "$MODE" in
+  --setup|setup)                setup_machine ;;
   --global|global)              install_global ;;
   --extension|extension)        install_extension ;;
   --update|update)              update_kit ;;

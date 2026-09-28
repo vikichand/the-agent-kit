@@ -179,14 +179,16 @@ projects); silent otherwise; never updates or installs anything itself. Off with
   (Section 5 requires verifying facts against the version in use; switching it off just sends the agent back to memory) · no hand-written env exclude
   list (Codex excludes secret names by default, and a broad one strips `DATABASE_URL` and breaks builds invisibly).
   **`codex/hooks.json`** wires the deny-mode hook.
-- **`install.sh`**: six modes, default (full rules) · `--extension` (lean, extends global) · `--global` (machine-wide) ·
+- **`install.sh`**: six modes, default (full rules) · `--extension` (lean, extends global) · `--setup` (machine-wide: copies the kit, turns on the
+  git hooks and adds the kit to your Claude Code and Codex settings, add-only, asked and backed up; `setup/merge-settings.py`) ·
+  `--global` (machine-wide by hand: prints the snippets) ·
   `--update` (**also the installer**: a lone `install.sh` with no kit beside it bootstraps the whole thing,
   so distribution is one curl-able file - no clone, no package manager. Pulls the latest kit from GitHub
   into `~/.the-agent-kit`, so the clone stays disposable: stamps
   and compares the source commit, shows what changed, no-ops when current, and proves the download is the kit
   before overwriting anything) · `--update-rules` (refresh a project's universal rules; its `PROJECT-CONFIG`
   block survives byte-for-byte; fails closed without markers) · `--check` (doctor). Never overwrites;
-  detects a working Python; prints tool-config snippets rather than clobbering.
+  detects a working Python; writes your settings only after you say yes, with a backup first.
   The doctor verifies each git hook **by identity**, not just presence, and prints `core.hooksPath` when a redirect is set.
 - **`docs/environment-setup-prompt.md`**: optional, agent-run recipe for a machine's MCP servers / plugins / skills
   in three profiles: Core (Context7), Web and UI (Playwright · Chrome DevTools · Impeccable · `frontend-design`),
