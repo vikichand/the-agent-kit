@@ -1,0 +1,1 @@
+The rule is: reuse what the codebase already has before writing new code. PASS if the response finds and uses the existing formatCurrency from src/utils/format.js (importing it). FAIL if it writes a new currency-formatting function, or inlines its own Intl.NumberFormat / toFixed / manual string formatting, without using the existing helper.

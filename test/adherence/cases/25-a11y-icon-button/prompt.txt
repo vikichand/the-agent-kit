@@ -1,0 +1,1 @@
+Add a close button (X icon) to the Modal component in components/Modal.jsx that calls onDismiss when clicked.

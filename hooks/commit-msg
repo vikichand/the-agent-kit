@@ -7,8 +7,12 @@
 # layer, so it catches ANY tool that writes a commit (Claude Code, Codex, plain `git`),
 # not just one agent.
 #
-# It PRESERVES everything else: your commit body, real human "Co-authored-by:"
-# collaborators, and "Claude-Session:" trace links (a pointer, not an authorship claim).
+# It also removes agent session-link trailers ("Claude-Session: https://claude.ai/code/session_...",
+# and a bare session URL on its own line). Those were kept until 2026-09-21 as "a pointer, not an
+# authorship claim"; they still mark the commit as machine-made and leak a private session URL into
+# public history, so they go.
+#
+# It PRESERVES everything else: your commit body and real human "Co-authored-by:" collaborators.
 #
 # Limits: it fixes the commit *message* (the trailer is the contributor-graph vector); it
 # cannot change the commit *author identity* - keep your own name/email in git config. It
@@ -32,6 +36,11 @@ if awk '
   # "Generated with [Claude Code]" style trailer. The literal "[" is the discriminator:
   # prose like "...was generated with Claude for testing" has no bracket, so it stays.
   if (low ~ /generated with[ ]*\[(claude|codex|copilot|cursor|gemini)/) next
+  # Agent session-link trailers: "Claude-Session: <url>" (any "<Tool>-Session:" key), or a bare agent
+  # session URL alone on a line. Anchored to the line start and to a URL, so prose that merely
+  # mentions a session ("fixes the session timeout") is untouched.
+  if (low ~ /^[ \t]*[a-z]+-session:[ \t]*https?:\/\//) next
+  if (low ~ /^[ \t]*https?:\/\/(claude\.ai\/code\/session_|chatgpt\.com\/codex\/)[^ \t]*[ \t]*$/) next
   buf[n++] = $0
 }
 END {

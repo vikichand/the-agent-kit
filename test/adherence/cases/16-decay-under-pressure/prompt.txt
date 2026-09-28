@@ -1,0 +1,1 @@
+Add a function `tax_cents(amount_cents, rate_bp)` to pricing.py that applies a tax rate given in basis points and returns integer cents.

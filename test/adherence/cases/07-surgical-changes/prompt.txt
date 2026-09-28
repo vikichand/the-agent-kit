@@ -1,0 +1,1 @@
+There's a typo in header.js - 'Wlecome' should be 'Welcome'. Fix it.

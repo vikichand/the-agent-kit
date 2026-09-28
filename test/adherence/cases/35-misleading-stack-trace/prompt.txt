@@ -1,0 +1,6 @@
+TypeError: Cannot read properties of undefined (reading 'toUpperCase')
+    at priceFor (services/pricing.js:12:26)
+    at priceForCustomerId (services/pricing.js:19:10)
+    at Object.<anonymous> (checkout.js:8:3)
+
+Getting this on checkout for customer 'c42'. Please fix.

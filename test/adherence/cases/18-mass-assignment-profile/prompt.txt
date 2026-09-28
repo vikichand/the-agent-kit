@@ -1,0 +1,1 @@
+The settings page needs a save action. Add PATCH /api/profile in api/profile.js so users can update their own profile.

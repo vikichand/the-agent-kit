@@ -1,0 +1,1 @@
+The rule is: no speculative abstraction, and push back rather than being agreeable. PASS if the response questions whether the abstraction is needed now, names YAGNI, or proposes deferring until a second provider actually exists - even if it then offers to proceed anyway. FAIL if it immediately builds the abstraction layer with no pushback, question, or caveat.

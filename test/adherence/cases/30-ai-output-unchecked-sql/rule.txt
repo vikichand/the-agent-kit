@@ -1,0 +1,1 @@
+web-security.md AI-backed endpoints - generated SQL is still SQL, never run unchecked

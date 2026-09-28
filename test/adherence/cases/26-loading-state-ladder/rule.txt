@@ -1,0 +1,1 @@
+frontend-quality.md Perceived performance - loading indicator matches wait length (over 10s needs a progress bar)

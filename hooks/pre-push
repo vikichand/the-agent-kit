@@ -6,15 +6,48 @@
 # Deliberate force-push override:   AGENT_KIT_ALLOW_FORCE=1 git push ...
 # Protected branches:               main, master, release/*   (edit below to taste)
 #
+# RELEASE-ONLY BRANCHES. A project that keeps a branch for releases only (this kit keeps `main`) marks
+# it in its AGENTS.md project block with a one-line comment, which costs nothing in context:
+#     <!-- agent-kit: release-branch=main -->
+# Any push to that branch is then refused - a normal fast-forward included, creating it included -
+# unless the push carries  AGENT_KIT_RELEASE=1 . The marker is read from the commit being pushed, the
+# branch's current tip and HEAD, and only counts for the branch it names, so a push that deletes the
+# marker is still refused while the branch it targets carries it. Tags are never affected: a release
+# pushes the tag and the branch together. The agent's tool guard asks on every command that sets
+# AGENT_KIT_RELEASE, and no chat request covers it, so cutting a release stays the owner's act.
+#
 # NOTE: `git push --no-verify` skips this hook - which is exactly why --no-verify is ALSO denied
 # at the agent-permission layer. This is the git-layer half of that defense.
 
 zero=0000000000000000000000000000000000000000
 blocked=0
+release_blocked=0
+
+release_branch_of() {  # $1 = a commit sha -> the release branch its AGENTS.md marks, or nothing
+  git show "$1:AGENTS.md" 2>/dev/null \
+    | sed -n 's/.*agent-kit: release-branch=\([A-Za-z0-9._/-][A-Za-z0-9._/-]*\).*/\1/p' | head -1
+}
 
 # git feeds "<local ref> <local sha> <remote ref> <remote sha>" per updated ref on stdin
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ -n "${remote_ref:-}" ] || continue
+  case "$remote_ref" in refs/heads/*) : ;; *) continue ;; esac   # tags and notes are never refused
+
+  # Release-only branch: marked in the pushed commit, the branch's current tip, or HEAD. Any one is
+  # enough, so a push cannot exempt itself by deleting the marker in the commits it carries.
+  rel=
+  for src in "$local_sha" "$remote_sha" HEAD; do
+    [ "$src" = "$zero" ] && continue
+    [ "$(release_branch_of "$src")" = "${remote_ref#refs/heads/}" ] && rel=${remote_ref#refs/heads/} && break
+  done
+  if [ -n "$rel" ] && [ "${AGENT_KIT_RELEASE:-}" != 1 ]; then
+    echo "the-agent-kit pre-push: $rel is RELEASE-ONLY in this repo (marked in AGENTS.md) - refusing a" >&2
+    echo "  push to it outside a release. Work goes on the other branch; a release goes in through the" >&2
+    echo "  project's release process (a pull request, or a push carrying AGENT_KIT_RELEASE=1)." >&2
+    release_blocked=1
+    continue
+  fi
+
   case "$remote_ref" in
     refs/heads/main|refs/heads/master|refs/heads/release/*) : ;;
     *) continue ;;
@@ -27,6 +60,8 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     blocked=1
   fi
 done
+
+[ "$release_blocked" = 1 ] && exit 1
 
 if [ "$blocked" = 1 ]; then
   if [ "${AGENT_KIT_ALLOW_FORCE:-}" = 1 ]; then

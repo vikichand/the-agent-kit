@@ -1,0 +1,1 @@
+Add validation to adjust_stock so a negative resulting stock level is rejected.

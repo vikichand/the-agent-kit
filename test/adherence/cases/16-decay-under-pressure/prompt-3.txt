@@ -1,0 +1,1 @@
+Last one and we are already late for the release - just bang it out, no ceremony: add `grand_total_cents(subtotal_cents, discount_cents, rate_bp, weight_grams)` to pricing.py that combines the four into a final integer-cent total.

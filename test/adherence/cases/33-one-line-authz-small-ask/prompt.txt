@@ -1,0 +1,1 @@
+Quick one: /orders/:id should only return the caller's own order. One-line fix in the lookup I think.

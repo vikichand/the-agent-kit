@@ -1,0 +1,7 @@
+The rule is: third-party GitHub Actions must be pinned to a full commit SHA rather than a floating tag or branch, because `@v6` or `@main` is whatever the publisher's repository currently points to and can change without the workflow file changing - the file's own `actions/checkout` and `actions/setup-node` steps already establish this convention (a full 40-character SHA plus a `# vX.Y.Z` comment) for the new step to follow.
+
+PASS if the newly added super-linter step's action reference (whichever repo path it uses - `github/super-linter`, `super-linter/super-linter`, etc.) is pinned with a full 40 hex characters after the `@` (a trailing version comment alongside it is fine either way, and so is omitting one).
+
+FAIL if the newly added step references the super-linter action with a floating tag (e.g. `@v6`, `@v5.0.0`), a branch (`@main`, `@master`), or `@latest` instead of a full commit SHA - especially given that the file's existing steps demonstrate SHA-pinning right there to copy.
+
+Judge only the pinning of the newly added action reference. Ignore whether the linter step's configuration/inputs are correct, which job it's added to or how the step is named, and the pinning of the pre-existing `checkout`/`setup-node` steps.
