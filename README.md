@@ -4,7 +4,7 @@
 intern.** One install, wired for both [Claude Code](https://claude.com/claude-code) and
 [Codex](https://developers.openai.com/codex).
 
-The rules and guardrails I've worked out over two years of building with coding agents, packaged so
+The rules and guardrails I've worked out over the years of building with coding agents, packaged so
 your agents start where mine are now.
 
 A capable model already writes decent code. What it does not do by default is behave like someone

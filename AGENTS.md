@@ -231,9 +231,9 @@ out in words ("Section 4", "and", "number"). This governs prose you write, never
 
 ## 10. Documentation
 
-- **For documentation, READMEs, reports and commit messages, load the installed `writing-docs` skill** unless
-  it is already loaded: it carries the prose standards in full and the README order (working path first, a
-  runnable command in the first screenful, every command surface as a table, shell differences named).
+- **For documentation, READMEs, reports, commit messages, PR descriptions and release notes, load the installed
+  `writing-docs` skill** unless it is already loaded: it carries the prose standards, the README order and how
+  to write commits, pull requests and release notes that people can skim.
 - **Docs move in the same diff.** A change that alters behavior, setup, or config updates the README / docs /
   `.env.example` with it.
 
