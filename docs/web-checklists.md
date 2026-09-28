@@ -2,7 +2,7 @@
 
 Two checklists for user-facing **web** projects. They are not loaded into every session - the
 project's `PROJECT-CONFIG` block points here, and the agent opens this file at the moments named
-below. Source and rationale: `SENIOR-ENGINEER.md` at the kit root.
+below. Source and rationale: `docs/senior-engineer.md`.
 
 The principles (server-side trust, least privilege, rate limits, untrusted input, replay safety)
 hold on every platform; this file is the web instance. A mobile or desktop project gets an analogous

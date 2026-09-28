@@ -9,7 +9,7 @@ senior: read before it writes, ask what breaks downstream, push back on a bad in
 and refuse to fake a green run, fix the cause rather than the symptom, and stop at what you asked for.
 That is a behaviour gap, not a capability gap, and it is what this kit closes. The traits it installs,
 with the reasoning and sources behind each, are in
-[`SENIOR-ENGINEER.md`](SENIOR-ENGINEER.md); how well they actually hold up under test is
+[`docs/senior-engineer.md`](docs/senior-engineer.md); how well they actually hold up under test is
 [measured, not asserted](#limits).
 
 ## Quick Start
@@ -322,7 +322,7 @@ and the installer is the adapter between them:
 **The guards** - hooks at the **git layer** (reorder-proof, covering Claude Code, Codex, plain `git`,
 and any MCP tool that shells out to `git`) plus the **tool layer**, a fast prompt-time veto. Full map
 in [`FEATURES.md`](FEATURES.md); the senior-engineer trait ledger with sources is
-[`SENIOR-ENGINEER.md`](SENIOR-ENGINEER.md).
+[`docs/senior-engineer.md`](docs/senior-engineer.md).
 
 **Honest about what this is:** the guards *reduce* slop and mistakes; they are **not a sandbox.** The
 tool-layer hook parses shell text, which can't be made bulletproof (`bash -c`, `eval`, `$(...)`, and
@@ -526,7 +526,7 @@ intent, web repos additionally get **path-scoped rules** in `.claude/rules/` tha
 agent opens auth, API, payment or migration code, and **[docs/web-checklists.md](docs/web-checklists.md)**
 for launch readiness.
 The full senior-engineer trait ledger behind these bars, with rationale and sources, is
-**[SENIOR-ENGINEER.md](SENIOR-ENGINEER.md)**.
+**[docs/senior-engineer.md](docs/senior-engineer.md)**.
 
 ## What each guard does
 

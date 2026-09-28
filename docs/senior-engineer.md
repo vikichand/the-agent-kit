@@ -1,20 +1,16 @@
-# Senior engineer traits - the ledger
+# Where the rules come from
 
-> **Status: MERGED and audited 2026-08-20. This file is the record, not the runtime.** The agent never
-> reads it; it reads `AGENTS.md`. Every trait below has been distilled into a file that IS consumed, and
-> the audit that proved it is at the bottom. Keep it as the "why" behind the rules - what was adopted,
-> what was deliberately rejected, and what it cost - so a future session doesn't re-litigate settled
-> decisions or merge the same idea twice.
->
-> | Part | Lives now in | Loaded |
-> |---|---|---|
-> | I - universal discipline | `AGENTS.md` safety invariants + Sections 1-10 | every turn, every repo |
-> | II - product quality bars | `PROJECT-CONFIG`, written by `docs/project-setup-prompt.md` | every turn, in user-facing repos |
-> | III - web security | `claude/rules/web-security.md` + `claude/rules/ci-cd.md` | automatically, on matching paths |
-> | IV - launch readiness | `docs/web-checklists.md` | on demand, before a public launch |
->
-> Tags below are historical: **[covered SN]** was already in `AGENTS.md` · **[partial]** was partly there ·
-> **[NEW]** was added by this work.
+The research behind the kit's rules: every senior-engineer trait it teaches, why, and where it now
+lives. **Nothing here is installed or loaded.** Agents read `AGENTS.md` and the depth rules; this file
+is the reasoning behind them, so a future change does not re-argue a settled decision or add the same
+idea twice.
+
+| Part | Ships in | Loaded |
+|---|---|---|
+| I - universal discipline | `AGENTS.md` safety invariants + Sections 0-10 | every turn, every repo |
+| II - product quality bars | the project block, written by `docs/project-setup-prompt.md` | every turn, in user-facing repos |
+| III - web security | `claude/rules/web-security.md` + `ci-cd.md` (Codex: `.agents/skills/`) | on matching paths or tasks |
+| IV - launch readiness | `docs/web-checklists.md` | on demand, before a public launch |
 
 ## The organizing idea
 
@@ -26,10 +22,9 @@ what I was told, fast" loses to "do what a senior would do".
 
 Two halves, two destinies:
 
-- **Part I - universal discipline.** True in every repo: CLI tool, library, web app. Merge target:
+- **Part I - universal discipline.** True in every repo: CLI tool, library, web app. Lives in:
   `AGENTS.md`, distilled - always in context.
-- **Parts II-IV - product bars and web checklists.** Only meaningful for user-facing products. Merge
-  target: the `PROJECT-CONFIG` block plus a `docs/` checklist - in context only where they apply.
+- **Parts II-IV - product bars and web checklists.** Only meaningful for user-facing products. Lives in: the `PROJECT-CONFIG` block plus a `docs/` checklist - in context only where they apply.
 
 ---
 
@@ -37,13 +32,13 @@ Two halves, two destinies:
 
 ## 1. Judgement before code
 
-- **Reuse before rebuild.** [covered S3] Climb the ladder: needs to exist at all -> already in this
+- **Reuse before rebuild.** Climb the ladder: needs to exist at all -> already in this
   codebase -> stdlib -> platform -> installed dependency -> only then write it. An agent generates a
   fresh component by instinct; a senior greps first. Create new only when the existing one genuinely
   doesn't fit, and say why in one line.
-- **Question the ticket.** [covered S1] "Do you actually need X, or does Y cover it?" Agreeable-but-
+- **Question the ticket.** "Do you actually need X, or does Y cover it?" Agreeable-but-
   wrong costs more than pushback. A strange request is a signal to ask, not a spec to obey.
-- **Name what you will NOT touch.** [covered S2] Scope is a fence; agents creep, seniors declare.
+- **Name what you will NOT touch.** Scope is a fence; agents creep, seniors declare.
 - **Know the blast radius before the first edit.** [partial - S6 covers callers of a changed function]
   Who calls this, what consumes this API, what breaks downstream if the shape changes - answered
   before editing, not discovered by the reviewer. Includes schema changes, event contracts, cron
@@ -52,17 +47,17 @@ Two halves, two destinies:
   Before adding: is it maintained, is the license compatible, how heavy is its own dependency tree,
   does the stdlib or an installed dep already cover it (rungs 3-5 of the ladder). Hallucinated and
   typo-squatted package names are a real attack surface - verify on the registry, never from memory.
-- **Surface risks early; state trade-offs.** [NEW] When choosing between approaches, say what was
+- **Surface risks early; state trade-offs.** When choosing between approaches, say what was
   traded away in one or two lines. When something smells wrong mid-task (a fragile API, a suspicious
   requirement), flag it at discovery time - no surprises at review time.
 
 ## 2. While writing code
 
-- **Simple beats flexible.** [covered S3] No speculative props, options, or config. A component's API
+- **Simple beats flexible.** No speculative props, options, or config. A component's API
   is a promise; if reuse means a tenth boolean prop that changes its meaning, that is the "existing
   component doesn't fit" case - split it, don't bloat it.
-- **Match the house style.** [covered S3] The codebase's patterns beat your preferences.
-- **Every line traces to the task.** [covered S4] No drive-by refactors, renames, or "improvements".
+- **Match the house style.** The codebase's patterns beat your preferences.
+- **Every line traces to the task.** No drive-by refactors, renames, or "improvements".
 - **Config comes from the environment.** [partial - secrets covered by invariants + pre-commit scanner]
   No hardcoded credentials, ever - `.env` (gitignored) with `.env.example` documenting every variable
   a fresh clone needs. The wider habit: no hardcoded URLs, ports, bucket names, or flags either. If it
@@ -71,22 +66,22 @@ Two halves, two destinies:
   Validate at trust boundaries (user input, network, file, env). Never swallow an error - an empty
   catch block is a lie to the operator, and `catch { return [] }` makes the demo work while production
   lies. Fallbacks are visible (logged or flagged) and bounded; retries have a limit.
-- **Multi-step writes are transactional; retried work is idempotent.** [NEW] A crash between two
+- **Multi-step writes are transactional; retried work is idempotent.** A crash between two
   writes must not leave half a record. Webhooks, queue consumers, and retried requests WILL fire
   twice; a senior's handler survives replay, an agent's handler double-charges.
 - **Check-then-act is a race.** [NEW 2026-08-27] The gap between "has enough credits" and "take the
   credits" is where two concurrent requests both pass. Make it one conditional write whose affected
   rows you inspect, a unique constraint, or a held lock - never SELECT then UPDATE. Invisible to any
   test that sends one request at a time.
-- **Ask "what happens at 100k rows?"** [NEW] No query inside a loop (N+1), no fetch-all without
+- **Ask "what happens at 100k rows?"** No query inside a loop (N+1), no fetch-all without
   pagination or limit, no loading a whole file or table into memory. Fine at demo scale, an incident
   at real scale.
-- **Time and money are not primitives.** [NEW] UTC internally, timezone conversion only at the edges,
+- **Time and money are not primitives.** UTC internally, timezone conversion only at the edges,
   never timezone-naive datetimes. Integers or decimal types for money, never floats.
 - **Mark deliberate shortcuts with a named ceiling.** [NEW - inspired by ponytail] Knowingly cut a
   corner (global lock, O(n^2) scan, naive heuristic) -> leave a comment naming the ceiling and the
   upgrade path. Tracked debt is a decision; silent debt is a trap.
-- **Delete, don't comment out.** [NEW] Dead code in comments is noise with authority; git remembers.
+- **Delete, don't comment out.** Dead code in comments is noise with authority; git remembers.
   (Flag pre-existing dead code rather than sweeping it - S4's surgical rule still holds.)
 - **Comments say why, not what.** [NEW - inspired by Sanglard's agent.md] A comment earns its place only
   by saying what the code can't: the constraint, the trap, the reason for the odd choice. Never narrate a
@@ -95,19 +90,18 @@ Two halves, two destinies:
 
 ## 3. Verification - the senior's definition of "done"
 
-- **TDD: the test comes first.** [covered S5 - "prefer test-first"; candidate for hardening to the
-  default] Write the failing test that defines the behavior, watch it fail, make it pass, refactor.
+- **TDD: the test comes first.** Write the failing test that defines the behavior, watch it fail, make it pass, refactor.
   For bugs: run an existing reproducing test, or add one; observe failure before fixing, then success.
 - **Never game the oracle.** [partial - S5 bans self-grading; the specific cheats aren't named]
   Under pressure agents delete failing tests, loosen assertions, mock the thing under test, or
   hardcode expected values. A red test is information, not an obstacle. A genuinely wrong test gets
   fixed visibly - never quietly weakened in the same diff as the feature.
-- **Test behavior, not implementation.** [NEW] Assert what the caller observes, not internal call
+- **Test behavior, not implementation.** Assert what the caller observes, not internal call
   counts. Happy-path-only is junior; the edges (empty, null, duplicate, concurrent, huge, malformed,
   unauthorized) are where seniors earn the title.
-- **Verify facts against the version in use.** [covered S5 + context7 rule] Training data lags; verify
+- **Verify facts against the version in use.** Training data lags; verify
   library and API behavior against current docs before asserting it.
-- **Run it before claiming it.** [covered S5] "Looks right" is not done; state how you verified.
+- **Run it before claiming it.** "Looks right" is not done; state how you verified.
 - **UI work gets end-to-end proof in a real browser.** [partial - `docs/browser-tools.md` has the
   tool-choice rule; making e2e part of "done" is new] Drive the flow with the Playwright MCP, inspect
   with the Chrome DevTools MCP. A passing unit suite does not prove a button works. The accessibility
@@ -115,20 +109,20 @@ Two halves, two destinies:
 
 ## 4. Delivery and git
 
-- **Sync before you ship.** [NEW] Fetch and rebase/merge per the project's convention before pushing
+- **Sync before you ship.** Fetch and rebase/merge per the project's convention before pushing
   or raising a PR - the PR lands on current HEAD, and conflicts are resolved by the author, not
   discovered by the reviewer or CI.
-- **Small, reviewable, honestly-messaged commits.** [covered S7 + hooks] One logical change per
+- **Small, reviewable, honestly-messaged commits.** One logical change per
   commit; the message says why. No `git add -A` sweeping in junk, no commits unless asked.
 - **Branch discipline; CI green before merge.** [partial - hooks protect main from force/delete]
   Work on a branch, never directly on main. A PR states intent, testing done, and what reviewers
   should look hard at. Red CI is a stop sign, not a suggestion.
-- **Migrations respect the data.** [NEW] Schema and data changes are backward-compatible or staged
+- **Migrations respect the data.** Schema and data changes are backward-compatible or staged
   (expand -> migrate -> contract), reversible, and never destructive without an explicit human
   decision. An agent that "fixes" a column by dropping it is the nightmare scenario.
-- **Breaking changes are announced, not smuggled.** [NEW] A changed public contract (API shape, event
+- **Breaking changes are announced, not smuggled.** A changed public contract (API shape, event
   schema, exported signature) is flagged in the PR and versioned per the project's convention.
-- **Risky changes ship behind a flag, and you watch them land.** [NEW] A senior's change isn't done at
+- **Risky changes ship behind a flag, and you watch them land.** A senior's change isn't done at
   merge: gate genuinely risky behavior behind a feature flag or staged rollout where the project
   supports it, and check logs/monitors after deploy instead of assuming green CI means healthy prod.
 - **Docs move in the same diff.** [partial - S10 governs README quality, not upkeep] A change that
@@ -142,10 +136,10 @@ Two halves, two destinies:
   sends you there or the task explicitly needs it - an asked-for excursion (read that report on C:,
   check that other repo) is normal work; just name where you're going. The rule kills unprompted
   wandering, never sanctioned trips.
-- **Confidential material stays local.** [NEW] Client code and data go to no external service beyond
+- **Confidential material stays local.** Client code and data go to no external service beyond
   what the task requires. When a tool call would send private content somewhere new, that is the
   human's decision, not a default.
-- **Copied code carries its license.** [NEW] Vendoring a snippet is a dependency decision: check the
+- **Copied code carries its license.** Vendoring a snippet is a dependency decision: check the
   license is compatible, keep its copyright notice, never present licensed code as original. (The
   dependency-vetting rule, extended to copy-paste.) Reimplementing is different and fine: building
   your own version of a library, borrowing its ideas or API shape, or porting the concept to another
@@ -156,13 +150,13 @@ Two halves, two destinies:
   source projects, reading how each solved a feature, and using that understanding to plan and build
   your own system is how seniors have always worked - the license question only arises when their
   code, not their lessons, lands in your tree.
-- **Own your incidents.** [NEW] On a real mistake - a secret exposed, a wrong-branch push, unintended
+- **Own your incidents.** On a real mistake - a secret exposed, a wrong-branch push, unintended
   data touched - stop and report it plainly. No silent cleanup, no unasked history rewrites, no
   deleting the evidence: an unreported incident is worse than the incident.
 
 ---
 
-# Part II - Product quality bars (any user-facing platform; `PROJECT-CONFIG` material)
+# Part II - Product quality bars (user-facing platforms)
 
 A feature that fails these is unfinished, not "done minus extras". [NEW as a block]
 
@@ -194,7 +188,7 @@ malpractice. The setup prompt asks which one this repo is.
 - **Audit logs.** Sensitive mutations (auth events, permission changes, money movement, data
   deletion/export) get an audit record: who, what, when, from where. Wire into the project's
   mechanism; if one obviously should exist and doesn't, flag it rather than shipping unauditable.
-- **Privacy by default.** [NEW] Collect the minimum personal data the feature needs, know why each
+- **Privacy by default.** Collect the minimum personal data the feature needs, know why each
   field exists, and respect the project's retention rules. PII stays out of logs, URLs, and
   analytics events unless explicitly designed in.
 - **Perceived performance.** Skeleton loaders that mirror the final layout while data loads - the
@@ -205,7 +199,7 @@ malpractice. The setup prompt asks which one this repo is.
 
 ---
 
-# Part III - Web security defaults (checklist; `docs/` + `PROJECT-CONFIG` pointer)
+# Part III - Web security defaults
 
 [NEW as a block.] The default shape of a web app, not hardening to schedule for later. The agent
 failure mode is precise: it builds the happy path, the login page ships, and that login page is the
@@ -296,9 +290,9 @@ Per-platform checklists get written when a real project needs them, not speculat
 
 ---
 
-# Part IV - Launch readiness (checklist; `docs/` + `PROJECT-CONFIG` pointer)
+# Part IV - Launch readiness
 
-[NEW] The app is not ship-ready when the code is done. Before a public launch:
+ The app is not ship-ready when the code is done. Before a public launch:
 
 - **Open Graph preview**: an `og.png` in `public/` plus OG metadata in the root layout, so shared
   links render a card on social instead of a bare URL.
@@ -306,13 +300,13 @@ Per-platform checklists get written when a real project needs them, not speculat
   tab, Google snippet, and SEO baseline in one move.
 - **`sitemap.xml`** listing all public pages, submitted in Google Search Console - then watch the
   console for indexing errors instead of assuming Google found you.
-- **[NEW] What you need the first time something breaks**: crash reporting someone actually
+- ** What you need the first time something breaks**: crash reporting someone actually
   receives; hard spend caps on every paid API and an alert on any LLM balance; backups with a
   *rehearsed* restore (an unrehearsed backup is a belief); a kill switch that disables the risky
   feature without a deploy; timeouts on every outbound call; production keys swapped in and
   verified; one real signup through a never-used address, which is how you find out SPF/DKIM/DMARC
   is sending every confirmation to spam.
-- **[NEW] The promises you are making** (not legal advice, and the kit must never read as if it
+- ** The promises you are making** (not legal advice, and the kit must never read as if it
   were): a reachable privacy policy that says you collect data, **that AI is involved**, and which
   third parties receive it; deletion that actually deletes, including object storage and backups,
   behind a button rather than a support request; buckets confirmed private by fetching a URL while
@@ -362,72 +356,6 @@ Per-platform checklists get written when a real project needs them, not speculat
 | Ships with no OG image / sitemap | IV launch readiness |
 | Wanders into `~` or another repo | I.5 stay inside the workspace |
 | Quietly cleans up its own mistake | I.5 own your incidents |
-
----
-
-# How this bakes into the kit (proposal - not actioned)
-
-**Not a skill, not a plugin.** Skills load on demand - the model chooses to invoke them from the
-description, which is exactly the "must be invoked" behavior we don't want, and Codex/Cursor/Aider
-never read them at all. Plugins are Claude-only packaging around the same on-demand parts. The only
-mechanism that is always-on across every tool the kit supports is the rules file the tool loads at
-session start (`AGENTS.md` / `CLAUDE.md` -> `@AGENTS.md`) - which is what the kit already is.
-
-Always-on means paid-for context on every turn, and adherence drops as the file grows (the doctor
-warns past ~200 effective lines; `AGENTS.md` is at ~160). So: distill, and load conditionally.
-
-- **Tier 1 - `AGENTS.md` (universal, always-on).** Distill Part I's [NEW]/[partial] items into
-  roughly a dozen lines under the existing sections, honoring the anti-churn contract (each addition
-  names a cut). Strongest candidates: blast radius, no silent fallbacks, idempotent/transactional,
-  100k-rows, time/money, never game the oracle, sync before ship, migrations, named-ceiling
-  shortcuts.
-- **Tier 2 - `PROJECT-CONFIG` (conditional, always-on where relevant).** Extend
-  `docs/project-setup-prompt.md`: it already classifies the repo; extend the classification to name
-  the platform (web / mobile / desktop / TV / CLI / library / service). Any user-facing platform gets
-  the Part II bars with that platform's mechanisms filled in; a web app additionally gets one-line
-  pointers to the Part III/IV checklists; a mobile/desktop app gets an analogous security block
-  generated from the Part III principles. A CLI tool or library never carries HSTS rules in its
-  context window. This keeps the promise "install the kit, run setup once per repo, the agent
-  behaves" - no invocation, ever.
-- **Tier 3 - `docs/web-checklists.md` (on-demand reference).** Parts III + IV verbatim as
-  checklists - the web instance, since that's what's being built first. The Tier 2 pointer tells the
-  agent WHEN to open them ("building auth or payments -> read the security checklist; preparing
-  launch -> run the launch checklist"). One always-on line buys the full checklist exactly when it
-  matters. Sibling checklists for other platforms get added when a real project needs one
-  (anti-churn: no speculative docs).
-- **Tier 4 - guards, only where mechanical.** The existing hooks already cover secrets and git. Most
-  of Part III is not reliably greppable; keep it as rules, not guards, rather than shipping noisy
-  false positives.
-
-## Audit: is every trait actually consumed? (2026-08-20)
-
-Traced each trait to the file that carries it, because a ledger nobody checks drifts into decoration.
-Method: extract every bolded trait, then grep the destination for its distinctive phrasing, then
-hand-verify each miss (keyword checks produce false negatives - "Every line traces to the task" was
-flagged only because `AGENTS.md` says "trace", not "traces").
-
-**Result: 50 of 54 traits were already live. Four were stranded here and have now been merged:**
-
-| Stranded trait | Was missing from | Now in |
-|---|---|---|
-| UI work gets proof in a real browser | `AGENTS.md` | Section 5 |
-| Breaking changes announced, not smuggled | `AGENTS.md` | Section 7 |
-| Risky changes behind a flag; watch them land | `AGENTS.md` | Section 7 |
-| Privacy by default | `PROJECT-CONFIG` | quality-bars line in the setup prompt |
-
-Paid for under the anti-churn contract by moving "What this file can and can't do" into an HTML
-comment: it addresses the human maintaining the file, not the agent, and Claude strips block-level
-comments before context, so it stays readable on disk at zero cost per turn. `AGENTS.md` 179 -> 180
-effective lines, still under the 200 target.
-
-Re-run this audit after any future merge: extract the bolded traits, grep the destinations, and
-hand-check every miss.
-
-## Flagged items - resolved 2026-08-19
-
-All three flags (keyword-intent SEO bullet, semantic colors, the "verified email" 2FA softener)
-were removed on Vik's call. The clutter half of UI restraint stays; the 2FA bullet now demands 2FA
-outright.
 
 ---
 
