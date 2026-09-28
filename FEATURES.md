@@ -148,8 +148,9 @@ prompt keeps meaning something; the allowlist fails closed on globs, `..`, absol
 stray operand.
 
 **Session start**: `kit-check.py`, a SessionStart hook. One line when a newer release is on `main` (checked at
-most daily) or when this project's rules differ from the installed kit; silent otherwise; never updates anything
-itself. Off with `AGENT_KIT_NO_UPDATE_CHECK=1`.
+most daily), when this project's rules differ from the installed kit, or when a tool on your
+`~/.the-agent-kit/recommended.json` is missing for the agent in use (at most daily; web items only in web
+projects); silent otherwise; never updates or installs anything itself. Off with `AGENT_KIT_NO_UPDATE_CHECK=1`.
 
 ## Wiring · installer · verification
 
@@ -188,9 +189,9 @@ itself. Off with `AGENT_KIT_NO_UPDATE_CHECK=1`.
   detects a working Python; prints tool-config snippets rather than clobbering.
   The doctor verifies each git hook **by identity**, not just presence, and prints `core.hooksPath` when a redirect is set.
 - **`docs/environment-setup-prompt.md`**: optional, agent-run recipe for a machine's MCP servers / plugins / skills
-  (Context7 · Playwright · Chrome DevTools · superpowers · codex · watch · ponytail · headroom, each with its
-  always-on context cost and execution footprint stated - ponytail re-injects on every prompt, headroom runs a
-  local proxy). Ships two drop-in rules:
+  in three profiles: Core (Context7), Web and UI (Playwright · Chrome DevTools · Impeccable · `frontend-design`),
+  and Optional (superpowers · ponytail · headroom, each with its always-on context cost and execution footprint
+  stated). Ships two drop-in rules:
   `docs/context7.md` (routes library questions to live docs - Section 5's enforcement half) and
   `docs/browser-tools.md` (picks Playwright vs DevTools by the question). The kit installs **none** of them;
   it halts for you on the API key rather than typing a credential.

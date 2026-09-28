@@ -239,7 +239,7 @@ behind. The session-start check below is what tells you when it has.
 
 ### Staying current without remembering to
 
-When a session starts, the kit checks two things and says nothing unless one needs you:
+When a session starts, the kit checks three things and says nothing unless one needs you:
 
 - **A newer release is on `main`.** One `git ls-remote` to GitHub, no clone and no download, at most
   once a day with a 3-second limit; the answer is cached so the rest of that day's sessions need no
@@ -247,8 +247,15 @@ When a session starts, the kit checks two things and says nothing unless one nee
 - **This project's rules differ from your installed kit.** Compared locally, every session. You see one
   line telling you to run `--update-rules` here. It is silent in the kit's own repo, whose rules are the
   source, and for an `--extension` stub, whose rules live globally.
+- **A recommended tool is missing** for the agent you started (Claude Code or Codex). The list is
+  `~/.the-agent-kit/recommended.json`, copied from the kit once and yours after that: delete an entry
+  to stop its reminder, add your own to be reminded of them. By default it names Context7 everywhere,
+  and in a project set up as a web or UI app also Playwright, Chrome DevTools, Impeccable and
+  `frontend-design` (the reasons are in
+  [`docs/environment-setup-prompt.md`](docs/environment-setup-prompt.md)). It reads local config
+  files only, reminds at most once a day, and the agent asks you before installing anything.
 
-It **never updates anything itself**: running downloaded code at session start, unasked, is exactly the
+It **never updates or installs anything itself**: running downloaded code at session start, unasked, is exactly the
 supply-chain shape the kit's rules forbid, so it only tells you what to run. It exits cleanly on every
 error, so an offline machine or a broken check never blocks a session, and when everything is current
 it prints nothing, so it costs no context. It ships in the Claude and Codex snippets as a `SessionStart`
@@ -443,8 +450,8 @@ runnable command in the first screenful, every command surface as a table, shell
 medium, subagent caps (`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS=2`,
 `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`), and three agent roles - `bounded-reader` (a small model for
 scoped lookups), `implementer` (a fully specified slice), `reviewer` (independent judgment on
-high-risk work). It is never installed by default and its effect is unmeasured; see
-[`enhancements-plan.md`](enhancements-plan.md) Section 5.7 before using it.
+high-risk work). It is never installed by default and its effect is unmeasured; see the
+decision record in [`docs/senior-engineer.md`](docs/senior-engineer.md) before using it.
 
 ### The guards: what's enforced, and where
 

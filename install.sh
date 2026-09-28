@@ -73,7 +73,7 @@ write_stub() {  # $1 = target file
      here - do NOT copy the universal rules in (that would double them in context). -->
 
 <!-- PROJECT-CONFIG:START -->
-<!-- Run the-agent-kit's docs/project-setup-prompt.md to fill this in (~15-30 lines, one screen). -->
+<!-- Run the setup prompt (~/.the-agent-kit/docs/project-setup-prompt.md) to fill this in (~15-30 lines, one screen). -->
 <!-- PROJECT-CONFIG:END -->
 STUB
 }
@@ -87,7 +87,7 @@ write_rules() {  # $1 = target AGENTS.md - the kit's rules with an EMPTY project
   awk '
     /PROJECT-CONFIG:START/ { skip = 1
       print "<!-- PROJECT-CONFIG:START -->"
-      print "<!-- Not configured yet. Run the setup prompt (the-agent-kit docs/project-setup-prompt.md) to fill this in. -->"
+      print "<!-- Not configured yet. Run the setup prompt (~/.the-agent-kit/docs/project-setup-prompt.md) to fill this in. -->"
       print "<!-- PROJECT-CONFIG:END -->" }
     !skip { print }
     /PROJECT-CONFIG:END/   { skip = 0 }
@@ -260,6 +260,8 @@ install_global() {
   # what the relocated install.sh compares against in --check and copies from per project.
   for h in command-guard.py kit-check.py commit-msg pre-commit pre-push; do cp "$KIT/hooks/$h" "$share/hooks/$h"; done
   for h in commit-msg pre-commit pre-push; do cp "$KIT/hooks/$h" "$share/git-hooks/$h"; done
+  # The recommended-tools list is the user's once seeded: never overwritten, so a declined item stays declined.
+  [ -f "$share/recommended.json" ] || cp "$KIT/hooks/recommended.json" "$share/recommended.json" 2>/dev/null || true
   # AGENTS.md goes through write_rules, never cp: this repo's file carries its OWN project block, and
   # the share is what --update-rules and the "prefer the rules global" append both read. A cp here put
   # this repo's branch rules into every user's global rules (Q3, found 2026-09-26 before it shipped).
@@ -269,7 +271,7 @@ install_global() {
   cp "$KIT/claude/settings.json" "$share/claude/" 2>/dev/null || true
   cp "$KIT/codex/config.toml" "$KIT/codex/hooks.json" "$share/codex/" 2>/dev/null || true
   cp "$KIT/docs/"*.md "$share/docs/" 2>/dev/null || true
-  rm -f "$share/docs/lessons.md"   # the owner's git-ignored work queue lives in docs/; it is not the kit's
+  rm -f "$share/docs/lessons.md" "$share/docs/my-skills-and-plugins.md"   # the owner's private, git-ignored notes; not the kit's
   mkdir -p "$share/rules"
   cp "$KIT/claude/rules/"*.md "$share/rules/" 2>/dev/null || cp "$KIT/rules/"*.md "$share/rules/" 2>/dev/null || true
   # Replace the share's skills wholesale. `cp -r src dest` with dest already present copies INTO it,
@@ -574,12 +576,12 @@ doctor() {
     # placeholder means the agent guesses how to build, test, and verify - so say so loudly.
     if grep -q 'PROJECT-CONFIG:START' AGENTS.md 2>/dev/null && grep -q 'fill this in' AGENTS.md 2>/dev/null; then
       say "  WARN: PROJECT-CONFIG is still the empty placeholder. Without it the agent GUESSES this project's"
-      say "        build / test / lint commands. Fill it via docs/project-setup-prompt.md - biggest win available."
+      say "        build / test / lint commands. Fill it via ~/.the-agent-kit/docs/project-setup-prompt.md - biggest win."
     elif grep -q 'PROJECT-CONFIG:START' AGENTS.md 2>/dev/null && ! grep -q '^\*\*Branches:\*\*' AGENTS.md 2>/dev/null; then
       # A block filled before 2026-09-26 has no branch model, and --update-rules keeps the block byte for
       # byte, so without this the gap is invisible: the agent guesses which branch takes work.
       say "  WARN: this project's block has no **Branches:** line, so the agent guesses which branch takes work"
-      say "        and whether one is release-only. Re-run docs/project-setup-prompt.md to add it."
+      say "        and whether one is release-only. Re-run ~/.the-agent-kit/docs/project-setup-prompt.md to add it."
     fi
     # The depth tier. It is invisible by design - it loads only on matching paths - so if it silently
     # failed to install, nothing else would ever say so. The doctor is the only place that can.
