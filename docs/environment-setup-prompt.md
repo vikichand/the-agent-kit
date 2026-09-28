@@ -186,9 +186,16 @@ Install only what the profile calls for. Each needs its marketplace added first 
   token mode and telemetry on: token mode rewrites the conversation history, which breaks the
   model's prompt cache and can cost more than it saves. The settings live in Headroom's profile
   manifest (`proxy_mode`, `telemetry_enabled`, and the `--mode` and telemetry flags in its proxy
-  arguments); check its README for the current keys. Caveats: its hooks run on every shell call; a
-  custom `ANTHROPIC_BASE_URL` disables first-party Remote Control on recent Claude Code; and
-  `headroom learn` can write to `AGENTS.md`, which the kit's rules say an agent never edits.
+  arguments); check its README for the current keys.
+
+  > **Headroom and Remote Control cannot both work in Claude Code.** Claude Code turns Remote Control
+  > off whenever `ANTHROPIC_BASE_URL` points anywhere other than `api.anthropic.com`, and routing
+  > through Headroom is exactly that setting. To keep Remote Control, remove `ANTHROPIC_BASE_URL` from
+  > the `env` block of `~/.claude/settings.json` after `headroom init -g` and start a new terminal:
+  > Claude Code then talks to Anthropic directly, and Codex keeps using Headroom.
+
+  Other caveats: its hooks run on every shell call, and `headroom learn` can write to `AGENTS.md`,
+  which the kit's rules say an agent never edits.
 
 > **Vendor figures are self-reported.** Treat benchmark numbers from any plugin's own suite as
 > direction, not measurement, and check your own token usage before and after.

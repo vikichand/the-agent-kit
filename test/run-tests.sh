@@ -451,14 +451,19 @@ w=$(mktemp -d) || exit 2; cd "$w" || exit 2
 # the installer it just downloaded, so cloning the last commit would test yesterday's code and go
 # green on a change that is still broken here.
 mkdir -p "$w/src" || exit 2
-(cd "$KIT" && cp -r install.sh AGENTS.md CLAUDE.md hooks docs claude codex "$w/src/") || exit 2
+(cd "$KIT" && cp -r install.sh AGENTS.md CLAUDE.md hooks docs claude codex setup "$w/src/") || exit 2
 head=$( (cd "$w/src" && git init -q -b main && git add -A \
         && git -c user.email=t@e.com -c user.name=T commit -qm "working tree" \
         && git rev-parse --short HEAD) 2>/dev/null || printf '' )
 if [ -z "$head" ]; then
   echo "SKIP: could not build a source repo - --update not exercised"
 else
-  d=$(HOME="$w" AGENT_KIT_REPO="$w/src" sh "$KIT/install.sh" --update 2>&1) || bad "U5 --update exited non-zero"
+  # AGENT_KIT_APPLY=1 on --update must NOT apply settings that just arrived from the network: the update
+  # lists them, and applying is a second, separate step taken after seeing that list.
+  mkdir -p "$w/.claude"
+  d=$(HOME="$w" AGENT_KIT_APPLY=1 AGENT_KIT_REPO="$w/src" sh "$KIT/install.sh" --update 2>&1) || bad "U5 --update exited non-zero"
+  [ ! -e "$w/.claude/settings.json" ] && has 'settings.json' "$d" \
+    && pass "U5 --update lists the settings changes but never applies them itself" || bad "U5 --update applied network-sourced settings"
   [ -f "$w/.the-agent-kit/AGENTS.md" ] && pass "U5 --update populated a fresh ~/.the-agent-kit" || bad "U5 kit not installed"
   [ "$(cat "$w/.the-agent-kit/.kit-version" 2>/dev/null)" = "$head" ] \
     && pass "U5 version stamped from the source commit" || bad "U5 .kit-version wrong or missing"
@@ -608,6 +613,114 @@ else
     || bad  "U9 update_kit no longer execs - it will read the file --global just overwrote"
 fi
 cd "$KIT"; rm -rf "$w"
+
+# ---------- install.sh --setup (one-command machine setup) ----------
+# The installer, run by the user, merges the kit into their settings. It only ever ADDS (plus updating
+# the kit's own older entries in place), backs up first, refuses a malformed file, and writes nothing
+# without consent: a terminal answer, or AGENT_KIT_APPLY=1, which the tool guard asks about.
+echo "== install.sh --setup =="
+if [ -n "$PY" ]; then
+  g=$(mktemp -d) || exit 2
+  wq() { cygpath -m "$1" 2>/dev/null || printf '%s' "$1"; }
+  G=$(wq "$g")
+  su() {  # $1 = AGENT_KIT_APPLY value ("" = no consent) -> output in $o, exit code in $src
+    src=0; o=$(HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY="$1" sh "$KIT/install.sh" --setup </dev/null 2>&1) || src=$?
+  }
+  jq_() { $PY -c "import json,sys; d=json.load(open(sys.argv[1],encoding='utf-8')); print($2)" "$(wq "$1")" 2>/dev/null; }
+  gh_() { HOME="$g" git config --global --get core.hooksPath 2>/dev/null; }
+  mkdir -p "$g/.claude"
+  su ""
+  [ ! -e "$g/.claude/settings.json" ] && [ -z "$(gh_)" ] && has 'AGENT_KIT_APPLY' "$o" \
+    && pass "M1 no terminal and no consent: nothing written, and it says how to apply" || bad "M1 wrote without consent: $o"
+  su 1
+  [ "$(jq_ "$g/.claude/settings.json" "any('command-guard.py' in h['command'] for e in d['hooks'].values() for b in e for h in b['hooks'])")" = True ] \
+    && [ "$(jq_ "$g/.claude/settings.json" "any('kit-check.py' in h['command'] and '--tool claude' in h['command'] for b in d['hooks']['SessionStart'] for h in b['hooks'])")" = True ] \
+    && pass "M2 fresh machine: Claude settings created with the guard and the session-start check" || bad "M2 settings not created: $o"
+  case "$(gh_)" in *".the-agent-kit/git-hooks") pass "M2 git hooks turned on (core.hooksPath -> the kit)" ;; *) bad "M2 core.hooksPath not set: [$(gh_)]" ;; esac
+  nb=$(ls "$g/.claude/" | grep -c 'bak-agent-kit' || true)
+  su 1; nb2=$(ls "$g/.claude/" | grep -c 'bak-agent-kit' || true)
+  has 'already' "$o" && [ "$nb" = "$nb2" ] && pass "M3 second run: already set up, nothing written" || bad "M3 re-run not idempotent ($nb -> $nb2): $o"
+  cat > "$g/.claude/settings.json" <<'EOF'
+{"statusLine":{"type":"command","command":"my-status"},
+ "permissions":{"ask":["Bash(foo *)"]},
+ "hooks":{"SessionStart":[{"matcher":"startup|resume","hooks":[{"type":"command","command":"headroom init hook ensure"}]},
+                          {"matcher":"startup","hooks":[{"type":"command","command":"python3 \"/old/.the-agent-kit/hooks/kit-check.py\""}]}]}}
+EOF
+  cp "$g/.claude/settings.json" "$g/orig.json"
+  su 1
+  [ "$(jq_ "$g/.claude/settings.json" "d['statusLine']['command']")" = my-status ] \
+    && [ "$(jq_ "$g/.claude/settings.json" "'Bash(foo *)' in d['permissions']['ask']")" = True ] \
+    && [ "$(jq_ "$g/.claude/settings.json" "sum('headroom' in h['command'] for b in d['hooks']['SessionStart'] for h in b['hooks'])")" = 1 ] \
+    && pass "M4 the user's own settings, rules and hooks are all kept" || bad "M4 user settings lost: $o"
+  kc=$(jq_ "$g/.claude/settings.json" "sum('kit-check.py' in h['command'] for b in d['hooks']['SessionStart'] for h in b['hooks'])")
+  kt=$(jq_ "$g/.claude/settings.json" "all('--tool claude' in h['command'] for b in d['hooks']['SessionStart'] for h in b['hooks'] if 'kit-check.py' in h['command'])")
+  [ "$kc" = 1 ] && [ "$kt" = True ] && pass "M4 an older kit hook is updated in place, not duplicated" || bad "M4 kit hook duplicated or stale (count $kc, current $kt)"
+  b=$(ls -t "$g/.claude/"settings.json.bak-agent-kit-* 2>/dev/null | head -1)
+  [ -n "$b" ] && cmp -s "$b" "$g/orig.json" && pass "M4 the original was backed up before writing" || bad "M4 no faithful backup"
+  # The same hook spelled another way (/c/... against C:/..., backslashes) is the same hook: a working
+  # file is not rewritten over spelling. Found on a real machine whose entries were merged by hand.
+  $PY - "$(wq "$g/.claude/settings.json")" <<'EOF'
+import json, re, sys
+p = sys.argv[1]; d = json.load(open(p, encoding='utf-8'))
+for ev in d['hooks'].values():
+    for b in ev:
+        for h in b['hooks']:
+            h['command'] = re.sub(r'([A-Za-z]):/', lambda m: '/' + m.group(1).lower() + '/', h['command'])
+json.dump(d, open(p, 'w', encoding='utf-8'))
+EOF
+  cp "$g/.claude/settings.json" "$g/respelled.json"
+  su 1
+  cmp -s "$g/.claude/settings.json" "$g/respelled.json" && has 'already' "$o" \
+    && pass "M4 a kit hook spelled with another path form is recognised, not rewritten" || bad "M4 path spelling caused a rewrite: $o"
+  printf '{ not json' > "$g/.claude/settings.json"
+  su 1
+  [ "$(cat "$g/.claude/settings.json")" = '{ not json' ] && [ "$src" != 0 ] && has 'settings.json' "$o" \
+    && pass "M5 a malformed settings file is refused and left untouched" || bad "M5 malformed file handled wrongly (rc=$src): $o"
+  printf '{}' > "$g/.claude/settings.json"
+  mkdir -p "$g/.codex"
+  printf 'model = "x"\n\n[projects.a]\ntrust_level = "trusted"\n' > "$g/.codex/config.toml"
+  su 1
+  t=$($PY -c "import tomllib,sys; d=tomllib.load(open(sys.argv[1],'rb')); print(d.get('approval_policy'), d.get('sandbox_mode'), d['sandbox_workspace_write']['network_access'], d['projects']['a']['trust_level'], d['model'])" "$(wq "$g/.codex/config.toml")" 2>&1)
+  [ "$t" = "on-request workspace-write True trusted x" ] && pass "M6 Codex config: kit settings added at top level, the user's tables unchanged" || bad "M6 Codex config wrong: [$t] $o"
+  [ "$(jq_ "$g/.codex/hooks.json" "any('command-guard.py' in h['command'] and '--decision deny' in h['command'] for b in d['hooks']['PreToolUse'] for h in b['hooks'])")" = True ] \
+    && pass "M6 Codex hooks.json created with the guard" || bad "M6 Codex guard not wired: $o"
+  printf 'approval_policy = "never"\n[projects.a]\ntrust_level = "trusted"\n' > "$g/.codex/config.toml"
+  su 1
+  t=$($PY -c "import tomllib,sys; print(tomllib.load(open(sys.argv[1],'rb'))['approval_policy'])" "$(wq "$g/.codex/config.toml")" 2>&1)
+  [ "$t" = never ] && pass "M7 a setting the user already chose is kept, not overwritten" || bad "M7 user's approval_policy overwritten: [$t]"
+  # The merge helper itself refuses to write without consent, so running it directly is no way around it.
+  printf '{}' > "$g/.claude/settings.json"
+  mrc=0; m=$(AGENT_KIT_APPLY= $PY "$KIT/setup/merge-settings.py" --home "$G" --share "$(wq "$g/.the-agent-kit")" --share-cmd x --py python --apply 2>&1) || mrc=$?
+  [ "$(cat "$g/.claude/settings.json")" = '{}' ] && [ "$mrc" != 0 ] \
+    && pass "M11 merge-settings.py --apply without AGENT_KIT_APPLY=1 refuses and writes nothing" || bad "M11 helper wrote without consent (rc=$mrc): $m"
+  # Ownership is strict: a user's own command that merely mentions a kit script is theirs, and a block
+  # the kit shares with a user hook keeps the user's matcher.
+  cat > "$g/.claude/settings.json" <<'EOF'
+{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"bash ~/wrap.sh && python3 ~/.the-agent-kit/hooks/command-guard.py --decision ask","timeout":99}]}],
+ "SessionStart":[{"matcher":"startup|resume","hooks":[{"type":"command","command":"headroom init hook ensure"},{"type":"command","command":"python3 \"/old/.the-agent-kit/hooks/kit-check.py\""}]}]}}
+EOF
+  su 1
+  [ "$(jq_ "$g/.claude/settings.json" "[h for b in d['hooks']['PreToolUse'] for h in b['hooks'] if 'wrap.sh' in h['command']][0]['timeout']")" = 99 ] \
+    && pass "M12 a user's wrapped command that mentions a kit script is left untouched" || bad "M12 user's wrapper clobbered: $o"
+  [ "$(jq_ "$g/.claude/settings.json" "[b['matcher'] for b in d['hooks']['SessionStart'] if any('headroom' in h['command'] for h in b['hooks'])][0]")" = 'startup|resume' ] \
+    && [ "$(jq_ "$g/.claude/settings.json" "sum('kit-check.py' in h['command'] for b in d['hooks']['SessionStart'] for h in b['hooks'])")" = 1 ] \
+    && pass "M12 a shared block keeps the user's matcher; the old kit hook moves out, not duplicated" || bad "M12 shared block mutated: $o"
+  HOME="$g" git config --global core.hooksPath .husky
+  su 1
+  [ "$(gh_)" = .husky ] && has 'is .husky' "$o" \
+    && pass "M8 git hooks owned by another tool are left alone, and it says so" || bad "M8 foreign core.hooksPath changed: [$(gh_)]"
+  HOME="$g" git config --global --unset core.hooksPath
+  d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
+  has 'settings.*kit entries' "$d" && ! has 'install.sh --setup' "$d" && pass "M9 --check confirms the settings carry the kit" || bad "M9 --check misreports current settings: $(printf '%s' "$d" | grep -i setting)"
+  printf '{}' > "$g/.claude/settings.json"
+  d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
+  has 'install.sh --setup' "$d" && pass "M9 --check warns when the settings are missing the kit" || bad "M9 --check silent about missing settings"
+  rm -rf "$g"
+else
+  bad "no python - install.sh --setup NOT tested"
+fi
+grep -q -- '--setup' "$KIT/install.sh" && awk '/^update_kit\(\)/,/^}/' "$KIT/install.sh" | grep -q 'install.sh" --setup' \
+  && pass "M10 --update hands over to --setup, so updates re-apply settings" || bad "M10 --update does not run --setup"
 
 # H1-H5: the eval harness's own oracles. Both were silently wrong until 2026-09-27: provider errors
 # scored as ordinary FAILs, and a red-then-fix run scored as "edited before any failing test".
