@@ -4,6 +4,9 @@
 intern.** One install, wired for both [Claude Code](https://claude.com/claude-code) and
 [Codex](https://developers.openai.com/codex).
 
+The rules and guardrails I've worked out over two years of building with coding agents, packaged so
+your agents start where mine are now.
+
 A capable model already writes decent code. What it does not do by default is behave like someone
 senior: read before it writes, ask what breaks downstream, push back on a bad instruction, test first
 and refuse to fake a green run, fix the cause rather than the symptom, and stop at what you asked for.
@@ -707,10 +710,12 @@ but the primary link could not be verified, it is attributed by talk and date in
 
 ## Contributing
 
-Two branches. **`develop`** takes all day-to-day work, one small commit per change. **`main`** holds
-releases only: one squashed commit per release, tagged `vX.Y.Z`, so its history reads as a list of
-releases. The pre-push hook enforces that: `main` accepts only a push carrying `AGENT_KIT_RELEASE=1`. The install commands above fetch from `main`, so what you install is the last release rather
-than the tip of development, and `--update` follows the same path.
+Two branches. **`develop`** takes all day-to-day work, one small commit per change, so its history
+shows every change and when it landed. **`main`** holds releases only: each release is a pull request
+from `develop`, squash-merged into one commit and tagged `vX.Y.Z`, so `main` reads as a list of
+releases. A GitHub ruleset allows `main` to change only that way, and the kit's pre-push hook refuses
+direct pushes to it. The install commands above fetch from `main`, so what you install is the last
+release rather than the tip of development, and `--update` follows the same path.
 
 The full process, the commit-message convention, and how a release is cut are in
 [`docs/branches-and-releases.md`](docs/branches-and-releases.md). Changes go in
