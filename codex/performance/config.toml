@@ -1,4 +1,4 @@
-# the-agent-kit OPTIONAL performance profile for Codex (experiment, see enhancements-plan.md 5.7).
+# the-agent-kit OPTIONAL performance profile for Codex (experiment, see the decision record in docs/senior-engineer.md).
 # Merge by hand into ~/.codex/config.toml; never installed by default. Every key below is in the
 # Codex configuration reference (learn.chatgpt.com/docs/config-file/config-reference and
 # docs/agent-configuration/subagents). Copy the role files from codex/performance/agents/ into

@@ -39,11 +39,11 @@ Two halves, two destinies:
 - **Question the ticket.** "Do you actually need X, or does Y cover it?" Agreeable-but-
   wrong costs more than pushback. A strange request is a signal to ask, not a spec to obey.
 - **Name what you will NOT touch.** Scope is a fence; agents creep, seniors declare.
-- **Know the blast radius before the first edit.** [partial - S6 covers callers of a changed function]
+- **Know the blast radius before the first edit.**
   Who calls this, what consumes this API, what breaks downstream if the shape changes - answered
   before editing, not discovered by the reviewer. Includes schema changes, event contracts, cron
   consumers, other teams' clients.
-- **Vet a dependency like a hire.** [partial - the invariants confirm the name is real; health is new]
+- **Vet a dependency like a hire.**
   Before adding: is it maintained, is the license compatible, how heavy is its own dependency tree,
   does the stdlib or an installed dep already cover it (rungs 3-5 of the ladder). Hallucinated and
   typo-squatted package names are a real attack surface - verify on the registry, never from memory.
@@ -58,18 +58,18 @@ Two halves, two destinies:
   component doesn't fit" case - split it, don't bloat it.
 - **Match the house style.** The codebase's patterns beat your preferences.
 - **Every line traces to the task.** No drive-by refactors, renames, or "improvements".
-- **Config comes from the environment.** [partial - secrets covered by invariants + pre-commit scanner]
+- **Config comes from the environment.**
   No hardcoded credentials, ever - `.env` (gitignored) with `.env.example` documenting every variable
   a fresh clone needs. The wider habit: no hardcoded URLs, ports, bucket names, or flags either. If it
   differs between dev and prod, it is config.
-- **Errors at the boundaries; no silent fallbacks.** [partial - S3 bans impossible-state handling]
+- **Errors at the boundaries; no silent fallbacks.**
   Validate at trust boundaries (user input, network, file, env). Never swallow an error - an empty
   catch block is a lie to the operator, and `catch { return [] }` makes the demo work while production
   lies. Fallbacks are visible (logged or flagged) and bounded; retries have a limit.
 - **Multi-step writes are transactional; retried work is idempotent.** A crash between two
   writes must not leave half a record. Webhooks, queue consumers, and retried requests WILL fire
   twice; a senior's handler survives replay, an agent's handler double-charges.
-- **Check-then-act is a race.** [NEW 2026-08-27] The gap between "has enough credits" and "take the
+- **Check-then-act is a race.** The gap between "has enough credits" and "take the
   credits" is where two concurrent requests both pass. Make it one conditional write whose affected
   rows you inspect, a unique constraint, or a held lock - never SELECT then UPDATE. Invisible to any
   test that sends one request at a time.
@@ -78,12 +78,12 @@ Two halves, two destinies:
   at real scale.
 - **Time and money are not primitives.** UTC internally, timezone conversion only at the edges,
   never timezone-naive datetimes. Integers or decimal types for money, never floats.
-- **Mark deliberate shortcuts with a named ceiling.** [NEW - inspired by ponytail] Knowingly cut a
+- **Mark deliberate shortcuts with a named ceiling.** Knowingly cut a
   corner (global lock, O(n^2) scan, naive heuristic) -> leave a comment naming the ceiling and the
   upgrade path. Tracked debt is a decision; silent debt is a trap.
 - **Delete, don't comment out.** Dead code in comments is noise with authority; git remembers.
   (Flag pre-existing dead code rather than sweeping it - S4's surgical rule still holds.)
-- **Comments say why, not what.** [NEW - inspired by Sanglard's agent.md] A comment earns its place only
+- **Comments say why, not what.** A comment earns its place only
   by saying what the code can't: the constraint, the trap, the reason for the odd choice. Never narrate a
   line, never annotate code you didn't touch. A stale or obvious comment misleads the next reader, human
   or agent, more than no comment would - fewer and truer is the target, not zero.
@@ -92,7 +92,7 @@ Two halves, two destinies:
 
 - **TDD: the test comes first.** Write the failing test that defines the behavior, watch it fail, make it pass, refactor.
   For bugs: run an existing reproducing test, or add one; observe failure before fixing, then success.
-- **Never game the oracle.** [partial - S5 bans self-grading; the specific cheats aren't named]
+- **Never game the oracle.**
   Under pressure agents delete failing tests, loosen assertions, mock the thing under test, or
   hardcode expected values. A red test is information, not an obstacle. A genuinely wrong test gets
   fixed visibly - never quietly weakened in the same diff as the feature.
@@ -102,8 +102,7 @@ Two halves, two destinies:
 - **Verify facts against the version in use.** Training data lags; verify
   library and API behavior against current docs before asserting it.
 - **Run it before claiming it.** "Looks right" is not done; state how you verified.
-- **UI work gets end-to-end proof in a real browser.** [partial - `docs/browser-tools.md` has the
-  tool-choice rule; making e2e part of "done" is new] Drive the flow with the Playwright MCP, inspect
+- **UI work gets end-to-end proof in a real browser.** Drive the flow with the Playwright MCP, inspect
   with the Chrome DevTools MCP. A passing unit suite does not prove a button works. The accessibility
   check (Lighthouse audit / a11y snapshot) rides in the same pass, not as a someday task.
 
@@ -114,7 +113,7 @@ Two halves, two destinies:
   discovered by the reviewer or CI.
 - **Small, reviewable, honestly-messaged commits.** One logical change per
   commit; the message says why. No `git add -A` sweeping in junk, no commits unless asked.
-- **Branch discipline; CI green before merge.** [partial - hooks protect main from force/delete]
+- **Branch discipline; CI green before merge.**
   Work on a branch, never directly on main. A PR states intent, testing done, and what reviewers
   should look hard at. Red CI is a stop sign, not a suggestion.
 - **Migrations respect the data.** Schema and data changes are backward-compatible or staged
@@ -125,13 +124,12 @@ Two halves, two destinies:
 - **Risky changes ship behind a flag, and you watch them land.** A senior's change isn't done at
   merge: gate genuinely risky behavior behind a feature flag or staged rollout where the project
   supports it, and check logs/monitors after deploy instead of assuming green CI means healthy prod.
-- **Docs move in the same diff.** [partial - S10 governs README quality, not upkeep] A change that
+- **Docs move in the same diff.** A change that
   alters behavior, setup, or config updates the README / docs / `.env.example` in the same diff.
 
 ## 5. Conduct and boundaries (from the guardrails comparison, 2026-08-19)
 
-- **Stay inside the workspace.** [partial - settings already deny credential-store and secret-file
-  reads; the general rule is unwritten] The working tree you were opened in is the job. Home
+- **Stay inside the workspace.** The working tree you were opened in is the job. Home
   directories, other repos, credential stores, and system folders are out of bounds unless the human
   sends you there or the task explicitly needs it - an asked-for excursion (read that report on C:,
   check that other repo) is normal work; just name where you're going. The rule kills unprompted
@@ -158,7 +156,7 @@ Two halves, two destinies:
 
 # Part II - Product quality bars (user-facing platforms)
 
-A feature that fails these is unfinished, not "done minus extras". [NEW as a block]
+A feature that fails these is unfinished, not "done minus extras".
 
 The bars are platform-agnostic - they apply to web, desktop, mobile, watch, and TV apps alike. Only
 the **mechanisms** differ (focus management via the DOM vs UIKit vs the TV remote's focus engine;
@@ -201,7 +199,7 @@ malpractice. The setup prompt asks which one this repo is.
 
 # Part III - Web security defaults
 
-[NEW as a block.] The default shape of a web app, not hardening to schedule for later. The agent
+ The default shape of a web app, not hardening to schedule for later. The agent
 failure mode is precise: it builds the happy path, the login page ships, and that login page is the
 softest target in the application.
 
@@ -279,7 +277,7 @@ Per-platform checklists get written when a real project needs them, not speculat
   string gets. An agent gets the narrowest credential that does the job, never admin "so it can do
   anything the user asks".
 
-**The pipeline** [NEW as a block; carried by `claude/rules/ci-cd.md`]
+**The pipeline**
 
 - CI holds production's credentials with none of production's review. Third-party actions and images
   are pinned to a digest, not a moving tag; installs resolve against the lockfile.

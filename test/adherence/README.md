@@ -129,8 +129,8 @@ one. A trace failure is deterministic and is decided before the judge sees the c
 | `36-working-review-in-chat` | `generating-reports` skill | An in-conversation assessment rendered as an HTML report nobody asked for |
 | `37-deliverable-report-rendered` | `generating-reports` skill | A report for the team saved as Markdown only, without the styled HTML render |
 
-Cases 32-37 were added on 2026-09-17 to grade the performance program in `enhancements-plan.md`
-Section 5. Cases 11-14 and 17-31 test the **depth tier**, not `AGENTS.md`, so their fixtures deliberately sit
+Cases 32-37 were added on 2026-09-17 to grade the 2026-09-18 performance program (its decision record is in
+`docs/senior-engineer.md`). Cases 11-14 and 17-31 test the **depth tier**, not `AGENTS.md`, so their fixtures deliberately sit
 on paths the relevant `claude/rules/*.md` file declares (`api/`, `middleware/`, `models/`,
 `components/`, `.github/workflows/`). Move a fixture off those paths and the rule stops loading and
 the case silently measures nothing - which is what the harness itself did until 2026-08-26, when it
