@@ -11,6 +11,25 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-29
+
+### Added
+
+- **One command sets up a machine:** `install.sh --setup` copies the kit, turns on its git hooks and
+  adds it to your Claude Code and Codex settings. It lists every change, asks first, backs each file
+  up, only adds, and keeps anything you already set.
+- `install.sh --check` now checks that your settings actually carry the kit's guard and session-start
+  check.
+
+### Changed
+
+- `--update` runs `--setup` from the new release, so new hooks and settings reach you the same way.
+- The README's Quick Start is three commands: set up the machine, set up a project, check.
+- The environment setup prompt now warns that routing Claude Code through Headroom turns off Remote
+  Control, and says how to keep Remote Control while Codex still uses Headroom.
+- An agent cannot answer the setup's question, so it lists the changes and stops; applying them takes
+  `AGENT_KIT_APPLY=1`, which the tool guard asks you about. An update never applies settings by itself.
+
 ## [0.1.0] - 2026-09-28
 
 First public release: the rules and guardrails I've worked out over the years of building with coding
@@ -51,5 +70,6 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.1.0...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.2.0...develop
+[0.2.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.2.0
 [0.1.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.1.0
