@@ -204,6 +204,35 @@ if [ -n "$PY" ]; then
   printf '<!-- The universal rules live in your global files -->\n<!-- PROJECT-CONFIG:START -->\n<!-- PROJECT-CONFIG:END -->\n' > "$k/proj/AGENTS.md"
   o=$(kc "$k/proj"); [ -z "$o" ] && pass "K8 --extension stub: silent" || bad "K8 nagged an extension stub"
   o=$(kc "$KIT"); has 'update-rules' "$o" && bad "K9 told the kit's own repo to overwrite its rules" || pass "K9 the kit's own repo is never told to --update-rules"
+  # K10-K17: recommended tools. Only what is missing from the user's copy of recommended.json, for the
+  # tool that started the session; web items only in a web project; at most once a day; silent when
+  # it cannot tell (an unreadable config is not "missing").
+  cp "$KIT/hooks/recommended.json" "$k/home/.the-agent-kit/recommended.json"
+  kt() {  # $1 = tool, $2 = cwd -> stdout; the once-a-day marker is cleared unless $3 = keep
+    [ "${3:-}" = keep ] || rm -f "$k/home/.the-agent-kit/.tools-check"
+    printf '{"cwd":"%s","source":"startup"}' "$(wp "$2")" | HOME="$KH" USERPROFILE="$KH" AGENT_KIT_REPO="$KS" $PY "$KIT/hooks/kit-check.py" --tool "$1" 2>/dev/null
+  }
+  rm -f "$k/proj/AGENTS.md"
+  o=$(kt claude "$k/proj"); has 'Context7' "$o" && ! has 'Playwright' "$o" \
+    && pass "K10 missing core tool named; web tools not suggested outside a web project" || bad "K10 wrong suggestions: $o"
+  printf '# rules v2\n<!-- PROJECT-CONFIG:START -->\n**Platform / intent:** web - production\n<!-- PROJECT-CONFIG:END -->\n' > "$k/proj/AGENTS.md"
+  o=$(kt claude "$k/proj"); has 'Playwright' "$o" && has 'Impeccable' "$o" && has 'claude mcp add' "$o" \
+    && pass "K11 web project: web tools suggested with their install command" || bad "K11 web tools not suggested: $o"
+  printf '{"mcpServers":{"context7":{},"playwright":{},"chrome-devtools":{}}}' > "$k/home/.claude.json"
+  for s in impeccable frontend-design; do mkdir -p "$k/home/.claude/skills/$s"; : > "$k/home/.claude/skills/$s/SKILL.md"; done
+  o=$(kt claude "$k/proj"); [ -z "$o" ] && pass "K12 everything installed: silent" || bad "K12 spoke with everything installed: $o"
+  printf '{"mcpServers":{"playwright":{},"chrome-devtools":{}}}' > "$k/home/.claude.json"
+  o1=$(kt claude "$k/proj"); o2=$(kt claude "$k/proj" keep)
+  has 'Context7' "$o1" && [ -z "$o2" ] && pass "K13 a reminder is given at most once a day" || bad "K13 throttle broken: [$o1] then [$o2]"
+  printf 'not json' > "$k/home/.claude.json"
+  o=$(kt claude "$k/proj"); has 'Context7' "$o" && bad "K14 unreadable config reported as missing" || pass "K14 unreadable config: no false reminder"
+  mkdir -p "$k/home/.codex"; : > "$k/home/.codex/config.toml"; rm -f "$k/proj/AGENTS.md"
+  o=$(kt codex "$k/proj"); has 'codex mcp add context7' "$o" && pass "K15 Codex session: Codex's missing tool and command named" || bad "K15 Codex gap not reported: $o"
+  printf '[mcp_servers.context7]\ncommand = "npx"\n' > "$k/home/.codex/config.toml"
+  o=$(kt codex "$k/proj"); [ -z "$o" ] && pass "K16 Codex tool present in config.toml: silent" || bad "K16 spoke when Codex had it: $o"
+  printf '{"items":[]}' > "$k/home/.the-agent-kit/recommended.json"; printf '{}' > "$k/home/.claude.json"
+  o=$(kt claude "$k/proj"); o2=$(kc "$k/proj")
+  [ -z "$o" ] && [ -z "$o2" ] && pass "K17 declined (removed) items and sessions without --tool stay silent" || bad "K17 not silent: [$o] [$o2]"
   rm -rf "$k"
 else
   bad "no python - kit-check.py NOT tested"
@@ -533,13 +562,25 @@ else
   if grep -q 'fill this in' "$g/.the-agent-kit/AGENTS.md" 2>/dev/null && ! grep -q 'the-agent-kit (rules and guardrails' "$g/.the-agent-kit/AGENTS.md" 2>/dev/null; then
     pass "U18 the machine-wide share gets an empty PROJECT-CONFIG, not the kit's own"
   else bad "U18 the machine-wide share inherited the kit repo's PROJECT-CONFIG"; fi
-  # U19: git-ignored working notes in docs/ (the owner's lessons.md) never reach the share.
-  [ -f "$KIT/docs/lessons.md" ] && lm=0 || { lm=1; : > "$KIT/docs/lessons.md"; }
+  # U19: the owner's git-ignored notes in docs/ never reach the share.
+  made=""
+  for n in lessons.md my-skills-and-plugins.md; do
+    [ -f "$KIT/docs/$n" ] || { : > "$KIT/docs/$n"; made="$made $n"; }
+  done
   HOME="$g" sh "$KIT/install.sh" --global >/dev/null 2>&1
   [ -f "$g/.the-agent-kit/docs/project-setup-prompt.md" ] && [ ! -e "$g/.the-agent-kit/docs/lessons.md" ] \
+    && [ ! -e "$g/.the-agent-kit/docs/my-skills-and-plugins.md" ] \
     && pass "U19 git-ignored notes in docs/ stay out of the share" \
-    || bad  "U19 the share received docs/lessons.md (private working notes)"
-  [ "$lm" = 1 ] && rm -f "$KIT/docs/lessons.md"
+    || bad  "U19 the share received a private note from docs/"
+  for n in $made; do rm -f "$KIT/docs/$n"; done
+  # U20: the recommended-tools list is seeded once, then it is the user's: a reinstall keeps their edits.
+  if [ -f "$g/.the-agent-kit/recommended.json" ]; then
+    printf '{"items":[]}' > "$g/.the-agent-kit/recommended.json"
+    HOME="$g" sh "$KIT/install.sh" --global >/dev/null 2>&1
+    grep -q '"items":\[\]' "$g/.the-agent-kit/recommended.json" \
+      && pass "U20 recommended.json seeded once; a reinstall keeps the user's edits" \
+      || bad  "U20 a reinstall overwrote the user's recommended.json"
+  else bad "U20 --global did not seed recommended.json"; fi
   rm -rf "$g"
   # U17: a fresh project install must get an EMPTY project block, never the kit repo's own config.
   # The kit's AGENTS.md is both this repo's rules file and the template shipped to projects; `cp`

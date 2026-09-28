@@ -97,7 +97,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "__PY__ \"__AGENT_KIT__/hooks/kit-check.py\"",
+            "command": "__PY__ \"__AGENT_KIT__/hooks/kit-check.py\" --tool claude",
             "timeout": 10
           }
         ]

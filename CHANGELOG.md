@@ -13,6 +13,10 @@ one squashed commit on `main`, tagged, with that version's section below as its 
 
 ### Added
 
+- **The session-start check names recommended tools you are missing**, for the agent in use, from
+  your own `~/.the-agent-kit/recommended.json` (seeded once, never overwritten). Web and UI tools are
+  only suggested in web projects; reminders come at most once a day, and the agent asks before
+  installing anything. The Claude and Codex snippets now pass `--tool`; re-merge them to enable it.
 - This repository records its own branch model, gates and careful zones in the project block of
   `AGENTS.md`, so an agent working on the kit knows to push to `develop` and never to `main` without
   being told. The per-project setup prompt asks every project the same question.
@@ -31,6 +35,12 @@ one squashed commit on `main`, tagged, with that version's section below as its 
 
 ### Changed
 
+- The environment setup prompt recommends in three profiles: Core (Context7), Web and UI (Playwright,
+  Chrome DevTools, Impeccable, `frontend-design`) and Optional (superpowers, ponytail, headroom).
+  codex, watch, skill-creator and an unused marketplace step are gone; Headroom's steps now use
+  `headroom init -g` and say to switch it to cache mode with telemetry off.
+- Paths the installed rules point to now name `~/.the-agent-kit/docs/`, where the files actually are,
+  instead of a `docs/` folder that does not exist in your project.
 - The senior-engineer research moved from `SENIOR-ENGINEER.md` at the root to
   `docs/senior-engineer.md` ("Where the rules come from"), trimmed of its historical merge notes.
   Nothing about what installs or loads changed: every trait was already in the shipped rules.
