@@ -42,8 +42,8 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   done
   if [ -n "$rel" ] && [ "${AGENT_KIT_RELEASE:-}" != 1 ]; then
     echo "the-agent-kit pre-push: $rel is RELEASE-ONLY in this repo (marked in AGENTS.md) - refusing a" >&2
-    echo "  push to it outside a release. Work goes on the other branch; a release is cut per the project's" >&2
-    echo "  process and pushed with:  AGENT_KIT_RELEASE=1 git push ..." >&2
+    echo "  push to it outside a release. Work goes on the other branch; a release goes in through the" >&2
+    echo "  project's release process (a pull request, or a push carrying AGENT_KIT_RELEASE=1)." >&2
     release_blocked=1
     continue
   fi

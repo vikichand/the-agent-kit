@@ -208,7 +208,7 @@ prose and README standards moved out of it.
 
 ### The 2026-09-26/27 measurement: the verdict on the shipped rewrite
 
-The rewrite shipped in 1.0.0 before this ran, so this grades it after the fact. Candidate = the
+The rewrite was already on `main` before this ran, so this grades it after the fact. Candidate = the
 deployed text, content hash `td97f3e6` (`results/AGENTS-candidate-td97f3e6.md`); current = `b79e756`;
 Sonnet under test, Opus judging, 3 runs per cell; rows in `results/2026-09-26.tsv` and
 `2026-09-27.tsv`. Excluded, by rule and not by result: ERROR rows, rows with zero tool calls, and rows
