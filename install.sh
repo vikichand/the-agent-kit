@@ -269,6 +269,7 @@ install_global() {
   cp "$KIT/claude/settings.json" "$share/claude/" 2>/dev/null || true
   cp "$KIT/codex/config.toml" "$KIT/codex/hooks.json" "$share/codex/" 2>/dev/null || true
   cp "$KIT/docs/"*.md "$share/docs/" 2>/dev/null || true
+  rm -f "$share/docs/lessons.md"   # the owner's git-ignored work queue lives in docs/; it is not the kit's
   mkdir -p "$share/rules"
   cp "$KIT/claude/rules/"*.md "$share/rules/" 2>/dev/null || cp "$KIT/rules/"*.md "$share/rules/" 2>/dev/null || true
   # Replace the share's skills wholesale. `cp -r src dest` with dest already present copies INTO it,
