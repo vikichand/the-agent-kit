@@ -533,6 +533,13 @@ else
   if grep -q 'fill this in' "$g/.the-agent-kit/AGENTS.md" 2>/dev/null && ! grep -q 'the-agent-kit (rules and guardrails' "$g/.the-agent-kit/AGENTS.md" 2>/dev/null; then
     pass "U18 the machine-wide share gets an empty PROJECT-CONFIG, not the kit's own"
   else bad "U18 the machine-wide share inherited the kit repo's PROJECT-CONFIG"; fi
+  # U19: git-ignored working notes in docs/ (the owner's lessons.md) never reach the share.
+  [ -f "$KIT/docs/lessons.md" ] && lm=0 || { lm=1; : > "$KIT/docs/lessons.md"; }
+  HOME="$g" sh "$KIT/install.sh" --global >/dev/null 2>&1
+  [ -f "$g/.the-agent-kit/docs/project-setup-prompt.md" ] && [ ! -e "$g/.the-agent-kit/docs/lessons.md" ] \
+    && pass "U19 git-ignored notes in docs/ stay out of the share" \
+    || bad  "U19 the share received docs/lessons.md (private working notes)"
+  [ "$lm" = 1 ] && rm -f "$KIT/docs/lessons.md"
   rm -rf "$g"
   # U17: a fresh project install must get an EMPTY project block, never the kit repo's own config.
   # The kit's AGENTS.md is both this repo's rules file and the template shipped to projects; `cp`
