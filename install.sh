@@ -266,8 +266,14 @@ copy_share() {  # copy this kit into ~/.the-agent-kit, so the download it came f
   cp "$KIT/claude/settings.json" "$share/claude/" 2>/dev/null || true
   cp "$KIT/codex/config.toml" "$KIT/codex/hooks.json" "$share/codex/" 2>/dev/null || true
   cp "$KIT/setup/merge-settings.py" "$share/setup/" 2>/dev/null || true
-  cp "$KIT/docs/"*.md "$share/docs/" 2>/dev/null || true
-  rm -f "$share/docs/lessons.md" "$share/docs/my-skills-and-plugins.md"   # the owner's private, git-ignored notes; not the kit's
+  # Only docs git would publish: anything git ignores is the owner's private working notes (plans,
+  # research, todo lists), never the kit's. A copy with no .git (a zip) has no ignored files to leak.
+  for f in "$KIT/docs/"*.md; do
+    [ -f "$f" ] || continue
+    git -C "$KIT" check-ignore -q "$f" 2>/dev/null && continue
+    cp "$f" "$share/docs/"
+  done
+  rm -f "$share/docs/lessons.md" "$share/docs/my-skills-and-plugins.md" "$share/docs/enhancements.md" "$share/docs/todo.md"   # left by earlier installs
   mkdir -p "$share/rules"
   cp "$KIT/claude/rules/"*.md "$share/rules/" 2>/dev/null || cp "$KIT/rules/"*.md "$share/rules/" 2>/dev/null || true
   # Replace the share's skills wholesale. `cp -r src dest` with dest already present copies INTO it,

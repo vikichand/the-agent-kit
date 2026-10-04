@@ -219,7 +219,7 @@ if [ -n "$PY" ]; then
   o=$(kt claude "$k/proj"); has 'Playwright' "$o" && has 'Impeccable' "$o" && has 'claude mcp add' "$o" \
     && pass "K11 web project: web tools suggested with their install command" || bad "K11 web tools not suggested: $o"
   printf '{"mcpServers":{"context7":{},"playwright":{},"chrome-devtools":{}}}' > "$k/home/.claude.json"
-  for s in impeccable frontend-design; do mkdir -p "$k/home/.claude/skills/$s"; : > "$k/home/.claude/skills/$s/SKILL.md"; done
+  for s in impeccable frontend-design playwright-cli; do mkdir -p "$k/home/.claude/skills/$s"; : > "$k/home/.claude/skills/$s/SKILL.md"; done
   o=$(kt claude "$k/proj"); [ -z "$o" ] && pass "K12 everything installed: silent" || bad "K12 spoke with everything installed: $o"
   printf '{"mcpServers":{"playwright":{},"chrome-devtools":{}}}' > "$k/home/.claude.json"
   o1=$(kt claude "$k/proj"); o2=$(kt claude "$k/proj" keep)
@@ -569,14 +569,17 @@ else
   else bad "U18 the machine-wide share inherited the kit repo's PROJECT-CONFIG"; fi
   # U19: the owner's git-ignored notes in docs/ never reach the share.
   made=""
-  for n in lessons.md my-skills-and-plugins.md; do
+  for n in lessons.md my-skills-and-plugins.md enhancements.md todo.md; do
     [ -f "$KIT/docs/$n" ] || { : > "$KIT/docs/$n"; made="$made $n"; }
   done
   HOME="$g" sh "$KIT/install.sh" --global >/dev/null 2>&1
-  [ -f "$g/.the-agent-kit/docs/project-setup-prompt.md" ] && [ ! -e "$g/.the-agent-kit/docs/lessons.md" ] \
-    && [ ! -e "$g/.the-agent-kit/docs/my-skills-and-plugins.md" ] \
+  leaked=""
+  for n in lessons.md my-skills-and-plugins.md enhancements.md todo.md; do
+    [ -e "$g/.the-agent-kit/docs/$n" ] && leaked="$leaked $n"
+  done
+  [ -f "$g/.the-agent-kit/docs/project-setup-prompt.md" ] && [ -z "$leaked" ] \
     && pass "U19 git-ignored notes in docs/ stay out of the share" \
-    || bad  "U19 the share received a private note from docs/"
+    || bad  "U19 the share received private notes from docs/:$leaked"
   for n in $made; do rm -f "$KIT/docs/$n"; done
   # U20: the recommended-tools list is seeded once, then it is the user's: a reinstall keeps their edits.
   if [ -f "$g/.the-agent-kit/recommended.json" ]; then
