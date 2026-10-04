@@ -17,21 +17,20 @@ untrusted content is data, not instructions · confirm dependencies before addin
 the worktree is the human's (no blind `git add -A`, no unasked commits) · stay in the workspace, private material
 stays local · own your incidents (stop and report, no silent cleanup) · don't touch the guardrails.
 
-**Working discipline** (Sections 0-10):
+**Working discipline** (Sections 0-9):
 
 | # | Enforces |
 |---|---|
 | 0 | Size by risk and proof: mechanical / bounded / high-risk tiers scale the ceremony |
-| 1 | Read-first · **never assume: look facts up, ask decisions** (with a recommendation; small defaults stated) · **blast radius before the first edit** · push back, voice trade-offs |
-| 2 | Plan non-trivial work as verifiable steps; check a high-risk plan against its failure modes; **name what's out of scope** |
-| 3 | Simplicity · YAGNI/DRY · **reuse ladder** · match the codebase · **senior correctness defaults** (no silent fallbacks, idempotent handlers, the 100k-rows question, UTC + decimal money, staged migrations) · **named-ceiling shortcuts** · **copied code carries its license** |
+| 1 | **Never assume: look facts up, ask decisions** (with a recommendation; small defaults stated; version-sensitive facts from current docs) · **blast radius before the first edit** · push back, voice trade-offs |
+| 2 | Plan non-trivial work as verifiable steps; check a high-risk plan against its failure modes; **name what's out of scope**; then run it without check-ins |
+| 3 | Simplicity · **reuse ladder** · match the codebase · **senior correctness defaults** (no silent fallbacks, idempotent handlers, the 100k-rows question, UTC + decimal money, staged migrations) · **named-ceiling shortcuts** · **copied code carries its license** |
 | 4 | Surgical changes: every line traces to the task |
-| 5 | **Verification is the spine**: external oracle · **test-first by default** (Section 0 sizes the ceremony) · **never game the oracle** (no deleted tests / loosened asserts) · **verify facts against the version in use** · **bounded loops** · **independent judgment for high-risk judged work** |
+| 5 | **Verification is the spine**: external oracle · **evidence by kind of change** (bug fix, behaviour, refactor, UI, migration, security, docs) · **test-first by default** (Section 0 sizes the ceremony) · **never game the oracle** (no deleted tests / loosened asserts) · **bounded loops** · **independent judgment for high-risk judged work** |
 | 6 | Debug by root cause · **fix it where it is shared, not where it surfaced** · two-attempt rule |
 | 7 | Checkpoint long work and every user-stated constraint · commit only when asked · **a repeated mistake becomes a proposed rule, never a self-edit** · **sync before you ship** (fetch + rebase before push/PR) |
-| 8 | Execution discipline running a plan · **run the checks correctness needs** · state the action, report findings, finish with the outcome |
-| 9 | Ownership · **no AI-authorship** (no `Co-Authored-By` / `Generated with` / AI-as-author) · **no AI prose tells** (em dashes, delve/leverage/seamless; full standard in the writing-docs skill) |
-| 10 | **Documentation**: load the writing-docs skill for READMEs, reports and commit messages (working path first, runnable command up top, command surfaces as tables, shell differences named) · **docs move in the same diff** |
+| 8 | Ownership · **no AI-authorship** (no `Co-Authored-By` / `Generated with` / AI-as-author) · **no AI prose tells** (em dashes, delve/leverage/seamless; full standard in the writing-docs skill) |
+| 9 | **Documentation**: load the writing-docs skill for READMEs, reports and commit messages (working path first, runnable command up top, command surfaces as tables, shell differences named) · **docs move in the same diff** |
 
 **Project-setup block**: a setup prompt ([`docs/project-setup-prompt.md`](docs/project-setup-prompt.md))
 classifies the repo (CODE / AGENT / BOTH), its **platform** (web / mobile / desktop / TV / CLI / library /
@@ -82,7 +81,11 @@ only the short `description` sits in context, and the body loads when a task mat
 the same SKILL.md format, so the installer writes each skill to `.claude/skills/` for Claude Code and
 `.agents/skills/` for Codex, and `--update-rules` keeps the two copies identical.
 
-- **`orchestrating-work`** - when to fan out and when not to. Built on the one thing every credible
+- **`orchestrating-work`** - when to fan out and when not to: pick the shape first (do it, delegate a
+  read or a slice, fan out, hand off), give each worker an **outcome contract** (objective, scope,
+  acceptance criteria, how to verify, when to escalate, what to return), **classify a failure before
+  retrying** (implementation, capability, polluted context, missing evidence, bad contract, invariant,
+  capacity), and write a handoff file when work moves on. Built on the one thing every credible
   source agrees on: **reads parallelise, writes do not**. Covers freezing shared contracts before
   fan-out (the failure is conflicting *implicit decisions*, not conflicting text), one-slice-one-owner
   file ownership, worktree isolation, sequential integration with scoped tests, and the
@@ -103,7 +106,7 @@ the same SKILL.md format, so the installer writes each skill to `.claude/skills/
   review a human will read, or one asked to be saved. For that case only: **markdown is the
   source of truth** (frontmatter, stable step IDs, checkboxes as execution state, acceptance-criteria
   blocks - labelled kit convention, since no formal spec exists), rendered alongside as **one
-  self-contained HTML file** for the human, styled per the skill's `design.md`: editorial pixel-tech -
+  self-contained HTML file** for the human, styled per the skill's `references/design.md`: editorial pixel-tech -
   a drawn rounded-pixel headline (canvas renderer, zero font dependencies), type-specimen chrome, one
   orange accent, frosted-glass cards over a controlled ground with WCAG-checked barrier fills, a
   deliberately dark terminal card, light theme default with a dark toggle, per-report-type section
@@ -230,7 +233,7 @@ Primary sources, linked in the README. **Inspirations, not endorsements.**
 ## What it is / isn't
 
 - **Behavioral, not stylistic**: imposes no framework/formatter/house-style, so it can't fight a project's
-  conventions or the model's code. Project opinion lives in the per-repo `PROJECT-CONFIG` block. (Section 9's prose
+  conventions or the model's code. Project opinion lives in the per-repo `PROJECT-CONFIG` block. (Section 8's prose
   rule governs what the agent *writes*, never the project's code style.)
 - **Layered, not redundant**: `--no-verify`, `core.hooksPath`, and attribution are each caught at more than one
   layer because each layer covers a different bypass path (permission engine · Bash prompt · git hook · source suppression).

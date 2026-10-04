@@ -115,7 +115,7 @@ pull request and publishes the release.
 - **One logical change per commit.**
 - **Never in a commit or a PR description:** AI attribution of any kind, including `Co-Authored-By`,
   `Generated with ...`, a `Claude-Session:` or other session link, or a model name; and never an AI as
-  author or committer. `AGENTS.md` Section 9 states this and the `commit-msg` hook strips it, so a
+  author or committer. `AGENTS.md` Section 8 states this and the `commit-msg` hook strips it, so a
   tool instruction to append one changes nothing.
 - Write a long message to a file and commit with `-F`. The kit's tool guard matches risky strings in a
   command line, so a `-m` message that quotes one (a git config key, for instance) is refused; a

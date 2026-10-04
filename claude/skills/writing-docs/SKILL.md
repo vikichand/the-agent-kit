@@ -5,7 +5,7 @@ description: Use when writing or editing documentation, a README, a CHANGELOG, a
 
 # Writing docs, READMEs, commits, pull requests and release notes
 
-`AGENTS.md` Section 9 keeps the two-line version of this always on; this file is the full standard and
+`AGENTS.md` Section 8 keeps the two-line version of this always on; this file is the full standard and
 loads only when you are writing prose.
 
 ## The prose does not get stamped either

@@ -325,23 +325,22 @@ On top of that, eleven working rules:
 | # | Enforces | Kills |
 |---|---|---|
 | 0 | **Size by risk and proof**: mechanical / bounded / high-risk tiers scale the ceremony | process theatre on a typo; winging a migration |
-| 1 | **Read first · never assume: look facts up, ask decisions · blast radius before editing · push back** | confident wrong builds off a guessed reading |
-| 2 | **Plan non-trivial work** as verifiable steps; check a high-risk plan against its failure modes | plans nobody can check |
-| 3 | **Simplicity · YAGNI / DRY · the reuse ladder · senior correctness defaults · match the codebase** | speculative abstraction; silent fallbacks, float money, N+1 queries |
+| 1 | **Never assume: look facts up, ask decisions · blast radius before editing · push back** | confident wrong builds off a guessed reading |
+| 2 | **Plan non-trivial work** as verifiable steps; check a high-risk plan against its failure modes; then run it top to bottom without checking in | plans nobody can check; stopping to chat between every step |
+| 3 | **Simplicity · the reuse ladder · senior correctness defaults · match the codebase** | speculative abstraction; silent fallbacks, float money, N+1 queries |
 | 4 | **Surgical changes**: every changed line traces to the task | drive-by edits, unreviewable diffs |
-| 5 | **Verification is the spine**: external oracle, test-first by default, never game the oracle, verify facts against the version in use | "looks right" shipped as done; a failing test quietly deleted |
+| 5 | **Verification is the spine**: external oracle, evidence by kind of change, test-first by default, never game the oracle | "looks right" shipped as done; a failing test quietly deleted |
 | 6 | **Root-cause debugging** · fix the shared function · two-attempt rule | symptom patches that leave sibling callers broken |
 | 7 | **Checkpoint long work and every constraint the user states** · commit only when asked · **a repeated mistake becomes a proposed rule, never a self-edit** · sync before you ship | decisions lost with the session; a rules file growing by accretion; PRs against stale HEAD |
-| 8 | **Execution discipline**: work the plan top to bottom · run the checks correctness needs · state the action, report findings, finish with the outcome | stopping to chat between every step |
-| 9 | **Ownership**: no AI authorship, no AI prose tells | `Co-Authored-By: Claude` in your history; em dashes and "delve" in your docs |
-| 10 | **Documentation**: load the writing-docs skill for READMEs, reports and commit messages · docs move in the same diff | the README you'd otherwise be scrolling; stale `.env.example` |
+| 8 | **Ownership**: no AI authorship, no AI prose tells | `Co-Authored-By: Claude` in your history; em dashes and "delve" in your docs |
+| 9 | **Documentation**: load the writing-docs skill for READMEs, reports and commit messages · docs move in the same diff | the README you'd otherwise be scrolling; stale `.env.example` |
 
 These are *behaviours, not style*. The kit imposes no framework, formatter, or house style, so it can't fight
 your project's conventions; project opinion lives in the per-project block instead. Several rules come
 straight from the people in [Inspired by](#inspired-by), noted there by section.
 
-**Section 9 keeps a two-line prose rule; the full standard is the `writing-docs` skill (Section 10).** A
-`Co-Authored-By` trailer isn't the only thing that marks work as machine-made; the writing does it too. Section 9
+**Section 8 keeps a two-line prose rule; the full standard is the `writing-docs` skill (Section 9).** A
+`Co-Authored-By` trailer isn't the only thing that marks work as machine-made; the writing does it too. Section 8
 always bans **em dashes** and the AI-vocabulary words (*delve / leverage / seamless / robust / comprehensive*);
 the skill adds the rest - "it's not just X, it's Y", filler openers, hedges, emoji headings, bolding every third
 phrase - and loads only when you're writing prose. It governs what the agent *writes*, never your project's code
@@ -398,7 +397,8 @@ sequential integration, and an orchestrator-worker split where the lead keeps de
 contract and the final review while workers execute already-complete specs. Delegate only when the
 expected parallel progress is worth the startup and integration cost, name the model and effort on
 every dispatch, and keep at most two workers active and one delegation layer - workers do not spawn
-workers.
+workers. It starts by picking the shape (do it, delegate a read or a slice, fan out, hand off), gives
+every worker an outcome contract with its escalation triggers, and classifies a failure before retrying it.
 
 **`generating-reports`** fires on a deliverable - a report, audit, plan or review a human will read,
 or one asked to be saved. It carries the dual-format rule for that case only - markdown as the source
@@ -407,7 +407,7 @@ plan machine-executable. A working plan or review the agent itself consumes, or 
 the conversation, stays markdown-only.
 
 **`writing-docs`** fires on documentation, README, commit-message, or PR-description work. It carries
-the full version of Section 9's two-line prose rule and the README order: working path first, a
+the full version of Section 8's two-line prose rule and the README order: working path first, a
 runnable command in the first screenful, every command surface as a table, shell differences named.
 
 ### Optional: the performance profile
