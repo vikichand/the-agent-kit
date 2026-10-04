@@ -212,6 +212,81 @@ install_codex_skills() {  # $1 = repo root. Everything Codex can load lazily, in
   return 0
 }
 
+rule_to_glob() {  # $1 = rule file -> Antigravity glob rule on stdout: `paths:` list -> one `globs:` string
+  awk 'NR==1 && $0=="---" {fm=1; next}
+       fm==1 && /^---$/ {printf "---\ntrigger: glob\nglobs: \"%s\"\n---\n", g; fm=2; next}
+       fm==1 { if (match($0, /^ *- *"[^"]*"/)) { p=$0; sub(/^ *- *"/, "", p); sub(/".*$/, "", p); g = g (g=="" ? "" : ", ") p }; next }
+       {print}' "$1"
+}
+
+write_ag_launcher() {  # $1 = target. Antigravity splits a hook command on whitespace and ignores quotes,
+  # so a guard path under a home folder with a space breaks the hook, and a broken hook blocks every
+  # command. Hooks run from the folder holding hooks.json, so this launcher sits there, is called by
+  # bare name, and hands the call to the machine-wide guard.
+  cat > "$1" <<'LAUNCH'
+# The Agent Kit: launcher for the command guard (see .agents/hooks.json). Kit-owned; --update-rules
+# replaces it. Antigravity cannot pass a quoted path to a hook, so the guard is found from here.
+import os, runpy, sys
+
+guard = os.path.join(os.path.expanduser("~"), ".the-agent-kit", "hooks", "command-guard.py")
+if not os.path.isfile(guard):
+    sys.stderr.write("the-agent-kit: no guard at %s; run install.sh --setup. Command not checked.\n" % guard)
+    sys.exit(0)
+sys.argv = [guard] + sys.argv[1:]
+runpy.run_path(guard, run_name="__main__")
+LAUNCH
+}
+
+merge_ag_hooks() {  # $1 = .agents/hooks.json. Add-only: the user's own hook entries are never touched.
+  py=$(detect_py)
+  if [ -z "$py" ]; then say "  ! no Python 3 found - Antigravity guard hook not written (the guard needs it)."; return 0; fi
+  r=$($py - "$1" "$py agent-kit-guard.py --tool antigravity" <<'MERGE'
+import json, os, sys
+path, cmd = sys.argv[1], sys.argv[2]
+data = {}
+if os.path.exists(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except ValueError:
+        print("unreadable"); sys.exit(0)
+if not isinstance(data, dict):
+    print("unreadable"); sys.exit(0)
+if "the-agent-kit" in data:
+    print("kept"); sys.exit(0)
+data["the-agent-kit"] = {"PreToolUse": [{"matcher": "run_command", "hooks": [
+    {"type": "command", "command": cmd, "timeout": 15}]}]}
+with open(path, "w", encoding="utf-8", newline="\n") as f:
+    json.dump(data, f, indent=2); f.write("\n")
+print("added")
+MERGE
+)
+  case "$r" in
+    added)      say "  + wired the command guard into .agents/hooks.json (Antigravity)" ;;
+    unreadable) say "  ! .agents/hooks.json is not a JSON object - left untouched; the Antigravity guard is NOT wired." ;;
+  esac
+}
+
+install_antigravity() {  # $1 = repo root. Antigravity reads AGENTS.md and the .agents/skills Codex gets
+  # (the three skills and four domain rules). What only it has: glob-triggered rules, for the two
+  # path-shaped depth files Codex skips, and a workspace PreToolUse hook for the command guard. The four
+  # domain rules stay skills only; writing them here too would load them twice.
+  src=""
+  [ -d "$KIT/claude/rules" ] && src="$KIT/claude/rules"
+  [ -z "$src" ] && [ -d "$KIT/rules" ] && src="$KIT/rules"
+  for n in code-correctness tests; do
+    [ -n "$src" ] && [ -e "$src/$n.md" ] || continue
+    if [ -e "$1/.agents/rules/$n.md" ]; then say "  = .agents/rules/$n.md already exists - left untouched."
+    else
+      mkdir -p "$1/.agents/rules"; rule_to_glob "$src/$n.md" > "$1/.agents/rules/$n.md"
+      say "  + wrote .agents/rules/$n.md (Antigravity: loads when a matching file is touched)"
+    fi
+  done
+  mkdir -p "$1/.agents"
+  [ -e "$1/.agents/agent-kit-guard.py" ] || write_ag_launcher "$1/.agents/agent-kit-guard.py"
+  merge_ag_hooks "$1/.agents/hooks.json"
+}
+
 install_project() {   # self-contained: full rules + git hooks
   root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
   say "Installing FULL rules + git hooks into: $root"
@@ -225,6 +300,7 @@ install_project() {   # self-contained: full rules + git hooks
   install_path_rules "$root"
   install_skills "$root"
   install_codex_skills "$root"
+  install_antigravity "$root"
   install_git_hooks "$root"
   hr
   say "Tool-layer guard is machine-wide - run once:  ./install.sh --setup   then:  ./install.sh --check"
@@ -244,6 +320,7 @@ install_extension() { # lean: project-config stub + git hooks
   install_path_rules "$root"
   install_skills "$root"
   install_codex_skills "$root"
+  install_antigravity "$root"
   install_git_hooks "$root"
 }
 
@@ -505,6 +582,21 @@ refresh_kit_owned() {  # $1 = repo root. Kit-NAMED rules and skills are kit-owne
       else mv -f "$tmp" "$tgt"; say "  ~ refreshed .agents/skills/$n/SKILL.md (kit-owned; regenerated from $n.md)"; fi
     done
   fi
+  # Antigravity's glob rules and guard launcher are kit-owned on the same terms.
+  if [ -n "$src" ]; then
+    for n in code-correctness tests; do
+      tgt="$1/.agents/rules/$n.md"; [ -e "$tgt" ] && [ -e "$src/$n.md" ] || continue
+      tmp="$tgt.refresh.tmp"; rule_to_glob "$src/$n.md" > "$tmp"
+      if cmp -s "$tmp" "$tgt"; then rm -f "$tmp"
+      else mv -f "$tmp" "$tgt"; say "  ~ refreshed .agents/rules/$n.md (kit-owned; regenerated from $n.md)"; fi
+    done
+  fi
+  tgt="$1/.agents/agent-kit-guard.py"
+  if [ -e "$tgt" ]; then
+    write_ag_launcher "$tgt.refresh.tmp"
+    if cmp -s "$tgt.refresh.tmp" "$tgt"; then rm -f "$tgt.refresh.tmp"
+    else mv -f "$tgt.refresh.tmp" "$tgt"; say "  ~ refreshed .agents/agent-kit-guard.py (kit-owned)"; fi
+  fi
 }
 
 update_rules() {  # refresh the universal rules in this repo's AGENTS.md, preserving its PROJECT-CONFIG block
@@ -553,6 +645,7 @@ update_rules() {  # refresh the universal rules in this repo's AGENTS.md, preser
   install_path_rules "$root"
   install_skills "$root"
   install_codex_skills "$root"
+  install_antigravity "$root"
 }
 
 doctor() {

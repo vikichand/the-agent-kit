@@ -577,6 +577,47 @@ else
     && pass "U15 --update-rules deploys and refreshes the Codex skills" \
     || bad "U15 --update-rules left the Codex skills missing or stale"
   rm -rf "$u"
+  # A1-A4: Antigravity. It already reads AGENTS.md and the .agents/skills Codex gets; the kit adds the
+  # two path-shaped rules as glob rules and the guard as a workspace PreToolUse hook. Antigravity splits
+  # a hook command on whitespace and ignores quotes (a quoted path with a space breaks the hook, and a
+  # broken hook blocks every command), so the hook calls a launcher beside hooks.json by bare name.
+  u=$(mktemp -d) && (cd "$u" && git init -q && mkdir -p .agents \
+      && printf '{"mine":{"Stop":[{"command":"echo bye"}]}}\n' > .agents/hooks.json \
+      && sh "$KIT/install.sh" >/dev/null 2>&1)
+  m=""
+  for n in code-correctness tests; do
+    f="$u/.agents/rules/$n.md"
+    body_a=$(awk 'fm<2 && /^---$/ {fm++; next} fm>=2 {print}' "$f" 2>/dev/null)
+    body_r=$(awk 'fm<2 && /^---$/ {fm++; next} fm>=2 {print}' "$KIT/claude/rules/$n.md")
+    { [ -f "$f" ] && grep -q '^trigger: glob$' "$f" && grep -q '^globs: ".*\*\*/\*\.' "$f" \
+      && ! grep -q '^paths:' "$f" && [ "$body_a" = "$body_r" ]; } || m="$m $n"
+  done
+  x=""; for n in web-security data-layer frontend-quality ci-cd; do [ -e "$u/.agents/rules/$n.md" ] && x="$x $n"; done
+  [ -z "$m" ] && [ -z "$x" ] \
+    && pass "A1 Antigravity glob rules: the 2 path-shaped rules, bodies unchanged, the 4 skills not doubled" \
+    || bad "A1 Antigravity rules wrong - bad:[$m] doubled:[$x]"
+  hj=$(wp "$u/.agents/hooks.json")
+  $PY -c "import json,sys; d=json.load(open(sys.argv[1])); h=d['the-agent-kit']['PreToolUse'][0]; c=h['hooks'][0]['command']; assert h['matcher']=='run_command' and 'mine' in d and c.endswith('agent-kit-guard.py --tool antigravity') and '\"' not in c" "$hj" 2>/dev/null \
+    && [ -f "$u/.agents/agent-kit-guard.py" ] \
+    && pass "A2 .agents/hooks.json wires the guard by bare name, keeps the user's own hooks" \
+    || bad "A2 .agents/hooks.json missing the guard, quoting a path, or dropping the user's hooks"
+  # A3: the launcher reaches the installed guard and answers in Antigravity's contract.
+  ah=$(mktemp -d); mkdir -p "$ah/.the-agent-kit/hooks"; cp "$KIT/hooks/command-guard.py" "$ah/.the-agent-kit/hooks/"
+  o=$(cd "$u/.agents" && printf '{"toolCall":{"name":"run_command","args":{"CommandLine":"git push --force"}}}' \
+      | HOME="$ah" USERPROFILE="$(wp "$ah")" $PY agent-kit-guard.py --tool antigravity 2>/dev/null)
+  printf '%s' "$o" | grep -q '"decision": "deny"' \
+    && pass "A3 the launcher runs the installed guard: a force push is denied" \
+    || bad "A3 the launcher did not deny a force push (got: $o)"
+  rm -rf "$ah"
+  # A4: --update-rules restores a stale launcher and glob rule, and re-adds a removed hook entry.
+  printf 'stale\n' > "$u/.agents/agent-kit-guard.py"; printf 'stale\n' > "$u/.agents/rules/tests.md"
+  printf '{"mine":{"Stop":[{"command":"echo bye"}]}}\n' > "$u/.agents/hooks.json"
+  (cd "$u" && sh "$KIT/install.sh" --update-rules >/dev/null 2>&1)
+  ! grep -q '^stale$' "$u/.agents/agent-kit-guard.py" && ! grep -q '^stale$' "$u/.agents/rules/tests.md" \
+    && grep -q '"the-agent-kit"' "$u/.agents/hooks.json" && grep -q '"mine"' "$u/.agents/hooks.json" \
+    && pass "A4 --update-rules refreshes the Antigravity launcher, rules and hook entry" \
+    || bad "A4 --update-rules left the Antigravity files stale or missing"
+  rm -rf "$u"
   # U18: the machine-wide share must hold the rules with an EMPTY block too. The README tells users who
   # prefer global rules to append the share's AGENTS.md to ~/.claude/CLAUDE.md, so a leak here would put
   # this repo's branch rules into every project they own.
