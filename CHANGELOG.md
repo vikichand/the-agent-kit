@@ -11,6 +11,8 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-04
+
 ### Changed
 
 - **Never assume: facts are looked up, decisions are asked.** One rule in Section 1 replaces three:
@@ -110,7 +112,8 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.3.0...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.4.0...develop
+[0.4.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.4.0
 [0.3.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.3.0
 [0.2.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.2.0
 [0.1.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.1.0
