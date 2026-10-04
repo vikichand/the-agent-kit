@@ -4,31 +4,58 @@
     {
       "name": "Context7 MCP (library docs)",
       "when": "always",
-      "claude": {"mcp": "context7", "install": "claude mcp add --transport http context7 https://mcp.context7.com/mcp --scope user --header \"Authorization: Bearer <your-context7-key>\""},
-      "codex": {"mcp": "context7", "install": "codex mcp add context7 -- npx -y @upstash/context7-mcp@latest"}
+      "claude": {
+        "mcp": "context7",
+        "install": "claude mcp add --transport http context7 https://mcp.context7.com/mcp --scope user --header \"Authorization: Bearer <your-context7-key>\""
+      },
+      "codex": {
+        "mcp": "context7",
+        "install": "codex mcp add context7 -- npx -y @upstash/context7-mcp@latest"
+      }
     },
     {
-      "name": "Playwright MCP (drive the UI in a real browser)",
+      "name": "Playwright CLI skill (drive the UI in a real browser)",
       "when": "web",
-      "claude": {"mcp": "playwright", "install": "claude mcp add playwright --scope user -- npx -y @playwright/mcp@latest"},
-      "codex": {"mcp": "playwright", "install": "codex mcp add playwright -- npx -y @playwright/mcp@latest"}
+      "claude": {
+        "skill": "playwright-cli",
+        "install": "npm install -g @playwright/cli@latest && playwright-cli install --skills -g"
+      },
+      "codex": {
+        "skill": "playwright-cli",
+        "install": "npm install -g @playwright/cli@latest && playwright-cli install --skills=agents -g"
+      }
     },
     {
       "name": "Chrome DevTools MCP (performance, network, console)",
       "when": "web",
-      "claude": {"mcp": "chrome-devtools", "install": "claude mcp add chrome-devtools --scope user -- npx -y chrome-devtools-mcp@latest"}
+      "claude": {
+        "mcp": "chrome-devtools",
+        "install": "claude mcp add chrome-devtools --scope user -- npx -y chrome-devtools-mcp@latest"
+      }
     },
     {
       "name": "Impeccable skill (design workflow)",
       "when": "web",
-      "claude": {"skill": "impeccable", "install": "install the skill build from github.com/pbakaus/impeccable (not its plugin form)"},
-      "codex": {"skill": "impeccable", "install": "install the .agents/skills build from github.com/pbakaus/impeccable"}
+      "claude": {
+        "skill": "impeccable",
+        "install": "install the skill build from github.com/pbakaus/impeccable (not its plugin form)"
+      },
+      "codex": {
+        "skill": "impeccable",
+        "install": "install the .agents/skills build from github.com/pbakaus/impeccable"
+      }
     },
     {
       "name": "frontend-design skill (visual direction)",
       "when": "web",
-      "claude": {"skill": "frontend-design", "install": "copy skills/frontend-design from github.com/anthropics/skills into ~/.claude/skills/"},
-      "codex": {"skill": "frontend-design", "install": "copy skills/frontend-design from github.com/anthropics/skills into ~/.agents/skills/"}
+      "claude": {
+        "skill": "frontend-design",
+        "install": "copy skills/frontend-design from github.com/anthropics/skills into ~/.claude/skills/"
+      },
+      "codex": {
+        "skill": "frontend-design",
+        "install": "copy skills/frontend-design from github.com/anthropics/skills into ~/.agents/skills/"
+      }
     }
   ]
 }

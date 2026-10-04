@@ -16,7 +16,7 @@ context for every session, whether it fires or not.
 | Profile | What | Why |
 |---|---|---|
 | **Core** (everyone) | Context7 MCP | The kit's `context7.md` rule sends library and API questions to it instead of stale training data |
-| **Web and UI** | Playwright MCP, Chrome DevTools MCP, Impeccable, `frontend-design` | Real-browser proof of UI work (Section 5) and design quality |
+| **Web and UI** | Playwright CLI and its skill, Chrome DevTools MCP, Impeccable, `frontend-design` | Real-browser proof of UI work (Section 5) and design quality |
 | **Optional** | Superpowers, ponytail, headroom | They work alongside the kit, but each costs context or latency, so opt in knowingly |
 
 The kit's session-start check suggests the Core items and, in a project set up as a web or UI app,
@@ -68,8 +68,7 @@ State plainly what is already present. Everything below is measured against this
 
 Install at **user** scope so they apply to every project; which of the three you need depends on the
 profile you picked above. For Codex, the same servers are added with `codex mcp add <name> -- <command>`
-(for example `codex mcp add context7 -- npx -y @upstash/context7-mcp@latest` and
-`codex mcp add playwright -- npx -y @playwright/mcp@latest`).
+(for example `codex mcp add context7 -- npx -y @upstash/context7-mcp@latest`).
 
 **a. Context7** (library and framework documentation; this is what stops the agent answering API
 questions from stale training data).
@@ -92,16 +91,21 @@ Do not proceed past this step until I confirm.
 variable instead of writing it to `~/.claude.json` in plaintext. It also installs a skill and an agent
 that overlap the kit's `context7.md` rule, so pick one, not both.
 
-**b. Playwright** (Web and UI profile; cross-browser automation: Chromium, Firefox, WebKit).
+**b. Playwright CLI and its skill** (Web and UI profile; drives Chromium, Firefox and WebKit). Not an
+MCP server: a command-line tool plus a skill that teaches the agent to use it.
 
 ```bash
-claude mcp add playwright --scope user -- npx -y @playwright/mcp@latest
+npm install -g @playwright/cli@latest
+playwright-cli install --skills -g            # Claude Code: ~/.claude/skills/playwright-cli
+playwright-cli install --skills=agents -g     # Codex: ~/.agents/skills/playwright-cli
 ```
 
-> `browser_find` is cheaper than capturing a full snapshot; snapshots themselves have been distilled
-> since 0.0.78. `--output-max-size` and `--caps` gate how much comes back. Playwright's own docs note
-> that CLI-as-skill workflows can be more token-efficient than driving the MCP directly. Checked
-> against Playwright MCP 0.0.81 on 2026-09-17.
+> Playwright's own docs recommend the CLI for coding agents because it "avoid[s] loading large tool
+> schemas and verbose accessibility trees into the model context", and the MCP for "exploratory
+> automation or long-running autonomous workflows". It covers clicking, filling, snapshots, console,
+> network requests, traces, screenshots, video and locator generation. Add the Playwright MCP
+> (`claude mcp add playwright --scope user -- npx -y @playwright/mcp@latest`) only for that
+> exploratory kind of loop. Checked against the Playwright CLI docs on 2026-10-04.
 
 **c. Chrome DevTools** (Web and UI profile; performance traces, network inspection, console access on a real Chrome).
 
@@ -116,8 +120,8 @@ claude mcp add chrome-devtools --scope user -- npx -y chrome-devtools-mcp@latest
 
 > **Install both; they do not overlap where it counts.** Only Chrome DevTools MCP can record a
 > performance trace with Core Web Vitals, run Lighthouse, or take a heap snapshot. Only Playwright
-> MCP can drive Firefox or WebKit, or generate real test-code locators. Both can click, fill, wait,
-> and snapshot the accessibility tree, so "one drives and one inspects" is not the dividing line.
+> can drive Firefox or WebKit, or generate real test-code locators. Both can click, fill, wait, and
+> snapshot the page, so "one drives and one inspects" is not the dividing line.
 > Copy [`browser-tools.md`](browser-tools.md) into `~/.claude/rules/` so the agent chooses by the
 > question rather than by which tool it used last.
 
