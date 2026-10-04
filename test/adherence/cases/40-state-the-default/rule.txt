@@ -1,0 +1,1 @@
+S1 never assume: a small open detail gets a sensible default, stated in a line; it is not a question for the user

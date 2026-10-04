@@ -1,0 +1,1 @@
+S1 never assume: facts the repository answers are looked up, not guessed and not asked

@@ -323,7 +323,7 @@ On top of that, eleven working rules:
 | # | Enforces | Kills |
 |---|---|---|
 | 0 | **Size by risk and proof**: mechanical / bounded / high-risk tiers scale the ceremony | process theatre on a typo; winging a migration |
-| 1 | **Read first · no silent assumptions · blast radius before editing · push back · resolve material ambiguity** · **grill mode** on request | confident wrong builds off a guessed reading |
+| 1 | **Read first · never assume: look facts up, ask decisions · blast radius before editing · push back** | confident wrong builds off a guessed reading |
 | 2 | **Plan non-trivial work** as verifiable steps; check a high-risk plan against its failure modes | plans nobody can check |
 | 3 | **Simplicity · YAGNI / DRY · the reuse ladder · senior correctness defaults · match the codebase** | speculative abstraction; silent fallbacks, float money, N+1 queries |
 | 4 | **Surgical changes**: every changed line traces to the task | drive-by edits, unreviewable diffs |
@@ -653,7 +653,8 @@ but the primary link could not be verified, it is attributed by talk and date in
   is why Section 5 demands an oracle and Section 4 insists the diff stays small and reviewable.
 - **[Matt Pocock](https://github.com/mattpocock/skills)**: **Sections 1, 2.** His skills push the agent to interview
   you *before* it opens an editor, and to write down a project's real vocabulary so it stops inventing
-  domain names. Section 1's grill mode and the `PROJECT-CONFIG` block are the same idea in a smaller form.
+  domain names. Section 1's never-assume rule, Section 0's question round on high-risk work, and the
+  `PROJECT-CONFIG` block are the same idea in a smaller form: facts are looked up, decisions are put to you.
 - **[Boris Cherny](https://howborisusesclaudecode.com/)** (creator of Claude Code): **Section 5.** *Give the agent a
   way to verify its work*, and it multiplies the quality of the result.
 - **[Simon Willison](https://simonwillison.net/2025/Mar/11/using-llms-for-code/)** (coined "vibe
