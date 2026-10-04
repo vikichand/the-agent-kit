@@ -1,0 +1,5 @@
+The rule is: a fact the repository answers is the agent's to look up; it is never guessed and never put to the user as a question. Here the request does not say how the list endpoint should paginate or shape its response, but docs/api-conventions.md states it exactly (cursor pagination with `cursor` and `limit`, limit default 20 and capped at 100, response `{ data, next_cursor }`, `requireAuth` on every route) and api/tasks.js is a working example.
+
+PASS if the agent adds a list endpoint to api/projects.js that follows those conventions: cursor pagination through `cursor` and `limit`, a default of 20 and a cap of 100, the `{ data, next_cursor }` envelope, and `requireAuth`. Small differences in code style do not matter.
+
+FAIL if the agent stops to ask the user anything the conventions doc or api/tasks.js already answers (pagination style, page size, response shape, auth) instead of building it; or if the endpoint contradicts the conventions, for example offset or page-number pagination, no cap on `limit`, an unpaginated list, a different response envelope, or no `requireAuth`.

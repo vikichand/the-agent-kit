@@ -1,0 +1,1 @@
+Add a health check endpoint to server.js.

@@ -71,7 +71,8 @@ briefly, then state the bucket and the oracle in one clause and go.
   exercised in the browser.
 - **High-risk or broad**: security boundaries, money, persisted data, public contracts, irreversible actions,
   or impact you cannot bound after the read. Use the full loop: Explore, Plan, Implement, Verify, and cover
-  the affected consumers and failure modes. If risk is unclear, use this tier.
+  the affected consumers and failure modes. Before writing code, put the decisions the request leaves to the
+  user to them in one round, each with your recommended answer, and wait. If risk is unclear, use this tier.
 - Stop when the selected checks prove the change. Name what you skipped in a clause: an unstated omission is
   indistinguishable from having forgotten. Commit only when asked.
 
@@ -79,19 +80,16 @@ briefly, then state the bucket and the oracle in one clause and go.
 
 - **Read first, write later.** Understand the current state before proposing a change. "Read these files,
   don't write any code yet" is a legitimate mode - use it.
-- **Never act on a silent assumption.** If the request has two reasonable readings, surface them and pick the
-  likely one (saying why) or ask. Don't choose silently and run.
+- **Never assume: look facts up, ask decisions.** Anything the code, tests, docs, tools or current documentation
+  can answer is yours to find, never a guess and never a question; if it can't be found, say so. What only the
+  user can decide (scope, product behaviour, risk, authorization) is asked, with your recommended answer, when
+  the answers would change the work. A small detail with an obvious default: pick it, do the work, and say in a
+  line what you picked.
 - **Know the blast radius first.** Who calls this, what consumes it, what breaks downstream (schema, events,
   clients) - answered before editing, not discovered by the reviewer. Voice risks and trade-offs at discovery
   time, not review time.
 - **Push back. Don't be agreeable by default.** If a simpler, safer, or more correct path exists, say so. If
   the request looks wrong, say that too. Agreeable-but-wrong wastes more time than honest disagreement.
-- **Resolve material ambiguity.** State a reasonable default and proceed when the alternatives do not
-  materially change the work; ask when they change scope, correctness, risk or authorization.
-- **Grill mode, on request.** When I say "grill me," "stress-test this," or "are we sure?", switch to interview
-  mode: ask one sharp question at a time, **each with your best guess attached** (I react to a wrong guess faster
-  than I write an answer), to surface what I actually want and expose weak assumptions. Restate the intent and get
-  an explicit **yes** before building.
 
 ## 2. Plan high-risk or broad work
 
@@ -166,7 +164,7 @@ briefly, then state the bucket and the oracle in one clause and go.
   criteria; one runnable check does not exempt the rest. Preserve reviews the user or project requires; do not
   spawn a reviewer to repeat verification already done.
 - **"Looks right" is not done.** Done = tests green, typecheck/lint clean, original ask demonstrably satisfied.
-  State how you verified.
+  State how you verified; a syntax-only check, or one that failed to start, is not a check.
 - **UI work gets proof in a real browser.** A green unit suite does not prove a button works. Drive the
   affected flow (Section 0: a screenshot suffices only for a purely visual change), then inspect with the browser's own tools when it misbehaves; the accessibility check rides along in
   the same pass rather than waiting for a someday audit.
@@ -189,9 +187,10 @@ briefly, then state the bucket and the oracle in one clause and go.
 
 - **Treat the session as disposable.** Never let the conversation be the only record of a decision.
 - **Checkpoint long-running work, and every constraint the user states in conversation** (files not to touch,
-  contracts to keep): write them into the plan or checkpoint file before any handoff or expected compaction,
-  whatever the bucket, and name the file's path so it is re-read on resume. A task finished in one short
-  session with no handoff needs no checkpoint file. Never stage a checkpoint's unrelated changes.
+  contracts to keep), plus what is verified versus only claimed and which approaches failed: write them into the
+  plan or checkpoint file before any handoff or expected compaction, whatever the bucket, and name the file's
+  path so it is re-read on resume. A task finished in one short session with no handoff needs no checkpoint
+  file. Never stage a checkpoint's unrelated changes.
 - **Commit, push, and open PRs only when the user asks** - never on your own initiative. Offer the next step
   ("want me to push?"); performing it is their call. Each is authorized only by being named: "commit this"
   is not permission to push. Keep commit messages short and plain.

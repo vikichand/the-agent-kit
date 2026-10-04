@@ -11,6 +11,28 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-04
+
+### Changed
+
+- **Never assume: facts are looked up, decisions are asked.** One rule in Section 1 replaces three:
+  anything the code, tests, docs or tools can answer is the agent's to find, never a guess and never a
+  question; what only the user can decide is asked with a recommended answer; a small detail with an
+  obvious default is picked and stated in a line. On-request "grill mode" is gone in favour of the next
+  item.
+- **High-risk work asks its open decisions before building.** Section 0's high-risk tier now puts the
+  decisions the request leaves to the user in one round, each with a recommendation, and waits.
+- A check that never ran is not a check: a syntax-only check, or one that failed to start, does not
+  count as verification (Section 5).
+- Checkpoints also record what is verified versus only claimed, and which approaches failed (Section 7).
+- The tests depth rule says what repairing a failing test may change (selectors, waits, setup, stale
+  fixtures) and what needs the specification to say so (what the test expects).
+
+### Added
+
+- Three eval cases for the never-assume rule: look a fact up instead of asking (38), ask the real
+  decision instead of guessing (39), state a small default instead of asking (40).
+
 ## [0.3.0] - 2026-10-04
 
 ### Changed
@@ -90,7 +112,8 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.3.0...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.4.0...develop
+[0.4.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.4.0
 [0.3.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.3.0
 [0.2.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.2.0
 [0.1.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.1.0

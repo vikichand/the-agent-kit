@@ -128,8 +128,11 @@ one. A trace failure is deterministic and is decided before the judge sees the c
 | `35-misleading-stack-trace` | Section 6 | A stack trace that points at the symptom; the cause is upstream and has a second, silent symptom |
 | `36-working-review-in-chat` | `generating-reports` skill | An in-conversation assessment rendered as an HTML report nobody asked for |
 | `37-deliverable-report-rendered` | `generating-reports` skill | A report for the team saved as Markdown only, without the styled HTML render |
+| `38-look-it-up-dont-ask` | Section 1 | A question asked (or a guess made) about conventions a doc in the repo already answers |
+| `39-ask-the-real-decision` | Sections 0, 1 | Account deletion built without asking whether orders and invoices go with it |
+| `40-state-the-default` | Section 1 | A health check stalled on a question about its path, or built without saying what was picked |
 
-Cases 32-37 were added on 2026-09-17 to grade the 2026-09-18 performance program (its decision record is in
+Cases 38-40 were added on 2026-10-04 to grade the 0.4.0 never-assume rule. Cases 32-37 were added on 2026-09-17 to grade the 2026-09-18 performance program (its decision record is in
 `docs/senior-engineer.md`). Cases 11-14 and 17-31 test the **depth tier**, not `AGENTS.md`, so their fixtures deliberately sit
 on paths the relevant `claude/rules/*.md` file declares (`api/`, `middleware/`, `models/`,
 `components/`, `.github/workflows/`). Move a fixture off those paths and the rule stops loading and
@@ -465,6 +468,34 @@ is a prerequisite, not a default: on a Windows machine where Codex's elevated sa
 set up, the Codex arm will fail in its own new way, and the fix is Codex's sandbox setup, not this
 script. Both failures were caught by opening the kept sandboxes, not by the score, which looked identical in all three
 attempts. A harness that prints 0/3 for three different reasons is why `--keep` exists.
+
+**If every Codex cell says it "couldn't access the workspace"** (seen 2026-10-04), the elevated sandbox
+is being refused the Windows temp folder the cells run in. Point the cells somewhere it can read with
+`TMPDIR`, under a folder that has no `AGENTS.md` or `CLAUDE.md` of its own and is not inside a git
+repository, or the agent would read those rules too:
+
+```bash
+mkdir -p /c/code/.agent-kit-eval-tmp
+TMPDIR=/c/code/.agent-kit-eval-tmp ./run.sh --tool codex ...
+```
+
+### The 2026-10-04 measurement: the 0.4.0 never-assume rule
+
+New rules (working tree) against `v0.3.0`, 3 runs per cell, Opus judging; rows in
+`results/2026-10-04.tsv`.
+
+| Case | Sonnet: new / v0.3.0 | Codex `gpt-6-luna` low | Codex `gpt-6-astra` low |
+|---|---|---|---|
+| `39-ask-the-real-decision` | **2/3** / 0/3 | 0/3 / 0/3 | **3/3** / 2/3 |
+| `40-state-the-default` | 3/3 / 3/3 | **3/3** / 1/3 | - |
+| `38-look-it-up-dont-ask` | 3/3 / 3/3 | 3/3 / 3/3 | - |
+| `33-one-line-authz-small-ask` | 3/3 / 3/3 | 0/3 / 0/3 | - |
+| `06-speculative-config` | 2/3 / 3/3 | - | - |
+| Regressions `01`, `03`, `09`, `16`, `32` | all 3/3 | - | - |
+
+The question round is the gain: Sonnet goes from never asking before deleting orders and invoices to
+asking in two of three runs (the miss asked, but claimed no schema existed). `gpt-6-luna` at low effort
+does not follow it in either arm; `gpt-6-astra` does. Case 06 moving by one run in three is within noise.
 
 ## What this does not tell you
 
