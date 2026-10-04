@@ -11,6 +11,8 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-04
+
 ### Changed
 
 - **Browser work: the Playwright CLI and its skill are now the recommendation**, with the Playwright MCP
@@ -88,6 +90,7 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.2.0...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.3.0...develop
+[0.3.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.3.0
 [0.2.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.2.0
 [0.1.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.1.0
