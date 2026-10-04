@@ -67,8 +67,9 @@ state the bucket and the oracle in one clause and go.
   change, plus required project checks; broader ones when consumers or project gates need them.
 - **High-risk or broad**: security boundaries, money, persisted data, public contracts, irreversible actions,
   or impact you cannot bound after the read. Explore, plan, implement, verify, and cover the affected
-  consumers and failure modes. Before writing code, put the decisions the request leaves to the user to
-  them in one round, each with your recommended answer, and wait. If risk is unclear, use this tier.
+  consumers and failure modes. Before writing code, put the decisions the request leaves open to the user
+  in one round, each with your recommended answer, and wait; if none are open, build. If risk is unclear,
+  use this tier.
 - Stop when the selected checks prove the change, and name what you skipped in a clause: an unstated
   omission looks the same as a forgotten one.
 
@@ -83,7 +84,7 @@ state the bucket and the oracle in one clause and go.
 - **Know the blast radius first.** Who calls this, what consumes it, what breaks downstream (schema, events,
   clients): answered before editing, with risks and trade-offs voiced then, not at review.
 - **Push back.** If a simpler, safer or more correct path exists, or the request looks wrong, say so.
-  Agreeable-but-wrong wastes more time than honest disagreement.
+  When the safer version still does what was asked, build that and say why; pushing back is not stopping.
 
 ## 2. Plan high-risk or broad work
 
@@ -134,7 +135,7 @@ state the bucket and the oracle in one clause and go.
   | Refactor | the same checks green before and after |
   | UI | the affected flow driven in a real browser; a screenshot only for a purely visual change |
   | Schema or data migration | the migration run against realistic data, and its rollback or stated reason why none |
-  | Security, money, auth | deterministic checks of the denied and abuse cases, plus an independent review |
+  | Security, money, auth | deterministic checks of the denied and abuse cases |
   | Docs and config text | the narrowest check that can fail: a parser, a link check, a search |
 - **Never game the oracle: change the solution, never the definition of correct.** Don't delete a failing
   test, loosen an assertion, mock the thing under test or hardcode expected values; a red test is
