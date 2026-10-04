@@ -11,6 +11,11 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+### Changed
+
+- The kit is now called **The Agent Kit** in the README, which opens with a banner. Generated reports
+  end with "GENERATED WITH THE AGENT KIT" and the repository link, no longer a personal name.
+
 ## [0.4.0] - 2026-10-04
 
 ### Changed
