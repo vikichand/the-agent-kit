@@ -31,6 +31,10 @@ quiet diff as the feature, and never without saying you did it.
 
 If a test is genuinely wrong, say so out loud, explain why, and change it as its own change.
 
+**Repairing a failing test** (by hand, or by an automated healer such as Playwright's) may fix selectors,
+waits, setup and stale fixtures. Changing what the test *expects* (behaviour, permissions, a contract, an
+acceptance criterion) needs the specification to say so; otherwise the failure is a regression to report.
+
 ## Test behaviour, not implementation
 
 - Assert what a caller observes: return values, emitted events, persisted state, rendered output.

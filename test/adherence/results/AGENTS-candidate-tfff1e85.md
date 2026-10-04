@@ -260,14 +260,7 @@ the exact checks that define "done" for code, or the sources and evidence bar fo
 between the markers; everything above stays exactly as it is. Re-run it any time the project changes.
 
 <!-- PROJECT-CONFIG:START -->
-## This project: CODE - the-agent-kit (rules and guardrails for coding agents)
-
-**Stack / platform / intent:** POSIX sh (installer, git hooks), Python 3 stdlib (the command guard, the session-start check), Markdown (the rules). A CLI and git hooks: no build, no runtime dependencies. Production: other people install this, so a broken installer is a broken product.
-**Must pass before "done":** `sh test/run-tests.sh` and `sh install.sh --check` (no FAIL), both free and offline - the release gates. During iteration run the narrowest check that proves the change (a guard change: `python3 test/command_guard_cases.py hooks/command-guard.py`). A change to the RULES also needs `test/adherence/run.sh`, which costs real tokens - read `test/adherence/README.md` for the acceptance contract before quoting any number from it.
-**Branches:** work on `develop`; `main` is release-only: each release is a pull request from `develop`, squash-merged and tagged `vX.Y.Z`, then `main` is merged back into `develop` (`docs/branches-and-releases.md`). An agent may prepare a release when asked; only the owner merges it. Never push to `main`, and never force-push or rebase either branch.
-<!-- agent-kit: release-branch=main -->
-**Follow these patterns:** `claude/rules/web-security.md` (depth-rule voice), `test/adherence/cases/22-check-then-act-coupon/` (eval-case shape), `hooks/command-guard.py` (guard style: fail closed, say why).
-**Careful zones / do-not-touch:** the guard hooks and `~/.claude/settings.json` - the kit denies an agent editing its own permission file, and that applies to you; `AGENTS.md` stays under 200 effective lines, so pay for any addition with a named cut; `test/adherence/results/` is the measurement record, append only; this file's rules ship to other people's projects, so nothing here may be specific to this machine, and this block must never ship: `write_rules` in `install.sh` empties it for every install, the machine-wide share and the eval arm.
+<!-- Not configured yet. Run the setup prompt (~/.the-agent-kit/docs/project-setup-prompt.md) to fill this in. -->
 <!-- PROJECT-CONFIG:END -->
 
 ---
