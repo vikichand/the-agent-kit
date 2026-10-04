@@ -198,8 +198,7 @@ the CAPITALISED content:
 ...report content...
 <div class="foot"><span>EDITS LAND IN SOURCE.MD &#8212; THIS PAGE IS A RENDER</span>
   <span>REV NN &#183; YYYY-MM-DD</span></div>
-<div class="colophon"><span>GENERATED WITH THE-AGENT-KIT</span><span class="mark">&#9787;</span>
-  <span>BUILT BY VIKASH CHAND</span><span>&#183;</span>
+<div class="colophon"><span>GENERATED WITH THE AGENT KIT</span><span class="mark">&#9787;</span>
   <span class="repo">GITHUB.COM/VIKICHAND/THE-AGENT-KIT</span></div>
 </div>
 ```
@@ -207,7 +206,7 @@ the CAPITALISED content:
 The colophon sits BELOW the document footer, separated by its dashed rule - deliberately outside
 the document, like a plate mark on a print. Exact text, exact classes, always last, never louder.
 It is the only place the kit names itself: never a badge, never in the headline, never in content.
-(It credits the human and his tool; Section 9's ban on AI attribution governs git trailers and stands.)
+(It names the tool, not an author; Section 9's ban on AI attribution governs git trailers and stands.)
 
 Everything lives inside `.frame` (max-width 860px), so chrome, content, foot and colophon share
 exact edges.

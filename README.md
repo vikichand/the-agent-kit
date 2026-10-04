@@ -1,4 +1,6 @@
-# the-agent-kit
+<p align="center"><img src="assets/banner.png" alt="The Agent Kit: rules and guardrails for coding agents" width="100%"></p>
+
+# The Agent Kit
 
 **Rules and guardrails that get a coding agent working like a senior engineer instead of an eager
 intern.** One install, wired for both [Claude Code](https://claude.com/claude-code) and
@@ -65,7 +67,7 @@ when a project's rules are behind.
 Paste this into Claude Code or Codex, **inside the project you want set up**:
 
 ```text
-Set up the-agent-kit for me, machine-wide and then in this project.
+Set up The Agent Kit for me, machine-wide and then in this project.
 
 1. If ~/.the-agent-kit/install.sh exists, run `~/.the-agent-kit/install.sh --update`. Otherwise
    download https://raw.githubusercontent.com/vikichand/the-agent-kit/main/install.sh into a temporary
