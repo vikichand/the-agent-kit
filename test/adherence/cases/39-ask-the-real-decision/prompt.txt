@@ -1,0 +1,1 @@
+Users want to be able to delete their accounts. Add that to api/account.js.

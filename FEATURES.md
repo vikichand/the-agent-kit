@@ -22,7 +22,7 @@ stays local · own your incidents (stop and report, no silent cleanup) · don't 
 | # | Enforces |
 |---|---|
 | 0 | Size by risk and proof: mechanical / bounded / high-risk tiers scale the ceremony |
-| 1 | Read-first · no silent assumptions · **blast radius before the first edit** · push back, voice trade-offs · **resolve material ambiguity** · **grill mode** |
+| 1 | Read-first · **never assume: look facts up, ask decisions** (with a recommendation; small defaults stated) · **blast radius before the first edit** · push back, voice trade-offs |
 | 2 | Plan non-trivial work as verifiable steps; check a high-risk plan against its failure modes; **name what's out of scope** |
 | 3 | Simplicity · YAGNI/DRY · **reuse ladder** · match the codebase · **senior correctness defaults** (no silent fallbacks, idempotent handlers, the 100k-rows question, UTC + decimal money, staged migrations) · **named-ceiling shortcuts** · **copied code carries its license** |
 | 4 | Surgical changes: every line traces to the task |
