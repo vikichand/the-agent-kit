@@ -793,13 +793,24 @@ grep -q -- '--setup' "$KIT/install.sh" && awk '/^update_kit\(\)/,/^}/' "$KIT/ins
 # scored as ordinary FAILs, and a red-then-fix run scored as "edited before any failing test".
 # The functions are lifted out of run.sh so the checks run offline, with no agent and no tokens.
 (
-  eval "$(sed -n '/^events_error() {/,/^}/p;/^trace_check() {/,/^}/p' "$KIT/test/adherence/run.sh")"
+  eval "$(sed -n '/^events_error() {/,/^}/p;/^trace_check() {/,/^}/p;/^ag_field() {/,/^}/p' "$KIT/test/adherence/run.sh")"
   hf="$KIT/test/adherence/harness-fixtures"; spec='red-before-edit: (node --test|npm test)'
   case "$(events_error "$hf/codex-usage-limit.jsonl" codex)" in *"usage limit"*) pass "H1 codex usage limit read as a provider error" ;; *) bad "H1 codex usage limit NOT detected" ;; esac
   case "$(events_error "$hf/claude-session-limit.jsonl" claude)" in *"session limit"*) pass "H2 claude session limit read as a provider error" ;; *) bad "H2 claude session limit NOT detected" ;; esac
   case "$(trace_check "$hf/claude-red-then-edit.jsonl" claude "$spec")" in OK*) pass "H3 red run then source edit passes the trace" ;; *) bad "H3 red-then-edit FAILED the trace" ;; esac
   case "$(trace_check "$hf/claude-edit-after-green.jsonl" claude "$spec")" in FAIL*) pass "H4 edit after a green run ('# fail 0') fails the trace" ;; *) bad "H4 edit after a green run PASSED the trace" ;; esac
   case "$(trace_check "$hf/codex-piped-red.jsonl" codex "$spec")" in OK*) pass "H5 codex piped red run (exit 0) is read as red" ;; *) bad "H5 codex piped red run read as green" ;; esac
+  # H6-H10: the Antigravity arm reads agy's stream-json, which carries no exit codes.
+  ag="$hf/antigravity-edit-after-green.jsonl"
+  case "$(trace_check "$ag" antigravity "$spec")" in FAIL*money.js*) pass "H6 antigravity edit after a green run fails the trace" ;; *) bad "H6 antigravity edit after a green run PASSED the trace" ;; esac
+  case "$(trace_check "$hf/antigravity-red-then-edit.jsonl" antigravity "$spec")" in OK) pass "H7 antigravity piped red run then source edit passes the trace" ;; *) bad "H7 antigravity red-then-edit FAILED the trace" ;; esac
+  m=$(ag_field "$ag" messages)
+  if [ -z "$(events_error "$ag" antigravity)" ] && has 'run_command] rm -rf build -> ERROR: tool call denied by pre-tool hook' "$m" && has '^Fixed rounding in lib/money.js. The rm' "$m"; then
+    pass "H8 antigravity denied tool call reaches the judge transcript and is not a provider error"
+  else bad "H8 antigravity transcript or provider-error read wrong: $(events_error "$ag" antigravity) / $m"; fi
+  u=$(ag_field "$ag" usage | tr '\t' ',')
+  [ "$u" = "1,4,1,51234,812,40100,," ] && pass "H9 antigravity usage: turns, tool calls, edits, tokens in/out, cache read" || bad "H9 antigravity usage read as '$u'"
+  [ "$(ag_field "$ag" thread)" = "0b7e5c1a-4f2d-4a8e-9c3b-2d1f6e8a9b10" ] && pass "H10 antigravity conversation id read for resuming later turns" || bad "H10 antigravity conversation id not read"
 ) | tee "$w.h"; grep -q '^FAIL' "$w.h" 2>/dev/null && fail=1; rm -f "$w.h"
 
 echo "---"
