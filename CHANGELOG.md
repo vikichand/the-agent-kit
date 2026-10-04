@@ -11,6 +11,26 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-04
+
+### Changed
+
+- **Browser work: the Playwright CLI and its skill are now the recommendation**, with the Playwright MCP
+  kept for exploratory or long-running browser sessions. Playwright's own docs recommend the CLI for
+  coding agents because it keeps tool schemas and page trees out of the context. The session-start
+  check suggests the `playwright-cli` skill in web projects. Existing installs keep their own
+  `recommended.json`; edit it, or delete it and re-run `--setup`, to pick this up.
+- The optional Codex performance profile names the models Codex currently offers (`gpt-6-sol`,
+  `gpt-6-luna`) and says to check your own plan's list with `codex debug models`.
+
+### Fixed
+
+- The optional Claude performance profile now actually sets effort on current models: Opus 5.5 and
+  later ignore the top-level `effortLevel`, so it also sets `modelSettings` for `opus` and `sonnet`.
+- An install from a working copy no longer copies the maintainer's git-ignored notes from `docs/`
+  (plans, research, todo lists) into `~/.the-agent-kit`: the installer now copies only docs git would
+  publish.
+
 ## [0.2.0] - 2026-09-29
 
 ### Added
@@ -70,6 +90,7 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.2.0...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.3.0...develop
+[0.3.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.3.0
 [0.2.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.2.0
 [0.1.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.1.0

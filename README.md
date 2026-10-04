@@ -254,6 +254,7 @@ the expected verdict.
 - [Verify](#verify)
 - [Limits](#limits)
 - [Inspired by](#inspired-by)
+- [The goal](#the-goal)
 - [License](#license)
 
 ## What you get
@@ -668,6 +669,29 @@ but the primary link could not be verified, it is attributed by talk and date in
 - Supporting data: Google's **[DORA 2025](https://dora.dev/)** (AI *amplifies* existing practices) and a
   Dec 2025 UC San Diego / Cornell study ([arXiv:2512.14012](https://arxiv.org/abs/2512.14012)):
   professional developers don't vibe, they control.
+
+## The goal
+
+**Get the highest-quality engineering out of the models your subscriptions give you.** Agents should
+work like senior engineers: read before writing, look facts up, ask the decisions that are yours, verify
+with real evidence, change only what was asked, and never produce AI slop. Quality is the hard
+constraint; cost, speed and subscription capacity are optimised beneath it.
+
+Every change to the kit is judged against that goal:
+
+- **Better than the stock model, or it goes.** A rule earns its place only when a model does measurably
+  better with it than without it, on the [eval harness](test/adherence/README.md). Models change, so
+  rules that a new model no longer needs are removed, and rules it still needs are kept.
+- **Facts are looked up, decisions are asked, nothing is silently assumed.** The agent finds anything
+  the code, tests, docs or tools can answer; it asks the user only what is genuinely theirs to decide.
+- **What must never be skipped is enforced in code** (hooks and the guard), not only written as a rule.
+- **The always-on rules stay small.** Detail loads only when a task needs it, because every line read on
+  every turn costs context and can over-constrain a stronger model.
+- **Provider-neutral.** The same rules work in every tool the kit supports, and no model name, price or
+  effort default goes into a permanent rule.
+
+When a new model ships, the routine is the same: run the eval on it, keep what still helps, remove what
+it no longer needs, and update the recommendations.
 
 ## Contributing
 

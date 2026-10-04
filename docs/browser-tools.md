@@ -2,10 +2,17 @@
      project does browser work and both MCPs are installed. It is not part of the kit's universal
      rules: a project with no browser has no use for it, and AGENTS.md stays lean. -->
 
-# Choosing between Playwright MCP and Chrome DevTools MCP
+# Choosing between Playwright and Chrome DevTools
 
-Both are browser MCPs, so an agent with both installed will pick one arbitrarily unless told how to
-choose. This is the rule that makes the choice deliberate.
+An agent with several browser tools installed picks one arbitrarily unless told how to choose. This is
+the rule that makes the choice deliberate.
+
+**Driving a browser from a coding agent: use the Playwright CLI (`playwright-cli`) and its skill.**
+Playwright's own docs recommend it for coding agents: it avoids loading large tool schemas and page
+trees into the context. It drives Chromium, Firefox and WebKit, and covers console, network requests,
+traces, screenshots and locator generation. Use the Playwright MCP only for exploratory or long-running
+autonomous browser loops, where its persistent state helps. Everything below that says "Playwright"
+applies to the CLI and to the MCP alike.
 
 **Neither subsumes the other, so running both is correct.** But the popular shorthand ("Playwright
 drives, DevTools inspects") is out of date and will send you to the wrong tool. The Chrome DevTools
