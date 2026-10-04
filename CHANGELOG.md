@@ -11,10 +11,32 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+### Added
+
+- **Antigravity is a supported tool.** It reads `AGENTS.md` and the `.agents/skills/` Codex gets; a
+  project install now also writes the two path-shaped depth rules (`code-correctness`, `tests`) to
+  `.agents/rules/` as glob rules, and the command guard as a workspace hook in `.agents/hooks.json`,
+  added alongside any hooks you already have. The guard asks every time where Claude Code asks, and
+  denies what it denies. `--update-rules` brings existing projects up to date and `--check` reports it.
+  No session-start update check on Antigravity: it has no documented hook for one.
+
 ### Changed
 
 - The kit is now called **The Agent Kit** in the README, which opens with a banner. Generated reports
   end with "GENERATED WITH THE AGENT KIT" and the repository link, no longer a personal name.
+- **`AGENTS.md` is about a fifth shorter** (154 effective lines, from 198) with the same rules: overlapping
+  bullets merged, Section 8 folded into Section 2's plan rules, so Ownership and Documentation are now
+  Sections 8 and 9.
+- **Evidence by kind of change.** Section 5 has a table of what proves a bug fix, a behaviour change, a
+  refactor, UI work, a migration, security work and a docs change.
+- "Never game the oracle" now opens with the principle behind it: change the solution, never the
+  definition of correct.
+- **`orchestrating-work`** starts by picking the shape (do it, delegate, fan out, hand off), gives each
+  worker an outcome contract with escalation triggers, classifies a failure before retrying it, and ends
+  with a handoff format. Its isolation and capacity detail moved to a reference file it opens when needed.
+- Skills keep their detail in `references/`, and the installer copies whole skill folders (it copied only
+  top-level files before). `generating-reports/design.md` is now `references/design.md`; `--update-rules`
+  removes the old copy.
 
 ## [0.4.0] - 2026-10-04
 
