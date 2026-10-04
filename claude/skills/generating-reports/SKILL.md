@@ -22,10 +22,10 @@ Two kinds of output, and the reader decides which:
 - **A deliverable** - a report, audit, plan or review that a human will read, or that was asked to be
   saved: write the markdown first as the source of truth, then render the self-contained HTML view
   beside it, dated (`plan.md` -> `2026-08-24-plan.html`), styled and structured per
-  [design.md](design.md) in this folder. Authority flows one way: the HTML is generated *from* the
+  [references/design.md](references/design.md). Authority flows one way: the HTML is generated *from* the
   markdown and is disposable; decisions, edits and review feedback land in the `.md`.
 - **A working artifact** - a plan or review that you yourself consume during the task, or that lives
-  only in the conversation: markdown only, no render, and do not load design.md. Section 0 sizing
+  only in the conversation: markdown only, no render, and do not load the design reference. Section 0 sizing
   applies; a three-line answer needs no file at all.
 
 When in doubt, ask in one clause whether the reader is a human. Match detail to the reader's decision;
@@ -51,7 +51,7 @@ review found") always run from the markdown.
 - **One self-contained file.** Inline all CSS and any JS; no CDN, no external fonts, no remote
   images or fetches of any kind - images as `data:` URIs if needed. It must open from a
   `file://` double-click and render identically offline.
-- Follow **[design.md](design.md)** for the visual system - tokens, components, and the hard
+- Follow **[references/design.md](references/design.md)** for the visual system - tokens, components, and the hard
   prohibitions. A verdict banner up top; badges for severities; tables for anything enumerable.
 - Wide content (tables, code) scrolls inside its own container; the page never scrolls sideways.
 - Keep it legible in dark and light (design.md carries both palettes).

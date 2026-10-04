@@ -396,6 +396,23 @@ sc=$(ls -d .claude/skills/*/ 2>/dev/null | wc -l | tr -d ' ')
 sh "$KIT/install.sh" >/dev/null 2>&1
 sc2=$(ls -d .claude/skills/*/ 2>/dev/null | wc -l | tr -d ' ')
 [ "$sc2" = "$sn" ] && pass "S3 re-install does not duplicate skills" || bad "S3 skill count changed to $sc2"
+# S4: a skill is its whole folder. A SKILL.md routing to a references/ file that never shipped fails
+# silently, so every kit file, nested ones included, must land in both tools' copies, and
+# --update-rules must restore a stale one.
+miss=""
+for f in $(cd "$KIT/claude/skills" && find . -type f | sed 's|^\./||'); do
+  for t in .claude/skills .agents/skills; do [ -f "$t/$f" ] || miss="$miss $t/$f"; done
+done
+nf=$(find "$KIT/claude/skills" -mindepth 3 -type f | head -1)
+if [ -n "$nf" ]; then
+  rel=${nf#"$KIT/claude/skills/"}; printf 'stale\n' > ".claude/skills/$rel"
+  printf 'pre-0.5.0 copy\n' > .claude/skills/generating-reports/design.md
+  sh "$KIT/install.sh" --update-rules >/dev/null 2>&1
+  cmp -s "$nf" ".claude/skills/$rel" || miss="$miss (stale .claude/skills/$rel not refreshed)"
+  [ -e .claude/skills/generating-reports/design.md ] && miss="$miss (pre-0.5.0 design.md not removed)"
+fi
+[ -z "$miss" ] && pass "S4 every skill file, nested ones too, reaches both tools and refreshes" \
+  || bad "S4 skill files missing or stale:$miss"
 cd "$KIT"; rm -rf "$w"
 
 # R5/R6: the doctor must report on the depth tier - a rule that fails to install is otherwise

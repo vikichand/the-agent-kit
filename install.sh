@@ -141,9 +141,9 @@ install_skills() {  # $1 = repo root. Task-shaped guidance: only the description
       say "  = .claude/skills/$b already exists - left untouched."
     else
       mkdir -p "$1/.claude/skills/$b"
-      # The whole folder, not just SKILL.md - skills may carry reference files (a design.md, a
-      # template) that the body points at, and a skill deployed without them is silently broken.
-      cp "$sd"*.md "$1/.claude/skills/$b/" 2>/dev/null || cp "$sd/SKILL.md" "$1/.claude/skills/$b/SKILL.md"
+      # The whole folder, not just SKILL.md - skills route to reference files (references/design.md)
+      # that the body points at, and a skill deployed without them is silently broken.
+      cp -r "$sd." "$1/.claude/skills/$b/"
       say "  + wrote .claude/skills/$b (loads when a task matches it)"
     fi
   done
@@ -188,7 +188,7 @@ install_codex_skills() {  # $1 = repo root. Everything Codex can load lazily, in
         say "  = .agents/skills/$b already exists - left untouched."
       else
         mkdir -p "$1/.agents/skills/$b"
-        cp "$sd"*.md "$1/.agents/skills/$b/" 2>/dev/null || cp "$sd/SKILL.md" "$1/.agents/skills/$b/SKILL.md"
+        cp -r "$sd." "$1/.agents/skills/$b/"
         say "  + wrote .agents/skills/$b (Codex: loads when a task matches it)"
       fi
     done
@@ -474,21 +474,22 @@ refresh_kit_owned() {  # $1 = repo root. Kit-NAMED rules and skills are kit-owne
     for sd in "$ssrc"/*/; do
       [ -d "$sd" ] || continue
       b=$(basename "$sd")
-      for sf in "$sd"*.md; do
-        [ -e "$sf" ] || continue
-        fn=$(basename "$sf"); tgt="$1/.claude/skills/$b/$fn"
-        if [ -e "$tgt" ] && ! cmp -s "$sf" "$tgt"; then
-          cp -f "$sf" "$tgt"; say "  ~ refreshed .claude/skills/$b/$fn (kit-owned)"
-        elif [ ! -e "$tgt" ] && [ -d "$1/.claude/skills/$b" ]; then
-          cp "$sf" "$tgt"; say "  + added .claude/skills/$b/$fn (new kit file)"
-        fi
+      # 0.5.0 moved generating-reports/design.md into references/; drop the old kit-owned copy.
+      [ "$b" = generating-reports ] && [ -f "$sd/references/design.md" ] && for t in .claude/skills .agents/skills; do
+        [ -f "$1/$t/$b/design.md" ] && rm -f "$1/$t/$b/design.md" && say "  - removed $t/$b/design.md (moved to references/)"
+      done
+      # Every file in the skill, nested ones (references/) included; $fn is the path inside it.
+      for fn in $(cd "$sd" && find . -type f | sed 's|^\./||'); do
+        sf="$sd$fn"
         # The Codex copy of the same skill is kit-owned on the same terms.
-        ctgt="$1/.agents/skills/$b/$fn"
-        if [ -e "$ctgt" ] && ! cmp -s "$sf" "$ctgt"; then
-          cp -f "$sf" "$ctgt"; say "  ~ refreshed .agents/skills/$b/$fn (kit-owned)"
-        elif [ ! -e "$ctgt" ] && [ -d "$1/.agents/skills/$b" ]; then
-          cp "$sf" "$ctgt"; say "  + added .agents/skills/$b/$fn (new kit file)"
-        fi
+        for t in .claude/skills .agents/skills; do
+          tgt="$1/$t/$b/$fn"
+          if [ -e "$tgt" ] && ! cmp -s "$sf" "$tgt"; then
+            cp -f "$sf" "$tgt"; say "  ~ refreshed $t/$b/$fn (kit-owned)"
+          elif [ ! -e "$tgt" ] && [ -d "$1/$t/$b" ]; then
+            mkdir -p "$(dirname "$tgt")"; cp "$sf" "$tgt"; say "  + added $t/$b/$fn (new kit file)"
+          fi
+        done
       done
     done
   fi
