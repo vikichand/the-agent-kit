@@ -617,6 +617,12 @@ else
     && grep -q '"the-agent-kit"' "$u/.agents/hooks.json" && grep -q '"mine"' "$u/.agents/hooks.json" \
     && pass "A4 --update-rules refreshes the Antigravity launcher, rules and hook entry" \
     || bad "A4 --update-rules left the Antigravity files stale or missing"
+  # A5: --check reports the Antigravity side - the guard answering in its contract, and the hook wired.
+  o=$(cd "$u" && sh "$KIT/install.sh" --check 2>&1)
+  printf '%s' "$o" | grep -q 'OK:   command-guard answers Antigravity' \
+    && printf '%s' "$o" | grep -q 'OK:   Antigravity guard wired' \
+    && pass "A5 --check reports the Antigravity guard and its wiring" \
+    || bad "A5 --check says nothing (or the wrong thing) about Antigravity"
   rm -rf "$u"
   # U18: the machine-wide share must hold the rules with an EMPTY block too. The README tells users who
   # prefer global rules to append the share's AGENTS.md to ~/.claude/CLAUDE.md, so a leak here would put

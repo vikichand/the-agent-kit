@@ -189,7 +189,7 @@ install_codex_skills() {  # $1 = repo root. Everything Codex can load lazily, in
       else
         mkdir -p "$1/.agents/skills/$b"
         cp -r "$sd." "$1/.agents/skills/$b/"
-        say "  + wrote .agents/skills/$b (Codex: loads when a task matches it)"
+        say "  + wrote .agents/skills/$b (Codex and Antigravity: loads when a task matches it)"
       fi
     done
   fi
@@ -204,7 +204,7 @@ install_codex_skills() {  # $1 = repo root. Everything Codex can load lazily, in
       else
         mkdir -p "$1/.agents/skills/$n"
         rule_to_skill "$r" "$n" "$d" > "$1/.agents/skills/$n/SKILL.md"
-        say "  + wrote .agents/skills/$n (Codex: the $n rule, matched by task instead of by path)"
+        say "  + wrote .agents/skills/$n (Codex and Antigravity: the $n rule, matched by task instead of by path)"
       fi
     done
   fi
@@ -652,7 +652,7 @@ doctor() {
   dfail=0
   hr; say "the-agent-kit --check (doctor)"
   # The compatibility tuple: a measurement or a bug report means nothing without the tool versions.
-  for cli in claude codex; do
+  for cli in claude codex agy; do
     v=$($cli --version 2>/dev/null | head -1)
     [ -n "$v" ] && say "  OK:   $cli = $v" || say "  NOTE: $cli not on PATH"
   done
@@ -674,6 +674,8 @@ doctor() {
     case "$e" in *'"deny"'*) say "  OK:   wrapper-composed --no-verify is denied" ;; *) dfail=1; say "  FAIL: wrapper-composed --no-verify NOT denied" ;; esac
     g=$(printf '%s' '{"tool_input":{"command":"printf x >> .git/config"}}' | $py "$KIT/hooks/command-guard.py" --decision deny 2>/dev/null)
     case "$g" in *'"deny"'*) say "  OK:   direct .git/config write is flagged" ;; *) dfail=1; say "  FAIL: direct .git/config write NOT flagged" ;; esac
+    a=$(printf '%s' '{"toolCall":{"name":"run_command","args":{"CommandLine":"git push --force"}}}' | $py "$KIT/hooks/command-guard.py" --tool antigravity 2>/dev/null)
+    case "$a" in *'"decision": "deny"'*) say "  OK:   command-guard answers Antigravity (force-push denied)" ;; *) dfail=1; say "  FAIL: command-guard gave Antigravity no decision for a force-push" ;; esac
   fi
   for h in commit-msg pre-commit pre-push; do
     if [ -x "$KIT/hooks/$h" ]; then say "  OK:   hooks/$h present + executable"; else say "  WARN: hooks/$h missing or not executable"; fi
@@ -735,8 +737,10 @@ doctor() {
     elif [ "$ab" -gt 32768 ]; then
       dfail=1; say "  FAIL: AGENTS.md is $ab bytes - Codex SILENTLY truncates past 32768 (project_doc_max_bytes)."
       say "        That cap applies to the COMBINED AGENTS.md chain read root-to-leaf, so nested files count too."
+    elif [ "$ab" -gt 24000 ]; then
+      say "  WARN: AGENTS.md is $ab bytes - Antigravity cuts each rules file at 24000 bytes."
     else
-      say "  OK:   AGENTS.md $ab bytes (Codex silently truncates the combined chain past 32768)"
+      say "  OK:   AGENTS.md $ab bytes (Codex truncates past 32768, Antigravity each file past 24000)"
     fi
     # Claude Code docs, Memory > Write effective instructions: "target under 200 lines per CLAUDE.md
     # file. Longer files consume more context and reduce adherence." Block-level HTML comments are
@@ -786,6 +790,12 @@ doctor() {
     else
       say "  NOTE: no .claude/rules here - the deep conditional rules are not installed. Run ./install.sh"
       say "        in this repo to add them (they cost nothing until a matching file is opened)."
+    fi
+    # Antigravity: the guard is a workspace hook, so it is per project, not machine-wide.
+    if grep -q '"the-agent-kit"' .agents/hooks.json 2>/dev/null && [ -f .agents/agent-kit-guard.py ]; then
+      say "  OK:   Antigravity guard wired (.agents/hooks.json + .agents/agent-kit-guard.py)"
+    elif [ -d .agents ]; then
+      say "  NOTE: Antigravity guard not wired in this project - run ./install.sh --update-rules here."
     fi
     if [ -e CLAUDE.md ]; then
       if grep -q '@AGENTS.md' CLAUDE.md 2>/dev/null; then
