@@ -442,7 +442,7 @@ def main():
         cmd = (call.get("args") or {}).get("CommandLine", "")
     else:
         cmd = data.get("tool_input", {}).get("command", "")
-    if not cmd:
+    if not isinstance(cmd, str) or not cmd:
         sys.exit(0)
     cmd = strip_message_heredocs(cmd)   # a commit message is data, not commands (see _MSG_HEREDOC)
     # Grants only exist in Claude ask-mode; Codex (deny) never consults them.

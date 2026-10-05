@@ -241,9 +241,11 @@ merge_ag_hooks() {  # $1 = .agents/hooks.json. Add-only: the user's own hook ent
   py=$(detect_py)
   if [ -z "$py" ]; then say "  ! no Python 3 found - Antigravity guard hook not written (the guard needs it)."; return 0; fi
   r=$($py - "$1" "$py agent-kit-guard.py --tool antigravity" <<'MERGE'
-import json, os, sys
+import json, os, sys, tempfile
 path, cmd = sys.argv[1], sys.argv[2]
 data = {}
+if os.path.islink(path):
+    print("symlink"); sys.exit(0)
 if os.path.exists(path):
     try:
         with open(path, encoding="utf-8") as f:
@@ -256,14 +258,17 @@ if "the-agent-kit" in data:
     print("kept"); sys.exit(0)
 data["the-agent-kit"] = {"PreToolUse": [{"matcher": "run_command", "hooks": [
     {"type": "command", "command": cmd, "timeout": 15}]}]}
-with open(path, "w", encoding="utf-8", newline="\n") as f:
+fd, tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(path)), prefix=".hooks.", suffix=".tmp")
+with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
     json.dump(data, f, indent=2); f.write("\n")
+os.replace(tmp, path)   # a kill mid-write must never leave the user's hooks.json half written
 print("added")
 MERGE
 )
   case "$r" in
     added)      say "  + wired the command guard into .agents/hooks.json (Antigravity)" ;;
     unreadable) say "  ! .agents/hooks.json is not a JSON object - left untouched; the Antigravity guard is NOT wired." ;;
+    symlink)    say "  ! .agents/hooks.json is a symlink - left untouched; the Antigravity guard is NOT wired." ;;
   esac
 }
 
@@ -276,14 +281,14 @@ install_antigravity() {  # $1 = repo root. Antigravity reads AGENTS.md and the .
   [ -z "$src" ] && [ -d "$KIT/rules" ] && src="$KIT/rules"
   for n in code-correctness tests; do
     [ -n "$src" ] && [ -e "$src/$n.md" ] || continue
-    if [ -e "$1/.agents/rules/$n.md" ]; then say "  = .agents/rules/$n.md already exists - left untouched."
+    if [ -e "$1/.agents/rules/$n.md" ] || [ -L "$1/.agents/rules/$n.md" ]; then say "  = .agents/rules/$n.md already exists - left untouched."
     else
       mkdir -p "$1/.agents/rules"; rule_to_glob "$src/$n.md" > "$1/.agents/rules/$n.md"
       say "  + wrote .agents/rules/$n.md (Antigravity: loads when a matching file is touched)"
     fi
   done
   mkdir -p "$1/.agents"
-  [ -e "$1/.agents/agent-kit-guard.py" ] || write_ag_launcher "$1/.agents/agent-kit-guard.py"
+  [ -e "$1/.agents/agent-kit-guard.py" ] || [ -L "$1/.agents/agent-kit-guard.py" ] || write_ag_launcher "$1/.agents/agent-kit-guard.py"
   merge_ag_hooks "$1/.agents/hooks.json"
 }
 
@@ -561,6 +566,7 @@ refresh_kit_owned() {  # $1 = repo root. Kit-NAMED rules and skills are kit-owne
         # The Codex copy of the same skill is kit-owned on the same terms.
         for t in .claude/skills .agents/skills; do
           tgt="$1/$t/$b/$fn"
+          [ -L "$tgt" ] && continue   # a symlink here is not the kit's file; never write through it
           if [ -e "$tgt" ] && ! cmp -s "$sf" "$tgt"; then
             cp -f "$sf" "$tgt"; say "  ~ refreshed $t/$b/$fn (kit-owned)"
           elif [ ! -e "$tgt" ] && [ -d "$1/$t/$b" ]; then
@@ -576,8 +582,8 @@ refresh_kit_owned() {  # $1 = repo root. Kit-NAMED rules and skills are kit-owne
     for r in "$src"/*.md; do
       [ -e "$r" ] || continue
       n=$(basename "$r" .md); d=$(codex_skill_desc "$n"); [ -n "$d" ] || continue
-      tgt="$1/.agents/skills/$n/SKILL.md"; [ -e "$tgt" ] || continue
-      tmp="$tgt.refresh.tmp"; rule_to_skill "$r" "$n" "$d" > "$tmp"
+      tgt="$1/.agents/skills/$n/SKILL.md"; [ -e "$tgt" ] && [ ! -L "$tgt" ] || continue
+      tmp=$(mktemp "$tgt.XXXXXX") || continue; rule_to_skill "$r" "$n" "$d" > "$tmp"
       if cmp -s "$tmp" "$tgt"; then rm -f "$tmp"
       else mv -f "$tmp" "$tgt"; say "  ~ refreshed .agents/skills/$n/SKILL.md (kit-owned; regenerated from $n.md)"; fi
     done
@@ -585,17 +591,17 @@ refresh_kit_owned() {  # $1 = repo root. Kit-NAMED rules and skills are kit-owne
   # Antigravity's glob rules and guard launcher are kit-owned on the same terms.
   if [ -n "$src" ]; then
     for n in code-correctness tests; do
-      tgt="$1/.agents/rules/$n.md"; [ -e "$tgt" ] && [ -e "$src/$n.md" ] || continue
-      tmp="$tgt.refresh.tmp"; rule_to_glob "$src/$n.md" > "$tmp"
+      tgt="$1/.agents/rules/$n.md"; [ -e "$tgt" ] && [ ! -L "$tgt" ] && [ -e "$src/$n.md" ] || continue
+      tmp=$(mktemp "$tgt.XXXXXX") || continue; rule_to_glob "$src/$n.md" > "$tmp"
       if cmp -s "$tmp" "$tgt"; then rm -f "$tmp"
       else mv -f "$tmp" "$tgt"; say "  ~ refreshed .agents/rules/$n.md (kit-owned; regenerated from $n.md)"; fi
     done
   fi
   tgt="$1/.agents/agent-kit-guard.py"
-  if [ -e "$tgt" ]; then
-    write_ag_launcher "$tgt.refresh.tmp"
-    if cmp -s "$tgt.refresh.tmp" "$tgt"; then rm -f "$tgt.refresh.tmp"
-    else mv -f "$tgt.refresh.tmp" "$tgt"; say "  ~ refreshed .agents/agent-kit-guard.py (kit-owned)"; fi
+  if [ -e "$tgt" ] && [ ! -L "$tgt" ] && tmp=$(mktemp "$tgt.XXXXXX"); then
+    write_ag_launcher "$tmp"
+    if cmp -s "$tmp" "$tgt"; then rm -f "$tmp"
+    else mv -f "$tmp" "$tgt"; say "  ~ refreshed .agents/agent-kit-guard.py (kit-owned)"; fi
   fi
 }
 
@@ -792,8 +798,25 @@ doctor() {
       say "        in this repo to add them (they cost nothing until a matching file is opened)."
     fi
     # Antigravity: the guard is a workspace hook, so it is per project, not machine-wide.
-    if grep -q '"the-agent-kit"' .agents/hooks.json 2>/dev/null && [ -f .agents/agent-kit-guard.py ]; then
+    hk="absent"
+    if [ -n "$py" ] && [ -f .agents/hooks.json ]; then
+      hk=$($py - .agents/hooks.json <<'HKCHK' 2>/dev/null
+import json, re, sys
+try:
+    c = json.load(open(sys.argv[1], encoding="utf-8"))["the-agent-kit"]["PreToolUse"][0]["hooks"][0]["command"]
+except Exception:
+    print("absent"); sys.exit(0)
+print("ok" if re.fullmatch(r"(python3?|py -3) agent-kit-guard\.py --tool antigravity", str(c)) else "other")
+HKCHK
+)
+    fi
+    if [ "$hk" = ok ] && [ -f .agents/agent-kit-guard.py ] && [ ! -L .agents/agent-kit-guard.py ]; then
       say "  OK:   Antigravity guard wired (.agents/hooks.json + .agents/agent-kit-guard.py)"
+      if [ ! -f "$HOME/.the-agent-kit/hooks/command-guard.py" ]; then
+        say "  WARN: the launcher has no guard to call (~/.the-agent-kit/hooks/command-guard.py missing): commands pass UNCHECKED. Run install.sh --setup."
+      fi
+    elif [ "$hk" = other ]; then
+      say "  WARN: the Antigravity guard command in .agents/hooks.json is not the kit's - it is not wired, whatever else it runs."
     elif [ -d .agents ]; then
       say "  NOTE: Antigravity guard not wired in this project - run ./install.sh --update-rules here."
     fi

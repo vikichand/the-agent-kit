@@ -624,6 +624,28 @@ else
     && pass "A5 --check reports the Antigravity guard and its wiring" \
     || bad "A5 --check says nothing (or the wrong thing) about Antigravity"
   rm -rf "$u"
+  # A6-A8: the Antigravity files are written into a project the user may not control. A planted symlink
+  # must never turn the kit's write into a write somewhere else, a hostile hooks.json must not pass the
+  # doctor, and an interrupted merge must not leave a half-written hooks.json.
+  u=$(mktemp -d) && vic=$(mktemp -d) && printf '{"keep":"me"}\n' > "$vic/victim.json"
+  (cd "$u" && git init -q && mkdir -p .agents/rules && MSYS=winsymlinks:nativestrict ln -s "$vic/victim.json" .agents/hooks.json \
+      && MSYS=winsymlinks:nativestrict ln -s "$vic/newfile" .agents/rules/tests.md.refresh.tmp 2>/dev/null \
+      && MSYS=winsymlinks:nativestrict ln -s "$vic/launcher" .agents/agent-kit-guard.py 2>/dev/null \
+      && sh "$KIT/install.sh" >/dev/null 2>&1; sh "$KIT/install.sh" --update-rules >/dev/null 2>&1)
+  if [ -L "$u/.agents/hooks.json" ]; then
+    [ "$(cat "$vic/victim.json")" = '{"keep":"me"}' ] && [ ! -e "$vic/newfile" ] && [ ! -e "$vic/launcher" ] \
+      && pass "A6 symlinks in .agents/ are never written through" \
+      || bad "A6 the installer wrote through a symlink: $(cat "$vic/victim.json") $(ls "$vic")"
+  else pass "A6 (this platform cannot create symlinks; skipped)"; fi
+  rm -rf "$u" "$vic"
+  u=$(mktemp -d) && (cd "$u" && git init -q && mkdir -p .agents && printf '{"the-agent-kit":{"PreToolUse":[{"matcher":"run_command","hooks":[{"command":"echo hostile"}]}]}}\n' > .agents/hooks.json \
+      && printf 'x\n' > .agents/agent-kit-guard.py && printf '# rules\n' > AGENTS.md)
+  o=$(cd "$u" && sh "$KIT/install.sh" --check 2>&1)
+  printf '%s' "$o" | grep -q 'OK:   Antigravity guard wired' \
+    && bad "A7 --check calls a hostile hooks.json wired" \
+    || { printf '%s' "$o" | grep -q 'Antigravity guard.*not the kit' && pass "A7 --check rejects a hooks.json whose guard command is not the kit's" \
+         || bad "A7 --check says nothing about a hostile Antigravity hook"; }
+  rm -rf "$u"
   # U18: the machine-wide share must hold the rules with an EMPTY block too. The README tells users who
   # prefer global rules to append the share's AGENTS.md to ~/.claude/CLAUDE.md, so a leak here would put
   # this repo's branch rules into every project they own.

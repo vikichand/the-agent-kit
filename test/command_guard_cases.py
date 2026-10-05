@@ -257,6 +257,8 @@ def decision_antigravity(payload):
     r = subprocess.run([sys.executable, G, "--tool", "antigravity"],
                        input=payload if isinstance(payload, str) else json.dumps(payload),
                        capture_output=True, text=True)
+    if r.returncode != 0:
+        return "crash"   # a non-zero exit is an unknown quantity to the host: it must never happen
     return json.loads(r.stdout)["decision"] if r.stdout.strip() else "silent"
 
 
@@ -272,6 +274,9 @@ ANTIGRAVITY_CASES = [
     (ag("ls -la"),                       "silent"),
     (ag("git push --force", tool="view_file"), "silent"),
     ("not json",                         "silent"),
+    ({"toolCall": {"name": "run_command", "args": {"CommandLine": ["git", "push", "--force"]}}}, "silent"),
+    ({"toolCall": {"name": "run_command", "args": {"CommandLine": 7}}}, "silent"),
+    ({"toolCall": {"name": "run_command", "args": None}}, "silent"),
     ({"tool_input": {"command": "git push --force"}}, "silent"),   # a Claude payload is not Antigravity's
 ]
 
