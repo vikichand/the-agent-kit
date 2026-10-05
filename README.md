@@ -228,7 +228,8 @@ It **never updates or installs anything itself**: running downloaded code at ses
 supply-chain shape the kit's rules forbid, so it only tells you what to run. It exits cleanly on every
 error, so an offline machine or a broken check never blocks a session, and when everything is current
 it prints nothing, so it costs no context. `--setup` wires it into Claude Code and Codex as a `SessionStart`
-hook (`hooks/kit-check.py`). To switch it off, set `AGENT_KIT_NO_UPDATE_CHECK=1`.
+hook (`hooks/kit-check.py`); Antigravity has no documented session-start hook, so it does not run there.
+To switch it off, set `AGENT_KIT_NO_UPDATE_CHECK=1`.
 
 ### Also worth having
 
@@ -298,9 +299,9 @@ and the installer is the adapter between them:
 | Tool-layer guard | `ask`, machine-wide | `deny`, machine-wide | asks every time, per project (`.agents/hooks.json`) |
 | Turn-scoped git grants | yes | no (deny mode; you push) | no (it asks; you approve) |
 | Session-start update check | yes | yes | no (Antigravity has no documented session-start hook) |
-| Measured | 40 cases, Sonnet | 7 cases, see [Limits](#limits) | 5 cases, small sample, see [Limits](#limits) |
+| Measured | 40 cases, Sonnet | 9 cases, see [Limits](#limits) | 5 cases, small sample, see [Limits](#limits) |
 
-**The guards** - hooks at the **git layer** (reorder-proof, covering Claude Code, Codex, plain `git`,
+**The guards** - hooks at the **git layer** (reorder-proof, covering Claude Code, Codex, Antigravity, plain `git`,
 and any MCP tool that shells out to `git`) plus the **tool layer**, a fast prompt-time veto. Full map
 in [`FEATURES.md`](FEATURES.md); the senior-engineer trait ledger with sources is
 [`docs/senior-engineer.md`](docs/senior-engineer.md).
@@ -452,10 +453,10 @@ Quick Start covers the usual path. The installer's modes:
 
 | Mode | Scope | What it does |
 |---|---|---|
-| `--setup` | machine | Copy the kit to `~/.the-agent-kit`, turn on its git hooks, and add it to your Claude Code and Codex settings: listed, asked, backed up. Safe to re-run. |
+| `--setup` | machine | Copy the kit to `~/.the-agent-kit`, turn on its git hooks, and add it to your Claude Code and Codex settings: listed, asked, backed up. Safe to re-run. Antigravity is wired per project, so this changes nothing under `~/.gemini`. |
 | `--update` | machine | Fetch the latest kit, check it is the kit, then run `--setup` from it. Needs no kit beside it, so one downloaded `install.sh` bootstraps everything. |
 | `--global` | machine | By hand: copy the kit and **print** the settings snippets and the git-hooks command for you to apply. |
-| *(none)* | project | Full rules - `AGENTS.md` plus a `CLAUDE.md` that imports it - the depth tier and skills for both tools (`.claude/` and `.agents/skills/`), and this repo's git hooks. |
+| *(none)* | project | Full rules - `AGENTS.md` plus a `CLAUDE.md` that imports it - the depth tier and skills for all three tools (`.claude/` for Claude Code, `.agents/` for Codex and Antigravity), and this repo's git hooks. |
 | `--extension` | project | Project block only, for when the universal rules already live in your global files, so nothing is duplicated into context. |
 | `--update-rules` | project | Replace the universal rules, keep `PROJECT-CONFIG` byte-for-byte. |
 | `--check` | project | Doctor: interpreter, guard firing, per-hook identity, settings wiring, rules-file size. |
@@ -592,7 +593,7 @@ Four config choices are deliberate, because the obvious "more locked down" setti
 ```bash
 ./install.sh --check                     # doctor: interpreter, guard firing, per-hook status, rules files
 sh test/run-tests.sh                     # git-layer hooks + doctor, end-to-end
-python3 test/command_guard_cases.py      # command-guard corpus (145 cases: guard + grants + intent)
+python3 test/command_guard_cases.py      # command-guard corpus (181 cases: guard + grants + intent + Antigravity)
 sh test/adherence/run.sh                 # do the SOFT rules actually fire? (costs tokens)
 ```
 
@@ -618,7 +619,7 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
   files is not seen by it. The git-layer hooks are the backstop; there is no local guard on MCP writes.
 - **The deny-lists are prefix-matched** (Claude's permission engine), so a reordered flag can slip a deny.
   The reorder-proof catch is the git layer.
-- **`--no-verify` skips git hooks.** It's denied at the tool/permission layer on both tools, the only place
+- **`--no-verify` skips git hooks.** It's denied at the tool/permission layer on all three tools, the only place
   it can be caught since git can't hook its own bypass, but a text parser is best-effort there too.
 - **`core.hooksPath` can be set via a *file*, not just a flag.** `command-guard` catches the CLI forms and
   flags direct `.git/config` writes, but a text scan can't read a config file it never sees. The durable
@@ -657,7 +658,7 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
   the guard is advisory against the agent itself, because `.agents/hooks.json` is a project file the agent
   can edit, so the git-layer hooks and server-side branch protection stay the backstop. Resuming a
   multi-turn conversation in the eval harness is untested, and macOS and Linux are untested.
-- **On Codex, seven cases measured; the rules never made it worse and rarely made it better.** The harness
+- **On Codex, nine cases measured, with small samples and mixed results.** The harness
   has a Codex arm with the skills port. Object-level authorization and personal data in logs came back 3/3
   in both arms: Codex's default model already does what those rules ask, on prompts where Sonnet needed the
   rule. For 0.5.0, the never-assume cases 39 and 40 are 3/3 against v0.4.0's 3/3 on `gpt-6-astra`, and case

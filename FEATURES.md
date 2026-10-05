@@ -83,7 +83,7 @@ too, which would load them twice.
 
 Some guidance is triggered by *what you are doing*, not by *which file you opened* - so it fits neither
 `AGENTS.md` (always-on, budget-capped) nor `.claude/rules/` (path-triggered). Skills are the right home:
-only the short `description` sits in context, and the body loads when a task matches it. Both tools read
+only the short `description` sits in context, and the body loads when a task matches it. All three tools read
 the same SKILL.md format, so the installer writes each skill to `.claude/skills/` for Claude Code and
 `.agents/skills/` for Codex and Antigravity, and `--update-rules` keeps the two copies identical. Skills
 route to detail in `references/`, opened only when the task needs it, and the installer copies the whole
@@ -131,14 +131,14 @@ folder.
   dashes, filler openers and hedges, *delve / leverage / seamless / robust / comprehensive*, emoji
   headings), symbols written out in words, and the README order - working path first, a runnable
   command in the first screenful, every command surface as a table, shell differences named. Fires on
-  documentation, README, commit-message and PR-description work; ships to both tools' skills folders.
+  documentation, README, commit-message and PR-description work; ships to both skills folders (`.claude/skills/` and `.agents/skills/`).
 
 Honest labelling inside the skill: the contract-freeze pattern and the verify-RED gate are
 **well-reasoned practice, not measured results**, and it says so rather than inventing authority.
 
 ## The guards: enforcement, two tiers
 
-**Git layer** (reorder-proof; covers Claude Code, Codex, plain `git`, git-shelling MCP):
+**Git layer** (reorder-proof; covers Claude Code, Codex, Antigravity, plain `git`, git-shelling MCP):
 
 - **`pre-commit`** blocks a commit that stages a secret. Seven built-in high-signal patterns
   (AWS · OpenAI/Stripe · GitHub · Slack · Google · private-key · JWT), no dependency; `gitleaks` too if present. Fail-closed; never prints the secret.
@@ -193,7 +193,7 @@ projects); silent otherwise; never updates or installs anything itself. Off with
   list (Codex excludes secret names by default, and a broad one strips `DATABASE_URL` and breaks builds invisibly).
   **`codex/hooks.json`** wires the deny-mode hook.
 - **`install.sh`**: six modes, default (full rules) · `--extension` (lean, extends global) · `--setup` (machine-wide: copies the kit, turns on the
-  git hooks and adds the kit to your Claude Code and Codex settings, add-only, asked and backed up; `setup/merge-settings.py`) ·
+  git hooks and adds the kit to your Claude Code and Codex settings, add-only, asked and backed up; `setup/merge-settings.py`; Antigravity is wired per project) ·
   `--global` (machine-wide by hand: prints the snippets) ·
   `--update` (**also the installer**: a lone `install.sh` with no kit beside it bootstraps the whole thing,
   so distribution is one curl-able file - no clone, no package manager. Pulls the latest kit from GitHub
@@ -221,7 +221,7 @@ projects); silent otherwise; never updates or installs anything itself. Off with
   second run no-ops, a non-kit repo is refused without clobbering the install, an update run from the
   *installed* copy stays clean, and `update_kit` still hands off with `exec` - without which `--global`
   overwrites the running script and the shell resumes at a stale byte offset inside the new file)
-  + `command_guard_cases.py` (145 cases: guard classification + turn-scoped grants + intent detection).
+  + `command_guard_cases.py` (181 cases: guard classification + turn-scoped grants + intent detection + the Antigravity contract).
   **`test/adherence/`** answers the question the rest of `test/` cannot: the hooks and permission rules are
   proven, but ~34 rule families are *guidance*, and guidance degrades. Ten realistic scenarios run twice - with
   the rules present and without - graded by a separate judge that sees only the rubric and the transcript

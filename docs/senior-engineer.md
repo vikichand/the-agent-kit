@@ -9,7 +9,7 @@ idea twice.
 |---|---|---|
 | I - universal discipline | `AGENTS.md` safety invariants + Sections 0-9 | every turn, every repo |
 | II - product quality bars | the project block, written by `docs/project-setup-prompt.md` | every turn, in user-facing repos |
-| III - web security | `claude/rules/web-security.md` + `ci-cd.md` (Codex: `.agents/skills/`) | on matching paths or tasks |
+| III - web security | `claude/rules/web-security.md` + `ci-cd.md` (Codex and Antigravity: `.agents/skills/`) | on matching paths or tasks |
 | IV - launch readiness | `docs/web-checklists.md` | on demand, before a public launch |
 
 ## The organizing idea

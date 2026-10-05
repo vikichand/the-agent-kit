@@ -1,14 +1,14 @@
 # Project setup prompt
 
 The universal rules are the floor; the per-project block is the multiplier. Run the prompt below in
-Claude Code or Codex **from inside the project**. It classifies the project (code / agent / both), reads
+Claude Code, Codex or Antigravity **from inside the project**. It classifies the project (code / agent / both), reads
 the repo (or asks if it's greenfield), and writes a tailored block into `CLAUDE.md` *only* between the
 `PROJECT-CONFIG` markers, leaving the universal rules untouched. Re-run it anytime; it replaces the
 block instead of stacking.
 
 Two notes:
 
-- It writes **`AGENTS.md`** only. That is the cross-tool file (Codex, Cursor, Aider, Copilot...), and the
+- It writes **`AGENTS.md`** only. That is the cross-tool file (Codex, Antigravity, Cursor, Aider, Copilot...), and the
   `CLAUDE.md` beside it is a one-line `@AGENTS.md` import, so Claude Code sees the same block with nothing
   to keep in sync.
 - **If your universal rules are global**, the block is all a project needs; it extends the global file.
@@ -65,9 +65,9 @@ Set up the AGENTS.md in this project for me.
    <!-- PROJECT-CONFIG:START --> and <!-- PROJECT-CONFIG:END -->. Replace anything already between them (no second
    block); if the markers aren't there, add them at the very bottom. DO NOT touch anything above the markers - the
    universal rules are the floor. If those universal rules ALREADY live globally (~/.claude/CLAUDE.md or
-   ~/.codex/AGENTS.md), this file EXTENDS them: write ONLY the block, never re-copy the ruleset. Keep the block tight
+   ~/.codex/AGENTS.md, ~/.gemini/AGENTS.md), this file EXTENDS them: write ONLY the block, never re-copy the ruleset. Keep the block tight
    and concrete - short bullets, real commands / paths / rules, no filler, ~15-25 lines (one screen, not a chapter);
-   the whole file must stay under ~200 effective lines and well under Codex's 32 KiB AGENTS.md limit (it's read on
+   the whole file must stay under ~200 effective lines and well under Codex's 32 KiB AGENTS.md limit and Antigravity's 24,000-byte one (it's read on
    every turn). If the block wants more room, trim the block - never the universal rules above it.
 
 4. SHOW me the block you wrote, plus one line on how you classified the project and why.
@@ -98,7 +98,7 @@ data views; no redundant explainer text under headings.
 **Checklists:** preparing a public launch -> open ~/.the-agent-kit/docs/web-checklists.md (launch readiness).
 Security rules need no pointer: on Claude Code .claude/rules/web-security.md self-loads on auth / api /
 webhook / payment paths and on edge config (nginx, Caddy, vercel.json, wrangler.toml, fly.toml,
-.htaccess); on Codex the same rules are the web-security skill in .agents/skills, matched by task.
+.htaccess); on Codex and Antigravity the same rules are the web-security skill in .agents/skills, matched by task.
 
 **A good run produces:** ...
 **Sources:** <allowed>   **Off-limits:** ...

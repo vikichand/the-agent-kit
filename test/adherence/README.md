@@ -596,7 +596,7 @@ as failures).
 Reading: the slimmer rules cost nothing on the two never-assume cases. Case 33 fails in both arms for the same
 reason as before (the agent changes no files and asks a question the repository already answers); it has never
 passed on Codex, so it is a standing gap in how Codex follows "look facts up before you ask", not a regression.
-Not measured: Opus, and Codex on the other 37 cases.
+Not measured: Opus, and Codex on the other 31 cases.
 
 ## What this does not tell you
 

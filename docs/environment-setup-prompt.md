@@ -68,7 +68,8 @@ State plainly what is already present. Everything below is measured against this
 
 Install at **user** scope so they apply to every project; which of the three you need depends on the
 profile you picked above. For Codex, the same servers are added with `codex mcp add <name> -- <command>`
-(for example `codex mcp add context7 -- npx -y @upstash/context7-mcp@latest`).
+(for example `codex mcp add context7 -- npx -y @upstash/context7-mcp@latest`). For Antigravity use `agy mcp add`
+(run `agy mcp add --help` for its arguments).
 
 **a. Context7** (library and framework documentation; this is what stops the agent answering API
 questions from stale training data).
@@ -128,7 +129,9 @@ claude mcp add chrome-devtools --scope user -- npx -y chrome-devtools-mcp@latest
 ### Step 3: Web and UI skills (Web and UI profile)
 
 Skip this step unless the profile is Web and UI. Both are plain skill folders, installed for Claude
-Code (`~/.claude/skills/`) and, if Codex is used, for Codex (`~/.agents/skills/`).
+Code (`~/.claude/skills/`) and, if Codex is used, for Codex (`~/.agents/skills/`). Antigravity reads a
+project's `.agents/skills/`; its own global skill folders are `~/.gemini/antigravity-cli/skills/` (the CLI)
+and `~/.gemini/config/skills/` (the app), which this prompt does not fill.
 
 - **Impeccable** ([pbakaus/impeccable](https://github.com/pbakaus/impeccable), Apache-2.0): a design
   workflow with commands and deterministic design checks. Follow its README, and install it as a
