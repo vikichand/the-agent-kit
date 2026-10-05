@@ -1,4 +1,10 @@
-<p align="center"><img src="assets/banner.png" alt="The Agent Kit: rules and guardrails for coding agents" width="100%"></p>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="assets/banner-light.png">
+    <img src="assets/banner-dark.png" alt="The Agent Kit: rules and guardrails for coding agents" width="100%">
+  </picture>
+</p>
 
 # The Agent Kit
 

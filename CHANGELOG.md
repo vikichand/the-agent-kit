@@ -24,7 +24,7 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ### Changed
 
-- The kit is now called **The Agent Kit** in the README, which opens with a banner. Generated reports
+- The kit is now called **The Agent Kit** in the README, which opens with a banner that follows your GitHub light or dark theme. Generated reports
   end with "GENERATED WITH THE AGENT KIT" and the repository link, no longer a personal name.
 - **`AGENTS.md` is about a fifth shorter** (155 effective lines, from 198) with the same rules: overlapping
   bullets merged, Section 8 folded into Section 2's plan rules, so Ownership and Documentation are now
