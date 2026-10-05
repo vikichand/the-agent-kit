@@ -423,6 +423,9 @@ install_global() {  # copy the kit, then PRINT the settings snippets for a hand 
   say "    $share/install.sh --check"
   say "Optional global rules (lets projects stay lean via --extension), review the merge first:"
   say "    cat \"$share/AGENTS.md\" >> ~/.claude/CLAUDE.md   ;   cat \"$share/AGENTS.md\" >> ~/.codex/AGENTS.md"
+  say "    mkdir -p ~/.gemini && cat \"$share/AGENTS.md\" >> ~/.gemini/AGENTS.md"
+  say "Antigravity: the guard hook stays per project; run $share/install.sh inside each project."
+  say "Antigravity has no documented session-start update check."
 }
 
 nat() { cygpath -m "$1" 2>/dev/null || printf '%s' "$1"; }   # a path Python and git accept on every OS
@@ -471,6 +474,7 @@ setup_machine() {  # --setup: everything a machine needs, applied with the user'
        say "  To add the kit's hooks, copy $share/git-hooks/* into that folder." ;;
   esac
   hr
+  say "Antigravity is wired per project: --setup changes nothing under ~/.gemini."
   if [ "$mrc" != 10 ] && [ "$sethooks" = 0 ]; then
     [ "$mrc" = 1 ] && { say "Fix the file named above (it could not be read safely), then run this again."; exit 1; }
     say "Already set up: your settings and git hooks carry the kit."

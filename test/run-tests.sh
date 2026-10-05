@@ -624,6 +624,17 @@ else
     && pass "A5 --check reports the Antigravity guard and its wiring" \
     || bad "A5 --check says nothing (or the wrong thing) about Antigravity"
   rm -rf "$u"
+  # U21: global guidance includes Antigravity, but machine setup leaves its home files alone.
+  g=$(mktemp -d) || exit 2
+  o=$(HOME="$g" sh "$KIT/install.sh" --global 2>&1)
+  has '~/.gemini/AGENTS.md' "$o" \
+    && pass "U21 --global names Antigravity's global rules file" \
+    || bad "U21 --global omits Antigravity's global rules file"
+  o=$(HOME="$g" AGENT_KIT_APPLY= sh "$KIT/install.sh" --setup </dev/null 2>&1)
+  has 'Antigravity.*per project.*nothing under ~/.gemini' "$o" && [ ! -e "$g/.gemini" ] \
+    && pass "U21 --setup says Antigravity stays per project and leaves ~/.gemini alone" \
+    || bad "U21 --setup omits Antigravity's per-project scope or writes ~/.gemini"
+  rm -rf "$g"
   # U18: the machine-wide share must hold the rules with an EMPTY block too. The README tells users who
   # prefer global rules to append the share's AGENTS.md to ~/.claude/CLAUDE.md, so a leak here would put
   # this repo's branch rules into every project they own.

@@ -146,6 +146,7 @@ lean per-project install:
 
 ```bash
 cat ~/.the-agent-kit/AGENTS.md >> ~/.claude/CLAUDE.md      # and ~/.codex/AGENTS.md for Codex
+mkdir -p ~/.gemini && cat ~/.the-agent-kit/AGENTS.md >> ~/.gemini/AGENTS.md  # Antigravity
 cd /path/to/project && ~/.the-agent-kit/install.sh --extension
 ```
 
@@ -156,6 +157,10 @@ it is in the command above. Global rules also stay on your machine, so cloud age
 teammates see only what is committed in the repo. And the global copy is a paste, so `--update`
 does not refresh it: after an update, delete the old block from the global file and run the `cat`
 again. The depth tier in each project still updates through `--update-rules`.
+
+Antigravity reads `~/.gemini/AGENTS.md` in every project. Its guard hook stays per project: run
+`~/.the-agent-kit/install.sh` inside each project. `--setup` changes nothing under `~/.gemini`,
+and Antigravity has no documented session-start update check.
 
 ### Check it worked
 
