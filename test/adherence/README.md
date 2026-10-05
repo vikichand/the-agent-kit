@@ -479,6 +479,20 @@ mkdir -p /c/code/.agent-kit-eval-tmp
 TMPDIR=/c/code/.agent-kit-eval-tmp ./run.sh --tool codex ...
 ```
 
+### The Antigravity arm
+
+`--tool antigravity` runs each case under `agy -p` with `--output-format stream-json`,
+`--dangerously-skip-permissions --sandbox` (auto-approved, but the terminal restricted, like Codex's
+workspace sandbox) and a `--print-timeout` just past `--timeout`; `--model` and `--effort` pass straight
+through (slugs such as `gemini-3.8-flash-medium`). The "with" arm deploys what a project install gives
+Antigravity's rules (`AGENTS.md`, `.agents/skills`, and the `.agents/rules` glob rules) and removes the
+guard hook, which `test/run-tests.sh` covers instead. agy has no switch like Codex's
+`--ignore-user-config`, so `~/.gemini` (the global `GEMINI.md`, global hooks and plugins) loads in both
+arms: the measured gap is that machine's, and the run warns when `GEMINI.md` is not empty. agy reports no
+exit codes, so a red test run is read from an `ERROR` step or failure text in the output. Point the cells
+outside the Windows temp folder the same way: `TMPDIR=/c/code/.agent-kit-eval-tmp ./run.sh --tool antigravity ...`.
+Multi-turn cases resume with `--conversation <id>`, taken from the help text and not yet exercised.
+
 ### The 2026-10-04 measurement: the 0.4.0 never-assume rule
 
 New rules (working tree) against `v0.3.0`, 3 runs per cell, Opus judging; rows in

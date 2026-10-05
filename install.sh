@@ -189,7 +189,7 @@ install_codex_skills() {  # $1 = repo root. Everything Codex can load lazily, in
       else
         mkdir -p "$1/.agents/skills/$b"
         cp -r "$sd." "$1/.agents/skills/$b/"
-        say "  + wrote .agents/skills/$b (Codex: loads when a task matches it)"
+        say "  + wrote .agents/skills/$b (Codex and Antigravity: loads when a task matches it)"
       fi
     done
   fi
@@ -204,12 +204,87 @@ install_codex_skills() {  # $1 = repo root. Everything Codex can load lazily, in
       else
         mkdir -p "$1/.agents/skills/$n"
         rule_to_skill "$r" "$n" "$d" > "$1/.agents/skills/$n/SKILL.md"
-        say "  + wrote .agents/skills/$n (Codex: the $n rule, matched by task instead of by path)"
+        say "  + wrote .agents/skills/$n (Codex and Antigravity: the $n rule, matched by task instead of by path)"
       fi
     done
   fi
   [ -n "$skipped" ] && say "  = not ported to Codex skills:$skipped - path-shaped (any source / test file), no honest task trigger; Codex has their one-line versions in AGENTS.md."
   return 0
+}
+
+rule_to_glob() {  # $1 = rule file -> Antigravity glob rule on stdout: `paths:` list -> one `globs:` string
+  awk 'NR==1 && $0=="---" {fm=1; next}
+       fm==1 && /^---$/ {printf "---\ntrigger: glob\nglobs: \"%s\"\n---\n", g; fm=2; next}
+       fm==1 { if (match($0, /^ *- *"[^"]*"/)) { p=$0; sub(/^ *- *"/, "", p); sub(/".*$/, "", p); g = g (g=="" ? "" : ", ") p }; next }
+       {print}' "$1"
+}
+
+write_ag_launcher() {  # $1 = target. Antigravity splits a hook command on whitespace and ignores quotes,
+  # so a guard path under a home folder with a space breaks the hook, and a broken hook blocks every
+  # command. Hooks run from the folder holding hooks.json, so this launcher sits there, is called by
+  # bare name, and hands the call to the machine-wide guard.
+  cat > "$1" <<'LAUNCH'
+# The Agent Kit: launcher for the command guard (see .agents/hooks.json). Kit-owned; --update-rules
+# replaces it. Antigravity cannot pass a quoted path to a hook, so the guard is found from here.
+import os, runpy, sys
+
+guard = os.path.join(os.path.expanduser("~"), ".the-agent-kit", "hooks", "command-guard.py")
+if not os.path.isfile(guard):
+    sys.stderr.write("the-agent-kit: no guard at %s; run install.sh --setup. Command not checked.\n" % guard)
+    sys.exit(0)
+sys.argv = [guard] + sys.argv[1:]
+runpy.run_path(guard, run_name="__main__")
+LAUNCH
+}
+
+merge_ag_hooks() {  # $1 = .agents/hooks.json. Add-only: the user's own hook entries are never touched.
+  py=$(detect_py)
+  if [ -z "$py" ]; then say "  ! no Python 3 found - Antigravity guard hook not written (the guard needs it)."; return 0; fi
+  r=$($py - "$1" "$py agent-kit-guard.py --tool antigravity" <<'MERGE'
+import json, os, sys
+path, cmd = sys.argv[1], sys.argv[2]
+data = {}
+if os.path.exists(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except ValueError:
+        print("unreadable"); sys.exit(0)
+if not isinstance(data, dict):
+    print("unreadable"); sys.exit(0)
+if "the-agent-kit" in data:
+    print("kept"); sys.exit(0)
+data["the-agent-kit"] = {"PreToolUse": [{"matcher": "run_command", "hooks": [
+    {"type": "command", "command": cmd, "timeout": 15}]}]}
+with open(path, "w", encoding="utf-8", newline="\n") as f:
+    json.dump(data, f, indent=2); f.write("\n")
+print("added")
+MERGE
+)
+  case "$r" in
+    added)      say "  + wired the command guard into .agents/hooks.json (Antigravity)" ;;
+    unreadable) say "  ! .agents/hooks.json is not a JSON object - left untouched; the Antigravity guard is NOT wired." ;;
+  esac
+}
+
+install_antigravity() {  # $1 = repo root. Antigravity reads AGENTS.md and the .agents/skills Codex gets
+  # (the three skills and four domain rules). What only it has: glob-triggered rules, for the two
+  # path-shaped depth files Codex skips, and a workspace PreToolUse hook for the command guard. The four
+  # domain rules stay skills only; writing them here too would load them twice.
+  src=""
+  [ -d "$KIT/claude/rules" ] && src="$KIT/claude/rules"
+  [ -z "$src" ] && [ -d "$KIT/rules" ] && src="$KIT/rules"
+  for n in code-correctness tests; do
+    [ -n "$src" ] && [ -e "$src/$n.md" ] || continue
+    if [ -e "$1/.agents/rules/$n.md" ]; then say "  = .agents/rules/$n.md already exists - left untouched."
+    else
+      mkdir -p "$1/.agents/rules"; rule_to_glob "$src/$n.md" > "$1/.agents/rules/$n.md"
+      say "  + wrote .agents/rules/$n.md (Antigravity: loads when a matching file is touched)"
+    fi
+  done
+  mkdir -p "$1/.agents"
+  [ -e "$1/.agents/agent-kit-guard.py" ] || write_ag_launcher "$1/.agents/agent-kit-guard.py"
+  merge_ag_hooks "$1/.agents/hooks.json"
 }
 
 install_project() {   # self-contained: full rules + git hooks
@@ -225,6 +300,7 @@ install_project() {   # self-contained: full rules + git hooks
   install_path_rules "$root"
   install_skills "$root"
   install_codex_skills "$root"
+  install_antigravity "$root"
   install_git_hooks "$root"
   hr
   say "Tool-layer guard is machine-wide - run once:  ./install.sh --setup   then:  ./install.sh --check"
@@ -244,6 +320,7 @@ install_extension() { # lean: project-config stub + git hooks
   install_path_rules "$root"
   install_skills "$root"
   install_codex_skills "$root"
+  install_antigravity "$root"
   install_git_hooks "$root"
 }
 
@@ -505,6 +582,21 @@ refresh_kit_owned() {  # $1 = repo root. Kit-NAMED rules and skills are kit-owne
       else mv -f "$tmp" "$tgt"; say "  ~ refreshed .agents/skills/$n/SKILL.md (kit-owned; regenerated from $n.md)"; fi
     done
   fi
+  # Antigravity's glob rules and guard launcher are kit-owned on the same terms.
+  if [ -n "$src" ]; then
+    for n in code-correctness tests; do
+      tgt="$1/.agents/rules/$n.md"; [ -e "$tgt" ] && [ -e "$src/$n.md" ] || continue
+      tmp="$tgt.refresh.tmp"; rule_to_glob "$src/$n.md" > "$tmp"
+      if cmp -s "$tmp" "$tgt"; then rm -f "$tmp"
+      else mv -f "$tmp" "$tgt"; say "  ~ refreshed .agents/rules/$n.md (kit-owned; regenerated from $n.md)"; fi
+    done
+  fi
+  tgt="$1/.agents/agent-kit-guard.py"
+  if [ -e "$tgt" ]; then
+    write_ag_launcher "$tgt.refresh.tmp"
+    if cmp -s "$tgt.refresh.tmp" "$tgt"; then rm -f "$tgt.refresh.tmp"
+    else mv -f "$tgt.refresh.tmp" "$tgt"; say "  ~ refreshed .agents/agent-kit-guard.py (kit-owned)"; fi
+  fi
 }
 
 update_rules() {  # refresh the universal rules in this repo's AGENTS.md, preserving its PROJECT-CONFIG block
@@ -553,13 +645,14 @@ update_rules() {  # refresh the universal rules in this repo's AGENTS.md, preser
   install_path_rules "$root"
   install_skills "$root"
   install_codex_skills "$root"
+  install_antigravity "$root"
 }
 
 doctor() {
   dfail=0
   hr; say "the-agent-kit --check (doctor)"
   # The compatibility tuple: a measurement or a bug report means nothing without the tool versions.
-  for cli in claude codex; do
+  for cli in claude codex agy; do
     v=$($cli --version 2>/dev/null | head -1)
     [ -n "$v" ] && say "  OK:   $cli = $v" || say "  NOTE: $cli not on PATH"
   done
@@ -581,6 +674,8 @@ doctor() {
     case "$e" in *'"deny"'*) say "  OK:   wrapper-composed --no-verify is denied" ;; *) dfail=1; say "  FAIL: wrapper-composed --no-verify NOT denied" ;; esac
     g=$(printf '%s' '{"tool_input":{"command":"printf x >> .git/config"}}' | $py "$KIT/hooks/command-guard.py" --decision deny 2>/dev/null)
     case "$g" in *'"deny"'*) say "  OK:   direct .git/config write is flagged" ;; *) dfail=1; say "  FAIL: direct .git/config write NOT flagged" ;; esac
+    a=$(printf '%s' '{"toolCall":{"name":"run_command","args":{"CommandLine":"git push --force"}}}' | $py "$KIT/hooks/command-guard.py" --tool antigravity 2>/dev/null)
+    case "$a" in *'"decision": "deny"'*) say "  OK:   command-guard answers Antigravity (force-push denied)" ;; *) dfail=1; say "  FAIL: command-guard gave Antigravity no decision for a force-push" ;; esac
   fi
   for h in commit-msg pre-commit pre-push; do
     if [ -x "$KIT/hooks/$h" ]; then say "  OK:   hooks/$h present + executable"; else say "  WARN: hooks/$h missing or not executable"; fi
@@ -642,8 +737,10 @@ doctor() {
     elif [ "$ab" -gt 32768 ]; then
       dfail=1; say "  FAIL: AGENTS.md is $ab bytes - Codex SILENTLY truncates past 32768 (project_doc_max_bytes)."
       say "        That cap applies to the COMBINED AGENTS.md chain read root-to-leaf, so nested files count too."
+    elif [ "$ab" -gt 24000 ]; then
+      say "  WARN: AGENTS.md is $ab bytes - Antigravity cuts each rules file at 24000 bytes."
     else
-      say "  OK:   AGENTS.md $ab bytes (Codex silently truncates the combined chain past 32768)"
+      say "  OK:   AGENTS.md $ab bytes (Codex truncates past 32768, Antigravity each file past 24000)"
     fi
     # Claude Code docs, Memory > Write effective instructions: "target under 200 lines per CLAUDE.md
     # file. Longer files consume more context and reduce adherence." Block-level HTML comments are
@@ -693,6 +790,12 @@ doctor() {
     else
       say "  NOTE: no .claude/rules here - the deep conditional rules are not installed. Run ./install.sh"
       say "        in this repo to add them (they cost nothing until a matching file is opened)."
+    fi
+    # Antigravity: the guard is a workspace hook, so it is per project, not machine-wide.
+    if grep -q '"the-agent-kit"' .agents/hooks.json 2>/dev/null && [ -f .agents/agent-kit-guard.py ]; then
+      say "  OK:   Antigravity guard wired (.agents/hooks.json + .agents/agent-kit-guard.py)"
+    elif [ -d .agents ]; then
+      say "  NOTE: Antigravity guard not wired in this project - run ./install.sh --update-rules here."
     fi
     if [ -e CLAUDE.md ]; then
       if grep -q '@AGENTS.md' CLAUDE.md 2>/dev/null; then

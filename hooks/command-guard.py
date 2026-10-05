@@ -399,7 +399,14 @@ def split_ops(cmd):
     return parts
 
 
+ANTIGRAVITY = False   # set by --tool antigravity: its PreToolUse contract differs from Claude's and Codex's
+
+
 def emit(decision, reason):
+    if ANTIGRAVITY:
+        # Plain "ask" honours cached Always-Allow grants; force_ask makes each push its own question.
+        print(json.dumps({"decision": "force_ask" if decision == "ask" else decision, "reason": reason}))
+        sys.exit(0)
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PreToolUse", "permissionDecision": decision, "permissionDecisionReason": reason}}))
     sys.exit(0)
@@ -415,6 +422,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--decision", choices=("ask", "deny"), default="ask")
     ap.add_argument("--event", choices=("pretool", "userprompt"), default="pretool")
+    ap.add_argument("--tool", choices=("claude", "codex", "antigravity"), default="claude")
     args, _ = ap.parse_known_args()
     try:
         data = json.load(sys.stdin)
@@ -425,7 +433,15 @@ def main():
     if args.event == "userprompt":
         capture_intent(data)
         return
-    cmd = data.get("tool_input", {}).get("command", "")
+    if args.tool == "antigravity":
+        global ANTIGRAVITY
+        ANTIGRAVITY = True
+        args.decision = "ask"   # Antigravity can ask the user; there are no turn grants (no prompt hook)
+        call = data.get("toolCall")
+        call = call if isinstance(call, dict) and call.get("name") == "run_command" else {}
+        cmd = (call.get("args") or {}).get("CommandLine", "")
+    else:
+        cmd = data.get("tool_input", {}).get("command", "")
     if not cmd:
         sys.exit(0)
     cmd = strip_message_heredocs(cmd)   # a commit message is data, not commands (see _MSG_HEREDOC)

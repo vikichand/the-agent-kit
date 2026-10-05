@@ -5,13 +5,21 @@
 #   ./run.sh --case 03-blast-radius   one case
 #   ./run.sh --runs 3                 3 runs per cell (the results are noisy; see README)
 #   ./run.sh --model sonnet           model under test      (default: the CLI default)
-#   ./run.sh --effort low             Codex reasoning effort (default: the CLI default); recorded with the model
+#   ./run.sh --effort low             Codex / Antigravity reasoning effort (default: the CLI default); recorded with the model
 #   ./run.sh --judge-model opus       model doing the grading
 #   ./run.sh --timeout 900            seconds per call (default 600; the "with" arm is the slow one)
 #   ./run.sh --keep                   keep the working dirs for inspection
 #   ./run.sh --tool codex             run the agent under Codex instead of Claude Code (the judge stays
 #                                     Claude). The "with" arm then carries what a Codex install gets:
 #                                     AGENTS.md plus .agents/skills, built by the installer's own code.
+#   ./run.sh --tool antigravity       run the agent under Antigravity (`agy -p ... --output-format stream-json
+#                                     --dangerously-skip-permissions --sandbox --print-timeout`); --model passes to
+#                                     --model (slugs like gemini-3.8-flash-medium), --effort to --effort.
+#                                     The "with" arm carries what a project install gives Antigravity's
+#                                     RULES: AGENTS.md, .agents/skills and the .agents/rules glob rules, but
+#                                     not its guard hook. CAVEAT: agy has no switch like Codex's
+#                                     --ignore-user-config, so ~/.gemini (GEMINI.md, global hooks, plugins)
+#                                     loads in BOTH arms; the measured gap is a floor on that machine.
 #   ./run.sh --arms with,without,current   add a third arm: the rules at --current-ref (default b79e756)
 #   ./run.sh --current-ref <git ref>  which shipped rules the "current" arm deploys
 #
@@ -55,7 +63,7 @@ while [ $# -gt 0 ]; do
     --tool)        TOOL="$2"; shift 2 ;;
     --arms)        ARMS="$2"; shift 2 ;;
     --current-ref) CURRENT_REF="$2"; shift 2 ;;
-    -h|--help)     sed -n '2,24p' "$0"; exit 0 ;;
+    -h|--help)     sed -n '2,31p' "$0"; exit 0 ;;
     *) echo "unknown option: $1"; exit 2 ;;
   esac
 done
@@ -65,7 +73,8 @@ command -v claude >/dev/null 2>&1 || { echo "FAIL: the 'claude' CLI is not on PA
 case "$TOOL" in
   claude) ;;
   codex)  command -v codex >/dev/null 2>&1 || { echo "FAIL: --tool codex but the 'codex' CLI is not on PATH."; exit 2; } ;;
-  *)      echo "FAIL: --tool must be claude or codex (got '$TOOL')."; exit 2 ;;
+  antigravity) command -v agy >/dev/null 2>&1 || { echo "FAIL: --tool antigravity but the 'agy' CLI is not on PATH."; exit 2; } ;;
+  *)      echo "FAIL: --tool must be claude, codex or antigravity (got '$TOOL')."; exit 2 ;;
 esac
 [ -f "$KIT/AGENTS.md" ] || { echo "FAIL: $KIT/AGENTS.md not found."; exit 2; }
 # Source the installer as a library: the Codex "with" arm is deployed by install_codex_skills, the
@@ -109,6 +118,9 @@ gms="$HOME/.claude/CLAUDE.md $HOME/.codex/AGENTS.md"
 # is not hookless either. Named, not silenced. config.toml - and with it the plugins and their
 # skills - is NOT in this list because the Codex arm runs with --ignore-user-config (see run_cell).
 [ "$TOOL" = codex ] && gms="$gms $HOME/.codex/hooks.json"
+# Antigravity's global rules file. Its global hooks and plugins load in both arms too and agy has no
+# switch to turn them off; that caveat is in the header, as there is no single file to check here.
+[ "$TOOL" = antigravity ] && gms="$gms $HOME/.gemini/GEMINI.md"
 for gm in $gms; do
   if [ -s "$gm" ]; then
     echo "WARNING: $gm ($(grep -c . "$gm") non-blank lines) loads in BOTH arms."
@@ -120,8 +132,11 @@ for gm in $gms; do
 done
 
 mflag=""; [ -n "$MODEL" ] && mflag="--model $MODEL"
-# Codex only: pin reasoning effort, so a run measures the setting its user actually runs.
-eflag=""; [ -n "$EFFORT" ] && eflag="-c model_reasoning_effort=\"$EFFORT\""
+# Codex and Antigravity: pin reasoning effort, so a run measures the setting its user actually runs.
+eflag=""
+if [ -n "$EFFORT" ]; then
+  case "$TOOL" in antigravity) eflag="--effort $EFFORT" ;; *) eflag="-c model_reasoning_effort=\"$EFFORT\"" ;; esac
+fi
 jflag=""; [ -n "$JUDGE" ] && jflag="--model $JUDGE"
 
 # What the agent may run inside the throwaway sandbox. Deliberately narrow: the test runners the
@@ -243,6 +258,17 @@ for line in open(sys.argv[1], encoding="utf-8", errors="replace"):
     if sys.argv[2] == "codex":
         if t == "turn.failed": msg = ((e.get("error") or {}).get("message") or "turn failed")
         elif t == "error" and not msg: msg = e.get("message") or "error"
+    elif sys.argv[2] == "antigravity":
+        # A denied or failed TOOL call is the agent's behaviour, not the provider's, so tool steps are
+        # not read here. Only a non-SUCCESS result, a failed agent step or a bare error event is.
+        # The failure shapes are inferred from the SUCCESS ones; none has been observed live yet.
+        ev = e.get("event"); su = e.get("step_update") or {}; r = e.get("result") or {}
+        def emsg(x, d):
+            er = x.get("error")
+            return str((er.get("message") if isinstance(er, dict) else er) or x.get("message") or d)
+        if ev == "result" and r.get("status") not in (None, "SUCCESS"): msg = emsg(r, str(r.get("status")))
+        elif ev == "step_update" and su.get("step_type") != "tool" and su.get("state") == "ERROR" and not msg: msg = emsg(su, "agent step failed")
+        elif ev == "error" and not msg: msg = emsg(e, "error")
     else:
         if t == "result" and (e.get("is_error") or e.get("subtype", "").startswith("error")):
             msg = str(e.get("result") or e.get("subtype") or "result error")
@@ -258,9 +284,10 @@ PY2
 # it cannot see the order things happened in. A case that needs ordering evidence ships a `trace`
 # file. Supported: `red-before-edit: <runner regex>` - the first edit to a non-test source file must
 # be preceded by a run of the test runner that FAILED (non-zero exit on Codex; is_error or a
-# failure word in the result on Claude). Text-based failure detection is a heuristic and is named as
+# failure word in the result on Claude; an ERROR step or a failure word in the output on Antigravity,
+# which reports no exit code). Text-based failure detection is a heuristic and is named as
 # such in the case README; a false negative here is a FAIL that a human should re-check under --keep.
-trace_check() {  # $1 = events file  $2 = tool (claude|codex)  $3 = trace spec line  -> prints OK or FAIL <reason>
+trace_check() {  # $1 = events file  $2 = tool (claude|codex|antigravity)  $3 = trace spec line  -> prints OK or FAIL <reason>
   for p in python python3; do
     r=$("$p" - "$1" "$2" "$3" <<'PY' 2>/dev/null
 import json, sys, re
@@ -292,6 +319,16 @@ for line in open(ev, encoding="utf-8", errors="replace"):
                 if s is not None and s[2] is None:
                     body = c.get("content"); txt = body if isinstance(body, str) else " ".join(x.get("text", "") for x in (body or []) if isinstance(x, dict))
                     s[2] = bool(c.get("is_error")) or bool(redtxt.search(txt or ""))
+    elif tool == "antigravity":
+        # Only a finished step (DONE or ERROR) counts; each tool call also emits an ACTIVE one first.
+        # run_command reports no exit code, so a run is red on ERROR state or a failure line in output.
+        s = e.get("step_update") or {}
+        if s.get("step_type") != "tool" or s.get("state") not in ("DONE", "ERROR"): continue
+        ti = s.get("tool_info") or {}; pr = ti.get("parameters") or {}; n = s.get("tool_name") or ti.get("name")
+        if n == "run_command":
+            seq.append(["run", pr.get("CommandLine", ""), s.get("state") == "ERROR" or bool(redtxt.search(str(ti.get("output") or "")))])
+        elif n in ("write_to_file", "replace_file_content", "multi_replace_file_content"):
+            seq.append(["edit", pr.get("TargetFile", ""), None])
     else:
         if e.get("type") != "item.completed": continue
         it = e.get("item") or {}
@@ -339,6 +376,52 @@ PY
   return 1
 }
 
+# Antigravity (`agy --output-format stream-json`) emits one event per line: `init` carries the
+# conversation id, `step_update` the tool steps (each ACTIVE, then DONE or ERROR) and agent text, and
+# `result` the final response, turn count and cumulative usage. Fields: thread | messages | usage.
+# `messages` is what the judge reads: each finished tool call on one line (command or path, plus the
+# error when it failed; never its output, which could carry the deployed rules to the judge), then
+# the final response. `usage` is in codex_usage's column order.
+ag_field() {  # $1 = events file  $2 = thread|messages|usage
+  for p in python python3; do
+    r=$("$p" - "$1" "$2" <<'PY' 2>/dev/null
+import json, sys
+want = sys.argv[2]; tid = ""; lines = []; deltas = []; res = None; calls = 0; edits = 0; su = {}
+EDITS = ("write_to_file", "replace_file_content", "multi_replace_file_content")
+for line in open(sys.argv[1], encoding="utf-8", errors="replace"):
+    try: e = json.loads(line)
+    except ValueError: continue
+    ev = e.get("event")
+    if ev == "init" and not tid: tid = e.get("conversation_id", "")
+    elif ev == "result": res = e.get("result") or {}
+    elif ev == "step_update":
+        s = e.get("step_update") or {}
+        if s.get("step_type") == "agent_response":
+            deltas.append(s.get("text_delta") or "")
+            if s.get("state") == "DONE":
+                for k, v in (s.get("usage") or {}).items():
+                    if isinstance(v, (int, float)): su[k] = su.get(k, 0) + v
+        elif s.get("step_type") == "tool" and s.get("state") in ("DONE", "ERROR"):
+            ti = s.get("tool_info") or {}; pr = ti.get("parameters") or {}; n = s.get("tool_name") or ti.get("name")
+            calls += 1; edits += n in EDITS
+            d = pr.get("CommandLine") or pr.get("TargetFile") or pr.get("AbsolutePath") or ""
+            er = ti.get("error") or {}
+            lines.append("[tool %s] %s%s" % (n, d, " -> ERROR: %s" % (er.get("message") if isinstance(er, dict) else er) if s.get("state") == "ERROR" else ""))
+if want == "thread": print(tid or (res or {}).get("conversation_id", ""))
+elif want == "messages":
+    final = (res or {}).get("response") or "".join(deltas)
+    print("\n".join(lines + ([final] if final else [])))
+elif want == "usage":
+    u = (res or {}).get("usage") or su
+    print("\t".join(str(x) for x in [(res or {}).get("num_turns", ""), calls, edits, u.get("input_tokens", ""),
+                                      u.get("output_tokens", ""), u.get("cache_read_tokens", ""), "", ""]))
+PY
+) || continue
+    printf '%s' "$r"; return 0
+  done
+  return 1
+}
+
 # Windows holds locks on files a just-exited process touched, so `rm -rf` on a sandbox loses a race
 # and prints "Device or resource busy" - leaving a throwaway repo behind on every affected run. Three
 # runs this week each leaked one, and they were cleaned by hand. Retry briefly, then say so rather
@@ -368,6 +451,12 @@ run_cell() {
       # What a Codex install actually gets: the floor, plus the depth tier as task-matched skills in
       # .agents/skills (four of six rules; see install_codex_skills). No .claude/ - Codex never reads it.
       ( KIT="$src"; install_codex_skills "$w" >/dev/null 2>&1 )
+    elif [ "$TOOL" = antigravity ]; then
+      # What an Antigravity project install gives its RULES: the Codex skills plus the two glob rules
+      # (install_antigravity). Its guard hook and launcher are removed: the eval measures rule
+      # adherence, and the guard is tested by test/run-tests.sh, not here.
+      ( KIT="$src"; install_codex_skills "$w" >/dev/null 2>&1; install_antigravity "$w" >/dev/null 2>&1 )
+      rm -f "$w/.agents/hooks.json" "$w/.agents/agent-kit-guard.py"
     else
       cp "$src/CLAUDE.md" "$w/CLAUDE.md"
       # The depth tier is most of the kit's content and until 2026-08-26 it was never deployed here,
@@ -447,6 +536,24 @@ run_cell() {
             </dev/null >"$ev" 2>>"$err" ); rc=$?
       fi
       tout=$(codex_field "$ev" messages)
+    elif [ "$TOOL" = antigravity ]; then
+      # Headless Antigravity: no permission prompts (a prompt in a non-interactive run is a hang), stdin
+      # closed, cwd = the sandbox. agy's own --print-timeout defaults to no limit; it is set just past
+      # the outer `timeout`, so a run that hits the budget still exits 124 and is recorded censored.
+      # agy exits 0 even when a tool call is denied; failures are read from the events.
+      ev="$w/.stderr.antigravity-turn$turn.jsonl"
+      cflag=""
+      if [ "$turn" -gt 1 ]; then
+        [ -n "$tid" ] || { echo "ERROR cannot resume: turn 1 produced no Antigravity conversation id"; \
+                           [ "$KEEP" -eq 0 ] && scrub "$w"; return 1; }
+        # By id, never -c/--continue ("the most recent conversation"), for the reason newsid gives.
+        cflag="--conversation $tid"
+      fi
+      ( cd "$w" && timeout "$TIMEOUT" agy -p "$(cat "$pf")" --output-format stream-json \
+          --dangerously-skip-permissions --sandbox --print-timeout "$((TIMEOUT + 30))s" $cflag $mflag $eflag \
+          </dev/null >"$ev" 2>>"$err" ); rc=$?
+      [ "$turn" -eq 1 ] && tid=$(ag_field "$ev" thread)
+      tout=$(ag_field "$ev" messages)
     else
       if [ "$turn" -eq 1 ]; then
         sflag=""; [ -n "$sid" ] && sflag="--session-id $sid"
@@ -472,14 +579,18 @@ $tout"
   # 127 means the CLI binary itself vanished - an npm self-update mid-run. Every later cell
   # would report ERROR and the suite would still print a confident-looking aggregate over them.
   # That has now happened three times. Abort loudly instead of publishing a number built on holes.
-  if [ "$rc" -eq 127 ] || grep -q "failed to run command '$TOOL'" "$err" 2>/dev/null; then
+  if [ "$rc" -eq 127 ] || grep -q "failed to run command '$([ "$TOOL" = antigravity ] && echo agy || echo "$TOOL")'" "$err" 2>/dev/null; then
     echo "ABORT the $TOOL CLI disappeared mid-run (exit 127) - almost certainly an npm self-update"
     [ "$KEEP" -eq 0 ] && scrub "$w"; return 1
   fi
   elapsed=$(( $(date +%s) - t_start )); censored=0
   # Telemetry columns: turns, tool calls, edits, tokens in/out, cache read/write, cost.
   tele="$(printf '\t\t\t\t\t\t\t')"
-  if [ "$TOOL" = codex ]; then tele=$(codex_usage "$w/.stderr.codex-turn1.jsonl"); else tele=$(claude_field "$w/.stderr.claude-turn1.jsonl" usage); fi
+  case "$TOOL" in
+    codex)       tele=$(codex_usage "$w/.stderr.codex-turn1.jsonl") ;;
+    antigravity) tele=$(ag_field "$w/.stderr.antigravity-turn1.jsonl" usage) ;;
+    *)           tele=$(claude_field "$w/.stderr.claude-turn1.jsonl" usage) ;;
+  esac
   [ -n "$tele" ] || tele=$(printf '							')
   # A timeout is an unsuccessful completion within budget AND a censored duration: the true time is
   # at least the budget. It is recorded with censored=1 and counted as a non-pass, never dropped and

@@ -577,6 +577,53 @@ else
     && pass "U15 --update-rules deploys and refreshes the Codex skills" \
     || bad "U15 --update-rules left the Codex skills missing or stale"
   rm -rf "$u"
+  # A1-A4: Antigravity. It already reads AGENTS.md and the .agents/skills Codex gets; the kit adds the
+  # two path-shaped rules as glob rules and the guard as a workspace PreToolUse hook. Antigravity splits
+  # a hook command on whitespace and ignores quotes (a quoted path with a space breaks the hook, and a
+  # broken hook blocks every command), so the hook calls a launcher beside hooks.json by bare name.
+  u=$(mktemp -d) && (cd "$u" && git init -q && mkdir -p .agents \
+      && printf '{"mine":{"Stop":[{"command":"echo bye"}]}}\n' > .agents/hooks.json \
+      && sh "$KIT/install.sh" >/dev/null 2>&1)
+  m=""
+  for n in code-correctness tests; do
+    f="$u/.agents/rules/$n.md"
+    body_a=$(awk 'fm<2 && /^---$/ {fm++; next} fm>=2 {print}' "$f" 2>/dev/null)
+    body_r=$(awk 'fm<2 && /^---$/ {fm++; next} fm>=2 {print}' "$KIT/claude/rules/$n.md")
+    { [ -f "$f" ] && grep -q '^trigger: glob$' "$f" && grep -q '^globs: ".*\*\*/\*\.' "$f" \
+      && ! grep -q '^paths:' "$f" && [ "$body_a" = "$body_r" ]; } || m="$m $n"
+  done
+  x=""; for n in web-security data-layer frontend-quality ci-cd; do [ -e "$u/.agents/rules/$n.md" ] && x="$x $n"; done
+  [ -z "$m" ] && [ -z "$x" ] \
+    && pass "A1 Antigravity glob rules: the 2 path-shaped rules, bodies unchanged, the 4 skills not doubled" \
+    || bad "A1 Antigravity rules wrong - bad:[$m] doubled:[$x]"
+  hj=$(wp "$u/.agents/hooks.json")
+  $PY -c "import json,sys; d=json.load(open(sys.argv[1])); h=d['the-agent-kit']['PreToolUse'][0]; c=h['hooks'][0]['command']; assert h['matcher']=='run_command' and 'mine' in d and c.endswith('agent-kit-guard.py --tool antigravity') and '\"' not in c" "$hj" 2>/dev/null \
+    && [ -f "$u/.agents/agent-kit-guard.py" ] \
+    && pass "A2 .agents/hooks.json wires the guard by bare name, keeps the user's own hooks" \
+    || bad "A2 .agents/hooks.json missing the guard, quoting a path, or dropping the user's hooks"
+  # A3: the launcher reaches the installed guard and answers in Antigravity's contract.
+  ah=$(mktemp -d); mkdir -p "$ah/.the-agent-kit/hooks"; cp "$KIT/hooks/command-guard.py" "$ah/.the-agent-kit/hooks/"
+  o=$(cd "$u/.agents" && printf '{"toolCall":{"name":"run_command","args":{"CommandLine":"git push --force"}}}' \
+      | HOME="$ah" USERPROFILE="$(wp "$ah")" $PY agent-kit-guard.py --tool antigravity 2>/dev/null)
+  printf '%s' "$o" | grep -q '"decision": "deny"' \
+    && pass "A3 the launcher runs the installed guard: a force push is denied" \
+    || bad "A3 the launcher did not deny a force push (got: $o)"
+  rm -rf "$ah"
+  # A4: --update-rules restores a stale launcher and glob rule, and re-adds a removed hook entry.
+  printf 'stale\n' > "$u/.agents/agent-kit-guard.py"; printf 'stale\n' > "$u/.agents/rules/tests.md"
+  printf '{"mine":{"Stop":[{"command":"echo bye"}]}}\n' > "$u/.agents/hooks.json"
+  (cd "$u" && sh "$KIT/install.sh" --update-rules >/dev/null 2>&1)
+  ! grep -q '^stale$' "$u/.agents/agent-kit-guard.py" && ! grep -q '^stale$' "$u/.agents/rules/tests.md" \
+    && grep -q '"the-agent-kit"' "$u/.agents/hooks.json" && grep -q '"mine"' "$u/.agents/hooks.json" \
+    && pass "A4 --update-rules refreshes the Antigravity launcher, rules and hook entry" \
+    || bad "A4 --update-rules left the Antigravity files stale or missing"
+  # A5: --check reports the Antigravity side - the guard answering in its contract, and the hook wired.
+  o=$(cd "$u" && sh "$KIT/install.sh" --check 2>&1)
+  printf '%s' "$o" | grep -q 'OK:   command-guard answers Antigravity' \
+    && printf '%s' "$o" | grep -q 'OK:   Antigravity guard wired' \
+    && pass "A5 --check reports the Antigravity guard and its wiring" \
+    || bad "A5 --check says nothing (or the wrong thing) about Antigravity"
+  rm -rf "$u"
   # U18: the machine-wide share must hold the rules with an EMPTY block too. The README tells users who
   # prefer global rules to append the share's AGENTS.md to ~/.claude/CLAUDE.md, so a leak here would put
   # this repo's branch rules into every project they own.
@@ -746,13 +793,24 @@ grep -q -- '--setup' "$KIT/install.sh" && awk '/^update_kit\(\)/,/^}/' "$KIT/ins
 # scored as ordinary FAILs, and a red-then-fix run scored as "edited before any failing test".
 # The functions are lifted out of run.sh so the checks run offline, with no agent and no tokens.
 (
-  eval "$(sed -n '/^events_error() {/,/^}/p;/^trace_check() {/,/^}/p' "$KIT/test/adherence/run.sh")"
+  eval "$(sed -n '/^events_error() {/,/^}/p;/^trace_check() {/,/^}/p;/^ag_field() {/,/^}/p' "$KIT/test/adherence/run.sh")"
   hf="$KIT/test/adherence/harness-fixtures"; spec='red-before-edit: (node --test|npm test)'
   case "$(events_error "$hf/codex-usage-limit.jsonl" codex)" in *"usage limit"*) pass "H1 codex usage limit read as a provider error" ;; *) bad "H1 codex usage limit NOT detected" ;; esac
   case "$(events_error "$hf/claude-session-limit.jsonl" claude)" in *"session limit"*) pass "H2 claude session limit read as a provider error" ;; *) bad "H2 claude session limit NOT detected" ;; esac
   case "$(trace_check "$hf/claude-red-then-edit.jsonl" claude "$spec")" in OK*) pass "H3 red run then source edit passes the trace" ;; *) bad "H3 red-then-edit FAILED the trace" ;; esac
   case "$(trace_check "$hf/claude-edit-after-green.jsonl" claude "$spec")" in FAIL*) pass "H4 edit after a green run ('# fail 0') fails the trace" ;; *) bad "H4 edit after a green run PASSED the trace" ;; esac
   case "$(trace_check "$hf/codex-piped-red.jsonl" codex "$spec")" in OK*) pass "H5 codex piped red run (exit 0) is read as red" ;; *) bad "H5 codex piped red run read as green" ;; esac
+  # H6-H10: the Antigravity arm reads agy's stream-json, which carries no exit codes.
+  ag="$hf/antigravity-edit-after-green.jsonl"
+  case "$(trace_check "$ag" antigravity "$spec")" in FAIL*money.js*) pass "H6 antigravity edit after a green run fails the trace" ;; *) bad "H6 antigravity edit after a green run PASSED the trace" ;; esac
+  case "$(trace_check "$hf/antigravity-red-then-edit.jsonl" antigravity "$spec")" in OK) pass "H7 antigravity piped red run then source edit passes the trace" ;; *) bad "H7 antigravity red-then-edit FAILED the trace" ;; esac
+  m=$(ag_field "$ag" messages)
+  if [ -z "$(events_error "$ag" antigravity)" ] && has 'run_command] rm -rf build -> ERROR: tool call denied by pre-tool hook' "$m" && has '^Fixed rounding in lib/money.js. The rm' "$m"; then
+    pass "H8 antigravity denied tool call reaches the judge transcript and is not a provider error"
+  else bad "H8 antigravity transcript or provider-error read wrong: $(events_error "$ag" antigravity) / $m"; fi
+  u=$(ag_field "$ag" usage | tr '\t' ',')
+  [ "$u" = "1,4,1,51234,812,40100,," ] && pass "H9 antigravity usage: turns, tool calls, edits, tokens in/out, cache read" || bad "H9 antigravity usage read as '$u'"
+  [ "$(ag_field "$ag" thread)" = "0b7e5c1a-4f2d-4a8e-9c3b-2d1f6e8a9b10" ] && pass "H10 antigravity conversation id read for resuming later turns" || bad "H10 antigravity conversation id not read"
 ) | tee "$w.h"; grep -q '^FAIL' "$w.h" 2>/dev/null && fail=1; rm -f "$w.h"
 
 echo "---"

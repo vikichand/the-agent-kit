@@ -3,8 +3,8 @@
 # The Agent Kit
 
 **Rules and guardrails that get a coding agent working like a senior engineer instead of an eager
-intern.** One install, wired for both [Claude Code](https://claude.com/claude-code) and
-[Codex](https://developers.openai.com/codex).
+intern.** One install, wired for [Claude Code](https://claude.com/claude-code),
+[Codex](https://developers.openai.com/codex) and [Antigravity](https://antigravity.google).
 
 The rules and guardrails I've worked out over the years of building with coding agents, packaged so
 your agents start where mine are now.
@@ -121,10 +121,12 @@ snippets instead.
 `~/.the-agent-kit/install.sh`, run inside a project, writes:
 
 - `AGENTS.md`, the rules, with an empty block at the bottom for this project's own settings;
-- a one-line `CLAUDE.md` that imports it, so Claude Code and Codex read the same file;
+- a one-line `CLAUDE.md` that imports it, so Claude Code, Codex and Antigravity read the same file;
 - `.claude/rules/`: deeper rules that load only when the agent opens a matching file (security rules on
   API code, accessibility rules on components), free the rest of the time;
-- the skills, in `.claude/skills/` for Claude Code and `.agents/skills/` for Codex.
+- the skills, in `.claude/skills/` for Claude Code and `.agents/skills/` for Codex and Antigravity;
+- for Antigravity, `.agents/rules/` (the two depth rules Codex can't take, loaded on matching files) and
+  the command guard as a workspace hook in `.agents/hooks.json`, with a small launcher beside it.
 
 It never overwrites an existing `AGENTS.md` or `CLAUDE.md`. `--update-rules` later replaces the
 universal rules and keeps the project's block byte for byte; anything hand-edited outside the block is
@@ -282,15 +284,16 @@ commit-message prose.
 **Which tool gets what.** The content is one set of markdown files; the *routing* differs per tool,
 and the installer is the adapter between them:
 
-| Layer | Claude Code | Codex |
-|---|---|---|
-| Floor (`AGENTS.md`) | via the one-line `CLAUDE.md` import | read directly |
-| Depth tier (6 rules) | `.claude/rules/`, loads by file path | 4 of 6 as `.agents/skills/`, loads by task match; the 2 path-shaped ones (`code-correctness`, `tests`) don't port and stay one-liners in the floor |
-| Task tier (3 skills) | `.claude/skills/` | `.agents/skills/`, same files |
-| Git-layer guards | yes | yes |
-| Tool-layer guard | `ask` | `deny` |
-| Turn-scoped git grants | yes | no (deny mode; you push) |
-| Measured | 31 cases, Sonnet | 2 cases so far, see [Limits](#limits) |
+| Layer | Claude Code | Codex | Antigravity |
+|---|---|---|---|
+| Floor (`AGENTS.md`) | via the one-line `CLAUDE.md` import | read directly | read directly |
+| Depth tier (6 rules) | `.claude/rules/`, loads by file path | 4 of 6 as `.agents/skills/`, loads by task match; the 2 path-shaped ones (`code-correctness`, `tests`) don't port and stay one-liners in the floor | the same 4 skills, plus the 2 path-shaped ones as glob rules in `.agents/rules/` |
+| Task tier (3 skills) | `.claude/skills/` | `.agents/skills/`, same files | `.agents/skills/`, shared with Codex |
+| Git-layer guards | yes | yes | yes |
+| Tool-layer guard | `ask`, machine-wide | `deny`, machine-wide | asks every time, per project (`.agents/hooks.json`) |
+| Turn-scoped git grants | yes | no (deny mode; you push) | no (it asks; you approve) |
+| Session-start update check | yes | yes | no (Antigravity has no documented session-start hook) |
+| Measured | 40 cases, Sonnet | a handful of cases, see [Limits](#limits) | not yet, see [Limits](#limits) |
 
 **The guards** - hooks at the **git layer** (reorder-proof, covering Claude Code, Codex, plain `git`,
 and any MCP tool that shells out to `git`) plus the **tool layer**, a fast prompt-time veto. Full map
@@ -432,7 +435,9 @@ decision record in [`docs/senior-engineer.md`](docs/senior-engineer.md) before u
 | **secret reads** | **asks**, naming the file (so "push my `.env` vars to Azure" is one click, and an injected "read the .env" can't pass silently) | `config.toml` (sandbox) |
 | **self-protection** | `deny` writes to `.git/hooks`, `.git/config`, settings; ask on rules files | `config.toml` (sandbox) |
 
-Codex has no `ask`, so where Claude prompts, Codex **denies** and you do it yourself. The git-layer hooks
+Codex has no `ask`, so where Claude prompts, Codex **denies** and you do it yourself. Antigravity gets
+the same guard as a workspace hook: its denials match Claude's, and where Claude asks it asks every
+time (`force_ask`), so an earlier "always allow" never covers a later push. The git-layer hooks
 run under `git` itself, so they survive flag-reordering, `--no-verify`, Codex, and MCP-driven commits.
 `command-guard.py` is the fast prompt-time catch on top.
 
@@ -633,6 +638,15 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
   reach at all (a high-risk plan checked against its failure modes, decay across a long session, proof in a real browser), are
   listed by name rather than folded into one fraction. Method, the full per-case tables, and that list
   are in [`test/adherence/README.md`](test/adherence/README.md).
+- **On Antigravity, the wiring is verified, the adherence is not yet measured.** Checked live on
+  Antigravity CLI 1.2.16 on Windows: `AGENTS.md` loads, the guard hook blocks a force push, and a denial
+  holds even under `--dangerously-skip-permissions` (which does auto-approve the guard's questions). Three
+  limits are Antigravity's own: it delivers a glob rule inside the tool output of the file that triggered
+  it, where a model may weigh it as untrusted content, so the two glob rules are the weakest link; it has
+  no documented session-start hook, so the update check does not run there; and it splits a hook command
+  on whitespace and ignores quotes, which is why the guard runs through a launcher in `.agents/`. The
+  launcher relies on hooks running from the folder that holds `hooks.json`, which was verified on
+  Windows only.
 - **On Codex, two cases measured, both pass with and without the kit.** The harness gained a Codex
   arm with the skills port, and the first two cases run (object-level authorization, personal data in
   logs) came back 3/3 in both arms: Codex's default model already does what those rules ask, on
