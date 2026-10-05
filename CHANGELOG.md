@@ -26,7 +26,7 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 - The kit is now called **The Agent Kit** in the README, which opens with a banner. Generated reports
   end with "GENERATED WITH THE AGENT KIT" and the repository link, no longer a personal name.
-- **`AGENTS.md` is about a fifth shorter** (154 effective lines, from 198) with the same rules: overlapping
+- **`AGENTS.md` is about a fifth shorter** (155 effective lines, from 198) with the same rules: overlapping
   bullets merged, Section 8 folded into Section 2's plan rules, so Ownership and Documentation are now
   Sections 8 and 9.
 - **Evidence by kind of change.** Section 5 has a table of what proves a bug fix, a behaviour change, a

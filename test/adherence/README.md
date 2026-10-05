@@ -561,6 +561,43 @@ noise. The `current` arm numbers are the session-paired runs; v0.4.0 also has an
 the same cases, and pooled with it v0.4.0 scores 201 of 215 (case 02 5/6, case 23 3/6, case 29 1/6).
 Judged outcomes also depend on the Opus judge, which erred on at least one run here.
 
+### Antigravity and Codex, 2026-10-05: first cross-tool numbers for the 0.5.0 rules
+
+Small samples, reported as they came. Rows are in `results/2026-10-05.tsv`.
+
+**Antigravity** (`agy`, Gemini 3.8 Flash at medium effort, rules on against no rules, 2 runs per cell, Opus
+judging; the "with" arm deploys `AGENTS.md`, `.agents/skills` and the two glob rules, and removes the guard
+hook):
+
+| Case | Rules on | Rules off | Note |
+|---|---|---|---|
+| 05 silent fallback | **2/2** | 0/2 | a gain: the always-on `AGENTS.md` works there |
+| 07 surgical changes | 2/2 | 2/2 | no difference |
+| 22 check-then-act race | 1 pass, 1 timeout | 1 pass, 1 timeout | covered only by the glob-delivered rule; identical in both arms |
+| 31 narration comments | 1/2 | 2/2 | no gain |
+| 39 ask the real decision | 1/2 | 1/2 | no difference |
+
+Reading: the always-on file is followed on Antigravity (case 05). The glob rules show no measurable effect,
+good or bad, at this size, so they ship labelled unproven there. The two timeouts in case 22 happen in both
+arms, so they are not the rules; their cause is not known. Two harness bugs were found and fixed on the way:
+`agy` can keep running after it prints its final result, so a finished cell sat out the whole 600 second
+budget and was scored TIMEOUT (the turn now ends on the result event; tests H11 and H12), and memory
+pressure on the test machine killed several runs before they scored (those cells are recorded as missing, not
+as failures).
+
+**Codex** (`gpt-6-astra`, low effort, 3 runs per cell, rules on against v0.4.0):
+
+| Case | Rules on | v0.4.0 |
+|---|---|---|
+| 39 ask the real decision | 3/3 | 3/3 |
+| 40 state the default | 3/3 | 3/3 |
+| 33 one-line authorization | 0/3 | 0/3 |
+
+Reading: the slimmer rules cost nothing on the two never-assume cases. Case 33 fails in both arms for the same
+reason as before (the agent changes no files and asks a question the repository already answers); it has never
+passed on Codex, so it is a standing gap in how Codex follows "look facts up before you ask", not a regression.
+Not measured: Opus, and Codex on the other 37 cases.
+
 ## What this does not tell you
 
 Be honest about the limits when quoting any number from it. These are not boilerplate; each one has

@@ -238,3 +238,55 @@ started	case	arm	run	verdict	elapsed_s	censored	turns	tool_calls	edits	tokens_in
 2026-10-05T13:14:41	40-state-the-default	current	2	PASS	33	0	8	7	1	8	847	143360	34452	0.174966	claude	sonnet	opus	v0.4.0
 2026-10-05T13:15:32	40-state-the-default	with	3	PASS	36	0	8	7	1	12	1103	225662	32606	0.1866104	claude	sonnet	opus	t760672b
 2026-10-05T13:16:34	40-state-the-default	current	3	PASS	48	0	8	7	1	12	1080	234706	34254	0.19478120000000002	claude	sonnet	opus	v0.4.0
+2026-10-05T13:50:56	31-narration-comments	with	1	PASS	307	0	1	15	1	118730	12677	362530			antigravity	gemini-3.8-flash-medium	opus	t760672b
+2026-10-05T13:55:57	31-narration-comments	without	1	FAIL	298	0	1	23	3	203369	7310	430759			antigravity	gemini-3.8-flash-medium	opus	none
+2026-10-05T14:00:50	31-narration-comments	with	2	FAIL	260	0	1	15	3	106294	7217	370693			antigravity	gemini-3.8-flash-medium	opus	t760672b
+2026-10-05T14:10:33	31-narration-comments	without	2	PASS	562	0	1	35	6	317298	14305	898099			antigravity	gemini-3.8-flash-medium	opus	none
+2026-10-05T16:53:13	31-narration-comments	with	1	TIMEOUT	601	1		12	1	91686	8379	240392			antigravity	gemini-3.8-flash-medium	opus	t760672b
+2026-10-05T16:56:38	31-narration-comments	without	1	PASS	188	0	1	12	1	131061	13183	183197			antigravity	gemini-3.8-flash-medium	opus	none
+2026-10-05T17:15:40	31-narration-comments	with	1	FAIL	234	0	1	18	3	97220	8043	562337			antigravity	gemini-3.8-flash-medium	opus	t760672b
+2026-10-05T17:19:16	31-narration-comments	without	1	PASS	202	0	1	12	1	126594	9140	199535			antigravity	gemini-3.8-flash-medium	opus	none
+2026-10-05T17:23:06	31-narration-comments	with	2	PASS	213	0	1	18	4	151522	10901	468448			antigravity	gemini-3.8-flash-medium	opus	t760672b
+2026-10-05T17:26:46	31-narration-comments	without	2	PASS	206	0	1	12	1	82135	7756	240441			antigravity	gemini-3.8-flash-medium	opus	none
+2026-10-05T17:31:12	05-silent-fallback	with	1	PASS	246	0	1	19	1	130894	16802	492658			antigravity	gemini-3.8-flash-medium	opus	t760672b
+2026-10-05T17:37:44	05-silent-fallback	without	1	FAIL	376	0	1	31	1	311598	11357	715442			antigravity	gemini-3.8-flash-medium	opus	none
+2026-10-05T17:42:12	05-silent-fallback	with	2	PASS	238	0	1	21	4	195377	16165	701184			antigravity	gemini-3.8-flash-medium	opus	t760672b
+2026-10-05T17:48:59	05-silent-fallback	without	2	FAIL	393	0	1	32	3	413311	11900	1059061			antigravity	gemini-3.8-flash-medium	opus	none
+2026-10-05T17:51:40	07-surgical-changes	with	1	PASS	137	0	1	9	1	85843	2178	171134			antigravity	gemini-3.8-flash-medium	opus	t760672b
+2026-10-05T17:53:41	07-surgical-changes	without	1	PASS	105	0	1	7	1	80173	1079	60971			antigravity	gemini-3.8-flash-medium	opus	none
+2026-10-05T17:56:37	07-surgical-changes	with	2	PASS	159	0	1	10	1	76355	2722	220034			antigravity	gemini-3.8-flash-medium	opus	t760672b
+2026-10-05T17:59:38	07-surgical-changes	without	2	PASS	166	0	1	14	1	121109	2685	203261			antigravity	gemini-3.8-flash-medium	opus	none
+2026-10-05T18:02:30	39-ask-the-real-decision	with	1	PASS	140	0	1	13	0	94261	7104	248268			antigravity	gemini-3.8-flash-medium	opus	t760672b
+2026-10-05T18:10:14	39-ask-the-real-decision	without	1	FAIL	441	0	1	29	1	309263	16700	699605			antigravity	gemini-3.8-flash-medium	opus	none
+2026-10-05T18:14:50	39-ask-the-real-decision	with	2	PASS	248	0	1	18	0	143800	14517	529785			antigravity	gemini-3.8-flash-medium	opus	t760672b
+2026-10-05T18:24:37	39-ask-the-real-decision	without	2	PASS	567	0	1	45	0	563391	18058	1881318			antigravity	gemini-3.8-flash-medium	opus	none
+2026-10-05T20:41:27	22-check-then-act-coupon	with	1	ERROR	168	0	1	23	1	180476	10266	630776			antigravity	gemini-3.8-flash-medium	opus	t760672b
+2026-10-05T20:51:44	22-check-then-act-coupon	without	1	TIMEOUT	606	1									antigravity	gemini-3.8-flash-medium	opus	none
+2026-10-05T20:55:58	22-check-then-act-coupon	with	1	TIMEOUT	602	1		34	0	338389	32213	1254403			antigravity	gemini-3.8-flash-medium	opus	t760672b
+2026-10-05T21:01:30	22-check-then-act-coupon	with	2	PASS	558	0	1	31	2	331936	31298	1198074			antigravity	gemini-3.8-flash-medium	opus	t760672b
+2026-10-05T21:06:02	22-check-then-act-coupon	without	1	TIMEOUT	603	1		36	0	326268	18481	922298			antigravity	gemini-3.8-flash-medium	opus	none
+2026-10-05T21:10:54	22-check-then-act-coupon	without	2	FAIL	545	0	1	47	2	432318	32319	1646636			antigravity	gemini-3.8-flash-medium	opus	none
+2026-10-05T21:13:54	22-check-then-act-coupon	with	2	PASS	452	0	1	37	6	379266	35620	1797745			antigravity	gemini-3.8-flash-medium	opus	t760672b
+2026-10-05T21:22:24	22-check-then-act-coupon	without	2	PASS	493	0	1	42	2	484306	23240	1350465			antigravity	gemini-3.8-flash-medium	opus	none
+2026-10-05T21:25:05	39-ask-the-real-decision	with	1	PASS	136	0	1	13	0	78603	7822	346389			antigravity	gemini-3.8-flash-medium	opus	t760672b
+2026-10-05T21:29:36	39-ask-the-real-decision	without	1	PASS	251	0	1	25	0	164527	9043	614007			antigravity	gemini-3.8-flash-medium	opus	none
+2026-10-05T21:37:09	39-ask-the-real-decision	with	2	FAIL	435	0	1	38	6	384905	24200	1666020			antigravity	gemini-3.8-flash-medium	opus	t760672b
+2026-10-05T21:42:23	39-ask-the-real-decision	without	2	FAIL	297	0	1	26	1	166862	17845	830667			antigravity	gemini-3.8-flash-medium	opus	none
+2026-10-05T22:25:57	39-ask-the-real-decision	with	1	PASS	41	0	1	3	0	77152	373	49792	0		codex	gpt-6-astra/low	opus	t760672b
+2026-10-05T22:26:46	39-ask-the-real-decision	current	1	PASS	32	0	1	3	0	74233	357	47744	0		codex	gpt-6-astra/low	opus	v0.4.0
+2026-10-05T22:27:57	39-ask-the-real-decision	with	2	PASS	55	0	1	3	0	70878	419	24192	0		codex	gpt-6-astra/low	opus	t760672b
+2026-10-05T22:28:52	39-ask-the-real-decision	current	2	PASS	38	0	1	3	0	74380	358	60928	0		codex	gpt-6-astra/low	opus	v0.4.0
+2026-10-05T22:29:54	39-ask-the-real-decision	with	3	PASS	46	0	1	4	0	95988	425	70272	0		codex	gpt-6-astra/low	opus	t760672b
+2026-10-05T22:30:49	39-ask-the-real-decision	current	3	PASS	32	0	1	3	0	74281	343	47872	0		codex	gpt-6-astra/low	opus	v0.4.0
+2026-10-05T22:32:42	40-state-the-default	with	1	PASS	97	0	1	8	1	270800	1093	240128	0		codex	gpt-6-astra/low	opus	t760672b
+2026-10-05T22:35:33	40-state-the-default	current	1	PASS	153	0	1	9	2	358061	1728	325888	0		codex	gpt-6-astra/low	opus	v0.4.0
+2026-10-05T22:37:22	40-state-the-default	with	2	PASS	88	0	1	7	1	186654	1063	157056	0		codex	gpt-6-astra/low	opus	t760672b
+2026-10-05T22:39:27	40-state-the-default	current	2	PASS	105	0	1	9	1	303015	1138	284672	0		codex	gpt-6-astra/low	opus	v0.4.0
+2026-10-05T22:41:10	40-state-the-default	with	3	PASS	88	0	1	8	1	273029	955	242688	0		codex	gpt-6-astra/low	opus	t760672b
+2026-10-05T22:42:42	40-state-the-default	current	3	PASS	76	0	1	7	1	239452	967	194816	0		codex	gpt-6-astra/low	opus	v0.4.0
+2026-10-05T22:44:05	33-one-line-authz-small-ask	with	1	FAIL	56	0	1	6	0	162326	560	129536	0		codex	gpt-6-astra/low	opus	t760672b
+2026-10-05T22:45:20	33-one-line-authz-small-ask	current	1	FAIL	55	0	1	5	0	162988	612	133376	0		codex	gpt-6-astra/low	opus	v0.4.0
+2026-10-05T22:48:09	33-one-line-authz-small-ask	with	2	FAIL	147	0	1	6	1	213586	1077	183040	0		codex	gpt-6-astra/low	opus	t760672b
+2026-10-05T22:49:25	33-one-line-authz-small-ask	current	2	FAIL	57	0	1	5	0	155539	585	127104	0		codex	gpt-6-astra/low	opus	v0.4.0
+2026-10-05T22:50:41	33-one-line-authz-small-ask	with	3	FAIL	58	0	1	5	0	162476	618	132096	0		codex	gpt-6-astra/low	opus	t760672b
+2026-10-05T22:52:05	33-one-line-authz-small-ask	current	3	FAIL	60	0	1	5	0	154993	580	119168	0		codex	gpt-6-astra/low	opus	v0.4.0

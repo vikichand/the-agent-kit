@@ -32,7 +32,7 @@ sh install.sh --setup
 
 It copies the kit to `~/.the-agent-kit`, turns on its git hooks, and adds it to your Claude Code and
 Codex settings. It lists every change and asks before writing anything, and backs your files up first.
-Then delete the downloaded `install.sh` and restart Claude Code and Codex.
+Then delete the downloaded `install.sh` and restart Claude Code, Codex and Antigravity.
 
 **2. Set up each project:**
 
@@ -298,7 +298,7 @@ and the installer is the adapter between them:
 | Tool-layer guard | `ask`, machine-wide | `deny`, machine-wide | asks every time, per project (`.agents/hooks.json`) |
 | Turn-scoped git grants | yes | no (deny mode; you push) | no (it asks; you approve) |
 | Session-start update check | yes | yes | no (Antigravity has no documented session-start hook) |
-| Measured | 40 cases, Sonnet | a handful of cases, see [Limits](#limits) | not yet, see [Limits](#limits) |
+| Measured | 40 cases, Sonnet | 7 cases, see [Limits](#limits) | 5 cases, small sample, see [Limits](#limits) |
 
 **The guards** - hooks at the **git layer** (reorder-proof, covering Claude Code, Codex, plain `git`,
 and any MCP tool that shells out to `git`) plus the **tool layer**, a fast prompt-time veto. Full map
@@ -643,22 +643,28 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
   reach at all (a high-risk plan checked against its failure modes, decay across a long session, proof in a real browser), are
   listed by name rather than folded into one fraction. Method, the full per-case tables, and that list
   are in [`test/adherence/README.md`](test/adherence/README.md).
-- **On Antigravity, the wiring is verified, the adherence is not yet measured.** Checked live on
-  Antigravity CLI 1.2.16 on Windows: `AGENTS.md` loads, the guard hook blocks a force push, and a denial
-  holds even under `--dangerously-skip-permissions` (which does auto-approve the guard's questions). Three
-  limits are Antigravity's own: it delivers a glob rule inside the tool output of the file that triggered
-  it, where a model may weigh it as untrusted content, so the two glob rules are the weakest link; it has
-  no documented session-start hook, so the update check does not run there; and it splits a hook command
-  on whitespace and ignores quotes, which is why the guard runs through a launcher in `.agents/`. The
-  launcher relies on hooks running from the folder that holds `hooks.json`, which was verified on
-  Windows only.
-- **On Codex, two cases measured, both pass with and without the kit.** The harness gained a Codex
-  arm with the skills port, and the first two cases run (object-level authorization, personal data in
-  logs) came back 3/3 in both arms: Codex's default model already does what those rules ask, on
-  prompts where Sonnet needed the rule. The same transcripts show the ported skill body was loaded in
-  a third of the with-arm cells, so even the passes are mostly the floor plus the model's defaults.
-  The port is deployed and discoverable; whether it changes Codex's behaviour anywhere is, as of this
-  writing, unmeasured beyond those two cases and should be read that way.
+- **On Antigravity, the wiring is verified and the always-on rules are followed; the glob rules are
+  unproven.** Checked live on Antigravity CLI 1.2.16 on Windows: `AGENTS.md` loads, the guard hook blocks a
+  force push, and a denial holds even under `--dangerously-skip-permissions` (which does auto-approve the
+  guard's questions). Measured on Gemini 3.8 Flash, 2 runs per cell, rules on against off: case 05 (silent
+  fallbacks) 2/2 against 0/2, cases 07 and 39 level, and case 31 (comments), the one most dependent on a glob
+  rule, no better with them. So the two glob rules ship on the strength of their Claude Code
+  measurements, not an Antigravity one: Antigravity delivers a glob rule inside the tool output of the file
+  that triggered it, where a model may weigh it as untrusted content. Other limits are Antigravity's own: it
+  has no documented session-start hook, so the update check does not run there; it splits a hook command on
+  whitespace and ignores quotes, which is why the guard runs through a launcher in `.agents/`, and that
+  launcher relies on hooks running from the folder that holds `hooks.json`, verified on Windows only; and
+  the guard is advisory against the agent itself, because `.agents/hooks.json` is a project file the agent
+  can edit, so the git-layer hooks and server-side branch protection stay the backstop. Resuming a
+  multi-turn conversation in the eval harness is untested, and macOS and Linux are untested.
+- **On Codex, seven cases measured; the rules never made it worse and rarely made it better.** The harness
+  has a Codex arm with the skills port. Object-level authorization and personal data in logs came back 3/3
+  in both arms: Codex's default model already does what those rules ask, on prompts where Sonnet needed the
+  rule. For 0.5.0, the never-assume cases 39 and 40 are 3/3 against v0.4.0's 3/3 on `gpt-6-astra`, and case
+  33 (a one-line authorization fix) is 0/3 on both, where the agent asks a question the repository already
+  answers; it has never passed on Codex. The same transcripts show the ported skill body was loaded in a
+  third of the with-arm cells, so even the passes are mostly the floor plus the model's defaults. Whether
+  the port changes Codex's behaviour elsewhere is unmeasured and should be read that way.
 
 ## Inspired by
 
