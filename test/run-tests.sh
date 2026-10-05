@@ -826,7 +826,7 @@ grep -q -- '--setup' "$KIT/install.sh" && awk '/^update_kit\(\)/,/^}/' "$KIT/ins
 # scored as ordinary FAILs, and a red-then-fix run scored as "edited before any failing test".
 # The functions are lifted out of run.sh so the checks run offline, with no agent and no tokens.
 (
-  eval "$(sed -n '/^events_error() {/,/^}/p;/^trace_check() {/,/^}/p;/^ag_field() {/,/^}/p' "$KIT/test/adherence/run.sh")"
+  eval "$(sed -n '/^events_error() {/,/^}/p;/^trace_check() {/,/^}/p;/^ag_field() {/,/^}/p;/^agy_turn() {/,/^}/p' "$KIT/test/adherence/run.sh")"
   hf="$KIT/test/adherence/harness-fixtures"; spec='red-before-edit: (node --test|npm test)'
   case "$(events_error "$hf/codex-usage-limit.jsonl" codex)" in *"usage limit"*) pass "H1 codex usage limit read as a provider error" ;; *) bad "H1 codex usage limit NOT detected" ;; esac
   case "$(events_error "$hf/claude-session-limit.jsonl" claude)" in *"session limit"*) pass "H2 claude session limit read as a provider error" ;; *) bad "H2 claude session limit NOT detected" ;; esac
@@ -844,6 +844,25 @@ grep -q -- '--setup' "$KIT/install.sh" && awk '/^update_kit\(\)/,/^}/' "$KIT/ins
   u=$(ag_field "$ag" usage | tr '\t' ',')
   [ "$u" = "1,4,1,51234,812,40100,," ] && pass "H9 antigravity usage: turns, tool calls, edits, tokens in/out, cache read" || bad "H9 antigravity usage read as '$u'"
   [ "$(ag_field "$ag" thread)" = "0b7e5c1a-4f2d-4a8e-9c3b-2d1f6e8a9b10" ] && pass "H10 antigravity conversation id read for resuming later turns" || bad "H10 antigravity conversation id not read"
+  # H11: agy can keep running after its final result event (seen live: a finished cell sat out the whole
+  # 600 s budget and was scored TIMEOUT). The turn must end when the result arrives, and a genuinely
+  # hung agy that never prints one must still be cut at the budget with the timeout's own exit code.
+  fb=$(mktemp -d); mkdir "$fb/bin" "$fb/w"
+  printf '#!/bin/sh\nprintf "%%s\\n" '"'"'{"event":"init","conversation_id":"c1"}'"'"' '"'"'{"event":"result","result":{"status":"SUCCESS","response":"done"}}'"'"'\nsleep 60\n' > "$fb/bin/agy"
+  printf '#!/bin/sh\nsleep 60\n' > "$fb/bin/agy-hang"
+  chmod +x "$fb/bin/agy" "$fb/bin/agy-hang"
+  t0=$(date +%s); ( PATH="$fb/bin:$PATH"; TIMEOUT=40; mflag=""; eflag=""; cflag=""; err="$fb/err"; : > "$err"; : > "$fb/pf"
+      agy_turn "$fb/w" "$fb/pf" "$fb/ev"; echo "$?" > "$fb/rc" ); t1=$(date +%s)
+  [ "$(cat "$fb/rc")" = 0 ] && [ $((t1 - t0)) -lt 25 ] && grep -q '"event":"result"' "$fb/ev" \
+    && pass "H11 an agy that lingers after its result is ended at once (took $((t1 - t0)) s), exit 0" \
+    || bad "H11 a lingering agy was not ended promptly (rc=$(cat "$fb/rc" 2>/dev/null), $((t1 - t0)) s)"
+  cp "$fb/bin/agy-hang" "$fb/bin/agy"
+  t0=$(date +%s); ( PATH="$fb/bin:$PATH"; TIMEOUT=6; mflag=""; eflag=""; cflag=""; err="$fb/err"; : > "$fb/ev"
+      agy_turn "$fb/w" "$fb/pf" "$fb/ev"; echo "$?" > "$fb/rc" ); t1=$(date +%s)
+  [ "$(cat "$fb/rc")" = 124 ] && [ $((t1 - t0)) -lt 20 ] \
+    && pass "H12 an agy that never answers is cut at the budget with the timeout exit code" \
+    || bad "H12 a hung agy was not cut at the budget (rc=$(cat "$fb/rc" 2>/dev/null), $((t1 - t0)) s)"
+  rm -rf "$fb"
 ) | tee "$w.h"; grep -q '^FAIL' "$w.h" 2>/dev/null && fail=1; rm -f "$w.h"
 
 echo "---"

@@ -382,6 +382,27 @@ PY
 # `messages` is what the judge reads: each finished tool call on one line (command or path, plus the
 # error when it failed; never its output, which could carry the deployed rules to the judge), then
 # the final response. `usage` is in codex_usage's column order.
+agy_turn() {  # $1 = workdir  $2 = prompt file  $3 = events file. Returns agy's exit code (124 = budget hit).
+  # agy can keep running after it prints its final result event (seen live: a finished cell sat out the
+  # whole budget and was scored TIMEOUT). So the turn ends on the result event, not on the process exit.
+  # A run that never answers is still cut at $TIMEOUT by timeout itself.
+  ( cd "$1" && exec timeout "$TIMEOUT" agy -p "$(cat "$2")" --output-format stream-json \
+      --dangerously-skip-permissions --sandbox --print-timeout "$((TIMEOUT + 30))s" $cflag $mflag $eflag \
+      </dev/null >"$3" 2>>"$err" ) &
+  _apid=$!; _ended=0
+  while kill -0 "$_apid" 2>/dev/null; do
+    if grep -q '"event": *"result"' "$3" 2>/dev/null; then
+      sleep 5   # a clean exit gets its chance first
+      if kill -0 "$_apid" 2>/dev/null; then kill "$_apid" 2>/dev/null; _ended=1; fi
+      break
+    fi
+    sleep 2
+  done
+  wait "$_apid"; _rc=$?
+  [ "$_ended" -eq 1 ] && return 0
+  return "$_rc"
+}
+
 ag_field() {  # $1 = events file  $2 = thread|messages|usage
   for p in python python3; do
     r=$("$p" - "$1" "$2" <<'PY' 2>/dev/null
@@ -549,9 +570,7 @@ run_cell() {
         # By id, never -c/--continue ("the most recent conversation"), for the reason newsid gives.
         cflag="--conversation $tid"
       fi
-      ( cd "$w" && timeout "$TIMEOUT" agy -p "$(cat "$pf")" --output-format stream-json \
-          --dangerously-skip-permissions --sandbox --print-timeout "$((TIMEOUT + 30))s" $cflag $mflag $eflag \
-          </dev/null >"$ev" 2>>"$err" ); rc=$?
+      agy_turn "$w" "$pf" "$ev"; rc=$?
       [ "$turn" -eq 1 ] && tid=$(ag_field "$ev" thread)
       tout=$(ag_field "$ev" messages)
     else
