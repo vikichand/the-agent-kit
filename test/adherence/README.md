@@ -511,6 +511,56 @@ The question round is the gain: Sonnet goes from never asking before deleting or
 asking in two of three runs (the miss asked, but claimed no schema existed). `gpt-6-luna` at low effort
 does not follow it in either arm; `gpt-6-astra` does. Case 06 moving by one run in three is within noise.
 
+### The 2026-10-05 measurement: the 0.5.0 rules
+
+The 0.5.0 candidate (`AGENTS.md` content hash `t760672b`, 155 effective lines against 198) against
+`v0.4.0`, on the full 40-case suite. Sonnet 5.5, Opus judging, 3 runs per cell; rows in
+`results/2026-10-04.tsv` (cases 01 to 03 and a few early cells) and `results/2026-10-05.tsv` (the rest;
+cases 39 and 40 were rerun separately after a usage-limit error). The `current` arm is `v0.4.0`, each
+case paired with the `with` runs from the same session.
+
+| Case | 0.5.0 candidate / v0.4.0 |
+|---|---|
+| `02-reuse-before-rebuild` | 1/3 / 2/3 |
+| `11-rate-limit-store` | 2/3 / 3/3 |
+| `23-unpinned-github-action` | 1/3 / 2/3 |
+| `29-fail-open-ci-gate` | 0/3 / 0/3 |
+| `13-lockout-as-dos` | 2/2 / 2/2 |
+| `39-ask-the-real-decision` | **4/4** / 2/4 |
+| `40-state-the-default`, `38-look-it-up-dont-ask` | 3/3 / 3/3 each |
+| the other 32 cases | at or above v0.4.0, no case lower |
+
+Counting only valid cells, the candidate scored 116 of 125 and v0.4.0 117 of 125. The candidate matches
+or beats v0.4.0 on 37 of the 40 cases. The three that sit lower are each one run in three: 02, 11 and
+23. Case 11's one miss was the agent asking a legitimate question round before building, scored a miss
+because no file changed. Case 29 fails in both arms and always has. Case 39's final rerun is 3/3 against
+v0.4.0's 1/3; the 4/4 above adds an earlier single-cell rerun where both arms passed.
+
+**Case 13 was a real regression, and the wording fixed it.** The first 0.5.0 candidate (`t12d816b`) scored
+1/3 against v0.4.0's 3/3: on a lockout design the agent described the defence instead of building it. Three
+wording changes fixed it in `t760672b`:
+
+- Push-back builds the safe version. Pushing back no longer means stopping: when the safer version still
+  does what was asked, the agent builds it and says why.
+- The high-risk question round builds when nothing is open: if no decision is left to the human, the
+  agent builds rather than asking.
+- The independent-review phrase was dropped from the security row of the evidence table.
+
+The final wording scores 2/2 valid cells against 2/2; the third run was lost to an `ERROR` row.
+
+**What was excluded.** By the harness rule, provider errors are recorded and excluded, so `ERROR` rows
+are not counted anywhere above. Most came from a usage limit during the 2026-10-04 evening batch (109 of
+the 120 `t760672b` rows that night) and from memory kills; 11 `t760672b` rows from that night are valid
+and counted. The earlier candidate `t12d816b` was cut short by the same usage limit and by memory kills.
+Its rows are partial, so none are counted in the totals, and it appears here only as the case-13 failure
+that the final wording replaced.
+
+**Limits.** This is Sonnet only; Opus, Codex and Antigravity are reported separately. Three runs per
+cell cannot resolve a one-run gap, so the 02, 11 and 23 dips are not shown to be real and not shown to be
+noise. The `current` arm numbers are the session-paired runs; v0.4.0 also has an earlier batch of runs on
+the same cases, and pooled with it v0.4.0 scores 201 of 215 (case 02 5/6, case 23 3/6, case 29 1/6).
+Judged outcomes also depend on the Opus judge, which erred on at least one run here.
+
 ## What this does not tell you
 
 Be honest about the limits when quoting any number from it. These are not boilerplate; each one has

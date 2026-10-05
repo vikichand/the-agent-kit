@@ -19,6 +19,8 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   added alongside any hooks you already have. The guard asks every time where Claude Code asks, and
   denies what it denies. `--update-rules` brings existing projects up to date and `--check` reports it.
   No session-start update check on Antigravity: it has no documented hook for one.
+- **An Antigravity arm for the adherence harness.** `--tool antigravity` runs each eval case under `agy`
+  with a sandbox, so the rules can be measured on Antigravity the way they are on Claude Code and Codex.
 
 ### Changed
 
@@ -37,6 +39,8 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 - Skills keep their detail in `references/`, and the installer copies whole skill folders (it copied only
   top-level files before). `generating-reports/design.md` is now `references/design.md`; `--update-rules`
   removes the old copy.
+- **Pushing back no longer means stopping.** When the safer version still does what was asked, the agent
+  builds it and says why; the high-risk question round builds when no decision is open.
 
 ## [0.4.0] - 2026-10-04
 
