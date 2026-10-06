@@ -143,6 +143,15 @@ wfy "$(printf 'jobs:\n  scan:\n    steps:\n      - run: ./scan.sh\n        conti
   && pass "PC-B4 a gate-exempt line passes" || bad "PC-B4 a gate-exempt line BLOCKED"
 wfy "$(printf 'jobs:\n  scan:\n    steps:\n      - run: ./scan.sh\n        # continue-on-error: true')" \
   && pass "PC-B5 a commented continue-on-error passes" || bad "PC-B5 a commented continue-on-error BLOCKED"
+wfy "$(printf 'jobs:\n  scan:\n    strategy: { fail-fast: false, continue-on-error: true }\n    steps:\n      - run: ./scan.sh')" \
+  && bad "PC-B7 flow-style continue-on-error: true was committed" || pass "PC-B7 flow-style continue-on-error: true blocked"
+wfy "$(printf 'jobs:\n  scan:\n    steps:\n      - run: ./scan.sh\n        "continue-on-error": True')" \
+  && bad "PC-B8 a quoted key with True was committed" || pass "PC-B8 a quoted key with True blocked"
+mkdir -p .github/actions/lint
+printf 'runs:\n  using: composite\n  steps:\n    - run: ./lint.sh\n      shell: bash\n      continue-on-error: true\n' > .github/actions/lint/action.yml
+git add .github/actions/lint/action.yml
+if git commit -q -m act 2>/dev/null; then bad "PC-B9 a composite action step that cannot fail was committed"; git reset -q; else pass "PC-B9 a composite action's continue-on-error: true blocked"; fi
+rm -rf .github/actions
 printf 'jobs:\n  scan:\n    steps:\n      - run: ./scan.sh\n        continue-on-error: true\n' > .github/workflows/gate.yml
 mv .git/hooks/pre-commit .git/hooks/pre-commit.off
 git add .github/workflows/gate.yml; git commit -qm 'an old repo, committed before the kit' >/dev/null 2>&1

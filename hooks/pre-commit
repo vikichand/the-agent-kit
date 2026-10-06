@@ -49,10 +49,11 @@ floating=$(git diff --cached --no-color -U0 --diff-filter=ACMRT -- '.github/work
 # failed 0/3 with the rules present in every measurement: the model adds it to make a red build pass. So
 # it is enforced here too. Only ADDED lines are checked. A line that says why it must be non-blocking passes:
 # `# gate-exempt: <reason>`.
-failopen=$(git diff --cached --no-color -U0 --diff-filter=ACMRT -- '.github/workflows/*.yml' '.github/workflows/*.yaml' 2>/dev/null \
+failopen=$(git diff --cached --no-color -U0 --diff-filter=ACMRT -- '.github/workflows/*.yml' '.github/workflows/*.yaml' \
+    '.github/actions/*/action.yml' '.github/actions/*/action.yaml' 2>/dev/null \
   | grep -E '^\+' | grep -vE '^\+\+\+' | tr -d '\r' | sed 's/^+//' \
   | grep -vE '^[[:space:]]*#' | grep -v 'gate-exempt:' \
-  | grep -E '^[[:space:]-]*continue-on-error:[[:space:]]*["'\'']?true["'\'']?([[:space:]]|$|#)')
+  | grep -E '(^|[{,[:space:]-])["'\'']?continue-on-error["'\'']?[[:space:]]*:[[:space:]]*["'\'']?[Tt][Rr][Uu][Ee]["'\'']?([[:space:]}#,]|$)')
 
 rc=0
 if [ -n "$hits" ]; then
