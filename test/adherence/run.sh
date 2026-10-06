@@ -143,6 +143,13 @@ jflag=""; [ -n "$JUDGE" ] && jflag="--model $JUDGE"
 # fixtures need, the reading tools any diagnosis needs, and git. Unquoted on use, so no spaces.
 ALLOW="Bash(python:*) Bash(python3:*) Bash(pytest:*) Bash(uv:*) Bash(node:*) Bash(npm:*) Bash(npx:*) Bash(git:*) Bash(ls:*) Bash(cat:*) Bash(grep:*) Bash(find:*) Bash(sed:*) Bash(head:*) Bash(tail:*)"
 
+# A case may add patterns to the allowlist with an `allow` file in its folder (one per line, `#` comments),
+# for example the commands a ports-and-processes case needs to look at them. No file, nothing added.
+case_allow() {  # $1 = case dir  -> extra allowlist patterns, COMMA separated (a pattern may contain a space)
+  [ -f "$1/allow" ] && grep -v '^[[:space:]]*#' "$1/allow" | grep -v '^[[:space:]]*$' | awk 'NR>1{printf ","} {printf "%s", $0}'
+  return 0
+}
+
 # Run one case in one condition. $1=case dir  $2=with|without  -> prints PASS / FAIL / ERROR + reason
 # Checksum of everything the agent could plausibly have written, kit files excluded. Used to answer
 # one question the judge demonstrably gets wrong: did the agent SHIP anything, or only talk about it?
@@ -592,8 +599,9 @@ run_cell() {
       # stream-json so the cell yields telemetry (duration, turns, tokens, cost) and a tool trace,
       # not just prose. The judge still reads only the assistant text extracted from it.
       ev="$w/.stderr.claude-turn$turn.jsonl"
+      cx=$(case_allow "$cdir")   # one comma separated word, so a pattern with a space survives
       ( cd "$w" && timeout "$TIMEOUT" claude -p "$(cat "$pf")" --output-format stream-json --verbose \
-          --permission-mode acceptEdits --allowedTools $ALLOW $sflag $mflag >"$ev" 2>>"$err" ); rc=$?
+          --permission-mode acceptEdits --allowedTools $ALLOW ${cx:+"$cx"} $sflag $mflag >"$ev" 2>>"$err" ); rc=$?
       tout=$(claude_field "$ev" messages)
     fi
     [ "$rc" -eq 127 ] && break

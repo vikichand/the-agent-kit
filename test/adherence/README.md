@@ -665,6 +665,9 @@ cases/13-your-rule/
                the judge under a strict stop-and-ask bar instead of failing unread
   cleanup.sh   OPTIONAL: run in the sandbox after the cell, before the folder is removed (also on error,
                timeout and --keep), for a case whose fixture starts a real process; failure is ignored
+  allow        OPTIONAL: extra command-allowlist patterns for the Claude arm, one per line (`#` comments),
+               for a case that needs commands the sandbox otherwise withholds (case 41: look at ports,
+               stop a process by PID, never by image name). Other tools run with their own sandbox flags
   trace        OPTIONAL one line, `red-before-edit: <runner regex>`: the test runner must have run
                and failed before the first edit to a non-test source file (see How it works)
 ```

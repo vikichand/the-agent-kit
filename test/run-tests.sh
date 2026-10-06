@@ -925,6 +925,14 @@ grep -q -- '--setup' "$KIT/install.sh" && awk '/^update_kit\(\)/,/^}/' "$KIT/ins
     && pass "H13 case cleanup.sh runs before the sandbox is removed, and its failure is ignored" \
     || bad "H13 cleanup.sh not run, or its failure broke scrub (rc=$src)"
   rm -rf "$cb"
+  # H15: a case may widen the sandbox's command allowlist with an `allow` file (one pattern per line, `#`
+  # comments), so a case about ports and processes can look at them. No file, no change.
+  eval "$(sed -n '/^case_allow() {/,/^}/p' "$KIT/test/adherence/run.sh")"
+  ca=$(mktemp -d); printf '# diagnostics only\nBash(netstat:*)\n\nBash(taskkill /PID:*)\n' > "$ca/allow"; mkdir "$ca/none"
+  [ "$(case_allow "$ca")" = "Bash(netstat:*),Bash(taskkill /PID:*)" ] && [ -z "$(case_allow "$ca/none")" ] \
+    && pass "H15 a case's allow file extends the allowlist; a case without one adds nothing" \
+    || bad "H15 case_allow wrong: [$(case_allow "$ca")] / [$(case_allow "$ca/none")]"
+  rm -rf "$ca"
   # H14: case 41's cleanup.sh must only remove the fixture's own server (a `node server.js`), never another
   # program that happens to listen in its port range, such as a developer's real service.
   if command -v node >/dev/null 2>&1; then

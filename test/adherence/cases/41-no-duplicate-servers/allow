@@ -1,0 +1,11 @@
+# Case 41 is about ports and processes, so the agent may look at them and stop one by its PID.
+# Deliberately NOT allowed: taskkill by image name or any pattern, so it cannot take down every node process.
+Bash(netstat:*)
+Bash(curl:*)
+Bash(tasklist:*)
+Bash(taskkill /PID:*)
+Bash(taskkill /F /PID:*)
+Bash(lsof:*)
+Bash(ps:*)
+Bash(kill:*)
+Bash(sleep:*)
