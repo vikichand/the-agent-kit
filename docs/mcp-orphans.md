@@ -50,7 +50,6 @@ The syntax was checked against each tool's own `--help`. How Antigravity treats 
 - **Servers a plugin launches** (for example a Context7 plugin). Their launch command lives in the plugin, so
   you cannot put the wrapper in front. Only the reaper covers them.
 - **macOS.** The POSIX paths ran on Linux (WSL2 Ubuntu) only. macOS has not been run.
-- **Chrome DevTools MCP.** Not measured yet.
 - **Reconnect loops.** Issue 90362 describes servers respawned while the agent runs. Not tested.
 - Servers that already exit when their input closes do not need the wrapper (see the table).
 
@@ -76,7 +75,12 @@ killed ungracefully, then processes were counted.
 |---|---|---|
 | `cmd /c node` test server | 1 (node) | 0 |
 | real `npx` MCP server | 3 (node, cmd, node) | 0 |
-| Playwright MCP | 0 (exits when its input closes) | not needed |
+| Playwright MCP, headless | 0 (exits when its input closes) | 0, not needed |
+| Chrome DevTools MCP, headless | 0, and its 5 browser processes closed too | 0, not needed |
+
+The two browser servers are not affected: both exit, and close their browser, when their input closes. The
+bug is specific to servers that ignore that signal, such as the `npx` server above, which is the kind the
+upstream reports describe. The wrapper helps those and is harmless for the rest.
 
 With the wrapper in front, Claude showed the server as `connected`, so the protocol passes through.
 One machine, one Claude Code version.
