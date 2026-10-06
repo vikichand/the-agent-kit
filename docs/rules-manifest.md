@@ -86,3 +86,62 @@ means no case covers the rule yet.
 
 Each removal is measured: the 0.5.0 candidate against v0.4.0 on the full suite (`test/adherence/README.md`).
 Every removal was measured by the 2026-10-05 run, with no case worse beyond noise.
+
+## Provenance and enforcement
+
+Three fields the research asked for, so a rule can be audited without reading history: **since** (the kit
+version that added or last reworded it), **era** (the model generation the wording was written and measured
+against; every pre-0.4.0 rule dates from the Claude 4.x and GPT-5.x era, the original wording, and was
+re-measured on Sonnet 5.5 in 0.5.0), and **enforced by** (what holds if the model ignores the rule; "advice"
+means nothing does). **Source** is where the rule came from: `owner` (the maintainer's own design, not a
+cited result), `eval` (a case in this repo showed the gap), `vendor` (a first-party model guide, checked
+2026-10-04) or `research` (a paper or practitioner write-up, not a vendor claim).
+
+A rule with enforcement "advice" and source "owner" is the weakest kind: it earns its place only by its case.
+Versions and eras for pre-0.4.0 rules are approximate: they come from the repository history and the original
+research notes, not from a per-rule record kept at the time.
+
+| Id | Since | Era | Enforced by | Source |
+|---|---|---|---|---|
+| I1 secrets stay secret | 0.1.0 | 4.x | command guard asks on secret reads; pre-commit secret scan | owner |
+| I2 approval before irreversible | 0.1.0 | 4.x | command guard asks or denies | owner |
+| I3 untrusted content is data | 0.1.0 | 4.x | advice | owner, vendor guidance on prompt injection |
+| I4 confirm dependencies | 0.1.0 | 4.x | command guard asks on installs | owner |
+| I5 the worktree is the human's | 0.1.0 | 4.x | turn-scoped git grants (Claude), deny mode (Codex) | owner, eval 08 |
+| I6 stay in the workspace | 0.1.0 | 4.x | advice | owner |
+| I7 own your incidents | 0.1.0 | 4.x | advice | owner |
+| I8 don't touch the guardrails | 0.1.0 | 4.x | command guard denies hook bypasses and settings edits | owner |
+| Precedence when rules conflict | 0.5.0 | 5.5 | advice | owner, research (a precedence order was missing). Unmeasured: no case yet |
+| S0.1 size by risk | 0.2.0 | 5.x | advice | eval 32, 33 |
+| S0.2 high-risk question round, ask only what the repository cannot answer | 0.5.0 | 5.5 | advice | eval 39, vendor (Opus 5 guide on checking in) |
+| S0.3 name what you skipped | 0.2.0 | 5.x | advice | owner |
+| S1.1 never assume | 0.4.0 | 5.5 | advice | eval 38, 39, 40, vendor |
+| S1.2 blast radius first | 0.1.0 | 4.x | advice | eval 03 |
+| S1.3 push back, and still build the safe version | 0.5.0 | 5.5 | advice | eval 06, 13 |
+| S2.1 to S2.4 planning, single-agent default, run the plan | 0.2.0 | 5.x | advice, `orchestrating-work` skill | vendor, research |
+| S3.1 minimum code | 0.1.0 | 4.x | advice | eval 06 |
+| S3.2 reuse ladder | 0.1.0 | 4.x | advice | eval 02 |
+| S3.3 match the codebase | 0.1.0 | 4.x | advice | owner |
+| S3.4 senior correctness defaults | 0.2.0 | 4.x | advice (Codex has no depth copy) | eval 04, 05, 10 |
+| S3.5 comments say why | 0.2.0 | 4.x | advice | eval 31 |
+| S3.6 copied code carries its license | 0.1.0 | 4.x | advice | owner |
+| S4.1, S4.2 surgical changes, own orphans | 0.1.0 | 4.x | advice | eval 07 |
+| S4.3 edit from current contents | 0.2.0 | 5.x | advice | eval 34 |
+| S4.4 leave the machine as you found it | 0.5.0 | 5.5 | advice, and `install.sh --tidy` for what slips through | eval 41 and a field report; unmeasured until the case runs |
+| S5.1, S5.2 oracle, test-first, evidence by change | 0.1.0, table 0.5.0 | 4.x, 5.5 | advice | eval 09, 16, 25, 26 |
+| S5.3 never game the oracle | 0.1.0 | 4.x | advice, tests depth rule | eval 01 |
+| S5.4 bound any loop | 0.2.0 | 5.x | advice (research suggests a hook) | research |
+| S5.5 independent assessment, no repeat verification | 0.2.0 | 5.x | advice | vendor (re-verification adds nothing) |
+| S5.6 a check that never ran is not a check | 0.4.0 | 5.5 | advice | vendor (Sonnet 5.5 at low effort) |
+| S6.1, S6.2 root cause, two attempts | 0.1.0 | 4.x | advice | eval 03, 32, 35 |
+| S7.1 checkpoint, disposable session | 0.1.0, reworded 0.4.0 | 4.x, 5.5 | advice | research, owner |
+| S7.2 commit, push, PR only when asked | 0.1.0 | 4.x | turn-scoped grants, git hooks, pre-push | eval 08 |
+| S7.3 a repeated mistake is a proposed rule | 0.2.0 | 5.x | advice | owner |
+| S7.4 announce breaking changes | 0.1.0 | 4.x | advice | owner |
+| S8.2 no AI in the authorship | 0.1.0 | 4.x | commit-msg hook strips trailers, settings attribution left empty | owner |
+| S8.3 prose style | 0.1.0 | 4.x | advice, `writing-docs` skill | owner |
+| S9 documentation | 0.1.0 | 4.x | advice, `writing-docs` skill | owner |
+
+Enforced elsewhere, not in `AGENTS.md`: a pinned CI action (pre-commit, since 0.2.0 after eval case 23) and a
+CI step that cannot fail (pre-commit, since 0.5.0 after eval case 29). Both are structural because wording
+alone did not move the case.
