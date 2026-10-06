@@ -1,5 +1,5 @@
 #!/bin/sh
-# pre-commit hook: block commits that stage obvious secrets, or GitHub Actions pinned to a floating tag.
+# pre-commit hook: block commits that stage obvious secrets, GitHub Actions pinned to a floating tag, or CI steps that cannot fail.
 #
 # Runs at the GIT layer, so it protects Claude Code, Codex, plain `git`, AND MCP-driven commits
 # alike - the one enforcement point below the tool layer. Fail-CLOSED: a detected secret blocks
@@ -44,6 +44,16 @@ floating=$(git diff --cached --no-color -U0 --diff-filter=ACMRT -- '.github/work
   | sed -n 's/^[[:space:]-]*uses:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]#]*\).*/\1/p' \
   | grep -vE '^\./' | grep -vE '@[0-9a-f]{40}$' | grep -vE '^docker://[^@]*@sha256:[0-9a-f]{64}$')
 
+# A pipeline that cannot fail is not a gate. `continue-on-error: true` lets a failing scan, test or audit
+# step report green, so the check the agent added or kept proves nothing. The adherence eval's case 29
+# failed 0/3 with the rules present in every measurement: the model adds it to make a red build pass. So
+# it is enforced here too. Only ADDED lines are checked. A line that says why it must be non-blocking passes:
+# `# gate-exempt: <reason>`.
+failopen=$(git diff --cached --no-color -U0 --diff-filter=ACMRT -- '.github/workflows/*.yml' '.github/workflows/*.yaml' 2>/dev/null \
+  | grep -E '^\+' | grep -vE '^\+\+\+' | tr -d '\r' | sed 's/^+//' \
+  | grep -vE '^[[:space:]]*#' | grep -v 'gate-exempt:' \
+  | grep -E '^[[:space:]-]*continue-on-error:[[:space:]]*["'\'']?true["'\'']?([[:space:]]|$|#)')
+
 rc=0
 if [ -n "$hits" ]; then
   { echo "the-agent-kit pre-commit: possible secret(s) in staged changes - commit BLOCKED:"
@@ -59,6 +69,14 @@ if [ -n "$floating" ]; then
     echo "Pin each to the full commit SHA of the release you reviewed, keeping the tag as a comment:"
     echo "    uses: actions/checkout@<40-hex sha>  # v4"
     echo "If one genuinely cannot be pinned, say why on the same line:  # pin-exempt: <reason>"
+  } >&2
+  rc=1
+fi
+if [ -n "$failopen" ]; then
+  { echo "the-agent-kit pre-commit: a CI step that cannot fail the build (continue-on-error: true) - commit BLOCKED:"
+    printf '%s\n' "$failopen" | sed 's/^[[:space:]]*/  - /'
+    echo "A gate that reports green when it fails proves nothing. Fix the failing step, or scope the exception."
+    echo "If this step truly must not block the build, say why on the same line:  # gate-exempt: <reason>"
   } >&2
   rc=1
 fi

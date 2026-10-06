@@ -125,6 +125,28 @@ git commit -qam 'seed an unpinned step, as an old repo would have' >/dev/null 2>
 mv .git/hooks/pre-commit.off .git/hooks/pre-commit
 printf '      - uses: actions/checkout@%s  # v4\n' "$S40" >> .github/workflows/ci.yml; git add .github/workflows/ci.yml
 if git commit -q -m touch 2>/dev/null; then pass "PC-A8 an untouched old floating step does not block"; else bad "PC-A8 an untouched old floating step BLOCKED an unrelated commit"; git reset -q; fi
+# PC-B: a pipeline that cannot fail is not a gate. A newly added `continue-on-error: true` is blocked (the
+# adherence eval's case 29 failed 0/3 with the rules present, in every measurement); false, a comment and a
+# line that says why (`# gate-exempt: <reason>`) pass; an untouched old line never blocks.
+git rm -q -f --cached .github/workflows/ci.yml 2>/dev/null; rm -f .github/workflows/ci.yml
+wfy() { printf '%s\n' "$1" > .github/workflows/gate.yml; git add .github/workflows/gate.yml
+  if git commit -q -m wf 2>/dev/null; then r=0; else r=1; git reset -q >/dev/null 2>&1; fi; return $r; }
+wfy "$(printf 'jobs:\n  scan:\n    steps:\n      - name: Security scan\n        run: ./scan.sh\n        continue-on-error: true')" \
+  && bad "PC-B1 a step-level continue-on-error: true was committed" || pass "PC-B1 step-level continue-on-error: true blocked"
+wfy "$(printf 'jobs:\n  scan:\n    continue-on-error: true\n    steps:\n      - run: ./scan.sh')" \
+  && bad "PC-B2 a job-level continue-on-error: true was committed" || pass "PC-B2 job-level continue-on-error: true blocked"
+wfy "$(printf 'jobs:\n  scan:\n    steps:\n      - run: ./scan.sh\n        continue-on-error: false')" \
+  && pass "PC-B3 continue-on-error: false passes" || bad "PC-B3 continue-on-error: false BLOCKED"
+wfy "$(printf 'jobs:\n  scan:\n    steps:\n      - run: ./scan.sh\n        continue-on-error: true  # gate-exempt: the nightly canary may fail')" \
+  && pass "PC-B4 a gate-exempt line passes" || bad "PC-B4 a gate-exempt line BLOCKED"
+wfy "$(printf 'jobs:\n  scan:\n    steps:\n      - run: ./scan.sh\n        # continue-on-error: true')" \
+  && pass "PC-B5 a commented continue-on-error passes" || bad "PC-B5 a commented continue-on-error BLOCKED"
+printf 'jobs:\n  scan:\n    steps:\n      - run: ./scan.sh\n        continue-on-error: true\n' > .github/workflows/gate.yml
+mv .git/hooks/pre-commit .git/hooks/pre-commit.off
+git add .github/workflows/gate.yml; git commit -qm 'an old repo, committed before the kit' >/dev/null 2>&1
+mv .git/hooks/pre-commit.off .git/hooks/pre-commit
+printf '      - run: echo more\n' >> .github/workflows/gate.yml; git add .github/workflows/gate.yml
+if git commit -q -m touch 2>/dev/null; then pass "PC-B6 an untouched old continue-on-error does not block"; else bad "PC-B6 an untouched old continue-on-error BLOCKED an unrelated commit"; git reset -q; fi
 cd "$KIT"; rm -rf "$w"
 
 # ---------- pre-push (force / delete / non-ff to a protected branch) ----------
