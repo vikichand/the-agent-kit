@@ -863,6 +863,16 @@ grep -q -- '--setup' "$KIT/install.sh" && awk '/^update_kit\(\)/,/^}/' "$KIT/ins
     && pass "H12 an agy that never answers is cut at the budget with the timeout exit code" \
     || bad "H12 a hung agy was not cut at the budget (rc=$(cat "$fb/rc" 2>/dev/null), $((t1 - t0)) s)"
   rm -rf "$fb"
+  # H13: a case's cleanup.sh runs from scrub, in the sandbox, before the folder is removed; a failing one
+  # neither aborts the cell nor stops the removal. Case 41 starts a real server, so this must hold.
+  eval "$(sed -n '/^scrub() {/,/^}/p' "$KIT/test/adherence/run.sh")"
+  cb=$(mktemp -d); mkdir "$cb/case" "$cb/w"
+  printf 'pwd > "%s/ran"\nexit 1\n' "$cb" > "$cb/case/cleanup.sh"
+  cdir="$cb/case"; KEEP=0; scrub "$cb/w"; src=$?
+  [ -s "$cb/ran" ] && [ ! -d "$cb/w" ] && [ "$src" -eq 0 ] \
+    && pass "H13 case cleanup.sh runs before the sandbox is removed, and its failure is ignored" \
+    || bad "H13 cleanup.sh not run, or its failure broke scrub (rc=$src)"
+  rm -rf "$cb"
 ) | tee "$w.h"; grep -q '^FAIL' "$w.h" 2>/dev/null && fail=1; rm -f "$w.h"
 
 echo "---"
