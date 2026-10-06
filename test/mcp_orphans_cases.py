@@ -129,8 +129,8 @@ def proc(pid, ppid, command="node mcp-server", created=100, mb=2):
                 name=command.split()[0], mb=mb)
 
 
-def find(procs, self_pid=999, patterns=None):
-    return reaper.find_orphans(procs, 1000, patterns or reaper.DEFAULT_PATTERNS, 300, self_pid)
+def find(procs, self_pid=999, patterns=None, init_pids=()):
+    return reaper.find_orphans(procs, 1000, patterns or reaper.DEFAULT_PATTERNS, 300, self_pid, init_pids)
 
 
 cases = []
@@ -149,9 +149,9 @@ check("plain dev server", lambda: not find([proc(10, 9, "next dev")]))
 check("young root", lambda: not find([proc(10, 9, created=900)]))
 check("own ancestors", lambda: not find(tree, self_pid=12))
 check("self", lambda: not find(tree, self_pid=10))
-check("custom environment patterns", lambda: bool(find([proc(10, 9, "CUSTOM-server")], patterns=reaper.patterns_from_env({"AGENT_KIT_MCP_PATTERNS": " , custom-server, "}))))
+check("custom environment patterns", lambda: bool(find([proc(10, 9, "node CUSTOM-server")], patterns=reaper.patterns_from_env({"AGENT_KIT_MCP_PATTERNS": " , custom-server, "}))))
 check("patterns only excludes defaults", lambda: not reaper.find_orphans([proc(10, 9)], 1000, reaper.patterns_from_env({"AGENT_KIT_MCP_PATTERNS": "AGENTKITORPHAN_", "AGENT_KIT_MCP_PATTERNS_ONLY": "1"}), 300, 999))
-check("patterns only matches custom", lambda: bool(find([proc(10, 9, "AGENTKITORPHAN_test")], patterns=reaper.patterns_from_env({"AGENT_KIT_MCP_PATTERNS": "AGENTKITORPHAN_", "AGENT_KIT_MCP_PATTERNS_ONLY": "1"}))))
+check("patterns only matches custom", lambda: bool(find([proc(10, 9, "node AGENTKITORPHAN_test")], patterns=reaper.patterns_from_env({"AGENT_KIT_MCP_PATTERNS": "AGENTKITORPHAN_", "AGENT_KIT_MCP_PATTERNS_ONLY": "1"}))))
 check("case insensitive", lambda: bool(find([proc(10, 9, "NODE MCP-SERVER")])) )
 check("npx conjunction", lambda: bool(find([proc(10, 9, "node npx-cli.js cool-mcp")])) and not find([proc(10, 9, "node npx-cli.js vite")]))
 check("uvx conjunction", lambda: bool(find([proc(10, 9, "uvx cool-mcp")])) and not find([proc(10, 9, "uvx tool")]))
@@ -161,6 +161,30 @@ check("kill refuses new descendant", lambda: not reaper.tree_unchanged(find(tree
 check("kill accepts original tree", lambda: reaper.tree_unchanged(find(tree)[0], tree))
 for value, expected in [("05:12", 312), ("1:02:03", 3723), ("2-03:04:05", 183845)]:
     check("etime " + value, lambda v=value, e=expected: reaper.parse_etime(v) == e)
+
+NOW = 1000.0
+PS_OK = "  10     1 05:12  2048 node mcp-server --x\n  11    10 00:30   512 child proc\n"
+check("ps parses", lambda: [(p["pid"], p["ppid"], p["name"], p["mb"], p["created"]) for p in reaper.parse_ps_output(PS_OK, NOW)]
+      == [(10, 1, "node", 2.0, NOW - 312), (11, 10, "child", 0.5, NOW - 30)])
+
+
+def ps_raises(text):
+    try:
+        reaper.parse_ps_output(text, NOW)
+    except ValueError:
+        return True
+    return False
+
+
+check("ps forged duplicate pid raises", lambda: ps_raises(PS_OK + "  10     1 00:01  1 forged\n"))
+check("ps garbage line raises", lambda: ps_raises(PS_OK + "garbage line\n"))
+check("ps pid zero raises", lambda: ps_raises("  0     1 00:01  1 x\n"))
+check("posix orphan reparented to init", lambda: bool(find([proc(1, 0, "init", 1), proc(10, 1)], init_pids=(0, 1))))
+check("init_pids empty skips init child", lambda: not find([proc(1, 0, "init", 1), proc(10, 1)]))
+check("clean strips control chars", lambda: reaper.clean("a\x1b[31mb\nc\x7fd\x00") == "a [31mb c d ")
+check("non-interpreter root not flagged", lambda: not find([proc(10, 9, "mcp-server-foo --x")]))
+check("interpreter root flagged", lambda: bool(find([proc(10, 9, "node mcp-server-foo --x")])))
+check("interpreter root with .exe flagged", lambda: bool(find([proc(10, 9, "Node.EXE mcp-server")])))
 
 passed = 0
 for name, assertion in cases:

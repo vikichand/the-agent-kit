@@ -4,6 +4,7 @@ import argparse
 import json
 import math
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -14,6 +15,16 @@ DEFAULT_PATTERNS = (
     "chrome-devtools-mcp", "mcp-server", "server-sequential-thinking",
     ("npx-cli.js", "mcp"), ("uvx", "mcp"),
 )
+
+INTERPRETERS = {"node", "python", "python3", "uv", "uvx", "npx", "bun", "deno", "cmd", "sh", "bash"}
+PS_LINE = re.compile(r"^\s*(\d+)\s+(\d+)\s+([0-9:-]+)\s+(\d+)\s+(.+)$")
+SYSTEM32 = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32")
+POWERSHELL = os.path.join(SYSTEM32, "WindowsPowerShell", "v1.0", "powershell.exe")
+TASKKILL = os.path.join(SYSTEM32, "taskkill.exe")
+
+
+def clean(text):
+    return re.sub(r"[\x00-\x1f\x7f]", " ", text)
 
 
 def patterns_from_env(env):
@@ -43,47 +54,61 @@ def list_processes():
     }
 }) | ConvertTo-Json -Compress
 """
-        result = subprocess.run(["powershell.exe", "-NoProfile", "-Command", script],
+        result = subprocess.run([POWERSHELL, "-NoProfile", "-Command", script],
                                 capture_output=True, check=True, timeout=20,
                                 encoding="utf-8-sig")
         data = json.loads(result.stdout or "[]")
         return [data] if isinstance(data, dict) else data or []
     result = subprocess.run(["ps", "-axo", "pid=,ppid=,etime=,rss=,command="],
                             capture_output=True, check=True, timeout=10, text=True)
-    now = time.time()
-    procs = []
-    for line in result.stdout.splitlines():
-        pid, ppid, elapsed, rss, command = line.strip().split(None, 4)
-        procs.append(dict(pid=int(pid), ppid=int(ppid),
-                          created=now - parse_etime(elapsed), mb=int(rss) / 1024,
-                          name=os.path.basename(command.split()[0]), command=command))
+    return parse_ps_output(result.stdout, time.time())
+
+
+def parse_ps_output(text, now):
+    # Fail closed: a command line containing a newline can forge records, so any irregularity aborts the check.
+    procs, seen = [], set()
+    for line in text.splitlines():
+        match = PS_LINE.match(line)
+        if not match:
+            raise ValueError(f"unparseable ps line: {line[:60]!r}")
+        pid, ppid, elapsed, rss, command = match.groups()
+        pid = int(pid)
+        if pid <= 0 or pid in seen:
+            raise ValueError(f"invalid or duplicate pid {pid} in ps output")
+        seen.add(pid)
+        procs.append(dict(pid=pid, ppid=int(ppid), created=now - parse_etime(elapsed),
+                          mb=int(rss) / 1024, name=os.path.basename(command.split()[0]),
+                          command=command))
     return procs
 
 
-def find_orphans(procs, now, patterns, min_age_s, self_pid):
+def find_orphans(procs, now, patterns, min_age_s, self_pid, init_pids=()):
     by_pid = {p["pid"]: p for p in procs}
+
+    def parentless(p):
+        parent = by_pid.get(p["ppid"])
+        return p["ppid"] in init_pids or not parent or parent["created"] > p["created"]
+
     children = {}
     for p in procs:
-        parent = by_pid.get(p["ppid"])
-        if parent and parent["created"] <= p["created"]:
+        if not parentless(p):
             children.setdefault(p["ppid"], []).append(p["pid"])
     protected = set()
     pid = self_pid
     while pid in by_pid and pid not in protected:
         protected.add(pid)
         p = by_pid[pid]
-        parent = by_pid.get(p["ppid"])
-        if not parent or parent["created"] > p["created"]:
+        if parentless(p):
             break
         pid = p["ppid"]
     trees = []
     for p in procs:
-        parent = by_pid.get(p["ppid"])
         command = p["command"].lower()
         matches = any(all(part.lower() in command for part in
                           ((pattern,) if isinstance(pattern, str) else pattern))
                       for pattern in patterns)
-        if (parent and parent["created"] <= p["created"]) or not matches:
+        root_name = p["name"].lower().removesuffix(".exe")
+        if not parentless(p) or not matches or root_name not in INTERPRETERS:
             continue
         if p["pid"] in protected or now - p["created"] < min_age_s:
             continue
@@ -143,7 +168,7 @@ def kill_trees(trees):
                     fresh = current.get(p["pid"])
                     if not fresh or not same_process(p, fresh):
                         continue
-                    result = subprocess.run(["taskkill", "/F", "/PID", str(p["pid"])],
+                    result = subprocess.run([TASKKILL, "/F", "/PID", str(p["pid"])],
                                             capture_output=True, text=True, timeout=20)
                     if result.returncode and any(q["pid"] == p["pid"] for q in list_processes()):
                         errors.append(f"pid {p['pid']}: taskkill returned {result.returncode}")
@@ -195,7 +220,8 @@ def main():
         parser.error("minimum age must be a finite nonnegative number")
     try:
         trees = find_orphans(list_processes(), time.time(), patterns_from_env(os.environ),
-                             args.min_age_minutes * 60, os.getpid())
+                             args.min_age_minutes * 60, os.getpid(),
+                             () if os.name == "nt" else (0, 1))
     except (OSError, ValueError, subprocess.SubprocessError) as exc:
         print(f"orphan check unavailable: {exc}", file=sys.stderr)
         if args.json:
@@ -205,8 +231,8 @@ def main():
         print(json.dumps(trees))
     else:
         for t in trees:
-            command = t["command"][:80].replace("\n", " ").replace("\r", " ")
-            print(f"{t['pid']}/{t['name']}  {t['age_s']/60:.1f} min  {t['mb']:.1f} MB  "
+            command = clean(t["command"][:80])
+            print(f"{t['pid']}/{clean(t['name'])}  {t['age_s']/60:.1f} min  {t['mb']:.1f} MB  "
                   f"{len(t['pids'])} processes  {command}")
         print(f"{len(trees)} orphaned MCP trees, {sum(len(t['pids']) for t in trees)} processes, "
               f"{sum(t['mb'] for t in trees):.1f} MB" if trees else "no orphaned MCP processes")
