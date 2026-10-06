@@ -11,6 +11,7 @@
 #   ./install.sh --update-rules  refresh THIS repo's AGENTS.md to the kit's current rules; the
 #                             project's PROJECT-CONFIG block is preserved byte-for-byte
 #   ./install.sh --check      doctor: verify the interpreter resolves and the guard actually fires
+#   ./install.sh --tidy       list orphaned MCP trees; add --kill to terminate them
 #
 # Safe by design: never overwrites an existing CLAUDE.md / AGENTS.md / git hook. Your tool settings are
 # only ever ADDED to, after you say yes, with a backup first; --global prints them for a hand merge
@@ -335,7 +336,10 @@ copy_share() {  # copy this kit into ~/.the-agent-kit, so the download it came f
   # Copy the WHOLE kit, not just the hooks, so the clone you ran this from becomes disposable.
   # git-hooks/ is the core.hooksPath target (those three only); hooks/ is the full set, which is
   # what the relocated install.sh compares against in --check and copies from per project.
-  for h in command-guard.py kit-check.py commit-msg pre-commit pre-push; do cp "$KIT/hooks/$h" "$share/hooks/$h"; done
+  for h in command-guard.py kit-check.py mcp-orphans.py mcp-wrap.py commit-msg pre-commit pre-push; do
+    [ "$h" != mcp-wrap.py ] || [ -f "$KIT/hooks/$h" ] || continue
+    cp "$KIT/hooks/$h" "$share/hooks/$h"
+  done
   for h in commit-msg pre-commit pre-push; do cp "$KIT/hooks/$h" "$share/git-hooks/$h"; done
   # The recommended-tools list is the user's once seeded: never overwritten, so a declined item stays declined.
   [ -f "$share/recommended.json" ] || cp "$KIT/hooks/recommended.json" "$share/recommended.json" 2>/dev/null || true
@@ -510,7 +514,8 @@ update_kit() {  # refresh ~/.the-agent-kit from GitHub, so the clone stays dispo
   fi
   # Never overwrite a working install from a surprise payload: prove the download is actually the kit
   # before it touches anything. A moved/renamed/hijacked repo fails here instead of half-installing.
-  for f in install.sh AGENTS.md hooks/command-guard.py hooks/pre-commit; do
+  for f in install.sh AGENTS.md hooks/command-guard.py hooks/mcp-orphans.py hooks/mcp-wrap.py hooks/pre-commit; do
+    [ "$f" != hooks/mcp-wrap.py ] || [ -f "$tmp/kit/$f" ] || continue
     [ -f "$tmp/kit/$f" ] || { rm -rf "$tmp"; say "  ! downloaded tree has no $f - that is not the kit. NOTHING was changed."; exit 2; }
   done
   new=$( (cd "$tmp/kit" && git rev-parse --short HEAD 2>/dev/null) || printf 'unknown' )
@@ -699,6 +704,9 @@ doctor() {
   else
     say "  OK:   hooks/kit-check.py present (session-start update check; wired if you merged SessionStart)"
   fi
+  for h in mcp-orphans.py mcp-wrap.py; do
+    if [ -f "$KIT/hooks/$h" ]; then say "  OK:   hooks/$h present"; else say "  NOTE: hooks/$h unavailable in this kit copy"; fi
+  done
   # The settings are where the tool guard and the session-start check are wired. Checking the scripts
   # alone reported all OK on a machine whose Codex had no guard at all (2026-09-29).
   share="$HOME/.the-agent-kit"
@@ -835,6 +843,19 @@ HKCHK
     fi
   fi
   hr
+  orphan_line=""
+  if [ -n "$py" ]; then
+    orphan_line=$($py "$KIT/hooks/mcp-orphans.py" --json 2>/dev/null | $py -c '
+import json, sys
+trees = json.load(sys.stdin)
+if not isinstance(trees, list):
+    sys.exit(1)
+count = sum(len(t["pids"]) for t in trees)
+mb = sum(t["mb"] for t in trees)
+print("  WARN: %d orphaned MCP processes (%.1f MB) - run: install.sh --tidy (add --kill after reading the list)" % (count, mb) if trees else "  OK:   no orphaned MCP processes")
+' 2>/dev/null) || orphan_line=""
+  fi
+  say "${orphan_line:-  NOTE: orphan check unavailable}"
   # A doctor that prints FAIL and exits 0 is worse than no doctor: CI and scripts read the exit code,
   # and a green exit over red text is false confidence.
   [ "$dfail" -eq 0 ] || exit 1
@@ -845,7 +866,7 @@ HKCHK
 # this line runs when sourced that way.
 if [ "${AGENT_KIT_LIB:-0}" = 1 ]; then return 0 2>/dev/null || exit 0; fi
 
-USAGE="Usage: ./install.sh [--setup | --update | --update-rules | --check | --extension | --global]"
+USAGE="Usage: ./install.sh [--setup | --update | --update-rules | --check | --tidy [--kill] [reaper options] | --extension | --global]"
 case "$MODE" in
   --setup|setup)                setup_machine ;;
   --global|global)              install_global ;;
@@ -853,6 +874,12 @@ case "$MODE" in
   --update|update)              update_kit ;;
   --update-rules|update-rules)  update_rules ;;
   --check|check|doctor)         doctor ;;
+  --tidy|tidy)
+    shift
+    py=$(detect_py)
+    [ -n "$py" ] || { say "Python 3 unavailable - cannot run orphan check"; exit 1; }
+    exec $py "$KIT/hooks/mcp-orphans.py" "$@"
+    ;;
   ""|project|--project)         install_project ;;
   -h|--help)                    say "$USAGE" ;;
   *) say "Unknown mode: $MODE"; say "$USAGE"; exit 2 ;;
