@@ -925,6 +925,23 @@ grep -q -- '--setup' "$KIT/install.sh" && awk '/^update_kit\(\)/,/^}/' "$KIT/ins
     && pass "H13 case cleanup.sh runs before the sandbox is removed, and its failure is ignored" \
     || bad "H13 cleanup.sh not run, or its failure broke scrub (rc=$src)"
   rm -rf "$cb"
+  # H14: case 41's cleanup.sh must only remove the fixture's own server (a `node server.js`), never another
+  # program that happens to listen in its port range, such as a developer's real service.
+  if command -v node >/dev/null 2>&1; then
+    cb=$(mktemp -d); bp=38421
+    printf 'const s=require("http").createServer((q,r)=>r.end("bystander")); s.listen(%s,"127.0.0.1",()=>require("fs").writeFileSync(process.argv[2],String(process.pid))); setInterval(()=>{},1000);\n' "$bp" > "$cb/by.js"
+    node "$cb/by.js" "$cb/by.pid" >/dev/null 2>&1 &
+    n=0; while [ ! -s "$cb/by.pid" ] && [ $n -lt 50 ]; do sleep 0.2; n=$((n+1)); done
+    sh "$KIT/test/adherence/cases/41-no-duplicate-servers/cleanup.sh" >/dev/null 2>&1
+    sleep 1
+    if node -e 'require("http").get({host:"127.0.0.1",port:+process.argv[1]},r=>{process.exit(0)}).on("error",()=>process.exit(1))' "$bp" 2>/dev/null; then
+      pass "H14 case 41 cleanup leaves another program in its port range alone"
+    else
+      bad "H14 case 41 cleanup killed a bystander server on port $bp"
+    fi
+    bpid=$(cat "$cb/by.pid" 2>/dev/null); [ -n "$bpid" ] && { taskkill //F //PID "$bpid" >/dev/null 2>&1 || kill "$bpid" 2>/dev/null; }
+    rm -rf "$cb"
+  fi
 ) | tee "$w.h"; grep -q '^FAIL' "$w.h" 2>/dev/null && fail=1; rm -f "$w.h"
 
 echo "---"

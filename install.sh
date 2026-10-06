@@ -337,7 +337,7 @@ copy_share() {  # copy this kit into ~/.the-agent-kit, so the download it came f
   # git-hooks/ is the core.hooksPath target (those three only); hooks/ is the full set, which is
   # what the relocated install.sh compares against in --check and copies from per project.
   for h in command-guard.py kit-check.py mcp-orphans.py mcp-wrap.py commit-msg pre-commit pre-push; do
-    [ "$h" != mcp-wrap.py ] || [ -f "$KIT/hooks/$h" ] || continue
+    case "$h" in mcp-*) [ -f "$KIT/hooks/$h" ] || continue ;; esac
     cp "$KIT/hooks/$h" "$share/hooks/$h"
   done
   for h in commit-msg pre-commit pre-push; do cp "$KIT/hooks/$h" "$share/git-hooks/$h"; done
@@ -515,7 +515,7 @@ update_kit() {  # refresh ~/.the-agent-kit from GitHub, so the clone stays dispo
   # Never overwrite a working install from a surprise payload: prove the download is actually the kit
   # before it touches anything. A moved/renamed/hijacked repo fails here instead of half-installing.
   for f in install.sh AGENTS.md hooks/command-guard.py hooks/mcp-orphans.py hooks/mcp-wrap.py hooks/pre-commit; do
-    [ "$f" != hooks/mcp-wrap.py ] || [ -f "$tmp/kit/$f" ] || continue
+    case "$f" in hooks/mcp-*) [ -f "$tmp/kit/$f" ] || continue ;; esac
     [ -f "$tmp/kit/$f" ] || { rm -rf "$tmp"; say "  ! downloaded tree has no $f - that is not the kit. NOTHING was changed."; exit 2; }
   done
   new=$( (cd "$tmp/kit" && git rev-parse --short HEAD 2>/dev/null) || printf 'unknown' )
