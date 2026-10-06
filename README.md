@@ -467,7 +467,8 @@ Quick Start covers the usual path. The installer's modes:
 | *(none)* | project | Full rules - `AGENTS.md` plus a `CLAUDE.md` that imports it - the depth tier and skills for all three tools (`.claude/` for Claude Code, `.agents/` for Codex and Antigravity), and this repo's git hooks. |
 | `--extension` | project | Project block only, for when the universal rules already live in your global files, so nothing is duplicated into context. |
 | `--update-rules` | project | Replace the universal rules, keep `PROJECT-CONFIG` byte-for-byte. |
-| `--check` | project | Doctor: interpreter, guard firing, per-hook identity, settings wiring, rules-file size. |
+| `--check` | project | Doctor: interpreter, guard firing, per-hook identity, settings wiring, rules-file size, and one line on orphaned MCP processes. |
+| `--tidy` | machine | List orphaned MCP server processes left by a crashed agent. Dry run; add `--kill` to end exactly the listed trees. See [`docs/mcp-orphans.md`](docs/mcp-orphans.md). |
 
 > **Merge, don't replace.** If your `settings.json` already has `permissions` or `hooks`, fold these
 > keys into them. Pasting the whole snippet over an existing file wipes what's there.
@@ -549,8 +550,10 @@ OpenAI / GitHub / Slack / Google keys, JWTs, private-key blocks) always runs, wi
 floating tag or branch** (`@v4`, `@main`) in a workflow file: a tag can be moved to different code after
 you reviewed it, a full commit SHA cannot. Only lines you add are checked, so an old unpinned step never
 blocks an unrelated commit; local actions and digest-pinned images pass, and a line that genuinely
-cannot be pinned says why with `# pin-exempt: <reason>`. The eval showed the rule does not fire from
+cannot be pinned says why with `# pin-exempt: <reason>`. It also **blocks an added `continue-on-error: true`** in a workflow file, which lets a failing step pass the build; `# gate-exempt: <reason>` on the same line allows it. The eval showed the rule does not fire from
 wording alone, which is why it is enforced here rather than asked for.
+
+**MCP orphans** (`hooks/mcp-wrap.py`, `hooks/mcp-orphans.py`): a launch wrapper and a reaper for MCP servers left running when the agent is killed. Details, adoption commands and measurements: [`docs/mcp-orphans.md`](docs/mcp-orphans.md).
 
 **commit-msg** (git layer) strips AI-authorship trailers: `Co-Authored-By` from known AI bots and
 `Generated with [Claude Code / Codex / Copilot / Cursor / Gemini]` lines, plus `Claude-Session:` and
@@ -621,6 +624,7 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
 
 ## Limits
 
+- **The MCP orphan wrapper is verified on Windows only.** The POSIX path is untested, and servers a plugin launches cannot be wrapped (the reaper covers them).
 - **Not a sandbox.** These stop a *well-intentioned* agent and the careless common paths, not a determined
   adversary; for real isolation, run agents in a container / OS sandbox.
 - **The tool hook is Bash-scoped.** It sees `Bash` commands only, so an MCP server that pushes or writes

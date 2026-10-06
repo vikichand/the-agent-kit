@@ -21,6 +21,13 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   No session-start update check on Antigravity: it has no documented hook for one.
 - **An Antigravity arm for the adherence harness.** `--tool antigravity` runs each eval case under `agy`
   with a sandbox, so the rules can be measured on Antigravity the way they are on Claude Code and Codex.
+- **MCP servers no longer outlive a killed agent (Windows).** `hooks/mcp-wrap.py` launches an MCP server so
+  it ends with the agent, and `hooks/mcp-orphans.py` finds and ends leftovers. `install.sh --tidy` lists
+  orphaned MCP processes (add `--kill` to end them) and `--check` prints one line on them. The kit mitigates
+  a known Claude Code issue and cannot fix it; POSIX is untested. See `docs/mcp-orphans.md`.
+- **The pre-commit hook blocks `continue-on-error: true`** added to a workflow file, which lets a failing step
+  pass the build. `# gate-exempt: <reason>` on the same line allows it.
+- **Eval case 41, and a `cleanup.sh` hook for the adherence harness** to run after each case.
 
 ### Changed
 
