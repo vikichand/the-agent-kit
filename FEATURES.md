@@ -144,6 +144,7 @@ Honest labelling inside the skill: the contract-freeze pattern and the verify-RE
   (AWS · OpenAI/Stripe · GitHub · Slack · Google · private-key · JWT), no dependency; `gitleaks` too if present. Fail-closed; never prints the secret.
   Also blocks a GitHub Actions step pinned to a floating tag (`@v4`, `@main`) on the workflow lines you add;
   `# pin-exempt: <reason>` for the rare step that cannot be pinned.
+  Also blocks an added `continue-on-error: true` in workflow files; `# gate-exempt: <reason>` on the same line passes.
 - **`pre-push`** refuses force / non-fast-forward / delete to `main`·`master`·`release/*`. Override: `AGENT_KIT_ALLOW_FORCE=1`.
   A branch a project marks release-only (`<!-- agent-kit: release-branch=main -->` in its block) refuses **every**
   push that is not a release (`AGENT_KIT_RELEASE=1`); tags and the work branch are unaffected.
@@ -159,6 +160,9 @@ direct `.git/config` / `GIT_CONFIG_GLOBAL` writes, force/delete push, and destru
 `rm -rf` on regenerable build output (`node_modules`, `dist`, `.next`, `__pycache__`, ...) stays **silent**, so the
 prompt keeps meaning something; the allowlist fails closed on globs, `..`, absolute/`~`/drive paths, and any
 stray operand.
+
+**MCP orphans**: `mcp-wrap.py` launches an MCP server so it dies with the agent (Job Object on Windows, verified; POSIX untested).
+`mcp-orphans.py` lists, and with `--kill` ends, orphaned MCP trees that match known patterns. See [`docs/mcp-orphans.md`](docs/mcp-orphans.md).
 
 **Session start**: `kit-check.py`, a SessionStart hook. One line when a newer release is on `main` (checked at
 most daily), when this project's rules differ from the installed kit, or when a tool on your
@@ -200,7 +204,7 @@ projects); silent otherwise; never updates or installs anything itself. Off with
   into `~/.the-agent-kit`, so the clone stays disposable: stamps
   and compares the source commit, shows what changed, no-ops when current, and proves the download is the kit
   before overwriting anything) · `--update-rules` (refresh a project's universal rules; its `PROJECT-CONFIG`
-  block survives byte-for-byte; fails closed without markers) · `--check` (doctor). Never overwrites;
+  block survives byte-for-byte; fails closed without markers) · `--check` (doctor, with one line on orphaned MCP processes) · `--tidy` (list orphaned MCP trees, `--kill` to end them). Never overwrites;
   detects a working Python; writes your settings only after you say yes, with a backup first.
   The doctor verifies each git hook **by identity**, not just presence, and prints `core.hooksPath` when a redirect is set.
 - **`docs/environment-setup-prompt.md`**: optional, agent-run recipe for a machine's MCP servers / plugins / skills
