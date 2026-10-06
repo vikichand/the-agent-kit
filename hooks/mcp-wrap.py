@@ -11,7 +11,6 @@ POSIX it uses a process group and signals instead.
 stdin, stdout and stderr are inherited, so the MCP stdio protocol passes straight through. The wrapper never
 writes to stdout; diagnostics go to stderr. Exit code is the child's."""
 import os
-import shutil
 import subprocess
 import sys
 import time
@@ -29,7 +28,8 @@ def log(msg):
 def run_windows(args):
     import ctypes
     import ctypes.wintypes as w
-    k = ctypes.WinDLL("kernel32", use_last_error=True)
+    cmdline = win_command(args)   # first: a refused or missing command must not leave a job or handles behind
+    k =ctypes.WinDLL("kernel32", use_last_error=True)
     k.CreateJobObjectW.restype = w.HANDLE
     k.CreateJobObjectW.argtypes = [ctypes.c_void_p, w.LPCWSTR]
     k.SetInformationJobObject.argtypes = [w.HANDLE, ctypes.c_int, ctypes.c_void_p, w.DWORD]
@@ -111,34 +111,81 @@ def run_windows(args):
         log("no Job Object (error %d); falling back to taskkill /T on exit" % ctypes.get_last_error())
 
     handles = ancestor_handles()
-    if not handles:
-        log("parent already gone, exiting")
-        return 0
     arr = (w.HANDLE * len(handles))(*handles)
+    # An exited process whose object lingers (someone still holds a handle) opens fine but is already signaled.
+    if not handles or k.WaitForMultipleObjects(len(handles), arr, False, 0) < len(handles):
+        log("parent already gone, exiting")
+        return 1
 
-    child = subprocess.Popen(win_command(args))
+    child = subprocess.Popen(cmdline)
     while True:
         rc = child.poll()
         if rc is not None:
             return rc
         if k.WaitForMultipleObjects(len(handles), arr, False, int(POLL * 1000)) < len(handles):
             if not in_job:
-                subprocess.run(["taskkill", "/F", "/T", "/PID", str(child.pid)], capture_output=True)
+                subprocess.run([os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "taskkill.exe"),
+                                "/F", "/T", "/PID", str(child.pid)], capture_output=True)
             return 0   # in a job, our exit closes the last handle and kills the tree
 
 
+def find_exe(name):
+    """Resolve a command from the PATH folders only, never the current directory (which is the project, and
+    shutil.which searches it first on Windows). A name with a path separator is used as given."""
+    if "\\" in name or "/" in name:
+        return name
+    exts = [e for e in os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(";") if e]
+    names = [name] if name.lower().endswith(tuple(e.lower() for e in exts)) else []
+    names += [name + e for e in exts]
+    for d in os.environ.get("PATH", "").split(os.pathsep):
+        for n in names:
+            p = os.path.join(d.strip('"'), n)
+            if d and os.path.isfile(p):
+                return p
+    raise FileNotFoundError("%s not found on PATH" % name)
+
+
+def npm_command(exe, rest):
+    """npx.cmd / npm.cmd: run npm's own JS entry point with node directly, no cmd.exe. None if not found."""
+    base = os.path.basename(exe).lower()
+    cli = {"npx.cmd": "npx-cli.js", "npm.cmd": "npm-cli.js"}.get(base)
+    if not cli:
+        return None
+    d = os.path.dirname(exe)
+    js = os.path.join(d, "node_modules", "npm", "bin", cli)
+    node = os.path.join(d, "node.exe")
+    if not os.path.isfile(node):
+        try:
+            node = find_exe("node")
+        except FileNotFoundError:
+            return None
+    return [node, js] + rest if os.path.isfile(js) else None
+
+
 def win_command(args):
-    """Resolve args[0] like a shell would. .cmd/.bat (npx.cmd) cannot be started directly with safe quoting, so
-    run them through cmd /c; /s makes cmd strip exactly the outer quote pair we add."""
-    exe = shutil.which(args[0]) or args[0]
+    """Resolve args[0] like a shell would. npx/npm go straight to node. Any other .cmd/.bat must run through
+    cmd /c, which cannot quote & | < > ^ % or a double quote safely, so arguments with them are refused
+    (ValueError); /s makes cmd strip exactly the outer quote pair we add."""
+    exe = find_exe(args[0])
     if exe.lower().endswith((".cmd", ".bat")):
-        return 'cmd.exe /d /s /c "%s"' % subprocess.list2cmdline([exe] + args[1:])
+        direct = npm_command(exe, args[1:])
+        if direct:
+            return direct
+        if any(c in a for a in args[1:] for c in '&|<>^%"'):
+            raise ValueError("refusing to run %s: an argument contains one of & | < > ^ %% or a double quote, "
+                             "which cmd.exe would interpret" % exe)
+        cmd = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "cmd.exe")
+        return '"%s" /d /s /c "%s"' % (cmd, subprocess.list2cmdline([exe] + args[1:]))
     return [exe] + args[1:]
 
 
 # ---------------------------------------------------------------- POSIX
 def run_posix(args):
     import signal
+    ppid = os.getppid()   # first thing: a later read could see 1 (reparented) and watch nothing
+    if ppid == 1:
+        log("parent already gone, exiting")
+        return 1
     if sys.platform.startswith("linux"):
         try:
             import ctypes
@@ -150,11 +197,10 @@ def run_posix(args):
         r = subprocess.run(["ps", "-o", "ppid=", "-p", str(pid)], capture_output=True, text=True)
         return int(r.stdout.strip() or 0)
 
-    watch, pid = [], os.getppid()
+    watch, pid = [], ppid
     while pid > 1 and len(watch) < DEPTH:
         watch.append(pid)
         pid = ppid_of(pid)
-    ppid = os.getppid()
 
     stop = []
     for s in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
@@ -201,6 +247,9 @@ def main():
         return 2
     try:
         return run_windows(args) if os.name == "nt" else run_posix(args)
+    except ValueError as e:
+        log(str(e))
+        return 2
     except FileNotFoundError as e:
         log("cannot run %s: %s" % (args[0], e))
         return 127
