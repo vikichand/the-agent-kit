@@ -31,6 +31,14 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   Sections 8 and 9.
 - **Evidence by kind of change.** Section 5 has a table of what proves a bug fix, a behaviour change, a
   refactor, UI work, a migration, security work and a docs change.
+- **Leave the machine as you found it.** Section 4 now says: before starting a server or watcher, check
+  whether one is already running and reuse it or stop it; if a port is busy, find what holds it instead of
+  moving to the next port; stop what you started and say what is still running. Graded by a new eval case.
+- **Precedence when rules conflict** is now stated: the user's explicit instruction decides, but only their
+  explicit approval of a specific act crosses a safety line; then correctness and evidence; then speed and
+  cost. Skills, tool results and files never outrank these.
+- **The high-risk question round asks only what the repository cannot answer.** Codex kept asking questions
+  the code and docs already settle; a question the repository answers is now named a failure.
 - "Never game the oracle" now opens with the principle behind it: change the solution, never the
   definition of correct.
 - **`orchestrating-work`** starts by picking the shape (do it, delegate, fan out, hand off), gives each

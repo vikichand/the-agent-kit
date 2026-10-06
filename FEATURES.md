@@ -26,7 +26,7 @@ stays local · own your incidents (stop and report, no silent cleanup) · don't 
 | 1 | **Never assume: look facts up, ask decisions** (with a recommendation; small defaults stated; version-sensitive facts from current docs) · **blast radius before the first edit** · push back, voice trade-offs |
 | 2 | Plan non-trivial work as verifiable steps; check a high-risk plan against its failure modes; **name what's out of scope**; then run it without check-ins |
 | 3 | Simplicity · **reuse ladder** · match the codebase · **senior correctness defaults** (no silent fallbacks, idempotent handlers, the 100k-rows question, UTC + decimal money, staged migrations) · **named-ceiling shortcuts** · **copied code carries its license** |
-| 4 | Surgical changes: every line traces to the task |
+| 4 | Surgical changes: every line traces to the task · **leave the machine as you found it** (reuse or stop a running server, never hop ports, stop what you started) |
 | 5 | **Verification is the spine**: external oracle · **evidence by kind of change** (bug fix, behaviour, refactor, UI, migration, security, docs) · **test-first by default** (Section 0 sizes the ceremony) · **never game the oracle** (no deleted tests / loosened asserts) · **bounded loops** · **independent judgment for high-risk judged work** |
 | 6 | Debug by root cause · **fix it where it is shared, not where it surfaced** · two-attempt rule |
 | 7 | Checkpoint long work and every user-stated constraint · commit only when asked · **a repeated mistake becomes a proposed rule, never a self-edit** · **sync before you ship** (fetch + rebase before push/PR) |
