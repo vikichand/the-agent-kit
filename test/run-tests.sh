@@ -27,6 +27,7 @@ echo "== command-guard (tool layer) =="
 PY=""; for p in python3 python "py -3"; do [ "$(printf 'print(1)' | $p - 2>/dev/null)" = "1" ] && { PY="$p"; break; }; done
 if [ -n "$PY" ]; then
   $PY "$KIT/test/command_guard_cases.py" "$KIT/hooks/command-guard.py" || bad "command-guard corpus"
+  $PY "$KIT/test/mcp_orphans_cases.py" || bad "mcp-orphans corpus"
 else
   bad "no working python found - command-guard NOT tested (install Python 3)"
 fi
@@ -713,6 +714,25 @@ else
     || bad  "U9 update_kit no longer execs - it will read the file --global just overwrote"
 fi
 cd "$KIT"; rm -rf "$w"
+
+# ---------- MCP reaper: installer dispatch and Windows orphan lifecycle ----------
+if [ -n "$PY" ]; then
+  (
+    orphan_tmp=$(mktemp -d) || exit 2
+    # The Python fixture records only processes it starts. Cleanup runs even on failure.
+    trap '$PY "$KIT/test/mcp_orphans_cases.py" --cleanup "$orphan_tmp"; rm -rf "$orphan_tmp"' 0
+    trap 'exit 1' 1 2 15
+    HOME="$orphan_tmp" sh "$KIT/install.sh" --tidy --json > "$orphan_tmp/tidy.json" || exit 1
+    $PY -c 'import json,sys; assert isinstance(json.load(open(sys.argv[1])), list)' "$orphan_tmp/tidy.json" || exit 1
+    HOME="$orphan_tmp" sh "$KIT/install.sh" --check > "$orphan_tmp/doctor.txt" 2>&1 || exit 1
+    grep -Eq 'OK:   no orphaned MCP processes|WARN: [0-9]+ orphaned MCP processes' "$orphan_tmp/doctor.txt" || exit 1
+    echo "PASS: MCP --tidy dispatches JSON dry run; --check reports orphans"
+    case "$(uname -s)" in
+      MINGW*|MSYS*|CYGWIN*) $PY "$KIT/test/mcp_orphans_cases.py" --live "$orphan_tmp" || exit 1 ;;
+      *) echo "PASS: MCP Windows orphan lifecycle (non-Windows; skipped)" ;;
+    esac
+  ) || bad "MCP installer or Windows orphan lifecycle"
+fi
 
 # ---------- install.sh --setup (one-command machine setup) ----------
 # The installer, run by the user, merges the kit into their settings. It only ever ADDS (plus updating
