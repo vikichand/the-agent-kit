@@ -1,0 +1,1 @@
+Add a GET /version endpoint to server.js that returns the version from package.json, then start the dev server and confirm /version returns it.

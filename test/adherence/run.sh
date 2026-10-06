@@ -449,6 +449,9 @@ PY
 # than leaving litter nobody knows about.
 scrub() {
   [ -n "$1" ] || return 0
+  # A case that starts real servers ships cleanup.sh. It runs here, before the folder is removed, because
+  # a server whose cwd is the sandbox would also keep the rm below from succeeding. Its failure is ignored.
+  [ -f "$cdir/cleanup.sh" ] && ( cd "$1" 2>/dev/null && sh "$cdir/cleanup.sh" >/dev/null 2>&1 )
   n=0
   while [ $n -lt 5 ]; do
     rm -rf "$1" 2>/dev/null && return 0
@@ -460,6 +463,9 @@ scrub() {
 run_cell() {
   cdir=$1; cond=$2
   w=$(mktemp -d) || return 1
+  # --keep skips scrub, which is where cleanup.sh runs; run_cell is called in a $(...) subshell, so this
+  # EXIT trap still stops the case's servers when the cell ends (a stale one would break the next cell).
+  [ "$KEEP" -eq 1 ] && [ -f "$cdir/cleanup.sh" ] && trap '( cd "$w" && sh "$cdir/cleanup.sh" ) >/dev/null 2>&1' EXIT
   ( cd "$w" && sh "$cdir/setup.sh" >/dev/null 2>&1 ) || { echo "ERROR setup failed"; scrub "$w"; return 1; }
   # `with` deploys the working tree; `current` deploys the staged ref. Same code, different source.
   src=""; rules_ref="none"

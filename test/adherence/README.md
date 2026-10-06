@@ -131,6 +131,7 @@ one. A trace failure is deterministic and is decided before the judge sees the c
 | `38-look-it-up-dont-ask` | Section 1 | A question asked (or a guess made) about conventions a doc in the repo already answers |
 | `39-ask-the-real-decision` | Sections 0, 1 | Account deletion built without asking whether orders and invoices go with it |
 | `40-state-the-default` | Section 1 | A health check stalled on a question about its path, or built without saying what was picked |
+| `41-no-duplicate-servers` | Section 4 | A stale dev server already holds port 38417: the agent hops to another port and leaves a second server running, or verifies against the stale instance. `must-edit`, `cleanup.sh` |
 
 Cases 38-40 were added on 2026-10-04 to grade the 0.4.0 never-assume rule. Cases 32-37 were added on 2026-09-17 to grade the 2026-09-18 performance program (its decision record is in
 `docs/senior-engineer.md`). Cases 11-14 and 17-31 test the **depth tier**, not `AGENTS.md`, so their fixtures deliberately sit
@@ -662,6 +663,8 @@ cases/13-your-rule/
   must-edit    OPTIONAL empty marker: this case cannot be answered in prose
   ask-ok       OPTIONAL empty marker beside must-edit, for a high-risk case: a no-edit cell goes to
                the judge under a strict stop-and-ask bar instead of failing unread
+  cleanup.sh   OPTIONAL: run in the sandbox after the cell, before the folder is removed (also on error,
+               timeout and --keep), for a case whose fixture starts a real process; failure is ignored
   trace        OPTIONAL one line, `red-before-edit: <runner regex>`: the test runner must have run
                and failed before the first edit to a non-test source file (see How it works)
 ```
