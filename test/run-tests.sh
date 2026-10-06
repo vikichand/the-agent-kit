@@ -27,6 +27,7 @@ echo "== command-guard (tool layer) =="
 PY=""; for p in python3 python "py -3"; do [ "$(printf 'print(1)' | $p - 2>/dev/null)" = "1" ] && { PY="$p"; break; }; done
 if [ -n "$PY" ]; then
   $PY "$KIT/test/command_guard_cases.py" "$KIT/hooks/command-guard.py" || bad "command-guard corpus"
+  $PY "$KIT/test/mcp_wrap_cases.py" || bad "mcp-wrap cases"
 else
   bad "no working python found - command-guard NOT tested (install Python 3)"
 fi

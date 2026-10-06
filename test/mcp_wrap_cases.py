@@ -1,0 +1,154 @@
+#!/usr/bin/env python3
+"""Tests for hooks/mcp-wrap.py. Run:  uv run python test/mcp_wrap_cases.py [path/to/mcp-wrap.py]
+Windows cases prove the wrapper leaves no orphans when the client is killed. The POSIX case is for Linux/macOS."""
+import os, shutil, subprocess, sys, tempfile, time
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+WRAP = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else os.path.join(HERE, "..", "hooks", "mcp-wrap.py")
+WIN = os.name == "nt"
+NODE = shutil.which("node")
+T0 = int(time.time()) - 2
+TMP = tempfile.mkdtemp(prefix="mcpwrap-")
+DUMMY = os.path.join(TMP, "dummy.js")
+with open(DUMMY, "w") as f:
+    f.write("if (process.argv[3] === 'exit') setTimeout(() => process.exit(5), 1500);\n"
+            "else setInterval(function () {}, 1000);\n")
+
+
+def find(marker):
+    """Survivors: processes whose command line carries the marker and that started after the test did."""
+    ps = ("Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*%s*' -and "
+          "$_.Name -in 'node.exe','cmd.exe' -and "
+          "([DateTimeOffset]$_.CreationDate).ToUnixTimeSeconds() -ge %d } | "
+          "ForEach-Object { '{0} {1}' -f $_.ProcessId,$_.Name }" % (marker, T0))
+    out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True).stdout
+    return [l.strip() for l in out.splitlines() if l.strip()]
+
+
+def kill_all(marker):
+    for l in find(marker):
+        subprocess.run(["taskkill", "/F", "/T", "/PID", l.split()[0]], capture_output=True)
+
+
+def crash_trial(marker, command):
+    """Start `command` under a client process, kill the client with no goodbye, return (before, after)."""
+    client = subprocess.Popen([sys.executable, "-c",
+                               "import subprocess,time; subprocess.Popen(%r); time.sleep(120)" % (command,)])
+    try:
+        time.sleep(4)
+        before = find(marker)
+        subprocess.run(["taskkill", "/F", "/PID", str(client.pid)], capture_output=True)
+        time.sleep(4)
+        return before, find(marker)
+    finally:
+        kill_all(marker)
+        client.kill()
+
+
+def server(marker):
+    return ["cmd", "/c", "node", DUMMY, marker]
+
+
+def wrapped(marker, srv=None):
+    return [sys.executable, WRAP, "--"] + (srv or server(marker))
+
+
+def t_control():
+    m = "ORPHAN_control"
+    before, after = crash_trial(m, server(m))
+    assert before and after, "control should leave orphans (before=%s after=%s)" % (before, after)
+
+
+def t_wrapped():
+    m = "ORPHAN_wrapped"
+    before, after = crash_trial(m, wrapped(m))
+    assert before and not after, "before=%s after=%s" % (before, after)
+
+
+def t_via_cmd():
+    m = "ORPHAN_viacmd"
+    cmd = 'cmd /c ""%s" "%s" -- cmd /c node "%s" %s"' % (sys.executable, WRAP, DUMMY, m)
+    before, after = crash_trial(m, cmd)
+    assert before and not after, "before=%s after=%s" % (before, after)
+
+
+def t_exit_code():
+    r = subprocess.run(wrapped("x", [NODE, "-e", "process.exit(7)"]), capture_output=True, timeout=30)
+    assert r.returncode == 7, r.returncode
+
+
+def t_stdout_clean():
+    r = subprocess.run(wrapped("x", [NODE, "-e", "console.log('hello')"]), capture_output=True, timeout=30)
+    assert r.stdout.replace(b"\r\n", b"\n") == b"hello\n", r.stdout
+
+
+def t_space_path():
+    d = os.path.join(TMP, "dir with space")
+    os.makedirs(d)
+    cmdfile = os.path.join(d, "my server.cmd")
+    with open(cmdfile, "w") as f:
+        f.write('@"%s" "%s" %%*\r\n' % (NODE, DUMMY))
+    m = "ORPHAN_space"
+    before, after = crash_trial(m, wrapped(m, [cmdfile, m]))
+    assert before and not after, "before=%s after=%s" % (before, after)
+    # a .cmd found through PATH, with an argument containing a space, keeps its argument intact
+    with open(os.path.join(d, "echoarg.cmd"), "w") as f:
+        f.write("@echo %~1\r\n")
+    env = dict(os.environ, PATH=d + os.pathsep + os.environ["PATH"])
+    r = subprocess.run([sys.executable, WRAP, "echoarg", "a b"], capture_output=True, timeout=30, env=env)
+    assert r.stdout.strip() == b"a b", r.stdout
+
+
+def t_child_exits():
+    m = "ORPHAN_exits"
+    p = subprocess.run(wrapped(m, ["cmd", "/c", "node", DUMMY, m, "exit"]), capture_output=True, timeout=30)
+    assert p.returncode == 5, p.returncode
+    time.sleep(1)
+    left = find(m)
+    kill_all(m)
+    assert not left, left
+
+
+def t_posix():
+    m = "ORPHANPOSIX%d" % os.getpid()
+    cmd = [sys.executable, WRAP, "--", "sh", "-c", "sleep 300; : " + m]
+    client = subprocess.Popen([sys.executable, "-c",
+                               "import subprocess,time; subprocess.Popen(%r); time.sleep(120)" % (cmd,)])
+    try:
+        time.sleep(3)
+        assert subprocess.run(["pgrep", "-f", m], capture_output=True).stdout, "server did not start"
+        client.kill()
+        time.sleep(9)   # poll interval + 3 s SIGTERM grace + margin
+        left = subprocess.run(["pgrep", "-f", m], capture_output=True, text=True).stdout.split()
+        assert not left, left
+    finally:
+        subprocess.run(["pkill", "-9", "-f", m], capture_output=True)
+        client.kill()
+
+
+CASES = [("control: orphans without wrapper", t_control, "win"), ("wrapped: no orphans", t_wrapped, "win"),
+         ("wrapped through cmd /c", t_via_cmd, "win"), ("exit code pass-through", t_exit_code, "win"),
+         ("stdout stays clean", t_stdout_clean, "win"), ("command path with a space", t_space_path, "win"),
+         ("child exits on its own", t_child_exits, "win"),
+         ("posix: no orphans (UNTESTED on the dev machine)", t_posix, "posix")]
+
+ok = total = 0
+try:
+    for name, fn, plat in CASES:
+        if (plat == "win") != WIN:
+            print("SKIPPED %s (needs %s)" % (name, "Windows" if plat == "win" else "POSIX"))
+            continue
+        if WIN and not NODE:
+            print("SKIPPED %s (node not found)" % name)
+            continue
+        total += 1
+        try:
+            fn()
+            ok += 1
+            print("ok   %s" % name)
+        except Exception as e:
+            print("FAIL %s: %s: %s" % (name, type(e).__name__, e))
+finally:
+    shutil.rmtree(TMP, ignore_errors=True)
+print("mcp-wrap: %d/%d passed" % (ok, total))
+sys.exit(0 if ok == total else 1)
