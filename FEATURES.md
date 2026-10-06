@@ -161,7 +161,7 @@ direct `.git/config` / `GIT_CONFIG_GLOBAL` writes, force/delete push, and destru
 prompt keeps meaning something; the allowlist fails closed on globs, `..`, absolute/`~`/drive paths, and any
 stray operand.
 
-**MCP orphans**: `mcp-wrap.py` launches an MCP server so it dies with the agent (Job Object on Windows, verified; POSIX untested).
+**MCP orphans**: `mcp-wrap.py` launches an MCP server so it dies with the agent (Job Object on Windows, process group on POSIX; verified on Windows and Linux, not macOS).
 `mcp-orphans.py` lists, and with `--kill` ends, orphaned MCP trees that match known patterns. See [`docs/mcp-orphans.md`](docs/mcp-orphans.md).
 
 **Session start**: `kit-check.py`, a SessionStart hook. One line when a newer release is on `main` (checked at

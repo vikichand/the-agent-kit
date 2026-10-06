@@ -624,7 +624,7 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
 
 ## Limits
 
-- **The MCP orphan wrapper is verified on Windows only.** The POSIX path is untested, and servers a plugin launches cannot be wrapped (the reaper covers them).
+- **The MCP orphan fix is verified on Windows and Linux (WSL2), not macOS.** Servers a plugin launches cannot be wrapped (the reaper covers them), and a server you run on purpose as a systemd service that matches an MCP pattern would be listed by the reaper.
 - **Not a sandbox.** These stop a *well-intentioned* agent and the careless common paths, not a determined
   adversary; for real isolation, run agents in a container / OS sandbox.
 - **The tool hook is Bash-scoped.** It sees `Bash` commands only, so an MCP server that pushes or writes

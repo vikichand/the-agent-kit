@@ -24,7 +24,7 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 - **MCP servers no longer outlive a killed agent (Windows).** `hooks/mcp-wrap.py` launches an MCP server so
   it ends with the agent, and `hooks/mcp-orphans.py` finds and ends leftovers. `install.sh --tidy` lists
   orphaned MCP processes (add `--kill` to end them) and `--check` prints one line on them. The kit mitigates
-  a known Claude Code issue and cannot fix it; POSIX is untested. See `docs/mcp-orphans.md`.
+  a known Claude Code issue and cannot fix it; verified on Windows and Linux, not macOS. See `docs/mcp-orphans.md`.
 - **The pre-commit hook blocks `continue-on-error: true`** added to a workflow file, which lets a failing step
   pass the build. `# gate-exempt: <reason>` on the same line allows it.
 - **Eval case 41, and a `cleanup.sh` hook for the adherence harness** to run after each case.

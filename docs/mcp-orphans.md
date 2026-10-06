@@ -17,7 +17,7 @@ A normal exit does not reproduce it.
   the whole tree when the wrapper dies, and the wrapper exits when the agent or any of its next 3 ancestors
   exits. stdin and stdout pass straight through and it never writes to stdout, so the MCP protocol is untouched.
   It finds `npx` (a `.cmd` file) itself, so you do not need `cmd /c`. On POSIX it uses a process group and
-  signals; that path is untested.
+  signals; that path passed its test on Linux (WSL2 Ubuntu) and has not been run on macOS.
 - **`hooks/mcp-orphans.py`**, a reaper. It lists orphaned MCP process trees: the root's parent is gone (or the
   pid was reused), the command line matches a known MCP pattern, the tree is at least 5 minutes old, and it is
   never an ancestor of the reaper itself. It is a dry run by default. `--kill` ends exactly what was listed,
@@ -49,7 +49,7 @@ The syntax was checked against each tool's own `--help`. How Antigravity treats 
 
 - **Servers a plugin launches** (for example a Context7 plugin). Their launch command lives in the plugin, so
   you cannot put the wrapper in front. Only the reaper covers them.
-- **POSIX.** The process-group path has not been run.
+- **macOS.** The POSIX paths ran on Linux (WSL2 Ubuntu) only. macOS has not been run.
 - **Chrome DevTools MCP.** Not measured yet.
 - **Reconnect loops.** Issue 90362 describes servers respawned while the agent runs. Not tested.
 - Servers that already exit when their input closes do not need the wrapper (see the table).
@@ -80,3 +80,9 @@ killed ungracefully, then processes were counted.
 
 With the wrapper in front, Claude showed the server as `connected`, so the protocol passes through.
 One machine, one Claude Code version.
+
+The reaper was also run on Linux (WSL2 Ubuntu): it found a real orphan, left it alone in the dry run, and
+`--kill` removed it. That run found that Linux does not hand orphans to pid 1: `systemd --user` and similar
+managers adopt them, so the reaper also treats a process adopted by `init`, `systemd`, `launchd`, `upstart`,
+`s6-svscan`, `tini` or `dumb-init` as parentless. A server you run deliberately as a systemd service and that
+matches an MCP pattern would be listed too: read the list before `--kill`.
