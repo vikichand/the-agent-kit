@@ -10,6 +10,7 @@ import subprocess
 import sys
 import time
 
+INIT_NAMES = ("init", "systemd", "launchd", "upstart", "s6-svscan", "tini", "dumb-init")
 DEFAULT_PATTERNS = (
     "modelcontextprotocol", "context7", "@playwright/mcp", "playwright/mcp",
     "chrome-devtools-mcp", "mcp-server", "server-sequential-thinking",
@@ -82,12 +83,15 @@ def parse_ps_output(text, now):
     return procs
 
 
-def find_orphans(procs, now, patterns, min_age_s, self_pid, init_pids=()):
+def find_orphans(procs, now, patterns, min_age_s, self_pid, init_pids=(), init_names=()):
     by_pid = {p["pid"]: p for p in procs}
 
     def parentless(p):
         parent = by_pid.get(p["ppid"])
-        return p["ppid"] in init_pids or not parent or parent["created"] > p["created"]
+        if p["ppid"] in init_pids or not parent or parent["created"] > p["created"]:
+            return True
+        # A service manager that adopts orphans as a subreaper (systemd --user, WSL init) is not pid 1.
+        return parent["name"].lower().removesuffix(".exe") in init_names
 
     children = {}
     for p in procs:
@@ -221,7 +225,8 @@ def main():
     try:
         trees = find_orphans(list_processes(), time.time(), patterns_from_env(os.environ),
                              args.min_age_minutes * 60, os.getpid(),
-                             () if os.name == "nt" else (0, 1))
+                             () if os.name == "nt" else (0, 1),
+                             () if os.name == "nt" else INIT_NAMES)
     except (OSError, ValueError, subprocess.SubprocessError) as exc:
         print(f"orphan check unavailable: {exc}", file=sys.stderr)
         if args.json:

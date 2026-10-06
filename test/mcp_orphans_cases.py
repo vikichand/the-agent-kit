@@ -129,8 +129,8 @@ def proc(pid, ppid, command="node mcp-server", created=100, mb=2):
                 name=command.split()[0], mb=mb)
 
 
-def find(procs, self_pid=999, patterns=None, init_pids=()):
-    return reaper.find_orphans(procs, 1000, patterns or reaper.DEFAULT_PATTERNS, 300, self_pid, init_pids)
+def find(procs, self_pid=999, patterns=None, init_pids=(), init_names=()):
+    return reaper.find_orphans(procs, 1000, patterns or reaper.DEFAULT_PATTERNS, 300, self_pid, init_pids, init_names)
 
 
 cases = []
@@ -181,6 +181,11 @@ check("ps garbage line raises", lambda: ps_raises(PS_OK + "garbage line\n"))
 check("ps pid zero raises", lambda: ps_raises("  0     1 00:01  1 x\n"))
 check("posix orphan reparented to init", lambda: bool(find([proc(1, 0, "init", 1), proc(10, 1)], init_pids=(0, 1))))
 check("init_pids empty skips init child", lambda: not find([proc(1, 0, "init", 1), proc(10, 1)]))
+# systemd --user (and WSL's init) adopt orphans as a subreaper, so their ppid is NOT 1: found live on Linux.
+check("orphan adopted by systemd is flagged", lambda: bool(find([proc(584, 1, "systemd", 1), proc(10, 584)], init_names=("systemd",))))
+check("adopted by systemd is not flagged without init_names", lambda: not find([proc(584, 1, "systemd", 1), proc(10, 584)]))
+check("child of an ordinary program is not an orphan", lambda: not find([proc(584, 1, "bash", 1), proc(10, 584)], init_names=("systemd",)))
+check("systemd-adopted non-MCP process is not flagged", lambda: not find([proc(584, 1, "systemd", 1), proc(10, 584, "node next dev")], init_names=("systemd",)))
 check("clean strips control chars", lambda: reaper.clean("a\x1b[31mb\nc\x7fd\x00") == "a [31mb c d ")
 check("non-interpreter root not flagged", lambda: not find([proc(10, 9, "mcp-server-foo --x")]))
 check("interpreter root flagged", lambda: bool(find([proc(10, 9, "node mcp-server-foo --x")])))
