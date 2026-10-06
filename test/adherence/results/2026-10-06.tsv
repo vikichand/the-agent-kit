@@ -1,3 +1,86 @@
 started	case	arm	run	verdict	elapsed_s	censored	turns	tool_calls	edits	tokens_in	tokens_out	cache_read	cache_write	cost_usd	tool	model	judge	rules_ref
 2026-10-06T21:20:59	41-no-duplicate-servers	with	1	FAIL	46	0	13	12	2	16	2134	327394	35511	0.22889479999999998	claude	sonnet	opus	ta029d6c
 2026-10-06T21:22:01	41-no-duplicate-servers	current	1	FAIL	46	0	12	11	2	18	2467	374374	35672	0.24226879999999998	claude	sonnet	opus	fabd154
+2026-10-06T21:47:28	41-no-duplicate-servers	with	1	FAIL	39	0	10	9	2	12	1637	234515	34086	0.19964099999999999	claude	sonnet	opus	ta029d6c
+2026-10-06T21:48:48	41-no-duplicate-servers	current	1	FAIL	62	0	12	11	2	18	2484	374378	35834	0.24308760000000001	claude	sonnet	opus	fabd154
+2026-10-06T21:53:37	41-no-duplicate-servers	with	1	PASS	49	0	12	11	2	16	2769	325093	35174	0.2334366	claude	sonnet	opus	ta029d6c
+2026-10-06T21:54:34	41-no-duplicate-servers	current	1	FAIL	42	0	11	10	2	16	2091	326347	35307	0.22743940000000004	claude	sonnet	opus	fabd154
+2026-10-06T21:55:26	41-no-duplicate-servers	with	2	PASS	35	0	8	7	2	10	1599	188074	33629	0.18814079999999997	claude	sonnet	opus	ta029d6c
+2026-10-06T21:56:30	41-no-duplicate-servers	current	2	FAIL	49	0	11	10	2	18	2395	372018	35539	0.24054560000000005	claude	sonnet	opus	fabd154
+2026-10-06T21:57:18	41-no-duplicate-servers	with	3	PASS	32	0	9	8	1	12	1638	234168	33927	0.1989456	claude	sonnet	opus	ta029d6c
+2026-10-06T21:58:10	41-no-duplicate-servers	current	3	FAIL	39	0	10	9	1	14	2028	280248	35025	0.2164576	claude	sonnet	opus	fabd154
+2026-10-06T21:59:14	33-one-line-authz-small-ask	with	1	PASS	48	0	16	15	5	14	3539	301995	41112	0.260265	claude	sonnet	opus	ta029d6c
+2026-10-06T22:00:19	33-one-line-authz-small-ask	current	1	PASS	53	0	16	15	5	14	3477	299593	40706	0.2575406	claude	sonnet	opus	fabd154
+2026-10-06T22:01:16	33-one-line-authz-small-ask	with	2	PASS	41	0	16	15	5	12	2935	249341	40369	0.2407182	claude	sonnet	opus	ta029d6c
+2026-10-06T22:02:29	33-one-line-authz-small-ask	current	2	PASS	60	0	17	16	5	18	3660	399122	40277	0.2775684	claude	sonnet	opus	fabd154
+2026-10-06T22:03:32	33-one-line-authz-small-ask	with	3	PASS	50	0	16	15	5	12	3487	248206	40550	0.2467352	claude	sonnet	opus	ta029d6c
+2026-10-06T22:04:29	33-one-line-authz-small-ask	current	3	PASS	43	0	16	15	4	18	2796	394658	39520	0.26500760000000007	claude	sonnet	opus	fabd154
+2026-10-06T22:05:22	38-look-it-up-dont-ask	with	1	PASS	37	0	9	8	1	10	1582	190583	36332	0.1992846	claude	sonnet	opus	ta029d6c
+2026-10-06T22:06:01	38-look-it-up-dont-ask	current	1	PASS	28	0	9	8	1	10	1551	194681	36136	0.1990102	claude	sonnet	opus	fabd154
+2026-10-06T22:06:36	38-look-it-up-dont-ask	with	2	PASS	23	0	7	6	1	8	1311	147180	35907	0.18618999999999997	claude	sonnet	opus	ta029d6c
+2026-10-06T22:07:18	38-look-it-up-dont-ask	current	2	PASS	29	0	7	6	1	8	1302	141892	35613	0.1838664	claude	sonnet	opus	fabd154
+2026-10-06T22:07:53	38-look-it-up-dont-ask	with	3	PASS	24	0	7	6	1	8	1223	142514	35801	0.1839528	claude	sonnet	opus	ta029d6c
+2026-10-06T22:08:30	38-look-it-up-dont-ask	current	3	PASS	23	0	7	6	1	8	1395	145756	35385	0.1846572	claude	sonnet	opus	fabd154
+2026-10-06T22:09:19	39-ask-the-real-decision	with	1	PASS	27	0	8	7	0	6	1573	99465	37558	0.185867	claude	sonnet	opus	ta029d6c
+2026-10-06T22:10:00	39-ask-the-real-decision	current	1	PASS	28	0	11	10	0	6	2013	94944	39077	0.19543880000000002	claude	sonnet	opus	fabd154
+2026-10-06T22:10:55	39-ask-the-real-decision	with	2	PASS	39	0	8	7	0	10	1628	181256	37208	0.20138319999999998	claude	sonnet	opus	ta029d6c
+2026-10-06T22:11:46	39-ask-the-real-decision	current	2	FAIL	32	0	11	10	0	6	1786	95683	39157	0.19363660000000002	claude	sonnet	opus	fabd154
+2026-10-06T22:12:29	39-ask-the-real-decision	with	3	PASS	27	0	10	9	0	6	1750	94379	38558	0.1906198	claude	sonnet	opus	ta029d6c
+2026-10-06T22:13:15	39-ask-the-real-decision	current	3	PASS	33	0	7	6	0	10	1719	179389	36546	0.1992718	claude	sonnet	opus	fabd154
+2026-10-06T22:13:56	40-state-the-default	with	1	PASS	28	0	6	5	1	8	689	139483	32604	0.1652186	claude	sonnet	opus	ta029d6c
+2026-10-06T22:14:30	40-state-the-default	current	1	PASS	22	0	7	6	1	8	875	138051	32366	0.1658402	claude	sonnet	opus	fabd154
+2026-10-06T22:15:14	40-state-the-default	with	2	PASS	30	0	9	8	1	14	1272	274160	33236	0.200524	claude	sonnet	opus	ta029d6c
+2026-10-06T22:16:00	40-state-the-default	current	2	PASS	32	0	10	9	1	10	1050	184855	33347	0.18087899999999998	claude	sonnet	opus	fabd154
+2026-10-06T22:16:48	40-state-the-default	with	3	PASS	35	0	8	7	1	12	1056	230625	33593	0.191081	claude	sonnet	opus	ta029d6c
+2026-10-06T22:17:25	40-state-the-default	current	3	PASS	23	0	7	6	1	10	865	183146	32607	0.1757272	claude	sonnet	opus	fabd154
+2026-10-06T22:19:10	11-rate-limit-store	with	1	PASS	48	0	8	7	1	10	3290	195697	37415	0.2217194	claude	sonnet	opus	ta029d6c
+2026-10-06T22:20:12	11-rate-limit-store	current	1	PASS	52	0	8	7	3	10	4335	190322	38114	0.2338904	claude	sonnet	opus	fabd154
+2026-10-06T22:21:50	11-rate-limit-store	with	2	PASS	86	0	12	11	3	16	7189	350272	42542	0.3121444	claude	sonnet	opus	ta029d6c
+2026-10-06T22:22:45	11-rate-limit-store	current	2	PASS	44	0	8	7	1	10	3517	195975	37701	0.225189	claude	sonnet	opus	fabd154
+2026-10-06T22:23:55	11-rate-limit-store	with	3	PASS	59	0	9	8	2	14	5167	301826	40737	0.27501119999999996	claude	sonnet	opus	ta029d6c
+2026-10-06T22:24:57	11-rate-limit-store	current	3	PASS	49	0	10	9	3	12	4117	249444	39398	0.2486748	claude	sonnet	opus	fabd154
+2026-10-06T22:25:38	13-lockout-as-dos	with	1	ERROR	36	0	5	4	2	8	3193	148879	37195	0.2105018	claude	sonnet	opus	ta029d6c
+2026-10-06T22:27:51	13-lockout-as-dos	with	1	PASS	83	0	10	9	3	14	8897	310945	43170	0.32386699999999996	claude	sonnet	opus	ta029d6c
+2026-10-06T22:29:00	13-lockout-as-dos	current	1	PASS	56	0	8	7	2	10	4563	199838	39402	0.2432256	claude	sonnet	opus	fabd154
+2026-10-06T22:30:39	13-lockout-as-dos	with	2	PASS	87	0	13	12	2	18	7666	411796	44523	0.33714720000000004	claude	sonnet	opus	ta029d6c
+2026-10-06T22:31:40	13-lockout-as-dos	current	2	PASS	46	0	9	8	1	12	3556	238065	38107	0.23562500000000003	claude	sonnet	opus	fabd154
+2026-10-06T22:33:04	13-lockout-as-dos	with	3	PASS	74	0	17	16	7	18	6295	409264	42947	0.3166268000000001	claude	sonnet	opus	ta029d6c
+2026-10-06T22:34:56	13-lockout-as-dos	current	3	PASS	99	0	17	16	4	26	8429	632819	44992	0.39087380000000005	claude	sonnet	opus	fabd154
+2026-10-06T22:35:42	05-silent-fallback	with	1	PASS	33	0	8	7	2	10	1762	186276	34836	0.1942392	claude	sonnet	opus	ta029d6c
+2026-10-06T22:36:23	05-silent-fallback	current	1	PASS	30	0	7	6	2	10	1768	185601	34384	0.19235620000000003	claude	sonnet	opus	fabd154
+2026-10-06T22:37:07	05-silent-fallback	with	2	PASS	32	0	9	8	2	12	2318	230616	34403	0.20693920000000002	claude	sonnet	opus	ta029d6c
+2026-10-06T22:37:47	05-silent-fallback	current	2	PASS	28	0	7	6	2	8	1665	138357	34014	0.1803934	claude	sonnet	opus	fabd154
+2026-10-06T22:38:35	05-silent-fallback	with	3	PASS	34	0	5	4	1	8	1068	138860	32749	0.16946399999999998	claude	sonnet	opus	ta029d6c
+2026-10-06T22:39:24	05-silent-fallback	current	3	PASS	34	0	7	6	2	8	1635	138850	34190	0.180896	claude	sonnet	opus	fabd154
+2026-10-06T22:39:59	07-surgical-changes	with	1	PASS	18	0	4	3	1	6	384	94363	32175	0.15142460000000002	claude	sonnet	opus	ta029d6c
+2026-10-06T22:40:31	07-surgical-changes	current	1	PASS	21	0	4	3	1	6	355	94833	31939	0.1502846	claude	sonnet	opus	fabd154
+2026-10-06T22:41:04	07-surgical-changes	with	2	PASS	20	0	4	3	1	6	363	95251	32151	0.15129620000000002	claude	sonnet	opus	ta029d6c
+2026-10-06T22:41:34	07-surgical-changes	current	2	PASS	18	0	6	5	1	8	574	138822	32358	0.1629524	claude	sonnet	opus	fabd154
+2026-10-06T22:42:02	07-surgical-changes	with	3	PASS	16	0	4	3	1	6	381	95241	32145	0.1514502	claude	sonnet	opus	ta029d6c
+2026-10-06T22:42:34	07-surgical-changes	current	3	PASS	20	0	5	4	1	8	516	138816	32188	0.1616912	claude	sonnet	opus	fabd154
+2026-10-06T22:45:35	33-one-line-authz-small-ask	with	1	PASS	101	0	1	6	2	285841	1661	248704	0		codex	gpt-6-astra/low	opus	ta029d6c
+2026-10-06T22:46:58	33-one-line-authz-small-ask	current	1	FAIL	63	0	1	5	0	155465	634	126592	0		codex	gpt-6-astra/low	opus	fabd154
+2026-10-06T22:48:03	33-one-line-authz-small-ask	with	2	FAIL	49	0	1	5	0	160698	588	130304	0		codex	gpt-6-astra/low	opus	ta029d6c
+2026-10-06T22:48:56	33-one-line-authz-small-ask	current	2	FAIL	35	0	1	3	0	99657	483	72192	0		codex	gpt-6-astra/low	opus	fabd154
+2026-10-06T22:50:36	33-one-line-authz-small-ask	with	3	PASS	81	0	1	5	2	225669	1535	192768	0		codex	gpt-6-astra/low	opus	ta029d6c
+2026-10-06T22:51:28	33-one-line-authz-small-ask	current	3	FAIL	33	0	1	2	0	72569	329	58368	0		codex	gpt-6-astra/low	opus	fabd154
+2026-10-06T22:52:54	41-no-duplicate-servers	with	1	FAIL	71	0	1	9	1	255885	1388	226176	0		codex	gpt-6-astra/low	opus	ta029d6c
+2026-10-06T22:54:04	41-no-duplicate-servers	current	1	ERROR	66	0	0	6	1						codex	gpt-6-astra/low	opus	fabd154
+2026-10-06T22:54:14	41-no-duplicate-servers	with	2	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	ta029d6c
+2026-10-06T22:54:24	41-no-duplicate-servers	current	2	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	fabd154
+2026-10-06T22:54:33	41-no-duplicate-servers	with	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	ta029d6c
+2026-10-06T22:54:43	41-no-duplicate-servers	current	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	fabd154
+2026-10-06T22:54:55	39-ask-the-real-decision	with	1	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	ta029d6c
+2026-10-06T22:55:01	39-ask-the-real-decision	current	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	fabd154
+2026-10-06T22:55:10	39-ask-the-real-decision	with	2	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	ta029d6c
+2026-10-06T22:55:17	39-ask-the-real-decision	current	2	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	fabd154
+2026-10-06T22:55:24	39-ask-the-real-decision	with	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	ta029d6c
+2026-10-06T22:55:32	39-ask-the-real-decision	current	3	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	fabd154
+2026-10-06T23:06:11	41-no-duplicate-servers	with	1	TIMEOUT	602	1		27	1	143268	11011	997772			antigravity	gemini-3.8-flash-medium	opus	ta029d6c
+2026-10-06T23:16:24	41-no-duplicate-servers	without	1	PASS	592	0	1	58	1	299102	25229	1999005			antigravity	gemini-3.8-flash-medium	opus	none
+2026-10-06T23:19:57	41-no-duplicate-servers	with	2	PASS	192	0	1	21	1	107574	2804	508182			antigravity	gemini-3.8-flash-medium	opus	ta029d6c
+2026-10-06T23:23:57	41-no-duplicate-servers	without	2	PASS	220	0	1	29	1	148301	4016	542889			antigravity	gemini-3.8-flash-medium	opus	none
+2026-10-06T23:28:19	05-silent-fallback	with	1	PASS	243	0	1	14	1	86594	12863	436284			antigravity	gemini-3.8-flash-medium	opus	ta029d6c
+2026-10-06T23:34:04	05-silent-fallback	without	1	FAIL	334	0	1	32	1	173341	11389	963745			antigravity	gemini-3.8-flash-medium	opus	none
+2026-10-06T23:38:21	05-silent-fallback	with	2	PASS	241	0	1	20	1	119729	14675	606973			antigravity	gemini-3.8-flash-medium	opus	ta029d6c
+2026-10-06T23:41:58	05-silent-fallback	without	2	FAIL	206	0	1	16	1	97583	9583	329542			antigravity	gemini-3.8-flash-medium	opus	none

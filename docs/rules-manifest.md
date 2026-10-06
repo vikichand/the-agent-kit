@@ -113,7 +113,7 @@ research notes, not from a per-rule record kept at the time.
 | I8 don't touch the guardrails | 0.1.0 | 4.x | command guard denies hook bypasses and settings edits | owner |
 | Precedence when rules conflict | 0.5.0 | 5.5 | advice | owner, research (a precedence order was missing). Unmeasured: no case yet |
 | S0.1 size by risk | 0.2.0 | 5.x | advice | eval 32, 33 |
-| S0.2 high-risk question round, ask only what the repository cannot answer | 0.5.0 | 5.5 | advice | eval 39, vendor (Opus 5 guide on checking in) |
+| S0.2 high-risk question round, ask only what the repository cannot answer | 0.5.0 | 5.5 | advice | eval 39, 33 (Codex 2/3, first ever pass), vendor (Opus 5 guide on checking in) |
 | S0.3 name what you skipped | 0.2.0 | 5.x | advice | owner |
 | S1.1 never assume | 0.4.0 | 5.5 | advice | eval 38, 39, 40, vendor |
 | S1.2 blast radius first | 0.1.0 | 4.x | advice | eval 03 |
@@ -127,7 +127,7 @@ research notes, not from a per-rule record kept at the time.
 | S3.6 copied code carries its license | 0.1.0 | 4.x | advice | owner |
 | S4.1, S4.2 surgical changes, own orphans | 0.1.0 | 4.x | advice | eval 07 |
 | S4.3 edit from current contents | 0.2.0 | 5.x | advice | eval 34 |
-| S4.4 leave the machine as you found it | 0.5.0 | 5.5 | advice, and `install.sh --tidy` for what slips through | eval 41 and a field report; unmeasured until the case runs |
+| S4.4 leave the machine as you found it | 0.5.0 | 5.5 | advice, and `install.sh --tidy` for what slips through | eval 41 (Sonnet 3/3 against 0/3; Codex not reliable; Antigravity no gap) and a field report |
 | S5.1, S5.2 oracle, test-first, evidence by change | 0.1.0, table 0.5.0 | 4.x, 5.5 | advice | eval 09, 16, 25, 26 |
 | S5.3 never game the oracle | 0.1.0 | 4.x | advice, tests depth rule | eval 01 |
 | S5.4 bound any loop | 0.2.0 | 5.x | advice (research suggests a hook) | research |

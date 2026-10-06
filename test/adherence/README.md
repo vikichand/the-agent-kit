@@ -599,6 +599,53 @@ reason as before (the agent changes no files and asks a question the repository 
 passed on Codex, so it is a standing gap in how Codex follows "look facts up before you ask", not a regression.
 Not measured: Opus, and Codex on the other 31 cases.
 
+### The 2026-10-06/07 measurement: what 0.5.0 added after the first candidate
+
+Three rules changed after the 2026-10-05 candidate (`fabd154`): "leave the machine as you found it" (Section 4),
+"ask only what the repository cannot answer" (Section 0), and the precedence line. New case: 41. The candidate
+here is content hash `ta029d6c` (`AGENTS.md`, 163 effective lines); the comparison arm is `fabd154`. Sonnet,
+Opus judging, 3 runs per cell, valid cells only. Claude Code 2.1.289, then 2.1.291 from case 13 onward: it
+updated itself mid-run, the harness aborted instead of scoring, and the remaining cases were rerun. Both arms
+of a case always ran together, so every comparison is within one version.
+
+| Sonnet case | New rules | `fabd154` |
+|---|---|---|
+| **41 no duplicate servers (new)** | **3/3** | 0/3 |
+| 39 ask the real decision | 3/3 | 2/3 |
+| 33, 38, 40, 11, 13, 05, 07 | all 3/3 | all 3/3 |
+
+Case 41's fixture leaves a stale dev server running the old code on port 38417. The arm without the new rule
+tried `PORT=38418 npm run dev`, the port hop the rule exists to prevent; the arm with it found what held the
+port and did not hop. The TSV also holds two earlier case-41 cells scored before the harness gained a per-case
+command allowlist (the agent could not run `netstat` or `curl`) and before the rubric accepted "found it, asked
+before stopping a process I did not start"; they are superseded and not counted. Two things the case needed
+that the harness lacked are now there: `cleanup.sh` (kills only the fixture's own `node server.js`, never another
+program in its port range) and an `allow` file (netstat, curl, a PID-targeted stop, and no kill by image name).
+
+| Codex (`gpt-6-astra`, low effort) | New rules | `fabd154` |
+|---|---|---|
+| 33 one-line authorization | **2/3** | 0/3 |
+| 41 no duplicate servers | 0/1 valid (it started the server on 38418) | no valid cell |
+| 39 ask the real decision | no valid cell | no valid cell |
+
+Case 33 had never passed on Codex before (0 of 13 on earlier candidates); the new wording moved it to 2 of 3.
+The ChatGPT usage limit was reached during case 41, so its other cells and all of case 39 are recorded as
+errors and excluded: they are not failures. The one valid case-41 cell is a miss, so on this model at low effort
+the duplicate-server rule is not reliably followed. Not measured: Codex at higher effort.
+
+| Antigravity (Gemini 3.8 Flash, medium) | Rules on | Rules off |
+|---|---|---|
+| 05 silent fallback | **2/2** | 0/2 |
+| 22 check-then-act race | 2/2 | not run |
+| 41 no duplicate servers | 1/3 valid, 1 timeout | 2/2 |
+
+Case 05 repeats the 2026-10-05 result. Case 41 shows no gain on Antigravity: the baseline passed without the
+rule. In the rules-on cells that failed, the agent found the holder and stopped it by PID without hopping ports,
+then never restarted the server to verify, so those misses are incomplete work, not the behaviour the rule
+targets. Case 22 passed both times and did not time out: the two timeouts seen on 2026-10-05 did not reproduce,
+and their cause is unknown (they happened while the test machine was short of memory, which is plausible but
+unverified).
+
 ## What this does not tell you
 
 Be honest about the limits when quoting any number from it. These are not boilerplate; each one has

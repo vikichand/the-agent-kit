@@ -1,0 +1,5 @@
+started	case	arm	run	verdict	elapsed_s	censored	turns	tool_calls	edits	tokens_in	tokens_out	cache_read	cache_write	cost_usd	tool	model	judge	rules_ref
+2026-10-07T07:10:59	22-check-then-act-coupon	with	1	PASS	175	0	1	26	1	137165	2699	793637			antigravity	gemini-3.8-flash-medium	opus	ta029d6c
+2026-10-07T07:17:04	22-check-then-act-coupon	with	2	PASS	353	0	1	38	1	215501	5951	1244064			antigravity	gemini-3.8-flash-medium	opus	ta029d6c
+2026-10-07T07:20:14	41-no-duplicate-servers	with	1	FAIL	173	0	1	23	1	112150	2791	532177			antigravity	gemini-3.8-flash-medium	opus	ta029d6c
+2026-10-07T07:23:48	41-no-duplicate-servers	with	2	FAIL	179	0	1	23	1	144771	3089	511993			antigravity	gemini-3.8-flash-medium	opus	ta029d6c

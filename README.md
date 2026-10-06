@@ -305,7 +305,7 @@ and the installer is the adapter between them:
 | Tool-layer guard | `ask`, machine-wide | `deny`, machine-wide | asks every time, per project (`.agents/hooks.json`) |
 | Turn-scoped git grants | yes | no (deny mode; you push) | no (it asks; you approve) |
 | Session-start update check | yes | yes | no (Antigravity has no documented session-start hook) |
-| Measured | 40 cases, Sonnet | 9 cases, see [Limits](#limits) | 5 cases, small sample, see [Limits](#limits) |
+| Measured | 41 cases, Sonnet | 10 cases, see [Limits](#limits) | 6 cases, small sample, see [Limits](#limits) |
 
 **The guards** - hooks at the **git layer** (reorder-proof, covering Claude Code, Codex, Antigravity, plain `git`,
 and any MCP tool that shells out to `git`) plus the **tool layer**, a fast prompt-time veto. Full map
@@ -661,7 +661,8 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
   force push, and a denial holds even under `--dangerously-skip-permissions` (which does auto-approve the
   guard's questions). Measured on Gemini 3.8 Flash, 2 runs per cell, rules on against off: case 05 (silent
   fallbacks) 2/2 against 0/2, cases 07 and 39 level, and case 31 (comments), the one most dependent on a glob
-  rule, no better with them. So the two glob rules ship on the strength of their Claude Code
+  rule, no better with them. The duplicate-server case showed no gain there either: the baseline already does
+  not hop ports. So the two glob rules ship on the strength of their Claude Code
   measurements, not an Antigravity one: Antigravity delivers a glob rule inside the tool output of the file
   that triggered it, where a model may weigh it as untrusted content. Other limits are Antigravity's own: it
   has no documented session-start hook, so the update check does not run there; it splits a hook command on
@@ -670,14 +671,15 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
   the guard is advisory against the agent itself, because `.agents/hooks.json` is a project file the agent
   can edit, so the git-layer hooks and server-side branch protection stay the backstop. Resuming a
   multi-turn conversation in the eval harness is untested, and macOS and Linux are untested.
-- **On Codex, nine cases measured, with small samples and mixed results.** The harness
-  has a Codex arm with the skills port. Object-level authorization and personal data in logs came back 3/3
-  in both arms: Codex's default model already does what those rules ask, on prompts where Sonnet needed the
-  rule. For 0.5.0, the never-assume cases 39 and 40 are 3/3 against v0.4.0's 3/3 on `gpt-6-astra`, and case
-  33 (a one-line authorization fix) is 0/3 on both, where the agent asks a question the repository already
-  answers; it has never passed on Codex. The same transcripts show the ported skill body was loaded in a
-  third of the with-arm cells, so even the passes are mostly the floor plus the model's defaults. Whether
-  the port changes Codex's behaviour elsewhere is unmeasured and should be read that way.
+- **On Codex, ten cases measured, with small samples and mixed results.** The harness has a Codex arm with the
+  skills port. Object-level authorization and personal data in logs came back 3/3 in both arms: Codex's default
+  model already does what those rules ask, on prompts where Sonnet needed the rule. For 0.5.0, the never-assume
+  cases 39 and 40 were 3/3 against v0.4.0's 3/3 on `gpt-6-astra`, and the one-line authorization fix (case 33),
+  which had never passed on Codex, passed 2 of 3 after the "ask only what the repository cannot answer"
+  wording. The new duplicate-server rule is not reliably followed there: its one valid cell hopped to another
+  port, and the rest of that run hit the usage limit. The same transcripts show the ported skill body was
+  loaded in a third of the with-arm cells, so even the passes are mostly the floor plus the model's defaults.
+  Whether the port changes Codex's behaviour elsewhere is unmeasured and should be read that way.
 
 ## Inspired by
 
