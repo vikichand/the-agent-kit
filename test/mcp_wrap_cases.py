@@ -109,6 +109,94 @@ def t_child_exits():
     assert not left, left
 
 
+def load_wrap():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("mcp_wrap_under_test", WRAP)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def t_refuse_metachar():
+    d = os.path.join(TMP, "meta")
+    os.makedirs(d)
+    mark = os.path.join(d, "ran.txt")
+    cmdfile = os.path.join(d, "srv.cmd")
+    try:
+        with open(cmdfile, "w") as f:
+            f.write("@echo hi\r\n")
+        r = subprocess.run([sys.executable, WRAP, "--", cmdfile, "a&type nul>" + mark],
+                           capture_output=True, timeout=30)
+        assert r.returncode == 2, (r.returncode, r.stderr)
+        assert not os.path.exists(mark), "second command ran"
+        assert b"refus" in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def t_npx_resolution():
+    mod = load_wrap()
+    d = os.path.join(TMP, "npmroot")
+    cli = os.path.join(d, "node_modules", "npm", "bin", "npx-cli.js")
+    try:
+        os.makedirs(os.path.dirname(cli))
+        for n in (os.path.join(d, "npx.cmd"), os.path.join(d, "node.exe"), cli):
+            open(n, "w").close()
+        got = mod.win_command([os.path.join(d, "npx.cmd"), "-y", "pkg&x"])
+        assert got == [os.path.join(d, "node.exe"), cli, "-y", "pkg&x"], got
+        os.remove(cli)
+        try:
+            mod.win_command([os.path.join(d, "npx.cmd"), "pkg&x"])
+            raise AssertionError("missing cli should fall through to the metachar refusal")
+        except ValueError:
+            pass
+        got = mod.win_command([os.path.join(d, "npx.cmd"), "pkg"])
+        assert isinstance(got, str) and "system32\\cmd.exe" in got.lower(), got
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def t_cwd_hijack():
+    decoy, real = os.path.join(TMP, "decoy"), os.path.join(TMP, "real")
+    mark = os.path.join(TMP, "hijack.txt")
+    try:
+        for d, who in ((decoy, "decoy"), (real, "real")):
+            os.makedirs(d)
+            with open(os.path.join(d, "evilcmd.cmd"), "w") as f:
+                f.write('@echo %s>"%s"\r\n' % (who, mark))
+        env = dict(os.environ, PATH=real + os.pathsep + os.environ["PATH"])
+        subprocess.run([sys.executable, WRAP, "evilcmd"], capture_output=True, timeout=30, env=env, cwd=decoy)
+        with open(mark) as f:
+            assert f.read().strip() == "real"
+    finally:
+        shutil.rmtree(decoy, ignore_errors=True)
+        shutil.rmtree(real, ignore_errors=True)
+
+
+def t_parent_gone():
+    import ctypes
+    k = ctypes.WinDLL("kernel32", use_last_error=True)
+    k.OpenProcess.restype = ctypes.c_void_p
+    k.OpenProcess.argtypes = [ctypes.c_uint32, ctypes.c_int, ctypes.c_uint32]
+    k.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+    k.GetExitCodeProcess.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+    errf = os.path.join(TMP, "gone.err")
+    # the wrapper sleeps first so the test can hold its handle; by the time it checks, its parent has exited
+    w = ("import time,sys,runpy; time.sleep(5); sys.argv=[%r,'--',%r,'-e','setInterval(()=>{},1000)']; "
+         "runpy.run_path(%r, run_name='__main__')" % (WRAP, NODE, WRAP))
+    client = ("import subprocess,sys; p=subprocess.Popen([sys.executable,'-c',%r],stderr=open(%r,'w')); "
+              "print(p.pid,flush=True)" % (w, errf))
+    out = subprocess.run([sys.executable, "-c", client], capture_output=True, text=True, timeout=30).stdout
+    h = k.OpenProcess(0x00101000, 0, int(out.strip()))
+    assert h, "could not open the wrapper process (%r, err %d)" % (out, ctypes.get_last_error())
+    assert k.WaitForSingleObject(h, 15000) == 0, "wrapper did not exit"
+    code = ctypes.c_uint32()
+    k.GetExitCodeProcess(h, ctypes.byref(code))
+    assert code.value == 1, (code.value, open(errf).read())
+    with open(errf) as f:
+        assert "parent already gone" in f.read()
+
+
 def t_posix():
     m = "ORPHANPOSIX%d" % os.getpid()
     cmd = [sys.executable, WRAP, "--", "sh", "-c", "sleep 300; : " + m]
@@ -130,6 +218,10 @@ CASES = [("control: orphans without wrapper", t_control, "win"), ("wrapped: no o
          ("wrapped through cmd /c", t_via_cmd, "win"), ("exit code pass-through", t_exit_code, "win"),
          ("stdout stays clean", t_stdout_clean, "win"), ("command path with a space", t_space_path, "win"),
          ("child exits on its own", t_child_exits, "win"),
+         ("shell metacharacter argument refused for .cmd", t_refuse_metachar, "win"),
+         ("npx resolves to node + npx-cli.js", t_npx_resolution, "win"),
+         ("cwd decoy does not hijack PATH lookup", t_cwd_hijack, "win"),
+         ("parent already gone exits 1", t_parent_gone, "win"),
          ("posix: no orphans (UNTESTED on the dev machine)", t_posix, "posix")]
 
 ok = total = 0
