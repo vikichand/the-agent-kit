@@ -473,7 +473,7 @@ Quick Start covers the usual path. The installer's modes:
 | `--extension` | project | Project block only, for when the universal rules already live in your global files, so nothing is duplicated into context. |
 | `--update-rules` | project | Replace the universal rules, keep `PROJECT-CONFIG` byte-for-byte. |
 | `--check` | project | Doctor: interpreter, guard firing, per-hook identity, settings wiring, rules-file size, and one line on orphaned MCP processes. |
-| `--tidy` | machine | List orphaned MCP server processes left by a crashed agent. Dry run; add `--kill` to end exactly the listed trees. See [`docs/mcp-orphans.md`](docs/mcp-orphans.md). |
+| `--tidy` | machine | List orphaned MCP server processes left by a crashed agent. Dry run; add `--kill` to end exactly the listed trees. See [`docs/mcp-orphans.md`](docs/mcp-orphans.md). This is only the quick check for leftover MCP servers; the `/tidy` skill covers branches, worktrees, files and dev servers too. |
 
 > **Merge, don't replace.** If your `settings.json` already has `permissions` or `hooks`, fold these
 > keys into them. Pasting the whole snippet over an existing file wipes what's there.

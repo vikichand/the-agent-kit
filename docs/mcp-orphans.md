@@ -23,7 +23,9 @@ A normal exit does not reproduce it.
   never an ancestor of the reaper itself. It is a dry run by default. `--kill` ends exactly what was listed,
   children first, re-checking each process before it acts. `AGENT_KIT_MCP_PATTERNS` adds comma separated
   patterns; `AGENT_KIT_MCP_PATTERNS_ONLY=1` uses only those.
-- **`install.sh --tidy [--kill] [--min-age-minutes N] [--json]`** runs the reaper.
+- **`install.sh --tidy [--kill] [--min-age-minutes N] [--json]`** runs the reaper. It is only the quick check for
+  leftover MCP servers. The [`/tidy` skill](tidy.md) is the full cleanup: it also covers duplicate and idle dev
+  servers, merged branches, stale worktrees and leftover files, and asks you group by group.
 - **`install.sh --check`** prints one line: `OK` (no orphans), `WARN` (count and size), or `NOTE` (unavailable).
 
 The kit never edits an MCP config for you. It only prints and documents the commands below.
