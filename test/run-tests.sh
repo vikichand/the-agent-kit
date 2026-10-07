@@ -29,6 +29,7 @@ if [ -n "$PY" ]; then
   $PY "$KIT/test/command_guard_cases.py" "$KIT/hooks/command-guard.py" || bad "command-guard corpus"
   $PY "$KIT/test/mcp_wrap_cases.py" || bad "mcp-wrap cases"
   $PY "$KIT/test/mcp_orphans_cases.py" || bad "mcp-orphans corpus"
+  $PY "$KIT/test/tidy_procs_cases.py" || bad "tidy-procs corpus"
 else
   bad "no working python found - command-guard NOT tested (install Python 3)"
 fi
