@@ -336,8 +336,8 @@ copy_share() {  # copy this kit into ~/.the-agent-kit, so the download it came f
   # Copy the WHOLE kit, not just the hooks, so the clone you ran this from becomes disposable.
   # git-hooks/ is the core.hooksPath target (those three only); hooks/ is the full set, which is
   # what the relocated install.sh compares against in --check and copies from per project.
-  for h in command-guard.py kit-check.py mcp-orphans.py mcp-wrap.py commit-msg pre-commit pre-push; do
-    case "$h" in mcp-*) [ -f "$KIT/hooks/$h" ] || continue ;; esac
+  for h in command-guard.py kit-check.py mcp-orphans.py mcp-wrap.py tidy-procs.py tidy-scan.py commit-msg pre-commit pre-push; do
+    case "$h" in mcp-*|tidy-*) [ -f "$KIT/hooks/$h" ] || continue ;; esac
     cp "$KIT/hooks/$h" "$share/hooks/$h"
   done
   for h in commit-msg pre-commit pre-push; do cp "$KIT/hooks/$h" "$share/git-hooks/$h"; done
@@ -514,8 +514,8 @@ update_kit() {  # refresh ~/.the-agent-kit from GitHub, so the clone stays dispo
   fi
   # Never overwrite a working install from a surprise payload: prove the download is actually the kit
   # before it touches anything. A moved/renamed/hijacked repo fails here instead of half-installing.
-  for f in install.sh AGENTS.md hooks/command-guard.py hooks/mcp-orphans.py hooks/mcp-wrap.py hooks/pre-commit; do
-    case "$f" in hooks/mcp-*) [ -f "$tmp/kit/$f" ] || continue ;; esac
+  for f in install.sh AGENTS.md hooks/command-guard.py hooks/mcp-orphans.py hooks/mcp-wrap.py hooks/tidy-procs.py hooks/tidy-scan.py hooks/pre-commit; do
+    case "$f" in hooks/mcp-*|hooks/tidy-*) [ -f "$tmp/kit/$f" ] || continue ;; esac
     [ -f "$tmp/kit/$f" ] || { rm -rf "$tmp"; say "  ! downloaded tree has no $f - that is not the kit. NOTHING was changed."; exit 2; }
   done
   new=$( (cd "$tmp/kit" && git rev-parse --short HEAD 2>/dev/null) || printf 'unknown' )
@@ -704,7 +704,7 @@ doctor() {
   else
     say "  OK:   hooks/kit-check.py present (session-start update check; wired if you merged SessionStart)"
   fi
-  for h in mcp-orphans.py mcp-wrap.py; do
+  for h in mcp-orphans.py mcp-wrap.py tidy-procs.py tidy-scan.py; do
     if [ -f "$KIT/hooks/$h" ]; then say "  OK:   hooks/$h present"; else say "  NOTE: hooks/$h unavailable in this kit copy"; fi
   done
   # The settings are where the tool guard and the session-start check are wired. Checking the scripts
