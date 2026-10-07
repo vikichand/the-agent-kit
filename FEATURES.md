@@ -133,6 +133,11 @@ folder.
   command in the first screenful, every command surface as a table, shell differences named. Fires on
   documentation, README, commit-message and PR-description work; ships to both skills folders (`.claude/skills/` and `.agents/skills/`).
 
+- **`tidy`** - the one user-invoked skill (`/tidy`, Codex `$tidy`): lists leftovers (stray and duplicate dev
+  servers, merged branches, stale worktrees, Playwright output, scratch files), asks per group, and removes only
+  approved ids through a scanner that never touches tracked or git-ignored files and logs each action. Idle
+  servers and candidate files are never offered as "remove all". See [`docs/tidy.md`](docs/tidy.md).
+
 Honest labelling inside the skill: the contract-freeze pattern and the verify-RED gate are
 **well-reasoned practice, not measured results**, and it says so rather than inventing authority.
 

@@ -289,9 +289,9 @@ observability, audit logs.
 to, so security rules arrive on API code and accessibility rules on components, at no cost the rest of
 the time.
 
-**The task tier** - three skills that load on what you are *doing* rather than which file you opened:
-splitting work across subagents, writing a plan or report a human will act on, and documentation and
-commit-message prose.
+**The task tier** - four skills that load on what you are *doing* rather than which file you opened:
+splitting work across subagents, writing a plan or report a human will act on, documentation and
+commit-message prose, and a user-invoked `/tidy` cleanup.
 
 **Which tool gets what.** The content is one set of markdown files; the *routing* differs per tool,
 and the installer is the adapter between them:
@@ -300,7 +300,7 @@ and the installer is the adapter between them:
 |---|---|---|---|
 | Floor (`AGENTS.md`) | via the one-line `CLAUDE.md` import | read directly | read directly |
 | Depth tier (6 rules) | `.claude/rules/`, loads by file path | 4 of 6 as `.agents/skills/`, loads by task match; the 2 path-shaped ones (`code-correctness`, `tests`) don't port and stay one-liners in the floor | the same 4 skills, plus the 2 path-shaped ones as glob rules in `.agents/rules/` |
-| Task tier (3 skills) | `.claude/skills/` | `.agents/skills/`, same files | `.agents/skills/`, shared with Codex |
+| Task tier (4 skills) | `.claude/skills/` | `.agents/skills/`, same files | `.agents/skills/`, shared with Codex |
 | Git-layer guards | yes | yes | yes |
 | Tool-layer guard | `ask`, machine-wide | `deny`, machine-wide | asks every time, per project (`.agents/hooks.json`) |
 | Turn-scoped git grants | yes | no (deny mode; you push) | no (it asks; you approve) |
@@ -405,7 +405,7 @@ so nothing double-loads.
 ### The task tier: skills
 
 A third trigger, for guidance keyed to *what you are doing* rather than which file you opened. Only the
-skill's one-line description sits in context; the body loads when a task matches. Three ship:
+skill's one-line description sits in context; the body loads when a task matches. Four ship:
 
 **`orchestrating-work`** fires when a task looks decomposable, or when you ask to parallelise or use
 subagents. Its spine is the rule every credible source agrees on - **reads parallelise, writes do
@@ -426,6 +426,11 @@ the conversation, stays markdown-only.
 **`writing-docs`** fires on documentation, README, commit-message, or PR-description work. It carries
 the full version of Section 8's two-line prose rule and the README order: working path first, a
 runnable command in the first screenful, every command surface as a table, shell differences named.
+
+**`/tidy`** is the one skill you run yourself (`/tidy` in Claude Code, `$tidy` in Codex). It lists leftovers
+(stray or duplicate dev-server processes, merged branches, stale worktrees, Playwright output, scratch files),
+asks group by group, and removes only what you approve, with a dry run first and a log. Details and limits:
+[`docs/tidy.md`](docs/tidy.md).
 
 ### Optional: the performance profile
 
@@ -624,6 +629,7 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
 
 ## Limits
 
+- **`/tidy` cannot be made user-only on Antigravity**, so the agent could start its read-only scan there; every removal still needs your yes. Its POSIX process listing (`ss`, `lsof`) has unit tests on canned text only, not a live run. See [`docs/tidy.md`](docs/tidy.md).
 - **The MCP orphan fix is verified on Windows and Linux (WSL2), not macOS.** Servers a plugin launches cannot be wrapped (the reaper covers them), and a server you run on purpose as a systemd service that matches an MCP pattern would be listed by the reaper.
 - **Not a sandbox.** These stop a *well-intentioned* agent and the careless common paths, not a determined
   adversary; for real isolation, run agents in a container / OS sandbox.

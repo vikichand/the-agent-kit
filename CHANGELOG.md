@@ -13,6 +13,10 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ### Added
 
+- **`/tidy`, a user-invoked cleanup skill.** It lists leftovers (stray and duplicate dev servers, merged
+  branches, stale worktrees, Playwright output, scratch files) and asks per group before removing anything,
+  with a dry run and a log. Claude Code and Codex make it user-only; Antigravity cannot. See
+  [`docs/tidy.md`](docs/tidy.md).
 - **Antigravity is a supported tool.** It reads `AGENTS.md` and the `.agents/skills/` Codex gets; a
   project install now also writes the two path-shaped depth rules (`code-correctness`, `tests`) to
   `.agents/rules/` as glob rules, and the command guard as a workspace hook in `.agents/hooks.json`,
