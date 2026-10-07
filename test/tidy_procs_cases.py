@@ -163,6 +163,42 @@ check("apply refuses an unknown pid and a malformed id", lambda: not applied(["p
 check("apply reports skipped ids", lambda: len(applied(["proc:40:1"])[1]) == 1 and "no longer" in applied(["proc:40:1"])[1][0])
 check("apply reports survivors", lambda: applied([good], survivors=[40])[2] == [40])
 
+# security findings
+r = S([PARENT, A, B], net({20: [3000], 21: [3001]}))
+check("listening duplicate is low with its port in the evidence", lambda r=r: groups(r) == [("processes.duplicates", 20)]
+      and r[0][0]["confidence"] == "low" and "also listening on port 3000" in r[0][0]["evidence"])
+check("non-listening duplicate stays medium without a listening note", lambda: (lambda x: x[0][0]["confidence"] == "medium"
+      and not any("also listening" in e for e in x[0][0]["evidence"]))(S([PARENT, A, B], net({21: [3001]}))))
+HOSTILE = NEXT.replace(r"C:\proj", "C:\\pr\x1b[31moj\x07X")
+r = S([PARENT, proc(20, 1, HOSTILE + " -p 3000", 9000), proc(21, 1, HOSTILE + " -p 3001", 8000)], net({21: [1]}))
+check("process evidence and label carry no control characters", lambda r=r: r[0] and not any(
+    re.search(r"[\x00-\x1f\x7f]", t) for i in r[0] for t in i["evidence"] + [i["label"]]) and any(
+    "[31m" in e for e in r[0][0]["evidence"]))
+check("clean replaces control characters", lambda: tidy.clean("a\x1b\nb") == "a  b")
+
+
+def which_ignores_cwd():
+    tmp = pathlib.Path(tempfile.mkdtemp(prefix="tidyprocs_which_"))
+    old_cwd, old_path = os.getcwd(), os.environ["PATH"]
+    try:
+        for n in ("ss.cmd", "ss.exe", "ss"):
+            (tmp / n).write_text("x")
+        os.chdir(tmp)
+        os.environ["PATH"] = "." + os.pathsep + str(tmp / "nope")
+        return tidy.which("ss") is None and os.environ.get("NoDefaultCurrentDirectoryInExePath") == "1"
+    finally:
+        os.chdir(old_cwd)
+        os.environ["PATH"] = old_path
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+check("which never resolves through the cwd", which_ignores_cwd)
+src = path.read_text()
+check("no bare executable names or shutil.which", lambda: not re.search(r'\["(?:ss|lsof|ps)"', src) and "shutil.which" not in src)
+check("nan and negative ages are rejected", lambda: all(subprocess.run(
+    [sys.executable, str(path), "scan", flag, v], capture_output=True, text=True).returncode == 2
+    for flag in ("--idle-hours", "--min-age-minutes") for v in ("nan", "-1", "inf")))
+
 passed = 0
 for name, assertion in cases:
     try:

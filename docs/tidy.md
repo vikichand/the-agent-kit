@@ -26,7 +26,7 @@ The skill needs the scripts at `~/.the-agent-kit/hooks/`, which `install.sh --se
 | processes.strays | MCP-server process trees whose parent is dead, older than 5 minutes | high | yes |
 | processes.duplicates | the same dev server running twice for one project; the listening, newest copy is kept | medium | yes |
 | processes.idle | a dev server that listens but has no connection, no CPU and hours of age | low | no, item by item |
-| branches and worktrees | local branches merged or with a gone upstream; clean, unlocked, stale worktrees | high or medium | yes |
+| branches and worktrees | local branches merged or with a gone upstream; clean, unlocked, stale worktrees | high or medium (low for a worktree holding git-ignored files) | yes, except low items |
 | tool_leftovers | `.playwright-mcp`, `playwright-report`, `test-results`, `*.trace.zip`, empty `.claude/worktrees/` folders, old auto-named screenshots | high or medium | yes |
 | candidates | untracked files with leftover-looking names (`*-plan.md`, `*.orig`, `*.bak`, `*.log`, `scratch*`) | low | no, item by item |
 
@@ -53,6 +53,16 @@ a guess you must judge. What each group never lists is in
   dirty or locked worktrees.
 - Nothing runs with force flags. The agent does not run `rm`, `kill`, `git branch -D` or `git clean` itself.
 
+## Safety checks
+
+- A worktree that holds git-ignored files (a `.env`, say) is low confidence, lists them, and `apply` refuses it
+  unless run with `--allow-ignored`, which the agent passes only after you approved that item having seen them.
+- A duplicate dev server that is itself listening on a port is low confidence and asked item by item.
+- Removing a worktree also deletes its merged branch; the label says so. Missing worktrees are pruned all
+  together, so `apply` skips them unless you approved every prunable one.
+- Labels and evidence come from the repository, so control characters are stripped and the agent treats them as
+  data. `git` is resolved from `PATH` only, never the current folder, and `--stale-days` must be 0 or more.
+
 ## Undo
 
 | Removed | Can it come back? |
@@ -70,7 +80,7 @@ python ~/.the-agent-kit/hooks/tidy-scan.py apply --ids ID1,ID2
 ```
 
 On Windows use `py -3` or `python`. Options for both commands: `--root PATH` (default: the current folder) and
-`--stale-days N` (default 14). `scan` also takes `--json`. `tidy-procs.py` handles the process groups and is
+`--stale-days N` (default 14). `scan` also takes `--json`; `apply` also takes `--dry-run` and `--allow-ignored`. `tidy-procs.py` handles the process groups and is
 called by the scanner.
 
 ## Limits
@@ -86,7 +96,7 @@ called by the scanner.
 
 ## What was measured
 
-The process scanner has 47 tests and the git and files scanner has 23. They include real throwaway repos and a
+The process scanner has 54 tests and the git and files scanner has 38. They include real throwaway repos and a
 live Windows test that starts two listeners and checks only the approved one dies. A real scan of this
 repository found exactly the two known leftovers. No adherence eval applies: `/tidy` is user-invoked, not an
 always-on rule.
