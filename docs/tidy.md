@@ -40,9 +40,9 @@ a guess you must judge. What each group never lists is in
 2. **Show.** The agent summarises one group at a time and says when a group is empty.
 3. **Ask per group.** Keep all, remove all listed (high and medium groups only), or let me choose. Silence
    counts as no.
-4. **Dry run.** `apply --ids ... --dry-run` shows what would happen.
-5. **Apply.** `apply --ids ...` re-checks each id against a fresh scan and skips any that changed.
-6. **Log.** Every applied action is appended to `~/.the-agent-kit/tidy.log` with a timestamp, the id and the result.
+4. **Dry run.** `apply --root ROOT --id ... --dry-run` shows what would happen.
+5. **Apply.** `apply --root ROOT --id ...` re-checks each id against a fresh scan and skips any that changed.
+6. **Log.** Every applied action is appended to `~/.the-agent-kit/tidy.log` with a timestamp, the id, the result and the repo root.
 
 ## What it never touches
 
@@ -58,8 +58,9 @@ a guess you must judge. What each group never lists is in
 - A worktree that holds git-ignored files (a `.env`, say) is low confidence, lists them, and `apply` refuses it
   unless run with `--allow-ignored`, which the agent passes only after you approved that item having seen them.
 - A duplicate dev server that is itself listening on a port is low confidence and asked item by item.
-- Removing a worktree also deletes its merged branch; the label says so. Missing worktrees are pruned all
-  together, so `apply` skips them unless you approved every prunable one.
+- Removing a worktree also deletes its merged branch, and only when the item's label names it (this holds for
+  missing worktrees too). Missing worktrees are pruned all together, so `apply` skips them unless you approved
+  every prunable one. If `git status` cannot be read in a worktree, it is low confidence and `apply` refuses it.
 - Labels and evidence come from the repository, so control characters are stripped and the agent treats them as
   data. `git` is resolved from `PATH` only, never the current folder, and `--stale-days` must be 0 or more.
 
@@ -75,12 +76,14 @@ a guess you must judge. What each group never lists is in
 
 ```sh
 python ~/.the-agent-kit/hooks/tidy-scan.py scan --json
-python ~/.the-agent-kit/hooks/tidy-scan.py apply --ids ID1,ID2 --dry-run
-python ~/.the-agent-kit/hooks/tidy-scan.py apply --ids ID1,ID2
+python ~/.the-agent-kit/hooks/tidy-scan.py apply --root ROOT --id ID1 --id ID2 --dry-run
+python ~/.the-agent-kit/hooks/tidy-scan.py apply --root ROOT --id ID1 --id ID2
 ```
 
-On Windows use `py -3` or `python`. Options for both commands: `--root PATH` (default: the current folder) and
-`--stale-days N` (default 14). `scan` also takes `--json`; `apply` also takes `--dry-run` and `--allow-ignored`. `tidy-procs.py` handles the process groups and is
+On Windows use `py -3` or `python`. Options for both commands: `--root PATH` and `--stale-days N` (default 14).
+`scan` defaults `--root` to the current folder; `apply` requires it, set to the `root` the scan reported, so the
+ids act on the repo you scanned. `apply` takes each id with a repeated `--id` (never split on commas; `--ids A,B`
+still works) and also `--dry-run` and `--allow-ignored`. Items with a comma in the name are not listed. `scan` also takes `--json`. `tidy-procs.py` handles the process groups and is
 called by the scanner.
 
 ## Limits

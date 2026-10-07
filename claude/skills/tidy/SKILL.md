@@ -52,9 +52,12 @@ For each non-empty group ask what to do. In Claude Code use the question tool; e
 First a dry run of the approved ids, then the real thing:
 
 ```sh
-python ~/.the-agent-kit/hooks/tidy-scan.py apply --ids ID1,ID2 --dry-run
-python ~/.the-agent-kit/hooks/tidy-scan.py apply --ids ID1,ID2
+python ~/.the-agent-kit/hooks/tidy-scan.py apply --root ROOT --id ID1 --id ID2 --dry-run
+python ~/.the-agent-kit/hooks/tidy-scan.py apply --root ROOT --id ID1 --id ID2
 ```
+
+`--root` is required: pass exactly the `root` the scan reported, so the ids act on the repo you scanned. Pass each
+id exactly as listed, one `--id` per id. Never combine ids into one value, never split one, and never edit one.
 
 A worktree that contains ignored files is refused unless `apply` gets `--allow-ignored`. Pass that flag only
 after the user approved that specific item having seen the ignored files listed.

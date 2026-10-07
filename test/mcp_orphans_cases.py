@@ -187,6 +187,8 @@ check("adopted by systemd is not flagged without init_names", lambda: not find([
 check("child of an ordinary program is not an orphan", lambda: not find([proc(584, 1, "bash", 1), proc(10, 584)], init_names=("systemd",)))
 check("systemd-adopted non-MCP process is not flagged", lambda: not find([proc(584, 1, "systemd", 1), proc(10, 584, "node next dev")], init_names=("systemd",)))
 check("clean strips control chars", lambda: reaper.clean("a\x1b[31mb\nc\x7fd\x00") == "a [31mb c d ")
+check("clean strips C1, bidi and line-separator characters", lambda: all(
+    reaper.clean(f"a{c}b") == "a b" for c in "\x9b\x85‮⁦⁩‎‏  "))
 check("non-interpreter root not flagged", lambda: not find([proc(10, 9, "mcp-server-foo --x")]))
 check("interpreter root flagged", lambda: bool(find([proc(10, 9, "node mcp-server-foo --x")])))
 check("interpreter root with .exe flagged", lambda: bool(find([proc(10, 9, "Node.EXE mcp-server")])))

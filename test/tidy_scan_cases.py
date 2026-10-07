@@ -318,7 +318,9 @@ def t_log_and_schema():
     tidy("apply", "--ids", "path:notes.bak", "--root", str(d))
     log = (HOME / ".the-agent-kit/tidy.log").read_text()
     keys = {"id", "group", "label", "evidence", "confidence", "size_bytes", "action"}
-    return "path:notes.bak" in log and all(set(i) == keys for i in scan(d)["items"])
+    return "path:notes.bak" in log and all(
+        set(i) == keys | {"delete_path": {"is_dir"}, "remove_worktree": {"branch"}}.get(i["action"], set())
+        for i in scan(d)["items"])
 
 
 def t_human():
@@ -408,11 +410,11 @@ def t_log_one_line():
     old = os.environ.get("HOME")
     os.environ["HOME"] = str(TMP / "home2")
     try:
-        mod.log_line("path:x\ny", "la\nbel\t2", "ok\nforged")
+        mod.log_line("path:x\ny", "la\nbel\t2", "ok\nforged", "/r\noot")
         lines = (TMP / "home2/.the-agent-kit/tidy.log").read_text(encoding="utf-8").splitlines()
     finally:
         os.environ["HOME"] = old
-    return len(lines) == 1 and len(json.loads(lines[0])) == 4
+    return len(lines) == 1 and len(json.loads(lines[0])) == 5
 
 
 def t_tracked_case_insensitive():
@@ -503,6 +505,160 @@ def t_procs_override_needs_test_flag():
     only = scan(d, env=dict(ENV, AGENT_KIT_TIDY_PROCS=str(fake)))
     both = scan(d, env=dict(ENV, AGENT_KIT_TIDY_PROCS=str(fake), AGENT_KIT_TIDY_TEST="1"))
     return not any(i["id"] == "proc:42" for i in only["items"]) and any(i["id"] == "proc:42" for i in both["items"])
+
+
+# --- second security review ---
+
+def branches(d):
+    return g(d, "branch", "--format=%(refname:short)").split()
+
+
+def t_prune_label_names_branch_and_apply_deletes():
+    d = mk()
+    w = wt(d, "pm", "featp")
+    shutil.rmtree(w)
+    label = {i["id"]: i for i in scan(d)["items"]}[wid(w)]["label"]
+    r = tidy("apply", "--ids", wid(w), "--root", str(d))
+    return "and branch featp" in label and r.returncode == 0 and "featp" not in branches(d)
+
+
+def t_prune_unmerged_branch_not_named_and_survives():
+    d = mk()
+    w = wt(d, "pu", "featu")
+    write(w / "n.txt", old=False), g(w, "add", "."), g(w, "commit", "-q", "-m", "n")
+    shutil.rmtree(w)
+    label = {i["id"]: i for i in scan(d)["items"]}[wid(w)]["label"]
+    r = tidy("apply", "--ids", wid(w), "--root", str(d))
+    return "branch" not in label.replace("worktree", "") and r.returncode == 0 and "featu" in branches(d)
+
+
+def t_prune_two_prunable_each_branch_matches_label():
+    d = mk()
+    a, b = wt(d, "qa", "wqa"), wt(d, "qb", "wqb")
+    shutil.rmtree(a), shutil.rmtree(b)
+    r = tidy("apply", "--ids", f"{wid(a)},{wid(b)}", "--root", str(d))
+    return r.returncode == 0 and not {"wqa", "wqb"} & set(branches(d))
+
+
+def corrupt_git(w, name):
+    """Point a worktree's .git file at a gitdir that does not exist (the file is hidden on Windows: remove first)."""
+    os.remove(w / ".git")
+    (w / ".git").write_text(f"gitdir: {(TMP / name).as_posix()}\n")
+
+
+def t_unreadable_status_is_low_and_refused():
+    d = mk()
+    write(d / ".gitignore", "node_modules/\n", old=False), g(d, "add", "."), g(d, "commit", "-q", "-m", "ign")
+    w = wt(d, "bad", "wbad")
+    write(w / "node_modules/x.js", old=False)
+    corrupt_git(w, "missing-gitdir")
+    it = {i["id"]: i for i in scan(d)["items"]}.get(wid(w))
+    r = tidy("apply", "--ids", wid(w), "--allow-ignored", "--root", str(d))
+    return (it is not None and it["confidence"] == "low"
+            and any(e.startswith("cannot verify ignored files:") for e in it["evidence"])
+            and r.returncode != 0 and w.exists() and (w / "node_modules/x.js").exists())
+
+
+def t_ignored_files_none_on_error():
+    d = mk()
+    w = wt(d, "ife", "wife")
+    corrupt_git(w, "missing-gitdir2")
+    return mod.ignored_files(str(w)) is None
+
+
+def t_apply_requires_root():
+    d = mk()
+    write(d / "test-results/a.txt", old=False)
+    r = tidy("apply", "--ids", "path:test-results", cwd=d)
+    return r.returncode == 2 and "--root" in r.stderr and (d / "test-results/a.txt").exists()
+
+
+def t_apply_other_root_leaves_first_repo():
+    d1, d2 = mk(), mk()
+    for d in (d1, d2):
+        write(d / "test-results/a.txt", old=False)
+    r = tidy("apply", "--ids", "path:test-results", "--root", str(d2), cwd=d1)
+    return r.returncode == 0 and (d1 / "test-results/a.txt").exists() and not (d2 / "test-results").exists()
+
+
+def t_log_line_has_root():
+    d = cand_repo()
+    tidy("apply", "--ids", "path:notes.bak", "--root", str(d))
+    last = json.loads((HOME / ".the-agent-kit/tidy.log").read_text(encoding="utf-8").splitlines()[-1])
+    return os.path.realpath(last[-1]) == os.path.realpath(d)
+
+
+def t_comma_name_not_listed_and_id_not_split():
+    d = mk()
+    write(d / "scratch1,scratch2.log")
+    write(d / "scratch2.log")
+    j = scan(d)
+    r = tidy("apply", "--id", "path:scratch1,scratch2.log", "--root", str(d))
+    return (not any("," in i["id"] for i in j["items"]) and "path:scratch2.log" in {i["id"] for i in j["items"]}
+            and any("skipped 1 items with a comma in the name" in n for n in j["notes"])
+            and (d / "scratch1,scratch2.log").exists() and (d / "scratch2.log").exists()
+            and "not in a fresh scan" in r.stdout)
+
+
+def t_repeated_id_flag():
+    d = mk()
+    write(d / "a.bak"), write(d / "b.bak"), write(d / "c.bak")
+    r = tidy("apply", "--id", "path:a.bak", "--id", "path:b.bak", "--root", str(d))
+    return (r.returncode == 0 and not (d / "a.bak").exists() and not (d / "b.bak").exists()
+            and (d / "c.bak").exists())
+
+
+def t_clean_strips_unicode_controls():
+    return all(mod.clean(f"a{c}b") == "a b" for c in "\x9b\x85‮⁦⁩‎‏  ")
+
+
+def t_human_survives_unencodable_name():
+    d = mk()
+    write(d / "scratch.log")
+    r = subprocess.run([sys.executable, str(SCRIPT), "scan", "--root", str(d)], env=dict(ENV, PYTHONIOENCODING="cp1252"),
+                       capture_output=True, encoding="utf-8")
+    return r.returncode == 0 and "UnicodeEncodeError" not in r.stderr and "scratch" in r.stdout
+
+
+def t_log_failure_does_not_abort():
+    d = mk()
+    write(d / "a.bak"), write(d / "b.bak")
+    home = TMP / "home-nolog"
+    home.mkdir()
+    (home / ".the-agent-kit").write_text("a file, so the log folder cannot be made")
+    env = dict(ENV, HOME=str(home), USERPROFILE=str(home))
+    r = tidy("apply", "--ids", "path:a.bak,path:b.bak", "--root", str(d), env=env)
+    return (r.returncode == 0 and not (d / "a.bak").exists() and not (d / "b.bak").exists()
+            and r.stderr.count("warning") == 1 and "Traceback" not in r.stderr)
+
+
+def t_log_file_private():
+    if os.name == "nt":
+        return True  # ponytail: POSIX mode bits only, Windows ACLs are not 0o600-addressable
+    home = TMP / "home-priv"
+    home.mkdir()
+    env = dict(ENV, HOME=str(home))
+    d = mk()
+    write(d / "a.bak")
+    tidy("apply", "--ids", "path:a.bak", "--root", str(d), env=env)
+    return (home / ".the-agent-kit/tidy.log").stat().st_mode & 0o777 == 0o600
+
+
+def t_type_swap_refused():
+    d = mk()
+    write(d / "swap.bak")
+    keep = write(d / "swap.bak.d/inner.txt")
+    f = mod.safe_delete(str(d), "swap.bak.d", False)  # recorded as a file, now a directory
+    g2 = mod.safe_delete(str(d), "swap.bak", True)  # recorded as a directory, now a file
+    ok = mod.safe_delete(str(d), "swap.bak.d", True)
+    return f and g2 and ok is None and (d / "swap.bak").exists() and not keep.exists()
+
+
+def t_scan_records_is_dir():
+    d = mk()
+    write(d / "x.bak"), write(d / ".playwright-mcp/y.txt")
+    byid = {i["id"]: i for i in scan(d)["items"]}
+    return byid["path:x.bak"]["is_dir"] is False and byid["path:.playwright-mcp"]["is_dir"] is True
 
 
 cases = [(n[2:], f) for n, f in sorted(globals().items()) if n.startswith("t_") and callable(f)]

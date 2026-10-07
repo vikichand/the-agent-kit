@@ -175,6 +175,8 @@ check("process evidence and label carry no control characters", lambda r=r: r[0]
     re.search(r"[\x00-\x1f\x7f]", t) for i in r[0] for t in i["evidence"] + [i["label"]]) and any(
     "[31m" in e for e in r[0][0]["evidence"]))
 check("clean replaces control characters", lambda: tidy.clean("a\x1b\nb") == "a  b")
+check("clean strips C1, bidi and line-separator characters", lambda: all(
+    tidy.clean(f"a{c}b") == "a b" for c in "\x9b\x85‮⁦⁩‎‏  "))
 
 
 def which_ignores_cwd():
