@@ -597,7 +597,7 @@ as failures).
 Reading: the slimmer rules cost nothing on the two never-assume cases. Case 33 fails in both arms for the same
 reason as before (the agent changes no files and asks a question the repository already answers); it has never
 passed on Codex, so it is a standing gap in how Codex follows "look facts up before you ask", not a regression.
-Not measured: Opus, and Codex on the other 31 cases.
+Not measured: Codex on the other 31 cases.
 
 ### The 2026-10-06/07 measurement: what 0.5.0 added after the first candidate
 
@@ -645,6 +645,21 @@ then never restarted the server to verify, so those misses are incomplete work, 
 targets. Case 22 passed both times and did not time out: the two timeouts seen on 2026-10-05 did not reproduce,
 and their cause is unknown (they happened while the test machine was short of memory, which is plausible but
 unverified).
+
+### Opus 5.5, 2026-10-07: a small check of the three cases the 0.5.0 additions touch
+
+Rules on (`ta029d6c`) against `fabd154`, 3 runs per cell, Opus judging, no valid cell lost to an error.
+
+| Opus case | New rules | `fabd154` |
+|---|---|---|
+| **41 no duplicate servers** | **2/3** | 0/3 |
+| 39 ask the real decision | 3/3 | 3/3 |
+| 33 one-line authorization | 2/3 | 3/3 |
+
+Case 41 shows a gain on Opus as well, which corrects the earlier note that the tested rules make no difference
+there: that was true of the original 14 cases and is not true of this one. Case 33 is one run lower; no transcript
+was kept for it, so a one-run dip and a real cost cannot be told apart at this size. This was a spot check, not
+the full suite: Opus has not been run on the other 38 cases.
 
 ## What this does not tell you
 
