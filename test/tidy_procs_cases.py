@@ -147,6 +147,16 @@ def applied(ids, items=ITEMS, survivors=()):
     return calls, report, left
 
 
+def dry(ids):
+    calls = []
+    report, left = tidy.apply_ids(ids, ITEMS, lambda trees: calls.append(trees) or [], dry_run=True)
+    return calls, report, left
+
+
+check("apply --dry-run kills nothing and says what it would", lambda: not dry([good])[0] and any(
+    "would kill" in line for line in dry([good])[1]) and dry([good])[2] == [])
+check("apply --dry-run still skips an id that no longer matches", lambda: not dry(["proc:41:1"])[0] and any(
+    "skipped" in line for line in dry(["proc:41:1"])[1]))
 check("apply kills exactly the id", lambda: [[p["pid"] for p in t["processes"]] for t in applied([good])[0][0]] == [[40]])
 check("apply refuses a different creation time", lambda: not applied(["proc:40:%d" % (int(NOW - 9000))])[0])
 check("apply refuses an unknown pid and a malformed id", lambda: not applied(["proc:41:1", "garbage"])[0])

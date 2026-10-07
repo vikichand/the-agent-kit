@@ -295,8 +295,9 @@ def run_scan(min_age_minutes, idle_hours):
     return items, ([note] if note else []) + more
 
 
-def apply_ids(ids, items, kill):
-    """Kill only ids that still match a fresh scan item (same root pid and creation time). Returns (report, survivors)."""
+def apply_ids(ids, items, kill, dry_run=False):
+    """Kill only ids that still match a fresh scan item (same root pid and creation time). Returns (report, survivors).
+    With dry_run nothing is killed and the report says what would be."""
     tolerance = 0 if os.name == "nt" else 2  # ps elapsed time is whole seconds
     chosen, report = [], []
     for item_id in ids:
@@ -307,6 +308,8 @@ def apply_ids(ids, items, kill):
             report.append(f"skipped {item_id}: no longer matches a fresh scan")
         elif hit not in chosen:
             chosen.append(hit)
+    if dry_run:
+        return report + [f"would kill pid {pid} ({i['label']})" for i in chosen for pid in i["pids"]], []
     survivors = kill([{"pid": i["pids"][0], "processes": i["_processes"]} for i in chosen]) if chosen else []
     for i in chosen:
         report += [f"pid {pid}: {'survived' if pid in survivors else 'killed or already exited'}" for pid in i["pids"]]
@@ -324,6 +327,7 @@ def main():
             p.add_argument("--json", action="store_true")
         else:
             p.add_argument("--ids", required=True)
+            p.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     if not all(math.isfinite(v) and v >= 0 for v in (args.min_age_minutes, args.idle_hours)):
         parser.error("ages must be finite nonnegative numbers")
@@ -342,7 +346,7 @@ def main():
             print(f"{len(items)} candidates" if items else "nothing to tidy")
         return 0
     ids = [x.strip() for x in args.ids.split(",") if x.strip()]
-    report, survivors = apply_ids(ids, items, reaper.kill_trees)
+    report, survivors = apply_ids(ids, items, reaper.kill_trees, args.dry_run)
     print("\n".join(report))
     return int(bool(survivors))
 
