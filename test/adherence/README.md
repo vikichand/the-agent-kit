@@ -646,6 +646,25 @@ targets. Case 22 passed both times and did not time out: the two timeouts seen o
 and their cause is unknown (they happened while the test machine was short of memory, which is plausible but
 unverified).
 
+### Codex, 2026-10-08: the duplicate-server rule, before and after its wording was tightened
+
+The first wording said "find what holds it instead of moving to the next port". Codex found the holder and
+then moved to the next port anyway: at medium effort on `gpt-6-astra`, all 3 runs. The wording now says what to
+do after finding it (reuse it, stop it if it is this project's own, or ask) and never to start a second copy on
+another port. Case 41, rules on against the previous wording (`a525e46`), 3 runs per cell, Opus judging, each
+model at its own default effort. The rules-on arm also carried the new user-only `/tidy` skill, which can only
+add noise.
+
+| Codex model, effort | Tightened wording | Previous wording |
+|---|---|---|
+| `gpt-6-astra`, low | **3/3** | 0/3 |
+| `gpt-6-sol`, medium | **1/3** | 0/3 |
+
+Of the two sol misses, one still ran the app on port 38418, and one did not start a second server but never told
+the user which process and PID held the port, which the rubric requires. Earlier runs of the previous wording
+on astra were 2/3 at low effort and 0/3 at medium. Small samples: this says the tightened wording helps on both
+models, not that it is reliable on sol.
+
 ### Opus 5.5, 2026-10-07: a small check of the three cases the 0.5.0 additions touch
 
 Rules on (`ta029d6c`) against `fabd154`, 3 runs per cell, Opus judging, no valid cell lost to an error.

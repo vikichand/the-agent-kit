@@ -1,3 +1,43 @@
 started	case	arm	run	verdict	elapsed_s	censored	turns	tool_calls	edits	tokens_in	tokens_out	cache_read	cache_write	cost_usd	tool	model	judge	rules_ref
 2026-10-08T00:17:40	41-no-duplicate-servers	with	1	PASS	175	0	1	8	1	316944	1734	254464	0		codex	gpt-6-astra/low	opus	ta029d6c
 2026-10-08T00:19:10	41-no-duplicate-servers	current	1	FAIL	74	0	1	5	1	152184	1240	131072	0		codex	gpt-6-astra/low	opus	fabd154
+2026-10-08T00:21:52	41-no-duplicate-servers	with	2	FAIL	147	0	1	11	1	396432	1819	370688	0		codex	gpt-6-astra/low	opus	ta029d6c
+2026-10-08T00:23:30	41-no-duplicate-servers	current	2	FAIL	83	0	1	7	1	180060	1549	131840	0		codex	gpt-6-astra/low	opus	fabd154
+2026-10-08T00:26:15	41-no-duplicate-servers	with	3	PASS	149	0	1	7	1	297828	1410	266880	0		codex	gpt-6-astra/low	opus	ta029d6c
+2026-10-08T00:28:29	41-no-duplicate-servers	current	3	FAIL	117	0	1	8	1	260708	1302	204800	0		codex	gpt-6-astra/low	opus	fabd154
+2026-10-08T00:29:29	39-ask-the-real-decision	with	1	PASS	44	0	1	3	0	96789	498	70784	0		codex	gpt-6-astra/low	opus	ta029d6c
+2026-10-08T00:30:18	39-ask-the-real-decision	current	1	PASS	34	0	1	3	0	74130	357	54400	0		codex	gpt-6-astra/low	opus	fabd154
+2026-10-08T00:31:13	39-ask-the-real-decision	with	2	PASS	41	0	1	3	0	71397	420	45952	0		codex	gpt-6-astra/low	opus	ta029d6c
+2026-10-08T00:32:02	39-ask-the-real-decision	current	2	PASS	34	0	1	3	0	70907	443	45568	0		codex	gpt-6-astra/low	opus	fabd154
+2026-10-08T00:33:03	39-ask-the-real-decision	with	3	PASS	47	0	1	3	0	96859	539	70912	0		codex	gpt-6-astra/low	opus	ta029d6c
+2026-10-08T00:33:50	39-ask-the-real-decision	current	3	PASS	33	0	1	3	0	70918	376	45568	0		codex	gpt-6-astra/low	opus	fabd154
+2026-10-08T00:36:26	41-no-duplicate-servers	with	1	FAIL	138	0	1	9	1	297772	1843	263552	0		codex	gpt-6-astra/medium	opus	ta029d6c
+2026-10-08T00:38:20	41-no-duplicate-servers	current	1	FAIL	99	0	1	5	1	217680	1375	187136	0		codex	gpt-6-astra/medium	opus	fabd154
+2026-10-08T00:40:36	41-no-duplicate-servers	with	2	FAIL	120	0	1	11	1	317176	1619	286848	0		codex	gpt-6-astra/medium	opus	ta029d6c
+2026-10-08T00:42:23	41-no-duplicate-servers	current	2	FAIL	92	0	1	6	1	233137	1483	176896	0		codex	gpt-6-astra/medium	opus	fabd154
+2026-10-08T00:45:14	41-no-duplicate-servers	with	3	FAIL	156	0	1	11	1	369784	2054	336640	0		codex	gpt-6-astra/medium	opus	ta029d6c
+2026-10-08T00:47:00	41-no-duplicate-servers	current	3	FAIL	88	0	1	6	1	181842	1355	152832	0		codex	gpt-6-astra/medium	opus	fabd154
+2026-10-08T05:14:13	41-no-duplicate-servers	with	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/medium	opus	td219c8e
+2026-10-08T05:14:23	41-no-duplicate-servers	current	1	ERROR	5	0	0	0	0						codex	gpt-6-astra/medium	opus	HEAD
+2026-10-08T05:14:34	41-no-duplicate-servers	with	2	ERROR	6	0	0	0	0						codex	gpt-6-astra/medium	opus	td219c8e
+2026-10-08T05:18:23	41-no-duplicate-servers	with	1	PASS	52	0	8	7	1	12	1484	234024	34313	0.1989208	claude	sonnet	opus	td219c8e
+2026-10-08T05:18:23	41-no-duplicate-servers	current	2	FAIL	209	0									codex	gpt-6-astra/medium	opus	HEAD
+2026-10-08T05:18:36	41-no-duplicate-servers	with	3	ERROR	8	0	0	0	0						codex	gpt-6-astra/medium	opus	td219c8e
+2026-10-08T05:19:25	41-no-duplicate-servers	current	1	PASS	45	0	8	7	2	10	1695	188891	33765	0.18980819999999998	claude	sonnet	opus	HEAD
+2026-10-08T05:20:27	41-no-duplicate-servers	with	2	PASS	46	0	11	10	2	16	2042	327381	34429	0.22364420000000004	claude	sonnet	opus	td219c8e
+2026-10-08T05:21:24	41-no-duplicate-servers	current	2	PASS	40	0	6	5	1	10	1323	184633	32798	0.18136860000000005	claude	sonnet	opus	HEAD
+2026-10-08T05:22:26	41-no-duplicate-servers	with	3	PASS	45	0	12	11	2	20	1813	409196	34019	0.23608519999999997	claude	sonnet	opus	td219c8e
+2026-10-08T05:23:02	41-no-duplicate-servers	current	3	FAIL	244	0	1	10	1	229403	1812	206592	0		codex	gpt-6-astra/medium	opus	HEAD
+2026-10-08T05:32:31	41-no-duplicate-servers	current	3	TIMEOUT	603	1	12	11	2	16	1593	325941	34177	0.2178582	claude	sonnet	opus	HEAD
+2026-10-08T05:47:05	41-no-duplicate-servers	with	1	PASS	146	0	1	19	1	450076	3127	424960	0		codex	gpt-6-sol/medium	opus	t1d63130
+2026-10-08T05:49:45	41-no-duplicate-servers	current	1	FAIL	148	0	1	21	1	493287	3126	461568	0		codex	gpt-6-sol/medium	opus	a525e46
+2026-10-08T05:52:15	41-no-duplicate-servers	with	2	FAIL	138	0	1	17	1	456969	3673	422400	0		codex	gpt-6-sol/medium	opus	t1d63130
+2026-10-08T05:54:13	41-no-duplicate-servers	current	2	FAIL	103	0	1	23	1	431358	3044	398592	0		codex	gpt-6-sol/medium	opus	a525e46
+2026-10-08T05:57:07	41-no-duplicate-servers	with	3	FAIL	152	0	1	17	1	370000	3336	345984	0		codex	gpt-6-sol/medium	opus	t1d63130
+2026-10-08T05:59:19	41-no-duplicate-servers	current	3	FAIL	115	0	1	20	1	393994	3232	336768	0		codex	gpt-6-sol/medium	opus	a525e46
+2026-10-08T06:01:56	41-no-duplicate-servers	with	1	PASS	138	0	1	6	1	251284	1621	222080	0		codex	gpt-6-astra/low	opus	t1d63130
+2026-10-08T06:03:48	41-no-duplicate-servers	current	1	FAIL	98	0	1	10	1	238589	1345	208896	0		codex	gpt-6-astra/low	opus	a525e46
+2026-10-08T06:06:21	41-no-duplicate-servers	with	2	PASS	136	0	1	6	1	332134	1570	300928	0		codex	gpt-6-astra/low	opus	t1d63130
+2026-10-08T06:08:17	41-no-duplicate-servers	current	2	FAIL	101	0	1	9	1	323280	1710	292096	0		codex	gpt-6-astra/low	opus	a525e46
+2026-10-08T06:11:15	41-no-duplicate-servers	with	3	PASS	161	0	1	6	1	315598	1279	286208	0		codex	gpt-6-astra/low	opus	t1d63130
+2026-10-08T06:13:47	41-no-duplicate-servers	current	3	FAIL	138	0	1	8	1	266978	1501	236544	0		codex	gpt-6-astra/low	opus	a525e46

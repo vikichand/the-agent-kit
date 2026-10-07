@@ -127,7 +127,7 @@ research notes, not from a per-rule record kept at the time.
 | S3.6 copied code carries its license | 0.1.0 | 4.x | advice | owner |
 | S4.1, S4.2 surgical changes, own orphans | 0.1.0 | 4.x | advice | eval 07 |
 | S4.3 edit from current contents | 0.2.0 | 5.x | advice | eval 34 |
-| S4.4 leave the machine as you found it | 0.5.0 | 5.5 | advice, and `install.sh --tidy` for what slips through | eval 41 (Sonnet 3/3 against 0/3; Codex not reliable; Antigravity no gap) and a field report |
+| S4.4 leave the machine as you found it | 0.5.0 | 5.5 | advice, and `install.sh --tidy` for what slips through | eval 41 (Sonnet 3/3 against 0/3; Opus 2/3 against 0/3; Codex astra 3/3 against 0/3 and sol 1/3 against 0/3 after the wording was tightened; Antigravity no gap) and a field report |
 | S5.1, S5.2 oracle, test-first, evidence by change | 0.1.0, table 0.5.0 | 4.x, 5.5 | advice | eval 09, 16, 25, 26 |
 | S5.3 never game the oracle | 0.1.0 | 4.x | advice, tests depth rule | eval 01 |
 | S5.4 bound any loop | 0.2.0 | 5.x | advice (research suggests a hook) | research |

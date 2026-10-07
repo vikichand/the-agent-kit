@@ -682,8 +682,10 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
   model already does what those rules ask, on prompts where Sonnet needed the rule. For 0.5.0, the never-assume
   cases 39 and 40 were 3/3 against v0.4.0's 3/3 on `gpt-6-astra`, and the one-line authorization fix (case 33),
   which had never passed on Codex, passed 2 of 3 after the "ask only what the repository cannot answer"
-  wording. The new duplicate-server rule is not reliably followed there: its one valid cell hopped to another
-  port, and the rest of that run hit the usage limit. The same transcripts show the ported skill body was
+  wording. The duplicate-server rule was first worded in a way Codex found a loophole in: it found the process holding a
+  busy port and then ran the app on the next port anyway. After the wording was tightened it passed 3 of 3 on
+  `gpt-6-astra` at low effort and 1 of 3 on `gpt-6-sol` at medium, against 0 of 3 before; on sol one run still
+  hopped ports, so treat it as helped, not solved. The same transcripts show the ported skill body was
   loaded in a third of the with-arm cells, so even the passes are mostly the floor plus the model's defaults.
   Whether the port changes Codex's behaviour elsewhere is unmeasured and should be read that way.
 
