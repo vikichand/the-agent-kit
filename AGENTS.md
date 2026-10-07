@@ -126,8 +126,9 @@ state the bucket and the oracle in one clause and go.
 - **Clean up only your own orphans**; flag pre-existing dead code, don't delete it unless asked.
 - Edit from the file's current contents; if they may have changed since your last read, read it again.
 - **Leave the machine as you found it.** Before starting a server or watcher, check whether one is already
-  running (port, process list) and reuse it or stop it; if a port is busy, find what holds it instead of
-  moving to the next port. Stop what you started, and say what is still running.
+  running (port, process list) and reuse it or stop it. If a port is busy, find what holds it and deal with
+  that: reuse it, stop it if it is this project's own, or ask. Never start a second copy on another port to
+  get around it. Stop what you started, and say what is still running.
 
 ## 5. Verification is the spine
 
