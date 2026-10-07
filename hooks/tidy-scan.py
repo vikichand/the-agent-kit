@@ -3,7 +3,9 @@
 import argparse
 import fnmatch
 import json
+import math
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -16,18 +18,48 @@ CANDIDATES = ("*-plan.md", "*_plan.md", "plan-*.md", "*.orig", "*.rej", "*.bak",
 PREFIXES = ("branch:", "worktree:", "path:", "proc:")
 ACTIONS = {"delete_branch", "remove_worktree", "delete_path", "kill"}
 SKIP_WALK = {".git", "node_modules"}
+os.environ["NoDefaultCurrentDirectoryInExePath"] = "1"  # Windows: never resolve a bare name through the cwd
+
+
+def find_exe(name):
+    """Resolve a command from absolute PATH folders only, never the current directory (a hostile repo can
+    ship git.exe). Returns None when not found."""
+    nt = os.name == "nt"
+    names = [name + e for e in os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(";") if e] if nt else [name]
+    for d in os.environ.get("PATH", "").split(os.pathsep):
+        d = d.strip('"')
+        for n in names:
+            p = os.path.join(d, n)
+            if d and os.path.isabs(d) and os.path.isfile(p) and (nt or os.access(p, os.X_OK)):
+                return p
+    return None
+
+
+GIT = find_exe("git")
+GIT_PREFIX = ["-c", "core.fsmonitor=false", "--no-optional-locks", "--literal-pathspecs"]
+
+
+def clean(text):
+    """Repository text is data: control characters (ESC, newlines) become spaces."""
+    return re.sub(r"[\x00-\x1f\x7f]", " ", str(text))
 
 
 def run(args, cwd=None):
     return subprocess.run(args, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
+def run_git(args, cwd=None):
+    if not GIT:
+        raise SystemExit("tidy-scan: git not found on PATH")
+    return run([GIT, *GIT_PREFIX, *args], cwd=cwd)
+
+
 def git(root, *args):
-    return run(["git", "-C", root, *args])
+    return run_git(["-C", root, *args])
 
 
 def toplevel(cwd):
-    r = run(["git", "rev-parse", "--show-toplevel"], cwd=cwd)
+    r = run_git(["rev-parse", "--show-toplevel"], cwd=cwd)
     return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else None
 
 
@@ -38,7 +70,7 @@ def repo_root(path):
 
 
 def item(id_, group, label, evidence, confidence, size, action):
-    return dict(id=id_, group=group, label=label, evidence=evidence, confidence=confidence,
+    return dict(id=id_, group=group, label=clean(label), evidence=[clean(e) for e in evidence], confidence=confidence,
                 size_bytes=size, action=action)
 
 
@@ -96,6 +128,36 @@ def branch_items(root, default, wts):
     return out
 
 
+def is_prunable(w):
+    return "prunable" in w or not os.path.isdir(w["path"])
+
+
+def prunable_ids(root):
+    """Ids that worktree prune would remove together (it is repo-wide)."""
+    return {"worktree:" + w["path"] for w in worktrees(root)[1:] if "locked" not in w and is_prunable(w)}
+
+
+def ignored_files(path):
+    """Ignored files in a worktree; worktree remove deletes these without --force."""
+    out = git(path, "status", "--porcelain", "--ignored", "-uall", "-z").stdout.split("\0")
+    return [e[3:] for e in out if e.startswith("!! ")]
+
+
+def ignored_evidence(path, files):
+    sizes = {}
+    for f in files:
+        top = f.split("/", 1)[0]
+        try:
+            sizes[top] = sizes.get(top, 0) + os.lstat(os.path.join(path, f)).st_size
+        except OSError:
+            sizes.setdefault(top, 0)
+    ev = [f"contains {len(files)} git-ignored files"]
+    ev += [f"ignored: {t} ({n} bytes)" for t, n in list(sizes.items())[:5]]
+    if len(sizes) > 5:
+        ev.append(f"and {len(sizes) - 5} more ignored top-level entries")
+    return ev
+
+
 def worktree_items(root, default):
     out = []
     here = os.path.realpath(root)
@@ -105,21 +167,26 @@ def worktree_items(root, default):
         path = w["path"]
         if "locked" in w or not default:
             continue
-        label = f"worktree {path}"
-        if "prunable" in w or not os.path.isdir(path):
-            out.append(item("worktree:" + path, "worktrees", label, ["directory is missing (prunable)"],
-                            "high", None, "remove_worktree"))
+        if is_prunable(w):
+            out.append(item("worktree:" + path, "worktrees",
+                            f"worktree {path} (git removes all prunable worktree entries together)",
+                            ["directory is missing (prunable)"], "high", None, "remove_worktree"))
             continue
         if git(path, "status", "--porcelain").stdout.strip():
             continue
         br = w.get("branch", "").removeprefix("refs/heads/")
         if br and is_ancestor(root, "refs/heads/" + br, default):
-            out.append(item("worktree:" + path, "worktrees", label,
-                            ["clean", f"branch {br} merged into {default}"], "high", None, "remove_worktree"))
+            ev, conf = ["clean", f"branch {br} merged into {default}"], "high"
+            label = f"worktree {path}" + (f" and branch {br}" if br != default.removeprefix("origin/") else "")
         elif not br and "HEAD" in w and is_ancestor(root, w["HEAD"], default):
-            out.append(item("worktree:" + path, "worktrees", label,
-                            ["clean", f"detached at a commit reachable from {default}"], "medium", None,
-                            "remove_worktree"))
+            ev, conf = ["clean", f"detached at a commit reachable from {default}"], "medium"
+            label = f"worktree {path}"
+        else:
+            continue
+        files = ignored_files(path)
+        if files:
+            ev, conf = ev + ignored_evidence(path, files), "low"
+        out.append(item("worktree:" + path, "worktrees", label, ev, conf, None, "remove_worktree"))
     return out
 
 
@@ -133,12 +200,28 @@ def size_of(path):
     return sum(os.lstat(os.path.join(d, f)).st_size for d, _, fs in os.walk(path) for f in fs)
 
 
+class Tracked:
+    """Tracked paths, compared case-insensitively on Windows or when core.ignorecase is true."""
+
+    def __init__(self, root):
+        ci = os.name == "nt" or git(root, "config", "--get", "core.ignorecase").stdout.strip().lower() == "true"
+        self.fold = str.lower if ci else str
+        self.paths = {self.fold(t) for t in git(root, "ls-files", "-z").stdout.split("\0")}
+
+    def __contains__(self, rel):
+        return self.fold(rel) in self.paths
+
+    def has(self, rel):
+        rel = self.fold(rel)
+        return rel in self.paths or any(t.startswith(rel + "/") for t in self.paths)
+
+
 def tracked_set(root):
-    return set(git(root, "ls-files", "-z").stdout.split("\0"))
+    return Tracked(root)
 
 
 def has_tracked(tracked, rel):
-    return rel in tracked or any(t.startswith(rel + "/") for t in tracked)
+    return tracked.has(rel)
 
 
 def leftover_items(root, tracked, stale, wts):
@@ -155,7 +238,8 @@ def leftover_items(root, tracked, stale, wts):
         if os.path.isdir(os.path.join(root, d)) and not has_tracked(tracked, d):
             add(d, "generated tool output folder", "high")
     for base, dirs, files in os.walk(root):
-        dirs[:] = [d for d in dirs if d not in SKIP_WALK and os.path.realpath(os.path.join(base, d)) not in linked]
+        dirs[:] = [d for d in dirs if d not in SKIP_WALK and os.path.realpath(os.path.join(base, d)) not in linked
+                   and not os.path.lexists(os.path.join(base, d, ".git"))]  # a nested clone tracks its own files
         for f in files:
             rel = os.path.relpath(os.path.join(base, f), root).replace(os.sep, "/")
             loose = base == root and any(fnmatch.fnmatch(f, p) for p in SCREENSHOTS)
@@ -193,7 +277,8 @@ def candidate_items(root, stale, seen):
 
 
 def procs_script():
-    return os.environ.get("AGENT_KIT_TIDY_PROCS") or os.path.join(os.path.dirname(os.path.abspath(__file__)),
+    override = os.environ.get("AGENT_KIT_TIDY_PROCS") if os.environ.get("AGENT_KIT_TIDY_TEST") == "1" else None
+    return override or os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                                                    "tidy-procs.py")
 
 
@@ -206,9 +291,13 @@ def proc_items(notes):
     try:
         assert r.returncode == 0
         items = json.loads(r.stdout)["items"]
-        return [i for i in items if isinstance(i, dict) and str(i.get("id", "")).startswith("proc:")]
+        items = [i for i in items if isinstance(i, dict) and str(i.get("id", "")).startswith("proc:")]
+        for i in items:
+            i["label"] = clean(i.get("label", ""))
+            i["evidence"] = [clean(e) for e in i.get("evidence", [])]
+        return items
     except Exception:
-        notes.append(f"process group skipped: tidy-procs scan failed ({r.stderr.strip()[:200] or 'bad output'})")
+        notes.append(f"process group skipped: tidy-procs scan failed ({clean(r.stderr.strip()[:200]) or 'bad output'})")
         return []
 
 
@@ -232,15 +321,15 @@ def scan_all(root, stale):
 def human(result):
     print(f"tidy scan of {result['root'] or '(no repo)'}")
     for n in result["notes"]:
-        print(f"note: {n}")
+        print(f"note: {clean(n)}")
     n = 0
     for group in dict.fromkeys(i["group"] for i in result["items"]):
         print(f"\n[{group}]")
         for i in (x for x in result["items"] if x["group"] == group):
             n += 1
-            print(f"{n:>3}. {i['label']}  ({i['confidence']}, {i['action']})\n     id: {i['id']}")
+            print(f"{n:>3}. {clean(i['label'])}  ({i['confidence']}, {i['action']})\n     id: {clean(i['id'])}")
             for e in i["evidence"]:
-                print(f"     - {e}")
+                print(f"     - {clean(e)}")
     if not n:
         print("\nnothing to tidy")
 
@@ -250,7 +339,7 @@ def log_line(item_id, label, result):
     d = os.path.join(home, ".the-agent-kit")
     os.makedirs(d, exist_ok=True)
     with open(os.path.join(d, "tidy.log"), "a", encoding="utf-8") as f:
-        f.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S')}\t{item_id}\t{label}\t{result}\n")
+        f.write(json.dumps([time.strftime("%Y-%m-%dT%H:%M:%S"), clean(item_id), clean(label), result]) + "\n")
 
 
 def safe_delete(root, rel):
@@ -267,7 +356,7 @@ def safe_delete(root, rel):
         if real == real_root or not real.startswith(real_root + os.sep):
             return "outside repo root"
     r = git(root, "ls-files", "--", rel)
-    if r.returncode != 0 or r.stdout.strip():
+    if r.returncode != 0 or r.stdout.strip() or Tracked(root).has(rel):
         return "tracked or not checkable"
     if os.path.islink(p) or os.path.isfile(p):
         os.unlink(p)  # a symlink is removed as a link, never followed
@@ -278,10 +367,10 @@ def safe_delete(root, rel):
     return None
 
 
-def act(root, it):
+def act(root, it, allow_ignored=False):
     action, id_ = it["action"], it["id"]
     if action == "delete_branch":
-        r = git(root, "branch", "-d", id_[len("branch:"):])
+        r = git(root, "branch", "-d", "--", id_[len("branch:"):])
         return None if r.returncode == 0 else r.stderr.strip() or "git branch -d failed"
     if action == "remove_worktree":
         path = id_[len("worktree:"):]
@@ -290,13 +379,17 @@ def act(root, it):
         if "prunable" in w or not os.path.isdir(path):
             r = git(root, "worktree", "prune")
         else:
-            r = git(root, "worktree", "remove", path)
+            files = ignored_files(path)
+            if files and not allow_ignored:
+                return (f"refused: worktree contains {len(files)} git-ignored files that removal would delete; "
+                        "rerun with --allow-ignored only after the user approved this item having seen them")
+            r = git(root, "worktree", "remove", "--", path)
         if r.returncode != 0:
             return r.stderr.strip() or "git worktree failed"
         br = w.get("branch", "").removeprefix("refs/heads/")
         default = default_branch(root)
         if br and "branch:" + br in {b["id"] for b in branch_items(root, default, worktrees(root))}:
-            git(root, "branch", "-d", br)
+            git(root, "branch", "-d", "--", br)
         return None
     if action == "delete_path":
         return safe_delete(root, id_[len("path:"):])
@@ -323,15 +416,20 @@ def apply(args):
         return 1
     if rest:
         fresh = {i["id"]: i for i in scan_all(root, args.stale_days)["items"]}
+    prunable = prunable_ids(root) if rest else set()
     for i in rest:
         it = fresh.get(i)
         if not it or it["action"] not in ACTIONS:
             print(f"skipped {i}: not in a fresh scan")
             continue
+        if i in prunable and not prunable <= set(wanted):
+            print(f"skipped {i}: worktree prune removes all prunable entries together; also approve "
+                  + ", ".join(sorted(prunable - set(wanted))))
+            continue
         if args.dry_run:
             print(f"dry-run {i}: would {it['action']}")
             continue
-        err = act(root, it)
+        err = act(root, it, args.allow_ignored)
         result = "ok" if err is None else f"failed: {err}"
         failed += err is not None
         print(f"{i}: {result}")
@@ -353,16 +451,25 @@ def apply(args):
     return 1 if failed else 0
 
 
+def days(value):
+    n = float(value)
+    if not math.isfinite(n) or n < 0:
+        raise argparse.ArgumentTypeError("--stale-days must be a finite number, 0 or more")
+    return n
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
     for name in ("scan", "apply"):
         p = sub.add_parser(name)
         p.add_argument("--root")
-        p.add_argument("--stale-days", type=float, default=14)
+        p.add_argument("--stale-days", type=days, default=14)
     sub.choices["scan"].add_argument("--json", action="store_true")
     sub.choices["apply"].add_argument("--ids")
     sub.choices["apply"].add_argument("--dry-run", action="store_true")
+    sub.choices["apply"].add_argument("--allow-ignored", action="store_true",
+                                      help="also remove worktrees holding git-ignored files (user approved that item)")
     args = ap.parse_args()
     if args.cmd == "apply":
         return apply(args)

@@ -8,10 +8,25 @@ import os
 import pathlib
 import re
 import shlex
-import shutil
 import subprocess
 import sys
 import time
+
+os.environ["NoDefaultCurrentDirectoryInExePath"] = "1"  # Windows: never resolve a bare name through the cwd
+
+
+def which(name):
+    """Resolve a command from absolute PATH folders only, never the current directory. None when not found."""
+    nt = os.name == "nt"
+    names = [name + e for e in os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(";") if e] if nt else [name]
+    for d in os.environ.get("PATH", "").split(os.pathsep):
+        d = d.strip('"')
+        for n in names:
+            exe = os.path.join(d, n)
+            if d and os.path.isabs(d) and os.path.isfile(exe) and (nt or os.access(exe, os.X_OK)):
+                return exe
+    return None
+
 
 # Reuse the reaper: orphan detection, process listing and the verified child-first kill.
 _spec = importlib.util.spec_from_file_location("reaper", pathlib.Path(__file__).resolve().with_name("mcp-orphans.py"))
@@ -85,7 +100,7 @@ def clean(text):
 def make_item(group, confidence, label, evidence, members):
     root = members[0]
     return {"id": f"proc:{root['pid']}:{int(root['created'])}", "group": group,
-            "label": clean(label)[:80], "evidence": evidence, "confidence": confidence,
+            "label": clean(label)[:80], "evidence": [clean(e) for e in evidence], "confidence": confidence,
             "size_bytes": int(sum(m["mb"] for m in members) * 1048576), "action": "kill",
             "pids": [m["pid"] for m in members], "_processes": members}
 
@@ -154,9 +169,13 @@ def scan(procs, now, patterns, min_age_s, idle_s, self_pid, net, cpu_probe, init
             if p is keep or now - p["created"] < min_age_s:
                 continue
             relation = "newer" if keep["created"] > p["created"] else "listening"
-            add(make_item("processes.duplicates", "medium", f"{p['name']}: {p['command']}",
-                          [f"same command and project as pid {keep['pid']}, which is {relation}",
-                           f"project {root}", f"started {age_h(p):.1f} h ago"], tree(p["pid"])))
+            evidence = [f"same command and project as pid {keep['pid']}, which is {relation}",
+                        f"project {root}", f"started {age_h(p):.1f} h ago"]
+            if listens[p["pid"]]:  # ports are stripped from the key, so a distinct server can land here
+                ports = sorted({port for m in tree(p["pid"]) for port in net["listen"].get(m["pid"], ())})
+                evidence.append("also listening on port " + ", ".join(map(str, ports)))
+            add(make_item("processes.duplicates", "low" if listens[p["pid"]] else "medium",
+                          f"{p['name']}: {p['command']}", evidence, tree(p["pid"])))
 
     candidates = []
     for p in dev:
@@ -234,11 +253,12 @@ def net_snapshot():
             data = [data] if isinstance(data, dict) else data
             return build_net(("listen" if r["state"].lower().startswith("listen") else "estab", r["port"], r["pid"])
                              for r in data), None
-        if shutil.which("ss"):
-            out = subprocess.run(["ss", "-tanp"], capture_output=True, check=True, timeout=10, text=True).stdout
+        ss, lsof = which("ss"), which("lsof")
+        if ss:
+            out = subprocess.run([ss, "-tanp"], capture_output=True, check=True, timeout=10, text=True).stdout
             return build_net(parse_ss(out)), None
-        if shutil.which("lsof"):
-            out = subprocess.run(["lsof", "-nP", "-iTCP", "-sTCP:LISTEN,ESTABLISHED"], capture_output=True,
+        if lsof:
+            out = subprocess.run([lsof, "-nP", "-iTCP", "-sTCP:LISTEN,ESTABLISHED"], capture_output=True,
                                  timeout=20, text=True).stdout  # lsof exits 1 when it lists nothing
             return build_net(parse_lsof(out)), None
         return None, "idle check unavailable: neither ss nor lsof is installed"
@@ -269,8 +289,9 @@ def cpu_times(pids):
         except (OSError, IndexError, ValueError):
             pass
     if not result and not pathlib.Path("/proc/self").exists():  # macOS: ps only, whole-second resolution on Linux
-        out = subprocess.run(["ps", "-o", "pid=,cputime=", "-p", ",".join(map(str, pids))],
-                             capture_output=True, text=True, timeout=10).stdout
+        ps = which("ps")
+        out = subprocess.run([ps, "-o", "pid=,cputime=", "-p", ",".join(map(str, pids))],
+                             capture_output=True, text=True, timeout=10).stdout if ps else ""
         result = {int(a): parse_cputime(b) for a, b in (line.split() for line in out.splitlines() if line.strip())}
     return result
 
