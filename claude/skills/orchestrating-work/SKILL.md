@@ -52,6 +52,16 @@ a strong check is good economics; a cheap model on an ambiguous slice returns a 
 finished. Before raising effort for a hard slice, compare the next effort level with a stronger model
 at lower effort.
 
+| Role | Tier and effort |
+|---|---|
+| Lookup, search, read-only survey | the provider's small, fast tier at medium; low risks stopping before the search is done |
+| Implement a frozen slice | the mid tier at medium; high for a bug whose cause is not yet known |
+| Review or judge | the top tier at medium, told to report everything it finds while the lead filters |
+
+A lookup worker needs facts, not the project's rules: use a read-only agent type that skips them where
+the tool has one (Claude Code's Explore). Codex seldom delegates on its own, so ask for the worker
+explicitly there.
+
 ## 3. Freeze the contract before fanning out
 
 The failure that ruins parallel work is conflicting implicit decisions: two workers inventing slightly
