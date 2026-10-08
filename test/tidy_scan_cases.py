@@ -496,7 +496,7 @@ def t_commands_use_resolved_git():
         seen.append(list(args))
         return real(args, *a, **k)
     keep = mod.proc_items
-    mod.subprocess.run, mod.proc_items = rec, lambda notes: []
+    mod.subprocess.run, mod.proc_items = rec, lambda notes, roots: []
     try:
         mod.scan_all(str(d), 14)
         mod.toplevel(str(d))
@@ -749,6 +749,44 @@ def t_tool_dir_in_subfolder_found():
     write(d / "packages/web/test-results/a.png")
     it = tool_item(d, "packages/web/test-results")
     return it is not None and it["confidence"] == "high"
+
+
+def recording_procs(logfile):
+    p = TMP / "recording-procs.py"
+    p.write_text(f"""import json, sys
+open({str(logfile)!r}, "a").write(json.dumps(sys.argv[1:]) + "\\n")
+if sys.argv[1] == "scan":
+    print(json.dumps({{"version": 1, "notes": ["from procs"], "items": []}}))
+""")
+    return p
+
+
+def logged_roots(logfile):
+    calls = [json.loads(line) for line in logfile.read_text().splitlines()]
+    return calls, [{os.path.normcase(os.path.realpath(c[i + 1])) for i, a in enumerate(c) if a == "--root"} for c in calls]
+
+
+def t_scope_roots_reach_both_hops():
+    d = mk()
+    w = wt(d, "scope", "wscope")
+    log = TMP / "scope-args.txt"
+    env = dict(ENV, AGENT_KIT_TIDY_PROCS=str(recording_procs(log)), AGENT_KIT_TIDY_TEST="1")
+    j = scan(d, env=env)
+    tidy("apply", "--ids", "proc:42:1", "--root", str(d), env=env)
+    calls, roots = logged_roots(log)
+    want = {os.path.normcase(os.path.realpath(x)) for x in (d, w)}
+    return (len(calls) == 2 and calls[0][0] == "scan" and calls[1][0] == "apply" and roots[0] == want == roots[1]
+            and "from procs" in j["notes"])
+
+
+def t_scope_outside_a_repo_is_the_folder():
+    plain = TMP / "plain-scope"
+    plain.mkdir()
+    log = TMP / "scope-args2.txt"
+    env = dict(ENV, AGENT_KIT_TIDY_PROCS=str(recording_procs(log)), AGENT_KIT_TIDY_TEST="1", GIT_CEILING_DIRECTORIES=str(TMP))
+    tidy("scan", "--json", "--root", str(plain), env=env)
+    calls, roots = logged_roots(log)
+    return roots == [{os.path.normcase(os.path.realpath(plain))}]
 
 
 def wt_item(d, w):

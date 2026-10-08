@@ -385,12 +385,24 @@ def procs_script():
                                                                    "tidy-procs.py")
 
 
-def proc_items(notes):
+def scope_roots(root, folder):
+    """The folders whose processes are this repository's: its root and every linked worktree (a dev server in an
+    agent's worktree belongs to the repo). Outside a repository: just the folder."""
+    if not root:
+        return [os.path.abspath(folder or os.getcwd())]
+    return list(dict.fromkeys([root] + [w["path"] for w in worktrees(root)]))
+
+
+def root_args(roots):
+    return [a for r in roots for a in ("--root", r)]
+
+
+def proc_items(notes, roots):
     script = procs_script()
     if not os.path.isfile(script):
         notes.append(f"process group skipped: {script} not found")
         return []
-    r = run([sys.executable, script, "scan", "--json"])
+    r = run([sys.executable, script, "scan", "--json", *root_args(roots)])
     try:
         assert r.returncode == 0
         items = json.loads(r.stdout)["items"]
@@ -398,13 +410,14 @@ def proc_items(notes):
         for i in items:
             i["label"] = clean(i.get("label", ""))
             i["evidence"] = [clean(e) for e in i.get("evidence", [])]
+        notes.extend(clean(n) for n in json.loads(r.stdout).get("notes", []))
         return items
     except Exception:
         notes.append(f"process group skipped: tidy-procs scan failed ({clean(r.stderr.strip()[:200]) or 'bad output'})")
         return []
 
 
-def scan_all(root, stale):
+def scan_all(root, stale, folder=None):
     notes = []
     items = []
     if root:
@@ -422,8 +435,8 @@ def scan_all(root, stale):
             notes.append(f"skipped {len(items) - len(kept)} items with a comma in the name")
         items = kept
     else:
-        notes.append("not inside a git repository: only the process group was scanned")
-    return dict(version=1, root=root, notes=notes, items=items + proc_items(notes))
+        notes.append("not inside a git repository: only the process group was scanned, for this folder")
+    return dict(version=1, root=root, notes=notes, items=items + proc_items(notes, scope_roots(root, folder)))
 
 
 def human(result):
@@ -564,7 +577,9 @@ def apply(args):
         log_line(i, it["label"], result, root)
     if procs:
         script = procs_script()
-        cmd = [sys.executable, script, "apply", "--ids", ",".join(procs)] + (["--dry-run"] if args.dry_run else [])
+        # The same scope as the scan: tidy-procs re-scans inside it, so an id from another repo is refused.
+        cmd = [sys.executable, script, "apply", "--ids", ",".join(procs), *root_args(scope_roots(root, args.root))]
+        cmd += ["--dry-run"] if args.dry_run else []
         if not os.path.isfile(script):
             print(f"failed {procs}: {script} not found")
             failed += len(procs)
@@ -608,7 +623,7 @@ def main():
     if args.cmd == "apply":
         return apply(args)
     root = repo_root(args.root)
-    result = scan_all(root, args.stale_days)
+    result = scan_all(root, args.stale_days, args.root)
     if root is None:
         print("tidy-scan: not inside a git repository", file=sys.stderr)
     if args.json:
