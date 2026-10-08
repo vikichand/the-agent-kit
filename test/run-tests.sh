@@ -275,7 +275,12 @@ if [ -n "$PY" ]; then
   mkdir -p "$k/home/.claude/plugins"; printf '{"plugins":{}}' > "$k/home/.claude/plugins/installed_plugins.json"; : > "$k/home/.codex/config.toml"
   o=$(kt claude "$k/proj"); o2=$(kt codex "$k/proj")
   has 'Context7' "$o" && has 'Context7' "$o2" && ! has 'superpowers' "$o$o2" && ! has 'ponytail' "$o$o2" && ! has 'headroom' "$o$o2" \
-    && pass "K18 optional items are never in the session reminder" || bad "K18 an optional item was reminded: $o $o2"  rm -rf "$k"
+    && pass "K18 optional items are never in the session reminder" || bad "K18 an optional item was reminded: $o $o2"
+  # K19: the reminder is ONE line that tells the agent to tell the user once, in one line, what is
+  # missing and the command for each - not an invitation to a conversation about installing.
+  has 'tell the user once, in one line' "$o" && has 'claude mcp add --transport http context7' "$o" && has 'claude mcp add chrome-devtools' "$o" \
+    && [ "$(printf '%s\n' "$o" | wc -l | tr -d ' ')" = 1 ] \
+    && pass "K19 one line, telling the agent to relay the missing tools and their commands once" || bad "K19 reminder wording or length wrong: $o"  rm -rf "$k"
 else
   bad "no python - kit-check.py NOT tested"
 fi

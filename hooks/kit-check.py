@@ -160,10 +160,10 @@ def missing_tools(tool, top):
     except OSError:
         pass
     who = "Claude Code" if tool == "claude" else "Codex"
-    return ("the-agent-kit: recommended for %s but not installed: %s. Mention this to the user once and "
-            "offer to install; install only what they approve, and let them run any command that needs a "
-            "key. To stop a reminder, remove its entry from ~/.the-agent-kit/recommended.json."
-            % (who, "; ".join(gaps)))
+    return ("the-agent-kit: tell the user once, in one line, that these recommended tools are not installed "
+            "for %s, with the command to install each: %s. Install nothing without their yes, and let them "
+            "run any command that needs a key. To stop a reminder, list its id under \"dismissed\" in "
+            "~/.the-agent-kit/recommended.json." % (who, "; ".join(gaps)))
 
 
 def main():
