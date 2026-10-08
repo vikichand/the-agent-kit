@@ -45,9 +45,10 @@ The adherence harness (`test/adherence/run.sh`) already runs each case under sev
 turns, tool calls, tokens, cache reads and writes, and cost per run. Performance testing reuses it.
 
 **Arms.**
-- `vanilla`: a clean Claude Code config folder (`CLAUDE_CONFIG_DIR`) authenticated with
-  `CLAUDE_CODE_OAUTH_TOKEN`, no rules, no user CLAUDE.md, hooks, plugins or MCP servers. Not `--bare`, which
-  also drops CLAUDE.md and system reminders. Codex uses `--ignore-user-config`. Antigravity has no such switch,
+- `vanilla`: a separate Claude Code config folder (`CLAUDE_CONFIG_DIR`) that holds only a login, made once
+  with `CLAUDE_CONFIG_DIR=~/.claude-vanilla claude` and `/login`: no rules, no user CLAUDE.md, hooks, plugins
+  or MCP servers. Not `--bare`, which also drops CLAUDE.md and system reminders. Not a
+  `CLAUDE_CODE_OAUTH_TOKEN` in the shell profile: it outranks the normal login in every session. Codex uses `--ignore-user-config`. Antigravity has no such switch,
   so its numbers are a machine baseline, labelled as such.
 - `current`: the last release.
 - `candidate`: the working tree.
