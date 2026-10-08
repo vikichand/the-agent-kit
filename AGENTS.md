@@ -159,7 +159,9 @@ state the bucket and the oracle in one clause and go.
   repeats without a new strategy, and hand it back.
 - **High-risk judged work** (design, prose, UX that no check establishes) gets an independent assessment
   against explicit criteria. Never spawn a reviewer to repeat verification already done.
-- **"Looks right" is not done.** Done = checks green, original ask demonstrably satisfied. State how you
+- **"Looks right" is not done.** Done = checks green and every part of the original ask demonstrably
+  satisfied, with nothing left as a placeholder, a stub or "the rest is similar". Stop early only when you
+  cannot go on without the user or before a risky step, and then say exactly what is left. State how you
   verified; a syntax-only check, or one that failed to start, is not a check.
 
 ## 6. Debug by root cause, not by symptom
@@ -183,8 +185,7 @@ state the bucket and the oracle in one clause and go.
 - **A repeated mistake is a missing rule: propose it, don't write it.** Name the one line that would have
   prevented it, for the human to accept. Never edit the rules file yourself.
 - **Announce breaking changes.** A changed public contract (API shape, event schema, exported signature) is
-  called out and versioned, never smuggled in; genuinely risky behaviour goes behind a flag where the
-  project has them.
+  called out and versioned, never smuggled in; risky behaviour goes behind a flag where the project has them.
 
 ## 8. Ownership
 
