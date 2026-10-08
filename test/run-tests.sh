@@ -370,6 +370,25 @@ d=$(sh "$KIT/install.sh" --check 2>&1)
 has 'no \*\*Branches:\*\* line' "$d" && bad "D12b Branches warning still shown (false positive)" || pass "D12b block with a Branches line is silent"
 cd "$KIT"; rm -rf "$w"
 
+# D13: a project that has the /tidy skill but whose machine has no tidy scripts is told, by name, what to run.
+if [ -n "$PY" ]; then
+  g=$(mktemp -d) || exit 2; u=$(mktemp -d) || exit 2
+  G=$(cygpath -m "$g" 2>/dev/null || printf '%s' "$g")
+  dr() { (cd "$u" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1); }
+  git init -q "$u"; git -C "$u" config core.hooksPath .git/hooks
+  mkdir -p "$u/.claude/skills/tidy" "$g/.the-agent-kit/hooks"; : > "$u/.claude/skills/tidy/SKILL.md"
+  d=$(dr)
+  has 'NOTE: /tidy is installed in this project but its scripts are missing; run install.sh --setup' "$d" \
+    && pass "D13 /tidy in the project but no scripts on the machine: the note names the fix" || bad "D13 no /tidy note: $(printf '%s' "$d" | grep -i tidy)"
+  : > "$g/.the-agent-kit/hooks/tidy-scan.py"; d=$(dr)
+  has '/tidy is installed in this project' "$d" && bad "D13 note shown although the scripts are there" || pass "D13 no note once the scripts are installed"
+  rm -rf "$u/.claude"; rm -f "$g/.the-agent-kit/hooks/tidy-scan.py"; d=$(dr)
+  has '/tidy is installed in this project' "$d" && bad "D13 note shown in a project without /tidy" || pass "D13 no note in a project without /tidy"
+  mkdir -p "$u/.agents/skills/tidy"; : > "$u/.agents/skills/tidy/SKILL.md"; d=$(dr)
+  has '/tidy is installed in this project' "$d" && pass "D13 the Codex and Antigravity copy (.agents/skills/tidy) counts too" || bad "D13 .agents/skills/tidy not noticed"
+  rm -rf "$g" "$u"
+fi
+
 # D14: the doctor lists the recommended tools missing for each tool installed on this machine, and the
 # optional ones (the session reminder never carries those); a config it cannot read is "cannot tell",
 # never "missing". A temp HOME stands in for the machine.

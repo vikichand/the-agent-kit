@@ -784,6 +784,11 @@ doctor() {
   for h in mcp-orphans.py mcp-wrap.py tidy-procs.py tidy-scan.py; do
     if [ -f "$KIT/hooks/$h" ]; then say "  OK:   hooks/$h present"; else say "  NOTE: hooks/$h unavailable in this kit copy"; fi
   done
+  # The /tidy skill is copied into each project but its scripts live on the machine: a project installed
+  # before they shipped, or cloned onto another machine, has the skill and nothing for it to run.
+  if { [ -d .claude/skills/tidy ] || [ -d .agents/skills/tidy ]; } && [ ! -f "$HOME/.the-agent-kit/hooks/tidy-scan.py" ]; then
+    say "  NOTE: /tidy is installed in this project but its scripts are missing; run install.sh --setup"
+  fi
   # The settings are where the tool guard and the session-start check are wired. Checking the scripts
   # alone reported all OK on a machine whose Codex had no guard at all (2026-09-29).
   share="$HOME/.the-agent-kit"
