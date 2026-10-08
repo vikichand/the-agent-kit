@@ -495,14 +495,14 @@ def t_commands_use_resolved_git():
     def rec(args, *a, **k):
         seen.append(list(args))
         return real(args, *a, **k)
-    keep = mod.proc_items
-    mod.subprocess.run, mod.proc_items = rec, lambda notes, roots: []
+    keep, keep_occ = mod.proc_items, mod.occupied_folders
+    mod.subprocess.run, mod.proc_items, mod.occupied_folders = rec, lambda notes, roots: [], lambda paths: set()
     try:
         mod.scan_all(str(d), 14)
         mod.toplevel(str(d))
         mod.act(str(d), dict(id="branch:nope", action="delete_branch"), False)
     finally:
-        mod.subprocess.run, mod.proc_items = real, keep
+        mod.subprocess.run, mod.proc_items, mod.occupied_folders = real, keep, keep_occ
     pre = ["-c", "core.fsmonitor=false", "--no-optional-locks", "--literal-pathspecs"]
     return len(seen) > 10 and all(c[0] == mod.GIT and os.path.isabs(c[0]) and c[1:5] == pre for c in seen)
 
@@ -775,8 +775,8 @@ def t_scope_roots_reach_both_hops():
     tidy("apply", "--ids", "proc:42:1", "--root", str(d), env=env)
     calls, roots = logged_roots(log)
     want = {os.path.normcase(os.path.realpath(x)) for x in (d, w)}
-    return (len(calls) == 2 and calls[0][0] == "scan" and calls[1][0] == "apply" and roots[0] == want == roots[1]
-            and "from procs" in j["notes"])
+    hops = [(c[0], r) for c, r in zip(calls, roots) if c[0] in ("scan", "apply")]  # 'occupied' is a third call
+    return hops == [("scan", want), ("apply", want)] and "from procs" in j["notes"]
 
 
 def t_scope_outside_a_repo_is_the_folder():
@@ -787,6 +787,29 @@ def t_scope_outside_a_repo_is_the_folder():
     tidy("scan", "--json", "--root", str(plain), env=env)
     calls, roots = logged_roots(log)
     return roots == [{os.path.normcase(os.path.realpath(plain))}]
+
+
+def t_worktree_with_a_running_process_is_skipped():
+    d = mk()
+    w, other = wt(d, "busy", "wbusy"), wt(d, "idle", "widle")
+    p = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"], cwd=w)
+    try:
+        time.sleep(1)
+        j = scan(d)
+        busy_skipped = wid(w) not in {i["id"] for i in j["items"]} and any(w.name in n for n in j["notes"])
+        other_listed = wid(other) in {i["id"] for i in j["items"]}
+    finally:
+        p.kill()
+        p.wait()
+    return busy_skipped and other_listed and wid(w) in ids(d)
+
+
+def t_worktree_busy_check_failure_is_low():
+    d = mk()
+    w = wt(d, "unchecked", "wunchecked")
+    env = dict(ENV, AGENT_KIT_TIDY_PROCS=str(fake_procs(TMP / "z.txt")), AGENT_KIT_TIDY_TEST="1")
+    it = {i["id"]: i for i in scan(d, env=env)["items"]}[wid(w)]  # the fake answers 'occupied' with nothing usable
+    return it["confidence"] == "low" and any("could not check" in e for e in it["evidence"])
 
 
 def wt_item(d, w):

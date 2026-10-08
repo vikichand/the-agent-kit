@@ -508,6 +508,12 @@ def memoised(probe):
     return get
 
 
+def occupied(procs, roots, cwds):
+    """The roots that some process (any: a shell, an agent session, a server) is working inside."""
+    folders = [norm(f) for f in cwds(sorted(p["pid"] for p in procs)).values() if f]
+    return [r for r in roots if any(under(f, [norm(r)]) for f in folders)]
+
+
 def run_scan(min_age_minutes, idle_hours, roots):
     notes = []
     try:
@@ -546,6 +552,8 @@ def apply_ids(ids, items, kill, dry_run=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("occupied", help="print the --root folders that a running process works inside, as JSON") \
+        .add_argument("--root", action="append", required=True)
     for name in ("scan", "apply"):
         p = sub.add_parser(name)
         p.add_argument("--root", action="append", required=True,
@@ -559,12 +567,19 @@ def main():
             p.add_argument("--ids", required=True)
             p.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
-    if not all(math.isfinite(v) and v >= 0 for v in (args.min_age_minutes, args.idle_hours)):
+    if args.command != "occupied" and not all(math.isfinite(v) and v >= 0 for v in (args.min_age_minutes, args.idle_hours)):
         parser.error("ages must be finite nonnegative numbers")
     home = norm(os.path.expanduser("~"))
     for r in args.root:
         if os.path.dirname(norm(r)) == norm(r) or norm(r) == home:  # a scope this wide is the whole machine
             parser.error(f"--root {r} is the home folder or a filesystem root: too broad to scope processes")
+    if args.command == "occupied":
+        try:
+            print(json.dumps(occupied(reaper.list_processes(), args.root, read_cwds)))
+        except (OSError, ValueError, subprocess.SubprocessError) as exc:
+            print(f"process listing unavailable: {exc}", file=sys.stderr)
+            return 1
+        return 0
     items, notes = run_scan(args.min_age_minutes, args.idle_hours, args.root)
     if args.command == "scan":
         if args.json:

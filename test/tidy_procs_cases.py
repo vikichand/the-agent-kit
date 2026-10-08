@@ -249,6 +249,12 @@ check("apply refuses an id whose process is outside the scope", lambda: (lambda 
 check("apply kills an id whose process is in scope", lambda: [t["pid"] for t in applied([good], items=ITEMS_A)[0][0]] == [40])
 
 
+check("occupied lists the roots a process works inside, any process", lambda: tidy.occupied(
+    [PARENT, proc(5, 1, "bash"), proc(6, 1, "vim x")], [RA, WT_A, RB], lambda pids: {
+        p: {5: os.path.join(WT_A, "sub"), 6: RB + "-other"}.get(p) for p in pids}) == [WT_A])
+check("occupied is empty when no folder can be read", lambda: tidy.occupied([PARENT], [RA], lambda pids: {1: None}) == [])
+
+
 def child_cwd():
     tmp = pathlib.Path(tempfile.mkdtemp(prefix="tidyprocs_cwd_"))
     p = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], cwd=tmp)

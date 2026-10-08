@@ -206,8 +206,8 @@ def ignored_evidence(path, files):
     return ev
 
 
-def worktree_items(root, default, stale):
-    out = []
+def worktree_items(root, default, stale, notes):
+    out, busy = [], []
     tip = commit_of(root, default)
     here = os.path.realpath(root)
     for w in worktrees(root)[1:]:
@@ -241,6 +241,13 @@ def worktree_items(root, default, stale):
             if checkout_age_days(path) < stale:
                 continue
             ev, conf = ev + [no_commits(default)], "low"
+        if not busy:  # one process listing for all linked worktrees, and only when one would be offered
+            busy.append(occupied_folders([x["path"] for x in worktrees(root)[1:]]))
+        if busy[0] is not None and path in busy[0]:  # an agent or a terminal is working in it right now
+            notes.append(f"worktree {clean(path)} skipped: a process is running in it")
+            continue
+        if busy[0] is None:
+            ev, conf = ev + ["could not check whether a process is running in it"], "low"
         files = ignored_files(path) if st.returncode == 0 else None
         if files is None:  # a failed git status is not "no ignored files"
             why = (st.stderr.strip().splitlines() or ["git status failed"])[0][:120]
@@ -397,6 +404,21 @@ def root_args(roots):
     return [a for r in roots for a in ("--root", r)]
 
 
+def occupied_folders(paths):
+    """The paths a process is working inside right now (any process); None when that cannot be checked."""
+    script = procs_script()
+    if not os.path.isfile(script):
+        return None
+    r = run([sys.executable, script, "occupied", *root_args(paths)])
+    try:
+        assert r.returncode == 0
+        found = json.loads(r.stdout)
+        assert isinstance(found, list)
+        return set(found)
+    except Exception:
+        return None
+
+
 def proc_items(notes, roots):
     script = procs_script()
     if not os.path.isfile(script):
@@ -426,7 +448,7 @@ def scan_all(root, stale, folder=None):
             notes.append("no default branch found (origin/HEAD, main, master): branches and worktrees skipped")
         wts = worktrees(root)
         tracked = tracked_set(root)
-        items += branch_items(root, default, wts) + worktree_items(root, default, stale)
+        items += branch_items(root, default, wts) + worktree_items(root, default, stale, notes)
         leftovers = leftover_items(root, tracked, stale, wts)
         items += leftovers + candidate_items(root, stale, {i["id"] for i in leftovers})
         # ids travel in a comma-separated --ids list; a comma in a name could smuggle in a second id
