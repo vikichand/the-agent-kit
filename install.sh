@@ -6,8 +6,10 @@
 #   ./install.sh --extension  per-project (extends global): project-config stub + git hooks
 #   ./install.sh --setup      machine-wide, all of it: copy the kit to ~/.the-agent-kit, turn on the git
 #                             hooks, add the kit to your Claude Code and Codex settings, and install its
-#                             skills once for all three tools (asks first)
-#   ./install.sh --undo       remove the machine-wide skill links, copies and skills.json names it made
+#                             skills once for all three tools and wire Antigravity's session-start check
+#                             (asks first)
+#   ./install.sh --undo       remove the machine-wide skill links, copies, skills.json names and the
+#                             Antigravity check hook it made
 #   ./install.sh --global     machine-wide, by hand: copy the kit and PRINT the snippets to merge yourself
 #   ./install.sh --update     pull the latest kit from GitHub into ~/.the-agent-kit, then run --setup
 #   ./install.sh --update-rules  refresh THIS repo's AGENTS.md to the kit's current rules; the
@@ -408,8 +410,8 @@ copy_share() {  # copy this kit into ~/.the-agent-kit, so the download it came f
   # Copy the WHOLE kit, not just the hooks, so the clone you ran this from becomes disposable.
   # git-hooks/ is the core.hooksPath target (those three only); hooks/ is the full set, which is
   # what the relocated install.sh compares against in --check and copies from per project.
-  for h in command-guard.py kit-check.py mcp-orphans.py mcp-wrap.py tidy-procs.py tidy-scan.py commit-msg pre-commit pre-push; do
-    case "$h" in mcp-*|tidy-*) [ -f "$KIT/hooks/$h" ] || continue ;; esac
+  for h in command-guard.py kit-check.py agent-kit-check.py mcp-orphans.py mcp-wrap.py tidy-procs.py tidy-scan.py commit-msg pre-commit pre-push; do
+    case "$h" in mcp-*|tidy-*|agent-kit-*) [ -f "$KIT/hooks/$h" ] || continue ;; esac
     cp "$KIT/hooks/$h" "$share/hooks/$h"
   done
   for h in commit-msg pre-commit pre-push; do cp "$KIT/hooks/$h" "$share/git-hooks/$h"; done
@@ -507,6 +509,12 @@ install_global() {  # copy the kit, then PRINT the settings snippets for a hand 
   say "  add {\"path\": \"~/.agents/skills\", \"include_only\": [<the skill names>]} to \"entries\" in ~/.gemini/config/skills.json (Antigravity)"
 
   hr
+  say "ANTIGRAVITY SESSION-START CHECK - Antigravity has no SessionStart event, so it runs as a PreInvocation hook"
+  say "  that acts on the first call of each conversation. Copy $share/hooks/agent-kit-check.py to"
+  say "  ~/.gemini/config/, then add this under its own name to ~/.gemini/config/hooks.json (keep your other hooks):"
+  say "    \"the-agent-kit\": {\"PreInvocation\": [{\"type\": \"command\", \"command\": \"$py agent-kit-check.py --tool antigravity\", \"timeout\": 10}]}"
+
+  hr
   # $share, never $KIT. Under --update, $KIT is a temp clone this run deletes on its way out, so a
   # command printed with that path is already broken by the time anyone reads it. $share is where
   # the kit actually lives afterwards.
@@ -516,7 +524,6 @@ install_global() {  # copy the kit, then PRINT the settings snippets for a hand 
   say "    cat \"$share/AGENTS.md\" >> ~/.claude/CLAUDE.md   ;   cat \"$share/AGENTS.md\" >> ~/.codex/AGENTS.md"
   say "    mkdir -p ~/.gemini && cat \"$share/AGENTS.md\" >> ~/.gemini/AGENTS.md"
   say "Antigravity: the guard hook stays per project; run $share/install.sh inside each project."
-  say "Antigravity has no documented session-start update check."
 }
 
 nat() { cygpath -m "$1" 2>/dev/null || printf '%s' "$1"; }   # a path Python and git accept on every OS
@@ -556,9 +563,9 @@ wire_machine() {  # $1 = plan | apply | undo. The kit's own skills, installed on
   share="$HOME/.the-agent-kit"
   py=$(detect_py)
   [ -n "$py" ] || { say "  ! no working Python 3 found - the kit's skills were not installed machine-wide."; return 1; }
-  $py - "$1" "$(nat "$HOME")" "$(nat "$share")" <<'WIRE'
-import json, os, shutil, subprocess, sys, tempfile, time
-mode, home, share = sys.argv[1:4]
+  $py - "$1" "$(nat "$HOME")" "$(nat "$share")" "$py" <<'WIRE'
+import json, os, re, shutil, subprocess, sys, tempfile, time
+mode, home, share, pycmd = sys.argv[1:5]
 KIT_SKILLS = ("generating-reports", "orchestrating-work", "tidy", "writing-docs")
 MARK = ".the-agent-kit"            # a file inside every skill folder the kit copied: that is what "ours" means
 canon_root = os.path.join(home, ".agents", "skills")
@@ -571,8 +578,13 @@ names = sorted(n for n in (os.listdir(src_root) if os.path.isdir(src_root) else 
                if os.path.isfile(os.path.join(src_root, n, "SKILL.md")))
 if mode == "undo":
     names = sorted(set(names) | set(KIT_SKILLS))
-elif not names:
-    sys.exit(0)                      # no kit skills on this machine yet: nothing to install
+# Antigravity's session-start check: a named PreInvocation hook in the global hooks.json, run through a
+# launcher beside it (the hook command is split on whitespace and quotes are ignored, so no quoted path).
+HOOK_KEY = "the-agent-kit"
+hooks_path = os.path.join(cfg, "hooks.json")
+launch_path = os.path.join(cfg, "agent-kit-check.py")
+launch_src = os.path.join(share, "hooks", "agent-kit-check.py")
+CMD_RE = re.compile(r"(python3?|py -3) agent-kit-check\.py --tool antigravity")
 stamp = time.strftime("%Y%m%d-%H%M%S")
 actions, lines, rc = [], [], 0
 
@@ -652,6 +664,24 @@ def kit_entry(e):
 def warn(s):
     lines.append("  ! " + s)
 
+def want_hook():
+    return {"PreInvocation": [{"type": "command", "command": pycmd + " agent-kit-check.py --tool antigravity", "timeout": 10}]}
+
+def kit_hook_shape(v):               # what an entry written by an earlier run looks like (any interpreter spelling)
+    h = v.get("PreInvocation") if isinstance(v, dict) and list(v) == ["PreInvocation"] else None
+    return (isinstance(h, list) and len(h) == 1 and isinstance(h[0], dict)
+            and CMD_RE.fullmatch(str(h[0].get("command", ""))) is not None)
+
+def read_launcher():
+    with open(launch_src, "rb") as f:
+        return f.read()
+
+def write_launcher():
+    fd, tmp = tempfile.mkstemp(dir=cfg, prefix=".agent-kit-check.", suffix=".tmp")
+    with os.fdopen(fd, "wb") as f:
+        f.write(read_launcher())
+    os.replace(tmp, launch_path)
+
 if mode in ("plan", "apply"):
     ok = []                          # skills whose one real copy is ours (made now or already)
     todo_copy, todo_link = [], []
@@ -703,13 +733,54 @@ if mode in ("plan", "apply"):
             if mine is None:
                 entries.append({"path": SJ_PATH, "include_only": list(ok)})
                 lines.append("  + add ~/.agents/skills (limited to the kit's skills) to ~/.gemini/config/skills.json for Antigravity")
-                actions.append(("skills.json", lambda: write_json(sj_path, data)))
+                actions.append(("skills.json", lambda d=data: write_json(sj_path, d)))
             elif isinstance(mine.get("include_only"), list):
                 missing = [n for n in ok if n not in mine["include_only"]]
                 if missing:
                     mine["include_only"] += missing
                     lines.append("  + add the kit's skills to your ~/.agents/skills entry in ~/.gemini/config/skills.json: " + ", ".join(missing))
-                    actions.append(("skills.json", lambda: write_json(sj_path, data)))
+                    actions.append(("skills.json", lambda d=data: write_json(sj_path, d)))
+    if os.path.isdir(cfg) and os.path.isfile(launch_src) and os.path.isfile(os.path.join(share, "hooks", "kit-check.py")):
+        data, state = {}, "add"      # `data` is rebound above for skills.json: the writers bind their own copy (d=data)
+        if os.path.islink(hooks_path):
+            warn("~/.gemini/config/hooks.json is a symlink; left untouched, so the Antigravity session-start check is not wired")
+            state = "blocked"
+        elif os.path.exists(hooks_path):
+            try:
+                with open(hooks_path, encoding="utf-8-sig") as f:
+                    data = json.load(f)
+                if not isinstance(data, dict):
+                    raise ValueError
+            except ValueError:
+                warn("~/.gemini/config/hooks.json is not a JSON object; left untouched, so the Antigravity session-start check is not wired")
+                state = "blocked"
+        if state != "blocked":
+            cur = data.get(HOOK_KEY)
+            if cur is None:
+                state = "add"
+            elif cur == want_hook():
+                state = "ok"
+            elif kit_hook_shape(cur):
+                state = "refresh"
+            else:
+                warn("the entry named the-agent-kit in ~/.gemini/config/hooks.json is not the kit's; left as it is, so the session-start check is not wired")
+                state = "blocked"
+        if state != "blocked":
+            if os.path.islink(launch_path):
+                warn("~/.gemini/config/agent-kit-check.py is a symlink; left untouched, so the Antigravity session-start check is not wired")
+            else:
+                try:
+                    stale = not os.path.isfile(launch_path) or open(launch_path, "rb").read() != read_launcher()
+                except OSError:
+                    stale = True
+                if stale:
+                    lines.append("  + write ~/.gemini/config/agent-kit-check.py (the launcher the hook calls; kit-owned)")
+                    actions.append(("launcher", write_launcher))
+                if state in ("add", "refresh"):
+                    data[HOOK_KEY] = want_hook()
+                    lines.append("  + %s the session-start check in ~/.gemini/config/hooks.json (a PreInvocation hook; your other hooks are kept)"
+                                 % ("add" if state == "add" else "refresh"))
+                    actions.append(("hooks.json", lambda d=data: write_json(hooks_path, d)))
     if mode == "apply":
         for what, fn in actions:
             try:
@@ -748,6 +819,21 @@ else:                                # undo
                     write_json(sj_path, data); gone.append("the kit's skills in ~/.gemini/config/skills.json")
         except (ValueError, KeyError, TypeError, OSError):
             lines.append("  ! ~/.gemini/config/skills.json could not be read; left as it is")
+    hook_left = False                # keep the launcher while an entry might still call it
+    if os.path.exists(hooks_path):
+        try:
+            if os.path.islink(hooks_path):
+                raise ValueError
+            with open(hooks_path, encoding="utf-8-sig") as f:
+                data = json.load(f)
+            if isinstance(data, dict) and kit_hook_shape(data.get(HOOK_KEY)):
+                del data[HOOK_KEY]
+                write_json(hooks_path, data); gone.append("the session-start check in ~/.gemini/config/hooks.json")
+        except (ValueError, OSError):
+            hook_left = True
+            lines.append("  ! ~/.gemini/config/hooks.json could not be read or is a symlink; left as it is")
+    if not hook_left and os.path.isfile(launch_path) and not os.path.islink(launch_path):
+        os.remove(launch_path); gone.append("~/.gemini/config/agent-kit-check.py")
     lines.insert(0, "  - removed: " + (", ".join(gone) if gone else "nothing (the kit made none of it, or it is already gone)"))
 print("\n".join(lines))
 sys.exit(rc)
@@ -775,7 +861,7 @@ setup_machine() {  # --setup: everything a machine needs, applied with the user'
        say "  To add the kit's hooks, copy $share/git-hooks/* into that folder." ;;
   esac
   hr
-  say "SKILLS - the kit's own skills, installed once for all three tools"
+  say "SKILLS AND THE ANTIGRAVITY CHECK - the kit's own skills installed once for all three tools, and the session-start check for Antigravity"
   wrc=0; wplan=$(wire_machine plan 2>&1) || wrc=$?
   if [ -n "$wplan" ]; then say "$wplan"; else say "  already in place"; fi
   say "Antigravity's command guard is still wired per project: run $share/install.sh inside each project."
@@ -1016,7 +1102,7 @@ doctor() {
   fi
   if [ -n "$py" ] && [ -d "$HOME/.the-agent-kit/skills" ]; then
     wrc=0; wire_machine plan >/dev/null 2>&1 || wrc=$?
-    [ "$wrc" = 10 ] && say "  NOTE: the kit's machine-wide skills are not all in place (one copy in ~/.agents/skills, linked for Claude Code and Antigravity); run install.sh --setup"
+    [ "$wrc" = 10 ] && say "  NOTE: the kit's machine-wide skills (one copy in ~/.agents/skills, linked for Claude Code and Antigravity) and the Antigravity session-start check are not all in place; run install.sh --setup"
   fi
   # The settings are where the tool guard and the session-start check are wired. Checking the scripts
   # alone reported all OK on a machine whose Codex had no guard at all (2026-09-29).

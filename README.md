@@ -113,6 +113,7 @@ see ([Limits](#limits)).
    | Claude Code | `~/.claude/settings.json` | the command guard, the session-start check, and the ask and deny rules |
    | Codex | `~/.codex/hooks.json` | the command guard and the session-start check |
    | Codex | `~/.codex/config.toml` | approval, sandbox and network settings |
+   | Antigravity | `~/.gemini/config/hooks.json` | the session-start check, as a `PreInvocation` hook run through a launcher beside it (your other hooks there are kept) |
 
    It only adds. A setting you already chose is kept, the kit's own older entries are updated in place,
    a file it cannot read safely is left untouched, and a tool you do not have is skipped. Each changed
@@ -177,7 +178,7 @@ does not refresh it: after an update, delete the old block from the global file 
 again. The depth tier in each project still updates through `--update-rules`.
 
 Antigravity reads `~/.gemini/AGENTS.md` in every project. Its guard hook stays per project: run
-`~/.the-agent-kit/install.sh` inside each project. `--setup` touches `~/.gemini/config` only for the skills entry above.
+`~/.the-agent-kit/install.sh` inside each project. `--setup` touches `~/.gemini/config` only for the skills entry and the session-start check above.
 
 ### Check it worked
 
@@ -194,7 +195,7 @@ Every settings file `--setup` changed has a backup beside it (`*.bak-agent-kit-<
 To turn the git hooks off: `git config --global --unset core.hooksPath`, run in a normal terminal. The
 kit itself is the `~/.the-agent-kit` folder, and a project's rules are its `AGENTS.md`, `CLAUDE.md`,
 `.claude/` and `.agents/skills/`. `install.sh --undo` removes the machine-wide skill links, the copies
-in `~/.agents/skills` and the `skills.json` names, and only those the kit made.
+in `~/.agents/skills`, the `skills.json` names and the Antigravity check hook, and only those the kit made.
 
 ### Your shell
 
@@ -234,7 +235,8 @@ When a session starts, the kit checks three things and says nothing unless one n
 - **This project's rules differ from your installed kit.** Compared locally, every session. You see one
   line telling you to run `--update-rules` here. It is silent in the kit's own repo, whose rules are the
   source, and for an `--extension` stub, whose rules live globally.
-- **A recommended tool is missing** for the agent you started (Claude Code or Codex). The list is
+- **A recommended tool is missing** for the agent you started (Claude Code, Codex or Antigravity). The agent is
+  told to say so once, in one line, with the install command for each. The list is
   `~/.the-agent-kit/recommended.json`. `--setup` (so `--update`) merges the kit's list into it by id:
   new items arrive and changed ones are replaced, while an entry you delete, or an id you add to its
   `dismissed` list, never comes back. Entries without an id are yours and are never touched. The optional
@@ -248,8 +250,10 @@ It **never updates or installs anything itself**: running downloaded code at ses
 supply-chain shape the kit's rules forbid, so it only tells you what to run. It exits cleanly on every
 error, so an offline machine or a broken check never blocks a session, and when everything is current
 it prints nothing, so it costs no context. `--setup` wires it into Claude Code and Codex as a `SessionStart`
-hook (`hooks/kit-check.py`); Antigravity has no documented session-start hook, so it does not run there.
-To switch it off, set `AGENT_KIT_NO_UPDATE_CHECK=1`.
+hook (`hooks/kit-check.py`). Antigravity has no `SessionStart` event, so there it runs as a global
+`PreInvocation` hook in `~/.gemini/config/hooks.json`: Antigravity fires that before every model call, so
+the check acts only on the first call of each conversation and answers `{}` to every other. Your other
+hooks in that file are kept. To switch it off, set `AGENT_KIT_NO_UPDATE_CHECK=1`.
 
 ### Also worth having
 
@@ -318,7 +322,7 @@ and the installer is the adapter between them:
 | Git-layer guards | yes | yes | yes |
 | Tool-layer guard | `ask`, machine-wide | `deny`, machine-wide | asks every time, per project (`.agents/hooks.json`) |
 | Turn-scoped git grants | yes | no (deny mode; you push) | no (it asks; you approve) |
-| Session-start update check | yes | yes | no (Antigravity has no documented session-start hook) |
+| Session-start update check | yes | yes | yes, on the first call of each conversation (a global `PreInvocation` hook; Antigravity has no `SessionStart` event) |
 | Measured | 41 cases, Sonnet | 10 cases, see [Limits](#limits) | 6 cases, small sample, see [Limits](#limits) |
 
 **The guards** - hooks at the **git layer** (reorder-proof, covering Claude Code, Codex, Antigravity, plain `git`,
@@ -480,8 +484,8 @@ Quick Start covers the usual path. The installer's modes:
 
 | Mode | Scope | What it does |
 |---|---|---|
-| `--setup` | machine | Copy the kit to `~/.the-agent-kit`, turn on its git hooks, and add it to your Claude Code and Codex settings, and install its four skills once for all three tools: listed, asked, backed up. Safe to re-run. Antigravity's command guard is still wired per project. |
-| `--undo` | machine | Remove the machine-wide skill links, copies and `skills.json` names that `--setup` made. Only what the kit made; your settings come back from their `.bak-agent-kit-*` files. |
+| `--setup` | machine | Copy the kit to `~/.the-agent-kit`, turn on its git hooks, and add it to your Claude Code and Codex settings, and install its four skills once for all three tools, plus Antigravity's session-start check: listed, asked, backed up. Safe to re-run. Antigravity's command guard is still wired per project. |
+| `--undo` | machine | Remove the machine-wide skill links, copies, `skills.json` names and Antigravity check hook that `--setup` made. Only what the kit made; your settings come back from their `.bak-agent-kit-*` files. |
 | `--update` | machine | Fetch the latest kit, check it is the kit, then run `--setup` from it. Needs no kit beside it, so one downloaded `install.sh` bootstraps everything. |
 | `--global` | machine | By hand: copy the kit and **print** the settings snippets and the git-hooks command for you to apply. |
 | *(none)* | project | Full rules - `AGENTS.md` plus a `CLAUDE.md` that imports it - the depth tier and skills for all three tools (`.claude/` for Claude Code, `.agents/` for Codex and Antigravity), and this repo's git hooks. |
@@ -686,8 +690,12 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
   not hop ports. So the two glob rules ship on the strength of their Claude Code
   measurements, not an Antigravity one: Antigravity delivers a glob rule inside the tool output of the file
   that triggered it, where a model may weigh it as untrusted content. Other limits are Antigravity's own: it
-  has no documented session-start hook, so the update check does not run there; it splits a hook command on
-  whitespace and ignores quotes, which is why the guard runs through a launcher in `.agents/`, and that
+  has no session-start event, so the update check is a `PreInvocation` hook that acts on the first call of
+  each conversation; it is built from Antigravity's documented hook contract and tested against canned
+  payloads, but not yet seen in a live conversation, and `invocationNum` is not documented to start at any
+  value, so the check keys on the conversation id alone; it splits a hook command on
+  whitespace and ignores quotes, which is why the guard and the check run through launchers beside their
+  `hooks.json`, and that
   launcher relies on hooks running from the folder that holds `hooks.json`, verified on Windows only; and
   the guard is advisory against the agent itself, because `.agents/hooks.json` is a project file the agent
   can edit, so the git-layer hooks and server-side branch protection stay the backstop. Resuming a

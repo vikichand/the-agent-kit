@@ -171,10 +171,13 @@ stray operand.
 **MCP orphans**: `mcp-wrap.py` launches an MCP server so it dies with the agent (Job Object on Windows, process group on POSIX; verified on Windows and Linux, not macOS).
 `mcp-orphans.py` lists, and with `--kill` ends, orphaned MCP trees that match known patterns. See [`docs/mcp-orphans.md`](docs/mcp-orphans.md).
 
-**Session start**: `kit-check.py`, a SessionStart hook. One line when a newer release is on `main` (checked at
-most daily), when this project's rules differ from the installed kit, or when a tool on your
-`~/.the-agent-kit/recommended.json` is missing for the agent in use (at most daily; web items only in web
-projects); silent otherwise; never updates or installs anything itself. Off with `AGENT_KIT_NO_UPDATE_CHECK=1`.
+**Session start**: `kit-check.py`, a SessionStart hook on Claude Code and Codex, and on Antigravity (which has no
+SessionStart event) a global PreInvocation hook that acts on the first call of each conversation and always
+answers in JSON. One line when a newer release is on `main` (checked at most daily), when this project's rules
+differ from the installed kit, or when a tool on your `~/.the-agent-kit/recommended.json` is missing for the
+agent in use (at most daily; web items only in web projects; optional items never): the agent is told to tell
+you once, in one line, with the install command for each. Silent otherwise; never updates or installs anything
+itself. `install.sh --check` lists what is missing, optional items included. Off with `AGENT_KIT_NO_UPDATE_CHECK=1`.
 
 ## Wiring · installer · verification
 
@@ -204,7 +207,7 @@ projects); silent otherwise; never updates or installs anything itself. Off with
   list (Codex excludes secret names by default, and a broad one strips `DATABASE_URL` and breaks builds invisibly).
   **`codex/hooks.json`** wires the deny-mode hook.
 - **`install.sh`**: six modes, default (full rules) · `--extension` (lean, extends global) · `--setup` (machine-wide: copies the kit, turns on the
-  git hooks and adds the kit to your Claude Code and Codex settings, add-only, asked and backed up; `setup/merge-settings.py`; also installs the kit's four skills once for all three tools: a real copy in `~/.agents/skills`, a directory link per skill for Claude Code, a `skills.json` entry for Antigravity; `--undo` removes them; Antigravity's guard is wired per project) ·
+  git hooks and adds the kit to your Claude Code and Codex settings, add-only, asked and backed up; `setup/merge-settings.py`; also installs the kit's four skills once for all three tools: a real copy in `~/.agents/skills`, a directory link per skill for Claude Code, a `skills.json` entry for Antigravity; wires Antigravity's session-start check into `~/.gemini/config/hooks.json`, keeping its other hooks; `--undo` removes both; Antigravity's guard is wired per project) ·
   `--global` (machine-wide by hand: prints the snippets) ·
   `--update` (**also the installer**: a lone `install.sh` with no kit beside it bootstraps the whole thing,
   so distribution is one curl-able file - no clone, no package manager. Pulls the latest kit from GitHub

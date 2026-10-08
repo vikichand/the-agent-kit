@@ -1188,6 +1188,113 @@ else
   bad "no python - machine-wide skills NOT tested"
 fi
 
+# ---------- Antigravity session-start check: a global PreInvocation hook ----------
+# Antigravity has no SessionStart event. Its built-in docs (agy-customizations/docs/hooks.md) define a
+# PreInvocation hook, "Before the model is called", fed {"conversationId", "invocationNum", ...} and
+# answered with {"injectSteps":[{"ephemeralMessage":"..."}]}, in a hooks.json in the global customization
+# root ~/.gemini/config. --setup merges one named hook into that file, which other tools also write to:
+# every existing entry is kept, the write is atomic, and a second run changes nothing. The hook command
+# is split on whitespace with quotes ignored, so it calls a launcher beside hooks.json by bare name.
+echo "== Antigravity session-start check =="
+if [ -n "$PY" ]; then
+  wq() { cygpath -m "$1" 2>/dev/null || printf '%s' "$1"; }
+  home_() { g=$(mktemp -d) || exit 2; G=$(wq "$g"); mkdir -p "$g/.gemini/config"; }
+  su() { src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY="$1" sh "$KIT/install.sh" --setup </dev/null 2>&1) || src=$?; }
+  hk() { $PY -c "import json,sys; d=json.load(open(sys.argv[1],encoding='utf-8')); print($2)" "$(wq "$1")" 2>/dev/null; }
+  HJ() { printf '%s' "$g/.gemini/config/hooks.json"; }
+  orca='{"orca-status":{"PreInvocation":[{"type":"command","command":"C:/x/orca.exe -a b","timeout":10}],"Stop":[{"type":"command","command":"echo bye"}],"PreToolUse":[{"matcher":"*","hooks":[{"type":"command","command":"orca pre"}]}]}}'
+  home_
+  printf '%s\n' "$orca" > "$(HJ)"; cp "$(HJ)" "$g/orca.json"
+  su ""
+  cmp -s "$(HJ)" "$g/orca.json" && [ ! -e "$g/.gemini/config/agent-kit-check.py" ] \
+    && pass "G0 no consent: hooks.json and the config folder are untouched" || bad "G0 wrote Antigravity files without consent: $o"
+  su 1
+  $PY - "$(wq "$(HJ)")" "$(wq "$g/orca.json")" <<'EOF' && pass "G1 the check is one named PreInvocation hook; every entry that was there is kept exactly" || bad "G1 hooks.json wrong: $(cat "$(HJ)")"
+import json, re, sys
+d, o = json.load(open(sys.argv[1], encoding="utf-8")), json.load(open(sys.argv[2], encoding="utf-8"))
+assert d["orca-status"] == o["orca-status"], "existing hook changed"
+mine = d["the-agent-kit"]
+assert list(mine) == ["PreInvocation"], list(mine)
+h = mine["PreInvocation"][0]
+assert re.fullmatch(r"(python3?|py -3) agent-kit-check\.py --tool antigravity", h["command"]), h
+assert h["type"] == "command" and h["timeout"] == 10 and '"' not in h["command"]
+EOF
+  [ -f "$g/.gemini/config/agent-kit-check.py" ] && ls "$g/.gemini/config/"hooks.json.bak-agent-kit-* >/dev/null 2>&1 \
+    && ! ls -a "$g/.gemini/config" | grep -q '\.tmp$' \
+    && cmp -s "$(ls "$g/.gemini/config/"hooks.json.bak-agent-kit-* | head -1)" "$g/orca.json" \
+    && pass "G2 the launcher is written, the original is backed up byte for byte, no temp file is left" || bad "G2 launcher/backup/temp wrong: $(ls -a "$g/.gemini/config")"
+  # The skills entry and the hook are written by the same run into two different files: neither may carry the other's data.
+  [ "$(hk "$g/.gemini/config/skills.json" "d['entries'][0]['path'], 'the-agent-kit' in d")" = "~/.agents/skills False" ] \
+    && [ "$(hk "$(HJ)" "'entries' in d")" = False ] \
+    && pass "G2b skills.json and hooks.json each hold their own data when one run writes both" || bad "G2b files crossed: $(cat "$g/.gemini/config/skills.json")"
+  before=$(ls -a "$g/.gemini/config" | md5sum); cp "$(HJ)" "$g/h.before"; su 1
+  [ "$(ls -a "$g/.gemini/config" | md5sum)" = "$before" ] && cmp -s "$(HJ)" "$g/h.before" \
+    && pass "G3 a second --setup changes nothing" || bad "G3 re-run not idempotent: $o"
+  # G4: the launcher answers in Antigravity's contract from the folder hooks.json is in, and says {} without a kit.
+  ah=$(mktemp -d); AH=$(wq "$ah"); mkdir -p "$ah/.the-agent-kit/hooks"; cp "$KIT/hooks/kit-check.py" "$ah/.the-agent-kit/hooks/"; printf 'abc1234\n' > "$ah/.the-agent-kit/.kit-version"
+  git init -q -b main "$ah/src" && ( cd "$ah/src" && git -c user.email=t@e.com -c user.name=T commit -q --allow-empty -m r1 )
+  o=$(cd "$g/.gemini/config" && printf '{"conversationId":"c1","workspacePaths":["%s"]}' "$AH" | HOME="$ah" USERPROFILE="$AH" AGENT_KIT_REPO="$(wq "$ah/src")" $PY agent-kit-check.py --tool antigravity 2>/dev/null)
+  has 'install.sh --update' "$o" && has 'ephemeralMessage' "$o" \
+    && pass "G4 the launcher runs the installed check and injects its note" || bad "G4 the launcher did not reach the check: $o"
+  rm -rf "$ah/.the-agent-kit"; mkdir -p "$ah/.the-agent-kit"
+  o=$(cd "$g/.gemini/config" && printf '{"conversationId":"c2"}' | HOME="$ah" USERPROFILE="$AH" $PY agent-kit-check.py --tool antigravity 2>/dev/null)
+  [ "$o" = '{}' ] && pass "G4b without the installed check the launcher answers {} (a hook must always answer JSON)" || bad "G4b launcher without a kit: [$o]"
+  rm -rf "$ah"
+  # G5: a stale launcher and a stale kit entry are refreshed; a different entry under the same name is not ours.
+  printf 'stale\n' > "$g/.gemini/config/agent-kit-check.py"
+  $PY - "$(wq "$(HJ)")" <<'EOF'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); d["the-agent-kit"]["PreInvocation"][0]["timeout"] = 99
+json.dump(d, open(p, "w", encoding="utf-8"))
+EOF
+  su 1
+  ! grep -q '^stale$' "$g/.gemini/config/agent-kit-check.py" && [ "$(hk "$(HJ)" "d['the-agent-kit']['PreInvocation'][0]['timeout']")" = 10 ] && [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status', 'the-agent-kit']" ] \
+    && pass "G5 a stale launcher and a stale kit entry are brought current" || bad "G5 stale files not refreshed: $o"
+  $PY - "$(wq "$(HJ)")" <<'EOF'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); d["the-agent-kit"] = {"PreInvocation": [{"command": "echo mine"}]}
+json.dump(d, open(p, "w", encoding="utf-8"))
+EOF
+  cp "$(HJ)" "$g/h.before"; su 1
+  cmp -s "$(HJ)" "$g/h.before" && has 'the-agent-kit' "$(printf '%s' "$o" | grep '!')" \
+    && pass "G6 an entry named the-agent-kit that is not the kit's is left alone, with a warning" || bad "G6 foreign entry replaced or not reported: $o"
+  # G7: undo takes the kit's hook and launcher and nothing else.
+  printf '%s\n' "$orca" > "$(HJ)"; su 1
+  src=0; o=$(env HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --undo </dev/null 2>&1) || src=$?
+  [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status']" ] && [ ! -e "$g/.gemini/config/agent-kit-check.py" ] \
+    && pass "G7 --undo removes the kit's hook and launcher and keeps the other tool's hooks" || bad "G7 undo wrong: $(cat "$(HJ)")"
+  rm -rf "$g"
+  # G8: a hooks.json that is not a JSON object, or is a symlink, is never rewritten or written through.
+  home_; printf '{ not json' > "$(HJ)"; su 1
+  [ "$(cat "$(HJ)")" = '{ not json' ] && has 'hooks.json' "$(printf '%s' "$o" | grep '!')" \
+    && pass "G8 an unreadable hooks.json is left untouched and named" || bad "G8 unreadable hooks.json handled wrongly: $o"
+  rm -rf "$g"; home_; vic=$(mktemp -d); printf '{"keep":"me"}\n' > "$vic/victim.json"
+  if MSYS=winsymlinks:nativestrict ln -s "$vic/victim.json" "$(HJ)" 2>/dev/null && [ -L "$(HJ)" ]; then
+    su 1
+    [ "$(cat "$vic/victim.json")" = '{"keep":"me"}' ] && has 'symlink' "$(printf '%s' "$o" | grep '!')" \
+      && pass "G8b a symlinked hooks.json is not written through, and the run says so" || bad "G8b wrote through a symlink: $(cat "$vic/victim.json")"
+  else pass "G8b (this platform cannot create symlinks; skipped)"; fi
+  rm -rf "$g" "$vic"
+  # G9: no hooks.json yet -> created with just the kit's hook. No Antigravity on the machine -> nothing made.
+  home_; su 1
+  [ "$(hk "$(HJ)" "sorted(d)")" = "['the-agent-kit']" ] && pass "G9 no hooks.json yet: created with only the kit's hook" || bad "G9 fresh hooks.json wrong: $(cat "$(HJ)" 2>/dev/null)"
+  # G10: --check says whether it is wired (a missing hook is a NOTE with the fix, not a FAIL).
+  d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
+  has 'machine-wide.*install.sh --setup' "$d" && bad "G10 --check complains although everything is in place" || pass "G10 --check is quiet when the Antigravity check is wired"
+  printf '{}\n' > "$(HJ)"
+  d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
+  has 'machine-wide.*Antigravity.*install.sh --setup' "$d" && pass "G10b --check notes the Antigravity check is not wired and what to run" || bad "G10b --check silent about an unwired Antigravity check"
+  rm -rf "$g"
+  # G11: --global prints the hook for a hand merge and writes nothing under ~/.gemini.
+  g=$(mktemp -d) || exit 2; G=$(wq "$g"); mkdir -p "$g/.gemini/config"
+  o=$(HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --global 2>&1)
+  has 'PreInvocation' "$o" && has 'agent-kit-check.py' "$o" && [ ! -e "$g/.gemini/config/hooks.json" ] \
+    && pass "G11 --global prints the Antigravity hook and writes none of it" || bad "G11 --global omits or wrote the Antigravity hook"
+  rm -rf "$g"
+else
+  bad "no python - the Antigravity session-start check NOT tested"
+fi
+
 # H1-H5: the eval harness's own oracles. Both were silently wrong until 2026-09-27: provider errors
 # scored as ordinary FAILs, and a red-then-fix run scored as "edited before any failing test".
 # The functions are lifted out of run.sh so the checks run offline, with no agent and no tokens.
