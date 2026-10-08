@@ -1227,7 +1227,7 @@ doctor() {
     elif [ "$al" -gt 200 ]; then
       say "  WARN: AGENTS.md is $al effective lines - Claude Code targets under 200; adherence drops past it."
     else
-      say "  OK:   AGENTS.md $al effective lines (target: under 200; HTML comments excluded, they cost nothing)"
+      say "  OK:   AGENTS.md $al effective lines (target: under 200; HTML comments excluded: Claude Code strips them, Codex and Antigravity read them)"
     fi
     # The single highest-value anti-hallucination content is this project's REAL commands. Shipping the
     # placeholder means the agent guesses how to build, test, and verify - so say so loudly.
