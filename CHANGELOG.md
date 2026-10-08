@@ -32,6 +32,8 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 - **The pre-commit hook blocks `continue-on-error: true`** added to a workflow file, which lets a failing step
   pass the build. `# gate-exempt: <reason>` on the same line allows it.
 - **Eval case 41, and a `cleanup.sh` hook for the adherence harness** to run after each case.
+- **`docs/performance.md`**: what is known about the cost of a rules file, how the kit measures its own
+  speed against a vanilla agent, and the bar a rule must meet to ship.
 
 ### Changed
 

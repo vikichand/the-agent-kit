@@ -688,6 +688,10 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
   hopped ports, so treat it as helped, not solved. The same transcripts show the ported skill body was
   loaded in a third of the with-arm cells, so even the passes are mostly the floor plus the model's defaults.
   Whether the port changes Codex's behaviour elsewhere is unmeasured and should be read that way.
+- **The kit costs time, and 0.5.0's cost against a vanilla agent is not yet measured.** Rules that make the
+  agent run tests and read before editing add steps: on older rules text the kit arm took 1.35x the time and
+  1.42x the cost of the control. The bar, the test design and the evidence are in
+  [`docs/performance.md`](docs/performance.md).
 
 ## Inspired by
 
