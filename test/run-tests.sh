@@ -1054,6 +1054,13 @@ EOF
   [ "$(rj "len(d['items'])")" = 8 ] && [ "$(rj "sorted(d['seeded']) == sorted(i['id'] for i in d['items'])")" = True ] \
     && [ "$(rj "d['dismissed']")" = "[]" ] \
     && pass "R5 a fresh machine is seeded with every item and the record of them" || bad "R5 fresh seed wrong: $(cat "$RL" 2>/dev/null | head -c 200)"
+  # R6: a kit list with no usable items (a bad download) retires nothing from the user's list.
+  printf '{"items":[]}' > "$g/empty.json"; cp "$RL" "$g/before.json"
+  HOME="$g" USERPROFILE="$G" AGENT_KIT_LIB=1 sh -c '. "$0"; merge_recommended "$1" "$2"' "$KIT/install.sh" "$(wq "$g/empty.json")" "$(wq "$RL")" >/dev/null 2>&1
+  cmp -s "$RL" "$g/before.json" && pass "R6 an empty kit list changes nothing in the user's list" || bad "R6 an empty kit list altered the user's list"
+  # R7: a list whose seeded or dismissed is not a list is treated as unreadable, not crashed on.
+  printf '{"items":[],"seeded":"x"}' > "$RL"; cp "$RL" "$g/before.json"; su
+  cmp -s "$RL" "$g/before.json" && has 'recommended.json' "$o" && pass "R7 a malformed seeded field is left untouched and named" || bad "R7 malformed list handled wrongly: $o"
   rm -rf "$g"
 else
   bad "no python - the recommended list refresh NOT tested"
@@ -1156,6 +1163,20 @@ EOF
   [ "$(cat "$g/.gemini/config/skills.json")" = '{ not json' ] && has 'skills.json' "$(printf '%s' "$o" | grep -i 'WARN\|!')" \
     && pass "W10c an unreadable skills.json is left untouched and named" || bad "W10c unreadable skills.json handled wrongly: $o"
   rm -rf "$g"
+  # W10d: a symlinked skills.json is not replaced by a plain file; an entry with keys of its own is not undone.
+  home_; vic=$(mktemp -d); printf '{"entries":[{"path":"~/theirs"}]}\n' > "$vic/real.json"
+  if MSYS=winsymlinks:nativestrict ln -s "$vic/real.json" "$g/.gemini/config/skills.json" 2>/dev/null && [ -L "$g/.gemini/config/skills.json" ]; then
+    su 1
+    [ -L "$g/.gemini/config/skills.json" ] && [ "$(cat "$vic/real.json")" = '{"entries":[{"path":"~/theirs"}]}' ] && has 'symlink' "$(printf '%s' "$o" | grep '!')" \
+      && pass "W10d a symlinked skills.json is left a symlink, unchanged, and named" || bad "W10d symlinked skills.json replaced or written through: $o"
+  else pass "W10d (this platform cannot create symlinks; skipped)"; fi
+  rm -rf "$g" "$vic"
+  home_
+  printf '{"entries":[{"path":"~/.agents/skills","include_only":["generating-reports","orchestrating-work","tidy","writing-docs"],"exclude":["x-.*"]}]}\n' > "$g/.gemini/config/skills.json"
+  cp "$g/.gemini/config/skills.json" "$g/sj.before"; su 1; undo_
+  cmp -s "$g/.gemini/config/skills.json" "$g/sj.before" && has 'skills.json' "$(printf '%s' "$o" | grep '!')" \
+    && pass "W10e --undo keeps a skills.json entry that carries keys of the user's own, and says so" || bad "W10e undo rewrote an entry with other keys: $(cat "$g/.gemini/config/skills.json")"
+  rm -rf "$g"
   # W11: a tool that is not installed is not set up: no ~/.claude or ~/.gemini is created for it, while
   # the one real copy still lands where Codex reads it.
   g=$(mktemp -d) || exit 2; G=$(wq "$g")
@@ -1213,7 +1234,7 @@ if [ -n "$PY" ]; then
 import json, re, sys
 d, o = json.load(open(sys.argv[1], encoding="utf-8")), json.load(open(sys.argv[2], encoding="utf-8"))
 assert d["orca-status"] == o["orca-status"], "existing hook changed"
-mine = d["the-agent-kit"]
+mine = d["the-agent-kit-check"]
 assert list(mine) == ["PreInvocation"], list(mine)
 h = mine["PreInvocation"][0]
 assert re.fullmatch(r"(python3?|py -3) agent-kit-check\.py --tool antigravity", h["command"]), h
@@ -1224,7 +1245,7 @@ EOF
     && cmp -s "$(ls "$g/.gemini/config/"hooks.json.bak-agent-kit-* | head -1)" "$g/orca.json" \
     && pass "G2 the launcher is written, the original is backed up byte for byte, no temp file is left" || bad "G2 launcher/backup/temp wrong: $(ls -a "$g/.gemini/config")"
   # The skills entry and the hook are written by the same run into two different files: neither may carry the other's data.
-  [ "$(hk "$g/.gemini/config/skills.json" "d['entries'][0]['path'], 'the-agent-kit' in d")" = "~/.agents/skills False" ] \
+  [ "$(hk "$g/.gemini/config/skills.json" "d['entries'][0]['path'], 'the-agent-kit-check' in d")" = "~/.agents/skills False" ] \
     && [ "$(hk "$(HJ)" "'entries' in d")" = False ] \
     && pass "G2b skills.json and hooks.json each hold their own data when one run writes both" || bad "G2b files crossed: $(cat "$g/.gemini/config/skills.json")"
   before=$(ls -a "$g/.gemini/config" | md5sum); cp "$(HJ)" "$g/h.before"; su 1
@@ -1241,18 +1262,18 @@ EOF
   [ "$o" = '{}' ] && pass "G4b without the installed check the launcher answers {} (a hook must always answer JSON)" || bad "G4b launcher without a kit: [$o]"
   rm -rf "$ah"
   # G5: a stale launcher and a stale kit entry are refreshed; a different entry under the same name is not ours.
-  printf 'stale\n' > "$g/.gemini/config/agent-kit-check.py"
+  printf '# The Agent Kit: launcher for the session-start check (old)\nstale\n' > "$g/.gemini/config/agent-kit-check.py"
   $PY - "$(wq "$(HJ)")" <<'EOF'
 import json, sys
-p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); d["the-agent-kit"]["PreInvocation"][0]["timeout"] = 99
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); d["the-agent-kit-check"]["PreInvocation"][0]["timeout"] = 99
 json.dump(d, open(p, "w", encoding="utf-8"))
 EOF
   su 1
-  ! grep -q '^stale$' "$g/.gemini/config/agent-kit-check.py" && [ "$(hk "$(HJ)" "d['the-agent-kit']['PreInvocation'][0]['timeout']")" = 10 ] && [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status', 'the-agent-kit']" ] \
+  ! grep -q '^stale$' "$g/.gemini/config/agent-kit-check.py" && [ "$(hk "$(HJ)" "d['the-agent-kit-check']['PreInvocation'][0]['timeout']")" = 10 ] && [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status', 'the-agent-kit-check']" ] \
     && pass "G5 a stale launcher and a stale kit entry are brought current" || bad "G5 stale files not refreshed: $o"
   $PY - "$(wq "$(HJ)")" <<'EOF'
 import json, sys
-p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); d["the-agent-kit"] = {"PreInvocation": [{"command": "echo mine"}]}
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); d["the-agent-kit-check"] = {"PreInvocation": [{"command": "echo mine"}]}
 json.dump(d, open(p, "w", encoding="utf-8"))
 EOF
   cp "$(HJ)" "$g/h.before"; su 1
@@ -1268,6 +1289,13 @@ EOF
   home_; printf '{ not json' > "$(HJ)"; su 1
   [ "$(cat "$(HJ)")" = '{ not json' ] && has 'hooks.json' "$(printf '%s' "$o" | grep '!')" \
     && pass "G8 an unreadable hooks.json is left untouched and named" || bad "G8 unreadable hooks.json handled wrongly: $o"
+  # G8a: a file named agent-kit-check.py that is not the kit's launcher is never overwritten or removed, and
+  # then the hook is not wired (it would call someone else's file).
+  rm -rf "$g"; home_; printf 'mine\n' > "$g/.gemini/config/agent-kit-check.py"; su 1
+  [ "$(cat "$g/.gemini/config/agent-kit-check.py")" = mine ] && [ ! -e "$(HJ)" ] && has 'launcher' "$(printf '%s' "$o" | grep '!')" \
+    && pass "G8a a foreign agent-kit-check.py is left alone and the hook is not wired to it" || bad "G8a foreign launcher overwritten or wired: $o"
+  src=0; o=$(env HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --undo </dev/null 2>&1) || src=$?
+  [ "$(cat "$g/.gemini/config/agent-kit-check.py")" = mine ] && pass "G8a --undo does not remove a launcher that is not the kit's" || bad "G8a undo removed a foreign file"
   rm -rf "$g"; home_; vic=$(mktemp -d); printf '{"keep":"me"}\n' > "$vic/victim.json"
   if MSYS=winsymlinks:nativestrict ln -s "$vic/victim.json" "$(HJ)" 2>/dev/null && [ -L "$(HJ)" ]; then
     su 1
@@ -1277,7 +1305,7 @@ EOF
   rm -rf "$g" "$vic"
   # G9: no hooks.json yet -> created with just the kit's hook. No Antigravity on the machine -> nothing made.
   home_; su 1
-  [ "$(hk "$(HJ)" "sorted(d)")" = "['the-agent-kit']" ] && pass "G9 no hooks.json yet: created with only the kit's hook" || bad "G9 fresh hooks.json wrong: $(cat "$(HJ)" 2>/dev/null)"
+  [ "$(hk "$(HJ)" "sorted(d)")" = "['the-agent-kit-check']" ] && pass "G9 no hooks.json yet: created with only the kit's hook" || bad "G9 fresh hooks.json wrong: $(cat "$(HJ)" 2>/dev/null)"
   # G10: --check says whether it is wired (a missing hook is a NOTE with the fix, not a FAIL).
   d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
   has 'machine-wide.*install.sh --setup' "$d" && bad "G10 --check complains although everything is in place" || pass "G10 --check is quiet when the Antigravity check is wired"

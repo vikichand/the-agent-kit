@@ -349,7 +349,9 @@ try:
         up = json.load(f)
     ups = [i for i in up["items"] if isinstance(i, dict) and i.get("id")]
 except (OSError, ValueError, KeyError, TypeError):
-    sys.exit(0)   # no usable list from the kit: nothing to merge
+    ups = []
+if not ups:
+    sys.exit(0)   # no usable list from the kit: nothing to merge, and nothing may be retired from a bad download
 if os.path.islink(path):
     print("  ! recommended.json is a symlink - left untouched."); sys.exit(0)
 fresh = not os.path.exists(path)
@@ -358,7 +360,7 @@ if not fresh:
     try:
         with open(path, encoding="utf-8-sig") as f:
             cur = json.load(f)
-        if not isinstance(cur, dict) or not isinstance(cur.get("items", []), list):
+        if not isinstance(cur, dict) or not all(isinstance(cur.get(k, []), list) for k in ("items", "seeded", "dismissed")):
             raise ValueError
     except ValueError:
         print("  ! ~/.the-agent-kit/recommended.json is not valid JSON - left as it is, so the tool reminders use it unchanged. Fix or delete it.")
@@ -392,7 +394,10 @@ new.update({k: v for k, v in cur.items() if k not in new})
 if not fresh and json.dumps(new, sort_keys=True) == json.dumps(cur, sort_keys=True):
     sys.exit(0)
 if not fresh:
-    shutil.copy2(path, "%s.bak-agent-kit-%s" % (path, time.strftime("%Y%m%d-%H%M%S")))
+    bak, n = "%s.bak-agent-kit-%s" % (path, time.strftime("%Y%m%d-%H%M%S")), 1
+    while os.path.exists(bak):   # two runs in one second must not overwrite the first backup
+        n += 1; bak = "%s.bak-agent-kit-%s-%d" % (path, time.strftime("%Y%m%d-%H%M%S"), n)
+    shutil.copy2(path, bak)
 fd, tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(path)), prefix=".recommended.", suffix=".tmp")
 with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
     json.dump(new, f, indent=2, ensure_ascii=False); f.write("\n")
@@ -580,10 +585,11 @@ if mode == "undo":
     names = sorted(set(names) | set(KIT_SKILLS))
 # Antigravity's session-start check: a named PreInvocation hook in the global hooks.json, run through a
 # launcher beside it (the hook command is split on whitespace and quotes are ignored, so no quoted path).
-HOOK_KEY = "the-agent-kit"
+HOOK_KEY = "the-agent-kit-check"     # not "the-agent-kit": the project hook in .agents/hooks.json already has that name
 hooks_path = os.path.join(cfg, "hooks.json")
 launch_path = os.path.join(cfg, "agent-kit-check.py")
 launch_src = os.path.join(share, "hooks", "agent-kit-check.py")
+LAUNCH_SIG = b"# The Agent Kit: launcher for the session-start check"   # first line of every launcher the kit has shipped
 CMD_RE = re.compile(r"(python3?|py -3) agent-kit-check\.py --tool antigravity")
 stamp = time.strftime("%Y%m%d-%H%M%S")
 actions, lines, rc = [], [], 0
@@ -610,6 +616,8 @@ def make_link(link, target):
     # which needs no admin rights and no Developer Mode). It exists so the other kind can be tested.
     kind = os.environ.get("AGENT_KIT_LINK_KIND") or ("junction" if os.name == "nt" else "symlink")
     if kind == "junction":
+        if re.search(r'[&|<>^%!"]', link + target):   # cmd.exe would act on these, quoted or not
+            raise OSError("a path contains a character cmd.exe interprets (& | < > ^ % ! \"); link it by hand")
         r = subprocess.run(["cmd", "/c", "mklink", "/J", os.path.normpath(link), os.path.normpath(target)],
                            capture_output=True, text=True)
         if r.returncode != 0:
@@ -641,17 +649,23 @@ def copy_skill(n):
     src, dst = os.path.join(src_root, n), os.path.join(canon_root, n)
     tmp = dst + ".agent-kit-new"
     shutil.rmtree(tmp, ignore_errors=True)
-    shutil.copytree(src, tmp)
+    shutil.copytree(src, tmp, symlinks=True)   # a link inside a kit skill is copied as a link, never followed
     with open(os.path.join(tmp, MARK), "w", encoding="utf-8") as f:
         f.write("This folder is a copy made by the-agent-kit's install.sh; --setup refreshes it and --undo removes it.\n")
-    if os.path.isdir(dst):
+    if os.path.lexists(dst):
+        if not owned_copy(dst):      # re-checked here: it may have changed since the plan was made
+            shutil.rmtree(tmp, ignore_errors=True)
+            raise OSError("%s is no longer the kit's copy; left as it is" % dst)
         shutil.rmtree(dst)
     os.makedirs(canon_root, exist_ok=True)
     os.rename(tmp, dst)
 
 def write_json(path, data):
     if os.path.exists(path):
-        shutil.copy2(path, "%s.bak-agent-kit-%s" % (path, stamp))
+        bak, n = "%s.bak-agent-kit-%s" % (path, stamp), 1
+        while os.path.exists(bak):   # two runs in one second must not overwrite the first backup
+            n += 1; bak = "%s.bak-agent-kit-%s-%d" % (path, stamp, n)
+        shutil.copy2(path, bak)
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(path)), prefix=".skills.", suffix=".tmp")
     with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
         json.dump(data, f, indent=2, ensure_ascii=False); f.write("\n")
@@ -684,7 +698,7 @@ def write_launcher():
 
 if mode in ("plan", "apply"):
     ok = []                          # skills whose one real copy is ours (made now or already)
-    todo_copy, todo_link = [], []
+    todo_copy, todo_refresh, todo_link = [], [], []
     for n in names:
         dst = os.path.join(canon_root, n)
         if not os.path.lexists(dst):
@@ -693,11 +707,17 @@ if mode in ("plan", "apply"):
             warn("~/.agents/skills/%s is not the kit's copy; left as it is, and nothing is linked to it" % n)
         else:
             ok.append(n)
-            if tree(dst) != tree(os.path.join(src_root, n)):
-                todo_copy.append(n)
+            try:
+                differs = tree(dst) != tree(os.path.join(src_root, n))
+            except OSError:
+                differs = True
+            if differs:
+                todo_refresh.append(n)
     if todo_copy:
         lines.append("  + copy to ~/.agents/skills (the one real copy, read by Codex): " + ", ".join(todo_copy))
-        actions += [("copy " + n, (lambda n=n: copy_skill(n))) for n in todo_copy]
+    if todo_refresh:
+        lines.append("  + refresh in ~/.agents/skills (the kit's copy; edits made to it are replaced): " + ", ".join(todo_refresh))
+    actions += [("copy " + n, (lambda n=n: copy_skill(n))) for n in todo_copy + todo_refresh]
     if os.path.isdir(os.path.join(home, ".claude")):
         for n in ok:
             link, dst = os.path.join(claude_skills, n), os.path.join(canon_root, n)
@@ -717,8 +737,10 @@ if mode in ("plan", "apply"):
                     make_link(os.path.join(claude_skills, n), os.path.join(canon_root, n))
             actions.append(("link", do_links))
     if os.path.isdir(cfg) and ok:
-        data, bad = {"entries": []}, False
-        if os.path.exists(sj_path):
+        data, bad, why = {"entries": []}, False, "is not a JSON object with an entries list"
+        if os.path.islink(sj_path):
+            bad, why = True, "is a symlink"
+        elif os.path.exists(sj_path):
             try:
                 with open(sj_path, encoding="utf-8-sig") as f:
                     data = json.load(f)
@@ -726,7 +748,7 @@ if mode in ("plan", "apply"):
             except ValueError:
                 bad = True
         if bad:
-            warn("~/.gemini/config/skills.json is not a JSON object with an entries list; left untouched, so Antigravity does not get the kit's skills from it")
+            warn("~/.gemini/config/skills.json %s; left untouched, so Antigravity does not get the kit's skills from it" % why)
         else:
             entries = data.setdefault("entries", [])
             mine = next((e for e in entries if kit_entry(e)), None)
@@ -763,17 +785,21 @@ if mode in ("plan", "apply"):
             elif kit_hook_shape(cur):
                 state = "refresh"
             else:
-                warn("the entry named the-agent-kit in ~/.gemini/config/hooks.json is not the kit's; left as it is, so the session-start check is not wired")
+                warn("the entry named %s in ~/.gemini/config/hooks.json is not the kit's; left as it is, so the session-start check is not wired" % HOOK_KEY)
                 state = "blocked"
         if state != "blocked":
-            if os.path.islink(launch_path):
-                warn("~/.gemini/config/agent-kit-check.py is a symlink; left untouched, so the Antigravity session-start check is not wired")
+            have = None
+            try:
+                if os.path.isfile(launch_path) and not os.path.islink(launch_path):
+                    with open(launch_path, "rb") as f:
+                        have = f.read()
+            except OSError:
+                pass
+            if os.path.islink(launch_path) or (os.path.lexists(launch_path) and (have is None or (
+                    have != read_launcher() and not have.startswith(LAUNCH_SIG)))):
+                warn("~/.gemini/config/agent-kit-check.py is a symlink or a file that is not the kit's launcher; left as it is, so the Antigravity session-start check is not wired")
             else:
-                try:
-                    stale = not os.path.isfile(launch_path) or open(launch_path, "rb").read() != read_launcher()
-                except OSError:
-                    stale = True
-                if stale:
+                if have != read_launcher():
                     lines.append("  + write ~/.gemini/config/agent-kit-check.py (the launcher the hook calls; kit-owned)")
                     actions.append(("launcher", write_launcher))
                 if state in ("add", "refresh"):
@@ -782,11 +808,15 @@ if mode in ("plan", "apply"):
                                  % ("add" if state == "add" else "refresh"))
                     actions.append(("hooks.json", lambda d=data: write_json(hooks_path, d)))
     if mode == "apply":
+        failed = set()
         for what, fn in actions:
+            if what == "hooks.json" and "launcher" in failed:   # a hook that calls a missing launcher errors on every model call
+                lines.append("  ! hooks.json not changed: the launcher it calls could not be written"); rc = 1
+                continue
             try:
                 fn()
             except (OSError, shutil.Error) as e:
-                lines.append("  ! %s failed: %s" % (what, e)); rc = 1
+                lines.append("  ! %s failed: %s" % (what, e)); rc = 1; failed.add(what)
         lines = [l for l in lines if l.startswith("  !")] + ["  done: " + ", ".join(w for w, _ in actions)] * bool(actions)
     elif actions:
         rc = 10
@@ -802,9 +832,14 @@ else:                                # undo
     for n in names:
         dst = os.path.join(canon_root, n)
         if os.path.lexists(dst) and owned_copy(dst):
-            shutil.rmtree(dst); gone.append("~/.agents/skills/" + n)
+            try:
+                shutil.rmtree(dst); gone.append("~/.agents/skills/" + n)
+            except OSError as e:
+                lines.append("  ! could not remove ~/.agents/skills/%s: %s" % (n, e)); rc = 1
     if os.path.exists(sj_path):
         try:
+            if os.path.islink(sj_path):
+                raise ValueError
             with open(sj_path, encoding="utf-8-sig") as f:
                 data = json.load(f)
             entries = data["entries"]
@@ -814,11 +849,13 @@ else:                                # undo
                 if left != mine["include_only"]:
                     if left:
                         mine["include_only"] = left
-                    else:
+                    elif set(mine) <= {"path", "include_only"}:
                         entries.remove(mine)
+                    else:            # an empty include_only may mean "everything", so keep the user's entry as it was
+                        raise ValueError
                     write_json(sj_path, data); gone.append("the kit's skills in ~/.gemini/config/skills.json")
         except (ValueError, KeyError, TypeError, OSError):
-            lines.append("  ! ~/.gemini/config/skills.json could not be read; left as it is")
+            lines.append("  ! ~/.gemini/config/skills.json could not be read, is a symlink, or has an entry with other keys; left as it is")
     hook_left = False                # keep the launcher while an entry might still call it
     if os.path.exists(hooks_path):
         try:
@@ -833,7 +870,15 @@ else:                                # undo
             hook_left = True
             lines.append("  ! ~/.gemini/config/hooks.json could not be read or is a symlink; left as it is")
     if not hook_left and os.path.isfile(launch_path) and not os.path.islink(launch_path):
-        os.remove(launch_path); gone.append("~/.gemini/config/agent-kit-check.py")
+        try:
+            with open(launch_path, "rb") as f:   # only the kit's own launcher, by its first line
+                ours = f.read(len(LAUNCH_SIG)).startswith(LAUNCH_SIG)
+        except OSError:
+            ours = False
+        if ours:
+            os.remove(launch_path); gone.append("~/.gemini/config/agent-kit-check.py")
+        else:
+            lines.append("  ! ~/.gemini/config/agent-kit-check.py is not the kit's launcher; left as it is")
     lines.insert(0, "  - removed: " + (", ".join(gone) if gone else "nothing (the kit made none of it, or it is already gone)"))
 print("\n".join(lines))
 sys.exit(rc)
