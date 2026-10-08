@@ -180,8 +180,9 @@ state the bucket and the oracle in one clause and go.
   before any handoff or expected compaction, and name its path so it is re-read on resume. A task finished
   in one short session needs no checkpoint file. When the thread degrades, clear it and reload from there.
 - **Commit, push, and open PRs only when the user asks.** Offer the next step; each action is authorized
-  only by being named ("commit this" is not permission to push). Keep commit messages short and plain.
-  When asked to push or raise a PR, sync with the target branch first.
+  only by being named ("commit this" is not permission to push). One logical change per commit: the subject
+  says what and where in under 72 characters, the body says why only when it is not obvious. When asked to
+  push or raise a PR, sync with the target branch first.
 - **A repeated mistake is a missing rule: propose it, don't write it.** Name the one line that would have
   prevented it, for the human to accept. Never edit the rules file yourself.
 - **Announce breaking changes.** A changed public contract (API shape, event schema, exported signature) is

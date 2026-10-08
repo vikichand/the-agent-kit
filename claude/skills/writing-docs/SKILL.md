@@ -35,16 +35,19 @@ thorough.
 
 - What changed and why, in the imperative. The body explains a non-obvious reason, never narrates the
   diff.
-- A good default shape, unless the project's own convention says otherwise: `type: what changed` on the
-  first line, lowercase, under 72 characters, no full stop (`feat`, `fix`, `docs`, `chore`, `ci`,
-  `test`, `refactor`, `release`), then a blank line and short bullets. One logical change per commit.
+- Follow the repository's own convention when `git log` shows one. Otherwise the first line is
+  `area: what changed`, where the area is the component or folder (`hooks:`, `docs:`): lowercase, no full
+  stop, under 72 characters (aim for 50). Then, only when needed, a blank line and short bullets.
+- One logical change per commit, each leaving the checks passing. A fix, its test and its doc line are one
+  commit, never one per file. A subject that needs a bracketed list or a second "and" is two commits.
+- For a squash merge, the pull request description becomes the commit message: write it as one.
 
 **Pull request descriptions**
 
 - **Title:** what the change does, in the imperative, under 72 characters. A release pull request is
   titled with the project and version.
 - **Body**, in this order, each part only when it has something to say:
-  - **What:** two to five bullets of the change as a reviewer or user sees it.
+  - **What:** the change as a reviewer or user sees it, in short bullets.
   - **Why:** a sentence or two, when the title does not already make it obvious.
   - **Verified:** the checks you ran and their result (`npm test`: 212 passed). Not "tested locally".
   - **Risks, breaking changes, follow-ups:** only real ones.

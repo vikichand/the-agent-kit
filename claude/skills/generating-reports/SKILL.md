@@ -64,9 +64,7 @@ review found") always run from the markdown.
 - **Follow the project's declared style guide** from `PROJECT-CONFIG`; absent one, Google's
   developer documentation style guide is the default for developer-facing prose. Declaring a
   standard matters more than which one.
-- **Commit messages follow the kit's own discipline** (Section 7: why over what, no attribution trailers).
-  Conventional Commits is *not* imposed: adopt it only where the project already uses it and
-  enforces it with tooling - agents default to it out of habit, and unenforced type prefixes decay
-  into noise.
+- **Commit messages follow the `writing-docs` skill** (`AGENTS.md` Section 7: one logical change per
+  commit; Section 8: no attribution trailers).
 - the `writing-docs` skill still governs: no AI prose tells, working path first, tables for what people
   scan for.
