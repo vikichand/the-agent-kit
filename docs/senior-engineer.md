@@ -102,7 +102,7 @@ Two halves, two destinies:
 - **Verify facts against the version in use.** Training data lags; verify
   library and API behavior against current docs before asserting it.
 - **Run it before claiming it.** "Looks right" is not done; state how you verified.
-- **UI work gets end-to-end proof in a real browser.** Drive the flow with the Playwright MCP, inspect
+- **UI work gets end-to-end proof in a real browser.** Drive the flow with the Playwright CLI, inspect
   with the Chrome DevTools MCP. A passing unit suite does not prove a button works. The accessibility
   check (Lighthouse audit / a11y snapshot) rides in the same pass, not as a someday task.
 

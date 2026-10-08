@@ -2,7 +2,7 @@
 
 The universal rules are the floor; the per-project block is the multiplier. Run the prompt below in
 Claude Code, Codex or Antigravity **from inside the project**. It classifies the project (code / agent / both), reads
-the repo (or asks if it's greenfield), and writes a tailored block into `CLAUDE.md` *only* between the
+the repo (or asks if it's greenfield), and writes a tailored block into `AGENTS.md` *only* between the
 `PROJECT-CONFIG` markers, leaving the universal rules untouched. Re-run it anytime; it replaces the
 block instead of stacking.
 

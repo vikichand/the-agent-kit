@@ -82,9 +82,6 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp \
   --scope user --header "Authorization: Bearer <paste-your-key-here>"
 ```
 
-(The kit's old `CONTEXT7_API_KEY:` header still works but is no longer documented; the form above is
-the current one.)
-
 Do not proceed past this step until I confirm.
 
 **Alternative: the official plugin.** `/plugin marketplace add upstash/context7` then
@@ -130,8 +127,8 @@ claude mcp add chrome-devtools --scope user -- npx -y chrome-devtools-mcp@latest
 
 Skip this step unless the profile is Web and UI. Both are plain skill folders, installed for Claude
 Code (`~/.claude/skills/`) and, if Codex is used, for Codex (`~/.agents/skills/`). Antigravity reads a
-project's `.agents/skills/`; its own global skill folders are `~/.gemini/antigravity-cli/skills/` (the CLI)
-and `~/.gemini/config/skills/` (the app), which this prompt does not fill.
+project's `.agents/skills/`; its own global skill folder is `~/.gemini/config/skills/`, which this prompt
+does not fill.
 
 - **Impeccable** ([pbakaus/impeccable](https://github.com/pbakaus/impeccable), Apache-2.0): a design
   workflow with commands and deterministic design checks. Follow its README, and install it as a
@@ -262,15 +259,13 @@ buried in the prose. A partial setup reported as done is worse than a failure re
 
 ## After it runs
 
-Two things worth doing by hand, since neither should be automated:
+One thing worth doing by hand, since it should not be automated:
 
 - **Store the Context7 key outside plain config if you can.** `claude mcp add` writes it to
   `~/.claude.json` in plaintext, which is readable by anything running as you.
-- **Decide Playwright vs Chrome DevTools** and write the answer into your global `CLAUDE.md`, so the
-  agent stops choosing per session.
 
 ## What this deliberately does not do
 
 No formatter, linter, language runtime, or editor config. That is machine bootstrap and belongs in a
-dedicated setup repo, not here. This file covers only what Claude Code itself loads: MCP servers,
-plugins, skills, agents, and rules.
+dedicated setup repo, not here. This file covers only what the coding agents themselves load: MCP
+servers, plugins, skills, agents, and rules.
