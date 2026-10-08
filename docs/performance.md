@@ -44,25 +44,37 @@ A rule that cannot pass both stays out of the release, however good it sounds.
 The adherence harness (`test/adherence/run.sh`) already runs each case under several arms and records time,
 turns, tool calls, tokens, cache reads and writes, and cost per run. Performance testing reuses it.
 
-**Arms.**
-- `vanilla`: a separate Claude Code config folder (`CLAUDE_CONFIG_DIR`) that holds only a login, made once
-  with `CLAUDE_CONFIG_DIR=~/.claude-vanilla claude` and `/login`: no rules, no user CLAUDE.md, hooks, plugins
-  or MCP servers. Not `--bare`, which also drops CLAUDE.md and system reminders. Not a
-  `CLAUDE_CODE_OAUTH_TOKEN` in the shell profile: it outranks the normal login in every session. Codex uses `--ignore-user-config`. Antigravity has no such switch,
-  so its numbers are a machine baseline, labelled as such.
-- `current`: the last release.
-- `candidate`: the working tree.
+**Arms** (`--arms`, flags and setup in `test/adherence/README.md`, "Measuring speed").
+- `vanilla`: a separate Claude Code config folder (`CLAUDE_CONFIG_DIR`, default `~/.claude-vanilla`, or
+  `AGENT_KIT_VANILLA_DIR`) that holds only a login, made once with `CLAUDE_CONFIG_DIR=<folder> claude` and
+  `/login`: no rules, no user CLAUDE.md, hooks, plugins or MCP servers. Not `--bare`, which also drops
+  CLAUDE.md and system reminders. Not a `CLAUDE_CODE_OAUTH_TOKEN` in the shell profile: it outranks the normal
+  login in every session. The harness refuses the arm unless the folder has a login and its `settings.json`
+  turns the claude.ai connector, skill and plugin sync off, and it clears sessions and history between cells.
+  Codex uses `--ignore-user-config`, so `vanilla` is for Claude only. Antigravity has no such switch, so its
+  numbers are a machine baseline, labelled as such.
+- `current`: the last release (`--current-ref`).
+- `with`: the working tree, the candidate.
 
-**Held fixed in every arm:** model, effort, CLI version (`DISABLE_AUTOUPDATER=1`), advisor off
-(`CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1`). Arm order rotates between runs.
+In a run that includes `vanilla`, all three Claude arms use that same clean config folder, and the kit reaches
+`current` and `with` as files in the cell's project, so the arms differ only by the kit.
 
-**Tasks.** A fixed speed panel of eight existing cases: five bounded tasks, one high-risk build, one
-multi-turn case and one trivial change where the kit should add nothing.
+**Held fixed in every Claude arm:** model; effort (`--effort`, default medium, also set through
+`CLAUDE_CODE_EFFORT_LEVEL` because the variable outranks the flag); CLI version (`DISABLE_AUTOUPDATER=1`);
+advisor off (`CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1`, documented on the advisor page). Arm order rotates left by
+one per run number.
 
-**Metrics.** Wall-clock time; Claude's `duration_ms`, `duration_api_ms` and `ttft_ms`, which split model time
-from start-up, hooks and tools; turns and tool calls; tokens and cache hit rate; cost per accepted completion
-(Codex and Antigravity report tokens, so cost is computed from list prices); pass rate. Hook latency is timed
-separately (about 0.1 s per shell command for the command guard).
+**Tasks.** A fixed speed panel, `test/adherence/panels/speed.txt` (`--panel`): five bounded tasks (cases 02,
+07, 32, 34, 35), one one-line authorization case (33), one multi-turn case (16). A line is reserved for a pure
+rename, where the kit should add nothing, until that case is written.
+
+**Metrics.** Wall-clock time (the survival estimator in `summarize.py` counts a timeout as a lower bound);
+Claude's `duration_ms`, `duration_api_ms` and `ttft_ms` (three TSV columns, last turn's result for a
+multi-turn case), which split model time from start-up, hooks and tools; turns and tool calls; tokens and
+cache hit rate; cost per accepted completion (Codex and Antigravity report tokens, so the summary computes
+cost from a dated list-price table); pass rate; and per arm the ratio to the control for time, cost and tool
+calls, with the number of cases whose pass rate is lower. Hook latency is timed separately (about 0.1 s per
+shell command for the command guard).
 
 **Runs.** Claude's time varies about 13% between identical runs, Codex about 35%, Antigravity about 43%.
 Three runs per cell detect a 20% shift on Claude; five runs per cell are needed for a 10% bar. Codex and
@@ -77,14 +89,24 @@ Antigravity numbers at three runs show direction only.
 **Cost.** About $0.21 per Claude Sonnet run plus the judge: $10 to $20 for a paired check, $25 to $50 for the
 baseline, $75 to $150 for the full suite. On a subscription the limit that bites is usage, not money.
 
-## Known gaps in the harness (fixed before the baseline)
+## Known gaps in the harness
 
-- The `without` arm still loaded the user's global config (CLAUDE.md, hooks, plugins, advisor), so it was not
-  vanilla.
-- Effort was not pinned for Claude Code.
-- Multi-turn cases recorded only the first turn's telemetry.
+Fixed for the baseline: the `without` arm loaded the user's global config, so it was not vanilla (the
+`vanilla` arm is); Claude's effort was not pinned (now `--effort`, default medium); the advisor and the
+auto-updater were not switched off; arm order was fixed; multi-turn cases recorded only the first turn's
+telemetry (now the last result, with tool calls summed); the duration columns were missing; the summary used
+a plain median where the acceptance contract asks for a survival estimator (now Kaplan-Meier).
+
+Still open:
 - Token columns exclude subagent tokens (`total_cost_usd` includes them).
-- The summary used a plain median where the acceptance contract asks for a survival estimator.
+- The old `without` arm is unchanged for compatibility and still carries the user's config; its rows are not
+  comparable with `vanilla` rows.
+- Whether Claude's `usage` and the three duration fields in a resumed result are session totals is not
+  documented (only cost is); check `duration_ms` against `elapsed_s` on the multi-turn case.
+- Codex and Antigravity telemetry is still read from turn 1 only, and neither reports a duration.
+- The vanilla-folder checks and the clean-config run path are tested on canned data; the first live run is
+  the first real test of the login, the folder's path form on Windows and the lock.
+- Computed Codex and Antigravity costs use a price table fetched on 2026-10-09 and go stale when prices do.
 
 ## Results
 
