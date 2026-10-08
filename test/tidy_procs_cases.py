@@ -255,6 +255,32 @@ check("occupied lists the roots a process works inside, any process", lambda: ti
 check("occupied is empty when no folder can be read", lambda: tidy.occupied([PARENT], [RA], lambda pids: {1: None}) == [])
 
 
+# processes.unknown: in the repo, matching no pattern, listening or old; low, with facts, never an editor or shell
+PG = proc(50, 1, "postgres -D data", age=27000, name="postgres")
+r = SC([PARENT, PG], {50: RA}, net(), {50: (1.0, 1.0)})
+check("unknown: an old unmatched process in the repo is listed low with facts", lambda r=r: groups(r) == [("processes.unknown", 50)]
+      and r[0][0]["confidence"] == "low" and r[0][0]["action"] == "kill"
+      and any("working folder" in e for e in r[0][0]["evidence"]) and "not listening on any port" in r[0][0]["evidence"]
+      and "used 0.00 s CPU in 3 s" in r[0][0]["evidence"] and any("started by bash (pid 1" in e for e in r[0][0]["evidence"]))
+check("unknown: a young listening process is listed, a young silent one is not", lambda: groups(
+    SC([PARENT, proc(50, 1, "postgres", age=600, name="postgres")], {50: RA}, net({50: [5432]}))) == [("processes.unknown", 50)]
+    and not SC([PARENT, proc(50, 1, "postgres", age=600, name="postgres")], {50: RA}, net())[0])
+check("unknown: another repo and an unreadable folder are not listed", lambda: not SC([PARENT, PG], {50: RB}, net())[0]
+      and not SC([PARENT, PG], {}, net())[0])
+check("unknown: shells, editors and agents are not listed", lambda: not SC(
+    [PARENT, proc(51, 1, "bash", 27000), proc(52, 1, r"C:\Apps\Code.exe", 27000, name="Code.exe"),
+     proc(53, 1, f"node {CLAUDE}", 27000, name="node.exe"), proc(54, 1, "pwsh -NoLogo", 27000, name="pwsh.exe")],
+    {51: RA, 52: RA, 53: RA, 54: RA}, net())[0])
+check("unknown: a live MCP server and a dev server are not unknown", lambda: not SC(
+    [PARENT, proc(52, 1, "node mcp-server --x", 27000)], {52: RA}, net())[0] and groups(SC(
+        [PARENT, SERVER], {40: RA}, LISTEN, CPU)) == [("processes.idle", 40)])
+check("unknown: only the root of a process tree is an item", lambda: (lambda x: groups(x) == [("processes.unknown", 50)]
+      and x[0][0]["pids"] == [50, 51])(SC([PARENT, PG, proc(51, 50, "postgres: worker", 27000, name="postgres")], {50: RA, 51: RA}, net())))
+check("unknown: capped at 20", lambda: len(SC([PARENT] + [proc(100 + k, 1, "svc", 27000 + k, name="svc") for k in range(25)],
+                                              {100 + k: RA for k in range(25)}, net())[0]) == 20)
+check("unknown: not produced without a scope", lambda: not S([PARENT, PG], net())[0])
+
+
 def child_cwd():
     tmp = pathlib.Path(tempfile.mkdtemp(prefix="tidyprocs_cwd_"))
     p = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], cwd=tmp)

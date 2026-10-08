@@ -100,6 +100,8 @@ def clean(text):
 # Scope: a process is this repository's only when its working folder (or an absolute path in its command line)
 # is inside the repository or one of its linked worktrees.
 
+SHELLS = re.compile(r"^(?:sh|bash|zsh|fish|dash|pwsh|powershell|cmd|wt|windowsterminal|conhost|openconsole)$")
+MAX_UNKNOWN = 20
 EDITORS = re.compile(r"^(?:code(?:-insiders)?|cursor|windsurf|zed|idea.*|explorer)$")
 # claude, codex and antigravity all run as node.exe on Windows: they are told apart by the script they run,
 # never by the executable name (that would also catch every dev server).
@@ -212,17 +214,17 @@ def scan(procs, now, patterns, min_age_s, idle_s, self_pid, net, cpu_probe, init
         return out
 
     verdict = {}  # pid -> "in" | "out" | "unknown"
+    found = {}  # pid -> working folder, for the pids that were asked and could be read
+
+    def own(p):  # None when this process alone cannot say
+        if argv_in_scope(p["command"], scope):
+            return "in"
+        folder = found.get(p["pid"])
+        return None if folder is None else "in" if under(norm(folder), scope) else "out"
+
     if scope is None:
         verdict = {p["pid"]: "in" for p in procs}
     else:
-        found = {}
-
-        def own(p):  # None when this process alone cannot say
-            if argv_in_scope(p["command"], scope):
-                return "in"
-            folder = found.get(p["pid"])
-            return None if folder is None else "in" if under(norm(folder), scope) else "out"
-
         wanted = {p["pid"]: p for p in dev + [m for t in trees for m in t["processes"]]}
         found.update(cwds(sorted(wanted)))
         first = {pid: own(p) for pid, p in wanted.items()}
@@ -302,19 +304,49 @@ def scan(procs, now, patterns, min_age_s, idle_s, self_pid, net, cpu_probe, init
         ports = sorted({port for m in members for port in net["listen"].get(m["pid"], ())})
         if ports and not any(net["established"].get(port) for port in ports):
             candidates.append((p, members, ports))
-    if candidates:
+
+    # Processes in the repository that match no known pattern but listen on a port or have run for hours: shown
+    # at low with facts, for the agent to name or leave. Editors, shells and agents are never among them.
+    unknown = []
+    if scope is not None:
+        known = {m["pid"] for p in dev for m in tree(p["pid"])} | {m["pid"] for t in trees for m in t["processes"]}
+        pool = [p for p in procs if p["pid"] not in known | protected and not interactive(p)
+                and not SHELLS.match(exe_name(p)) and not is_mcp(p["command"], patterns)
+                and now - p["created"] >= min_age_s]
+        found.update(cwds([p["pid"] for p in pool if p["pid"] not in found]))
+        pool = [p for p in pool if own(p) == "in"]  # no inheritance here: an unreadable folder is not listed
+        listening = lambda p: net is not None and any(m["pid"] in net["listen"] for m in tree(p["pid"]))
+        picked = {p["pid"]: p for p in pool if listening(p) or now - p["created"] >= idle_s}
+        unknown = sorted((p for p in picked.values() if p["ppid"] not in picked), key=lambda p: p["created"])[:MAX_UNKNOWN]
+    want = [m["pid"] for _, members, _ in candidates for m in members] + [m["pid"] for p in unknown for m in tree(p["pid"])]
+    cpu = {}
+    if want:
         try:
-            cpu = cpu_probe([m["pid"] for _, members, _ in candidates for m in members])
+            cpu = cpu_probe(want)
         except (OSError, ValueError, subprocess.SubprocessError) as exc:
-            cpu = {}
             notes.append(f"idle check unavailable: cannot sample CPU: {exc}")
-        for p, members, ports in candidates:
-            used = sum(cpu[m["pid"]][1] - cpu[m["pid"]][0] for m in members if m["pid"] in cpu)
-            if p["pid"] in cpu and used < CPU_EPSILON_S:
-                where = ("port " if len(ports) == 1 else "ports ") + ", ".join(map(str, ports))
-                add(make_item("processes.idle", "low", f"{p['name']}: {p['command']}",
-                              [f"no connection to {where}", f"no CPU in {SAMPLE_S} s",
-                               f"started {age_h(p):.1f} h ago"], members))
+    for p, members, ports in candidates:
+        used = sum(cpu[m["pid"]][1] - cpu[m["pid"]][0] for m in members if m["pid"] in cpu)
+        if p["pid"] in cpu and used < CPU_EPSILON_S:
+            where = ("port " if len(ports) == 1 else "ports ") + ", ".join(map(str, ports))
+            add(make_item("processes.idle", "low", f"{p['name']}: {p['command']}",
+                          [f"no connection to {where}", f"no CPU in {SAMPLE_S} s",
+                           f"started {age_h(p):.1f} h ago"], members))
+    for p in unknown:
+        members = tree(p["pid"])
+        ports = sorted({port for m in members for port in (net or {"listen": {}})["listen"].get(m["pid"], ())})
+        used = sum(cpu[m["pid"]][1] - cpu[m["pid"]][0] for m in members if m["pid"] in cpu)
+        parent = by_pid.get(p["ppid"])
+        evidence = [f"no known server, watcher or MCP pattern matches; working folder {clean(found[p['pid']])}"
+                    if p["pid"] in found else "no known server, watcher or MCP pattern matches",
+                    f"started {age_h(p):.1f} h ago",
+                    ("listening on port " + ", ".join(map(str, ports)) + "; " + (
+                        "a connection is open" if any(net["established"].get(x) for x in ports) else "no connection"))
+                    if ports else "not listening on any port",
+                    (f"used {used:.2f} s CPU in {SAMPLE_S} s" if p["pid"] in cpu else "CPU not sampled"),
+                    (f"started by {parent['name']} (pid {parent['pid']}, still running)" if parent
+                     and parent["created"] <= p["created"] else f"its parent (pid {p['ppid']}) is gone")]
+        add(make_item("processes.unknown", "low", f"{p['name']}: {p['command']}", evidence, members))
     return items, notes
 
 
