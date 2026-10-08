@@ -576,7 +576,7 @@ def t_apply_requires_root():
 def t_apply_other_root_leaves_first_repo():
     d1, d2 = mk(), mk()
     for d in (d1, d2):
-        write(d / "test-results/a.txt", old=False)
+        write(d / "test-results/a.txt")  # old: a folder touched in the last hour is not offered
     r = tidy("apply", "--ids", "path:test-results", "--root", str(d2), cwd=d1)
     return r.returncode == 0 and (d1 / "test-results/a.txt").exists() and not (d2 / "test-results").exists()
 
@@ -693,6 +693,53 @@ def t_long_lived_worktree_branch_not_deleted():
     r = tidy("apply", "--ids", wid(w), "--root", str(d))
     return (it is not None and "and branch" not in it["label"] and r.returncode == 0 and not w.exists()
             and "release/2.0" in branches(d))
+
+
+def tool_item(d, rel="test-results"):
+    return {i["id"]: i for i in scan(d)["items"]}.get("path:" + rel)
+
+
+def t_tool_dir_with_notes_is_low():
+    d = mk()
+    write(d / ".gitignore", "test-results/\n", old=False), g(d, "add", "."), g(d, "commit", "-q", "-m", "ign")
+    write(d / "test-results/a.png"), write(d / "test-results/analysis.md", "my real notes\n")
+    it = tool_item(d)
+    return it is not None and it["confidence"] == "low" and any("analysis.md" in e for e in it["evidence"])
+
+
+def t_tool_dir_artefacts_stay_high():
+    d = mk()
+    write(d / "test-results/a.png"), write(d / "test-results/.last-run.json", "{}")
+    it = tool_item(d)
+    return it is not None and it["confidence"] == "high"
+
+
+def t_tool_dir_fresh_not_listed():
+    d = mk()
+    write(d / "test-results/a.png", old=False)
+    return tool_item(d) is None
+
+
+def t_tool_dir_nested_git_refused():
+    d = mk()
+    (d / "test-results/proj").mkdir(parents=True), g(d / "test-results/proj", "init", "-q")
+    write(d / "test-results/a.png")
+    return tool_item(d) is None
+
+
+def t_tool_dir_info_exclude_not_listed():
+    d = mk()
+    (d / ".git/info").mkdir(exist_ok=True)
+    (d / ".git/info/exclude").write_text("test-results/\n")
+    write(d / "test-results/a.png")
+    return tool_item(d) is None
+
+
+def t_tool_dir_in_subfolder_found():
+    d = mk()
+    write(d / "packages/web/test-results/a.png")
+    it = tool_item(d, "packages/web/test-results")
+    return it is not None and it["confidence"] == "high"
 
 
 cases = [(n[2:], f) for n, f in sorted(globals().items()) if n.startswith("t_") and callable(f)]

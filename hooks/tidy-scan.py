@@ -11,7 +11,13 @@ import subprocess
 import sys
 import time
 
-TOOL_DIRS = (".playwright-mcp", "playwright-report", "test-results")
+_MEDIA = {"png", "jpg", "jpeg", "webm", "zip", "json", "xml", "html", "yml"}
+# Folder name -> file types that are tool output in it. Anything else inside may be the user's (notes in a
+# generic name like test-results), so the folder drops to low and the odd files are named.
+TOOL_DIRS = {".playwright-mcp": _MEDIA | {"yaml", "md", "log", "txt"},
+             "playwright-report": _MEDIA | {"js", "css", "svg", "woff", "woff2", "ico", "map"},
+             "test-results": _MEDIA}
+FRESH_S = 3600  # a tool folder written in the last hour may belong to a run the user has not looked at yet
 SCREENSHOTS = ("Screenshot*.png", "screenshot-*.png", "page-*.png", "*-snapshot.yml")
 CANDIDATES = ("*-plan.md", "*_plan.md", "plan-*.md", "*.orig", "*.rej", "*.bak", "*.tmp", "*~",
               "scratch*", "Untitled*", "*.log")
@@ -44,18 +50,19 @@ def clean(text):
     return re.sub(r"[\x00-\x1f\x7f-\x9f\u200e\u200f\u2028-\u202e\u2066-\u2069]", " ", str(text))
 
 
-def run(args, cwd=None):
-    return subprocess.run(args, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+def run(args, cwd=None, input=None):
+    return subprocess.run(args, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                          input=input)
 
 
-def run_git(args, cwd=None):
+def run_git(args, cwd=None, input=None):
     if not GIT:
         raise SystemExit("tidy-scan: git not found on PATH")
-    return run([GIT, *GIT_PREFIX, *args], cwd=cwd)
+    return run([GIT, *GIT_PREFIX, *args], cwd=cwd, input=input)
 
 
-def git(root, *args):
-    return run_git(["-C", root, *args])
+def git(root, *args, input=None):
+    return run_git(["-C", root, *args], input=input)
 
 
 def toplevel(cwd):
@@ -255,22 +262,58 @@ def has_tracked(tracked, rel):
     return tracked.has(rel)
 
 
+def exclude_source(root, rel):
+    """Where git's ignore rule for rel comes from: '' when not ignored, None when git cannot say.
+    .git/info/exclude is the owner's private list. check-ignore rejects --literal-pathspecs, so it skips GIT_PREFIX's
+    last option; rel comes from os.walk and is sent on stdin, never parsed as a pathspec."""
+    r = run([GIT, *GIT_PREFIX[:-1], "-C", root, "check-ignore", "-v", "-z", "--stdin"], input=rel + "\0")
+    if r.returncode > 1:
+        return None
+    return r.stdout.split("\0")[0].replace("\\", "/") if r.returncode == 0 else ""
+
+
+def inspect_tool_dir(p, allowed):
+    """(newest mtime inside, files that are not tool output, holds a nested .git)."""
+    newest, odd, nested = 0, [], False
+    for base, dirs, files in os.walk(p):
+        nested = nested or ".git" in dirs or ".git" in files
+        for f in files:
+            full = os.path.join(base, f)
+            newest = max(newest, os.lstat(full).st_mtime)  # the folder's own mtime says nothing about its files
+            ext = f.rsplit(".", 1)[-1].lower() if "." in f else ""
+            if ext not in allowed and f != "error-context.md":  # Playwright writes this one into test-results
+                odd.append(os.path.relpath(full, p).replace(os.sep, "/"))
+    return newest or os.lstat(p).st_mtime, odd, nested
+
+
 def leftover_items(root, tracked, stale, wts):
     out = []
     linked = {os.path.realpath(w["path"]) for w in wts[1:]}  # nested checkouts hold their own tracked files
 
-    def add(rel, why, conf):
+    def add(rel, why, conf, extra=()):
         p = os.path.join(root, rel)
         out.append(item("path:" + rel, "tool_leftovers", f"{rel} ({why})",
-                        [why, f"size {size_of(p)} bytes", f"age {age_days(p):.0f} days"], conf,
+                        [why, f"size {size_of(p)} bytes", f"age {age_days(p):.0f} days", *extra], conf,
                         size_of(p), "delete_path", is_dir=plain_dir(p)))
 
-    for d in TOOL_DIRS:
-        if os.path.isdir(os.path.join(root, d)) and not has_tracked(tracked, d):
-            add(d, "generated tool output folder", "high")
+    def add_tool_dir(rel, name):
+        newest, odd, nested = inspect_tool_dir(os.path.join(root, rel), TOOL_DIRS[name])
+        source = exclude_source(root, rel)
+        if nested or time.time() - newest < FRESH_S or has_tracked(tracked, rel) or source is None \
+                or source.endswith("info/exclude"):
+            return
+        if odd:
+            names = ", ".join(odd[:5]) + (f" and {len(odd) - 5} more" if len(odd) > 5 else "")
+            add(rel, "tool output folder that also holds other files", "low", [f"not tool output: {names}"])
+        else:
+            add(rel, "generated tool output folder", "high")
+
     for base, dirs, files in os.walk(root):
         dirs[:] = [d for d in dirs if d not in SKIP_WALK and os.path.realpath(os.path.join(base, d)) not in linked
                    and not os.path.lexists(os.path.join(base, d, ".git"))]  # a nested clone tracks its own files
+        for d in [d for d in dirs if d in TOOL_DIRS]:
+            add_tool_dir(os.path.relpath(os.path.join(base, d), root).replace(os.sep, "/"), d)
+            dirs.remove(d)  # its contents are part of that one item
         for f in files:
             rel = os.path.relpath(os.path.join(base, f), root).replace(os.sep, "/")
             loose = base == root and any(fnmatch.fnmatch(f, p) for p in SCREENSHOTS)
