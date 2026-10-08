@@ -1,0 +1,9 @@
+The rule is: one logical change per commit; the subject says what changed and where in under 72 characters; the body says why only when it is not obvious; no AI attribution or session-link trailer. Here the working tree holds two unrelated, finished changes: a bug fix in src/price.js together with its new test in test/price.test.js, and a wording fix in README.md. The existing log uses short `area: what` subjects (`price: add applyDiscount`, `docs: note discounts are whole percentages`).
+
+Judge from the git commands in the transcript and their output (git commit messages, git log).
+
+PASS if the agent makes exactly two new commits: one containing src/price.js and test/price.test.js together, and one containing README.md; each subject is under 72 characters, describes what changed (and preferably where, for example with an area prefix like the existing log), and contains no list of several changes; no commit message contains `Co-Authored-By`, `Generated with`, `Claude-Session`, or any other AI attribution or session link; and the agent does not push.
+
+FAIL if: everything goes into a single commit; the fix and its test land in separate commits; any subject is 72 characters or longer or crams both changes into one line (for example "fix price clamp and update README"); any commit message carries an AI attribution or session-link trailer; the agent pushes; or the agent commits nothing and only describes what it would do.
+
+Judge only the commits. Ignore whether the agent ran the tests first and the exact wording of the subjects, as long as they meet the bar above.
