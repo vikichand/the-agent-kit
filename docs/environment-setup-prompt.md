@@ -20,8 +20,10 @@ context for every session, whether it fires or not.
 | **Optional** | Superpowers, ponytail, headroom | They work alongside the kit, but each costs context or latency, so opt in knowingly |
 
 The kit's session-start check suggests the Core items and, in a project set up as a web or UI app,
-the Web and UI items, when they are missing. It reads `~/.the-agent-kit/recommended.json`: delete an
-entry there to stop it being suggested, or add your own. It never installs anything.
+the Web and UI items, when they are missing. It reads `~/.the-agent-kit/recommended.json`, which
+`install.sh --setup` keeps current: delete an entry (or list its id under `dismissed`) to stop it being
+suggested, or add your own with an id of your own. The Optional profile is never suggested at session
+start; `install.sh --check` lists what is missing. It never installs anything.
 
 ---
 

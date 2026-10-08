@@ -223,8 +223,10 @@ When a session starts, the kit checks three things and says nothing unless one n
   line telling you to run `--update-rules` here. It is silent in the kit's own repo, whose rules are the
   source, and for an `--extension` stub, whose rules live globally.
 - **A recommended tool is missing** for the agent you started (Claude Code or Codex). The list is
-  `~/.the-agent-kit/recommended.json`, copied from the kit once and yours after that: delete an entry
-  to stop its reminder, add your own to be reminded of them. By default it names Context7 everywhere,
+  `~/.the-agent-kit/recommended.json`. `--setup` (so `--update`) merges the kit's list into it by id:
+  new items arrive and changed ones are replaced, while an entry you delete, or an id you add to its
+  `dismissed` list, never comes back. Entries without an id are yours and are never touched. The optional
+  tools (superpowers, ponytail, headroom) are never reminded; `--check` lists them. By default it names Context7 everywhere,
   and in a project set up as a web or UI app also Playwright, Chrome DevTools, Impeccable and
   `frontend-design` (the reasons are in
   [`docs/environment-setup-prompt.md`](docs/environment-setup-prompt.md)). It reads local config

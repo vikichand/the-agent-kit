@@ -14,7 +14,8 @@ current - the common case costs zero tokens - and one line per thing you can act
 
   3. A tool the user's recommended list names is missing for the agent that started the session
      (`--tool claude|codex`, set by the settings snippet). The list is ~/.the-agent-kit/recommended.json,
-     seeded from the kit once and then the user's: delete an entry to stop a reminder. Items marked
+     which install.sh --setup merges the kit's list into by id: delete an entry (or list its id under
+     "dismissed") to stop a reminder. Items marked "optional" are never reminded. Items marked
      "web" only count in a project whose AGENTS.md block marks a web or user-facing platform. At most
      one reminder a day per tool, read from local files only, and a file it cannot read counts as
      "cannot tell", never as "missing".
@@ -140,7 +141,7 @@ def missing_tools(tool, top):
     gaps = []
     for it in items:
         spec = it.get(tool) if isinstance(it, dict) else None
-        if not isinstance(spec, dict) or (it.get("when") == "web" and not web):
+        if not isinstance(spec, dict) or it.get("optional") or (it.get("when") == "web" and not web):
             continue
         kind = next((k for k in ("mcp", "plugin", "skill") if spec.get(k)), None)
         if kind and installed(tool, kind, spec[kind], top) is False:

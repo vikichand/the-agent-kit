@@ -330,6 +330,76 @@ install_extension() { # lean: project-config stub + git hooks
   install_git_hooks "$root"
 }
 
+merge_recommended() {  # $1 = the kit's list  $2 = the user's list (~/.the-agent-kit/recommended.json)
+  # Items are matched by id. New upstream items are added and changed ones replaced; an item the user
+  # removed (it was offered before, so it is in `seeded`) or dismissed never comes back; entries without
+  # an id are the user's own and are never touched. A list from before ids existed is matched by name,
+  # and its missing originals count as deleted, which is what deleting an entry meant then.
+  py=$(detect_py)
+  [ -n "$py" ] || return 1
+  $py - "$(nat "$1")" "$(nat "$2")" <<'RECO'
+import json, os, shutil, sys, tempfile, time
+up_path, path = sys.argv[1], sys.argv[2]
+try:
+    with open(up_path, encoding="utf-8-sig") as f:
+        up = json.load(f)
+    ups = [i for i in up["items"] if isinstance(i, dict) and i.get("id")]
+except (OSError, ValueError, KeyError, TypeError):
+    sys.exit(0)   # no usable list from the kit: nothing to merge
+if os.path.islink(path):
+    print("  ! recommended.json is a symlink - left untouched."); sys.exit(0)
+fresh = not os.path.exists(path)
+cur = {"items": []}
+if not fresh:
+    try:
+        with open(path, encoding="utf-8-sig") as f:
+            cur = json.load(f)
+        if not isinstance(cur, dict) or not isinstance(cur.get("items", []), list):
+            raise ValueError
+    except ValueError:
+        print("  ! ~/.the-agent-kit/recommended.json is not valid JSON - left as it is, so the tool reminders use it unchanged. Fix or delete it.")
+        sys.exit(0)
+items = cur.get("items", [])
+legacy = not fresh and "seeded" not in cur
+seeded, dismissed = set(cur.get("seeded", [])), list(cur.get("dismissed", []))
+added, updated, dropped = [], [], []
+upstream_ids = {u["id"] for u in ups}
+for n in range(len(items) - 1, -1, -1):   # a kit item that was offered and has since been retired goes
+    i = items[n]
+    if isinstance(i, dict) and i.get("id") in seeded and i["id"] not in upstream_ids:
+        dropped.append(i.get("name", i["id"])); del items[n]
+for u in ups:
+    entry = {k: v for k, v in u.items() if k not in ("since", "replaces")}
+    if u["id"] in dismissed:
+        continue
+    names = [u["name"]] + list(u.get("replaces", []))
+    at = next((n for n, i in enumerate(items) if isinstance(i, dict) and (
+        i.get("id") == u["id"] or (not i.get("id") and i.get("name") in names))), None)
+    if at is not None:
+        if items[at] != entry:
+            items[at] = entry; updated.append(u["name"])
+    elif u["id"] in seeded or (legacy and int(u.get("since", 1)) <= 1):
+        dismissed.append(u["id"])   # offered before and gone from the list: the user removed it
+    else:
+        items.append(entry); added.append(u["name"])
+new = {"_about": up.get("_about", cur.get("_about")), "items": items, "seeded": sorted(upstream_ids),
+       "dismissed": list(dict.fromkeys(dismissed))}
+new.update({k: v for k, v in cur.items() if k not in new})
+if not fresh and json.dumps(new, sort_keys=True) == json.dumps(cur, sort_keys=True):
+    sys.exit(0)
+if not fresh:
+    shutil.copy2(path, "%s.bak-agent-kit-%s" % (path, time.strftime("%Y%m%d-%H%M%S")))
+fd, tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(path)), prefix=".recommended.", suffix=".tmp")
+with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
+    json.dump(new, f, indent=2, ensure_ascii=False); f.write("\n")
+os.replace(tmp, path)   # a kill mid-write must never leave the user's list half written
+if not fresh:
+    bits = [("added", added), ("updated", updated), ("retired", dropped)]
+    print("  + recommended tools: " + "; ".join("%s %s" % (k, ", ".join(v)) for k, v in bits if v)
+          if any(v for _, v in bits) else "  + recommended tools: list brought up to date")
+RECO
+}
+
 copy_share() {  # copy this kit into ~/.the-agent-kit, so the download it came from can be deleted
   share="$HOME/.the-agent-kit"
   mkdir -p "$share/hooks" "$share/git-hooks" "$share/docs" "$share/claude" "$share/codex" "$share/setup"
@@ -341,8 +411,11 @@ copy_share() {  # copy this kit into ~/.the-agent-kit, so the download it came f
     cp "$KIT/hooks/$h" "$share/hooks/$h"
   done
   for h in commit-msg pre-commit pre-push; do cp "$KIT/hooks/$h" "$share/git-hooks/$h"; done
-  # The recommended-tools list is the user's once seeded: never overwritten, so a declined item stays declined.
-  [ -f "$share/recommended.json" ] || cp "$KIT/hooks/recommended.json" "$share/recommended.json" 2>/dev/null || true
+  # The recommended-tools list is the user's once seeded. hooks/recommended.json beside it is the kit's
+  # pristine copy, which --setup merges in by id (merge_recommended): a declined item stays declined.
+  cp "$KIT/hooks/recommended.json" "$share/hooks/recommended.json" 2>/dev/null || true
+  [ -f "$share/recommended.json" ] || merge_recommended "$KIT/hooks/recommended.json" "$share/recommended.json" \
+    || cp "$KIT/hooks/recommended.json" "$share/recommended.json" 2>/dev/null || true
   # AGENTS.md goes through write_rules, never cp: this repo's file carries its OWN project block, and
   # the share is what --update-rules and the "prefer the rules global" append both read. A cp here put
   # this repo's branch rules into every user's global rules (Q3, found 2026-09-26 before it shipped).
@@ -468,6 +541,7 @@ setup_machine() {  # --setup: everything a machine needs, applied with the user'
   [ "$KIT" = "$share" ] || copy_share
   py=$(detect_py)
   [ -n "$py" ] || { say "  ! no working Python 3 found - the kit's guard and this setup both need it. Install it and re-run."; exit 2; }
+  merge_recommended "$KIT/hooks/recommended.json" "$share/recommended.json" || true
   hr
   say "SETTINGS - the kit's entries are added to yours; nothing of yours is removed or changed"
   mrc=0; plan=$(merge_settings "$share" "$py" 2>&1) || mrc=$?

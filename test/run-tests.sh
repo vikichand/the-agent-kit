@@ -269,7 +269,13 @@ if [ -n "$PY" ]; then
   printf '{"items":[]}' > "$k/home/.the-agent-kit/recommended.json"; printf '{}' > "$k/home/.claude.json"
   o=$(kt claude "$k/proj"); o2=$(kc "$k/proj")
   [ -z "$o" ] && [ -z "$o2" ] && pass "K17 declined (removed) items and sessions without --tool stay silent" || bad "K17 not silent: [$o] [$o2]"
-  rm -rf "$k"
+  # K18: optional items (superpowers, ponytail, headroom) are for install.sh --check, never the reminder.
+  cp "$KIT/hooks/recommended.json" "$k/home/.the-agent-kit/recommended.json"
+  printf '# rules v2\n<!-- PROJECT-CONFIG:START -->\n**Platform / intent:** web - production\n<!-- PROJECT-CONFIG:END -->\n' > "$k/proj/AGENTS.md"
+  mkdir -p "$k/home/.claude/plugins"; printf '{"plugins":{}}' > "$k/home/.claude/plugins/installed_plugins.json"; : > "$k/home/.codex/config.toml"
+  o=$(kt claude "$k/proj"); o2=$(kt codex "$k/proj")
+  has 'Context7' "$o" && has 'Context7' "$o2" && ! has 'superpowers' "$o$o2" && ! has 'ponytail' "$o$o2" && ! has 'headroom' "$o$o2" \
+    && pass "K18 optional items are never in the session reminder" || bad "K18 an optional item was reminded: $o $o2"  rm -rf "$k"
 else
   bad "no python - kit-check.py NOT tested"
 fi
@@ -876,6 +882,87 @@ else
 fi
 grep -q -- '--setup' "$KIT/install.sh" && awk '/^update_kit\(\)/,/^}/' "$KIT/install.sh" | grep -q 'install.sh" --setup' \
   && pass "M10 --update hands over to --setup, so updates re-apply settings" || bad "M10 --update does not run --setup"
+
+# ---------- recommended tools list: refreshed by --setup, never re-adds what the user dismissed ----------
+# The list is seeded once and then the user's, but a list that never learns about new upstream items goes
+# stale (the machine this was found on still named the Playwright MCP the kit had retired). --setup, which
+# --update runs, merges upstream items by id: new ones in, changed ones replaced, and an item the user
+# removed or dismissed stays gone. Entries without an id are the user's own and are never touched.
+echo "== recommended tools refresh =="
+if [ -n "$PY" ]; then
+  g=$(mktemp -d) || exit 2
+  wq() { cygpath -m "$1" 2>/dev/null || printf '%s' "$1"; }
+  G=$(wq "$g")
+  su() { src=0; o=$(HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY=1 sh "$KIT/install.sh" --setup </dev/null 2>&1) || src=$?; }
+  rj() { $PY -c "import json,sys; d=json.load(open(sys.argv[1],encoding='utf-8')); print($1)" "$G/.the-agent-kit/recommended.json" 2>/dev/null; }
+  RL="$g/.the-agent-kit/recommended.json"
+  mkdir -p "$g/.the-agent-kit"
+  # R1: a list from before ids existed (the stale one). Entries are matched by name; a retired name is
+  # replaced; originals the user had deleted stay deleted; items added to the kit since are offered.
+  cat > "$RL" <<'EOF'
+{"items":[
+ {"name":"Context7 MCP (library docs)","when":"always","claude":{"mcp":"context7","install":"old command"}},
+ {"name":"Playwright MCP (drive the UI in a real browser)","when":"web","claude":{"mcp":"playwright","install":"claude mcp add playwright"}},
+ {"name":"my own tool","when":"always","claude":{"mcp":"mine","install":"x"}}
+]}
+EOF
+  su
+  [ "$(rj "[i for i in d['items'] if i.get('id')=='context7'][0]['codex']['mcp']")" = context7 ] \
+    && [ "$(rj "'old command' in open(sys.argv[1],encoding='utf-8').read()")" = False ] \
+    && pass "R1 a changed upstream entry is replaced (Context7 gained its Codex and Antigravity keys)" || bad "R1 stale entry not refreshed: $o"
+  [ "$(rj "any(i.get('claude',{}).get('mcp')=='playwright' for i in d['items'])")" = False ] \
+    && [ "$(rj "any(i.get('id')=='playwright-cli' for i in d['items'])")" = True ] \
+    && pass "R1 the retired Playwright MCP entry is replaced by the Playwright CLI one" || bad "R1 retired entry still listed"
+  [ "$(rj "any(i.get('name')=='my own tool' for i in d['items'])")" = True ] \
+    && pass "R1 the user's own entry is kept" || bad "R1 the user's own entry was lost"
+  [ "$(rj "any(i.get('id') in ('chrome-devtools','impeccable','frontend-design') for i in d['items'])")" = False ] \
+    && [ "$(rj "sorted(d['dismissed'])")" = "['chrome-devtools', 'frontend-design', 'impeccable']" ] \
+    && pass "R1 originals the user had deleted stay deleted (recorded as dismissed)" || bad "R1 a deleted original came back: $(rj "[i.get('id') for i in d['items']]")"
+  [ "$(rj "sorted(i['id'] for i in d['items'] if i.get('optional'))")" = "['headroom', 'ponytail', 'superpowers']" ] \
+    && pass "R1 items added to the kit since are offered, flagged optional" || bad "R1 new upstream items not added"
+  cp "$RL" "$g/after1.json"; su
+  cmp -s "$RL" "$g/after1.json" && pass "R2 a second --setup leaves the list byte-identical" || bad "R2 re-run rewrote the list"
+  # R3: from here the list carries its own record of what was offered. A removed item is dismissed,
+  # an explicitly dismissed one never returns, and an item the list never saw is added.
+  $PY - "$G/.the-agent-kit/recommended.json" <<'EOF'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8"))
+d["items"] = [i for i in d["items"] if i.get("id") not in ("ponytail", "superpowers", "headroom")]
+d["seeded"] = [s for s in d["seeded"] if s != "superpowers"]
+d["dismissed"].append("headroom")
+json.dump(d, open(p, "w", encoding="utf-8"))
+EOF
+  su
+  [ "$(rj "[i['id'] for i in d['items'] if i.get('id') in ('ponytail','superpowers','headroom')]")" = "['superpowers']" ] \
+    && [ "$(rj "'ponytail' in d['dismissed'] and 'headroom' in d['dismissed']")" = True ] \
+    && pass "R3 removed and dismissed items stay gone; an item the list never saw is added" || bad "R3 wrong merge: $(rj "[i.get('id') for i in d['items']]") dismissed=$(rj "d['dismissed']")"
+  # R3b: an item the kit offered and has since retired goes; one of the user's own with an id of its own stays.
+  $PY - "$G/.the-agent-kit/recommended.json" <<'EOF'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8"))
+d["items"] += [{"id": "old-thing", "name": "retired", "when": "always", "claude": {"mcp": "x", "install": "y"}},
+               {"id": "mine-1", "name": "kept", "when": "always", "claude": {"mcp": "z", "install": "y"}}]
+d["seeded"].append("old-thing")
+json.dump(d, open(p, "w", encoding="utf-8"))
+EOF
+  su
+  [ "$(rj "[i['id'] for i in d['items'] if i.get('id') in ('old-thing','mine-1')]")" = "['mine-1']" ] && has 'retired' "$o" \
+    && ls "$g/.the-agent-kit/"recommended.json.bak-agent-kit-* >/dev/null 2>&1 \
+    && pass "R3b a retired kit item is dropped, the user's own id kept, a backup left, and the run says what changed" || bad "R3b retired item handling wrong: $o"
+  # R4: a list that cannot be parsed is left exactly as it is, and the run says so.
+  printf '{ not json' > "$RL"
+  su
+  [ "$(cat "$RL")" = '{ not json' ] && has 'recommended.json' "$o" \
+    && pass "R4 an unreadable list is left untouched and named" || bad "R4 unreadable list handled wrongly: $o"
+  # R5: no list yet -> seeded from the kit, with the record the next merge needs.
+  rm -f "$RL"; su
+  [ "$(rj "len(d['items'])")" = 8 ] && [ "$(rj "sorted(d['seeded']) == sorted(i['id'] for i in d['items'])")" = True ] \
+    && [ "$(rj "d['dismissed']")" = "[]" ] \
+    && pass "R5 a fresh machine is seeded with every item and the record of them" || bad "R5 fresh seed wrong: $(cat "$RL" 2>/dev/null | head -c 200)"
+  rm -rf "$g"
+else
+  bad "no python - the recommended list refresh NOT tested"
+fi
 
 # H1-H5: the eval harness's own oracles. Both were silently wrong until 2026-09-27: provider errors
 # scored as ordinary FAILs, and a red-then-fix run scored as "edited before any failing test".

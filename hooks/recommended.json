@@ -1,7 +1,8 @@
 {
-  "_about": "What the-agent-kit's session-start check suggests when missing. The installer copies this to ~/.the-agent-kit/recommended.json once and never overwrites it: delete an entry there to stop it being suggested, add your own to be reminded of them. 'when': 'always', or 'web' for projects whose AGENTS.md block marks a web or user-facing platform. Per tool, 'mcp', 'plugin' or 'skill' names what must be present. Details: ~/.the-agent-kit/docs/environment-setup-prompt.md",
+  "_about": "What the-agent-kit's session-start check suggests when a tool is missing. install.sh --setup (and --update, which runs it) merges this list into ~/.the-agent-kit/recommended.json by 'id': new items are added and changed ones replaced. To stop a reminder, add the id to \"dismissed\" in your copy (deleting the entry works too). Entries without an id are yours and are never touched. 'when': 'always', or 'web' for projects whose AGENTS.md block marks a web or user-facing platform. 'optional': true items are listed by install.sh --check only, never in the session reminder. Per tool, 'mcp', 'plugin' or 'skill' names what must be present; 'install_windows' replaces 'install' on Windows. 'since' and 'replaces' are for the merge only. Details: ~/.the-agent-kit/docs/environment-setup-prompt.md",
   "items": [
     {
+      "id": "context7",
       "name": "Context7 MCP (library docs)",
       "when": "always",
       "claude": {
@@ -11,10 +12,16 @@
       "codex": {
         "mcp": "context7",
         "install": "codex mcp add context7 -- npx -y @upstash/context7-mcp@latest"
+      },
+      "antigravity": {
+        "mcp": "context7",
+        "install": "agy mcp add --header \"Authorization: Bearer <your-context7-key>\" context7 https://mcp.context7.com/mcp"
       }
     },
     {
+      "id": "playwright-cli",
       "name": "Playwright CLI skill (drive the UI in a real browser)",
+      "replaces": ["Playwright MCP (drive the UI in a real browser)"],
       "when": "web",
       "claude": {
         "skill": "playwright-cli",
@@ -23,17 +30,32 @@
       "codex": {
         "skill": "playwright-cli",
         "install": "npm install -g @playwright/cli@latest && playwright-cli install --skills=agents -g"
+      },
+      "antigravity": {
+        "skill": "playwright-cli",
+        "install": "npm install -g @playwright/cli@latest && playwright-cli install --skills=agents -g, then copy ~/.agents/skills/playwright-cli to ~/.gemini/config/skills/"
       }
     },
     {
+      "id": "chrome-devtools",
       "name": "Chrome DevTools MCP (performance, network, console)",
       "when": "web",
       "claude": {
         "mcp": "chrome-devtools",
         "install": "claude mcp add chrome-devtools --scope user -- npx -y chrome-devtools-mcp@latest"
+      },
+      "codex": {
+        "mcp": "chrome-devtools",
+        "install": "codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest",
+        "install_windows": "codex mcp add chrome-devtools -- npx.cmd -y chrome-devtools-mcp@latest"
+      },
+      "antigravity": {
+        "mcp": "chrome-devtools",
+        "install": "agy mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest"
       }
     },
     {
+      "id": "impeccable",
       "name": "Impeccable skill (design workflow)",
       "when": "web",
       "claude": {
@@ -43,9 +65,14 @@
       "codex": {
         "skill": "impeccable",
         "install": "install the .agents/skills build from github.com/pbakaus/impeccable"
+      },
+      "antigravity": {
+        "skill": "impeccable",
+        "install": "install the Antigravity build from github.com/pbakaus/impeccable into ~/.gemini/config/skills/"
       }
     },
     {
+      "id": "frontend-design",
       "name": "frontend-design skill (visual direction)",
       "when": "web",
       "claude": {
@@ -55,6 +82,55 @@
       "codex": {
         "skill": "frontend-design",
         "install": "copy skills/frontend-design from github.com/anthropics/skills into ~/.agents/skills/"
+      },
+      "antigravity": {
+        "skill": "frontend-design",
+        "install": "copy skills/frontend-design from github.com/anthropics/skills into ~/.gemini/config/skills/"
+      }
+    },
+    {
+      "id": "superpowers",
+      "name": "superpowers (planning, TDD and review skill library)",
+      "optional": true,
+      "since": 2,
+      "when": "always",
+      "claude": {
+        "plugin": "superpowers@superpowers-marketplace",
+        "install": "claude plugin marketplace add obra/superpowers-marketplace && claude plugin install superpowers@superpowers-marketplace --scope user"
+      },
+      "codex": {
+        "plugin": "superpowers@superpowers-marketplace",
+        "install": "codex plugin marketplace add obra/superpowers-marketplace && codex plugin add superpowers@superpowers-marketplace"
+      }
+    },
+    {
+      "id": "ponytail",
+      "name": "ponytail (minimalism ladder, run it at lite)",
+      "optional": true,
+      "since": 2,
+      "when": "always",
+      "claude": {
+        "plugin": "ponytail@ponytail",
+        "install": "claude plugin marketplace add DietrichGebert/ponytail && claude plugin install ponytail@ponytail --scope user"
+      },
+      "codex": {
+        "plugin": "ponytail@ponytail",
+        "install": "codex plugin marketplace add DietrichGebert/ponytail && codex plugin add ponytail@ponytail"
+      }
+    },
+    {
+      "id": "headroom",
+      "name": "headroom (tool-output compression proxy)",
+      "optional": true,
+      "since": 2,
+      "when": "always",
+      "claude": {
+        "plugin": "headroom@headroom-marketplace",
+        "install": "uv tool install \"headroom-ai[all]\" && headroom init -g"
+      },
+      "codex": {
+        "mcp": "headroom",
+        "install": "uv tool install \"headroom-ai[all]\" && headroom init -g"
       }
     }
   ]
