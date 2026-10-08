@@ -370,6 +370,29 @@ d=$(sh "$KIT/install.sh" --check 2>&1)
 has 'no \*\*Branches:\*\* line' "$d" && bad "D12b Branches warning still shown (false positive)" || pass "D12b block with a Branches line is silent"
 cd "$KIT"; rm -rf "$w"
 
+# D14: the doctor lists the recommended tools missing for each tool installed on this machine, and the
+# optional ones (the session reminder never carries those); a config it cannot read is "cannot tell",
+# never "missing". A temp HOME stands in for the machine.
+if [ -n "$PY" ]; then
+  g=$(mktemp -d) || exit 2; u=$(mktemp -d) || exit 2
+  G=$(cygpath -m "$g" 2>/dev/null || printf '%s' "$g")
+  dr() { (cd "$u" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1); }
+  git init -q "$u"; git -C "$u" config core.hooksPath .git/hooks
+  mkdir -p "$g/.the-agent-kit/hooks"
+  cp "$KIT/hooks/recommended.json" "$g/.the-agent-kit/recommended.json"; cp "$KIT/hooks/kit-check.py" "$g/.the-agent-kit/hooks/kit-check.py"
+  mkdir -p "$g/.claude" "$g/.gemini/config"; printf '{"mcpServers":{}}' > "$g/.claude.json"; printf 'not json' > "$g/.gemini/config/mcp_config.json"
+  d=$(dr)
+  has 'Claude Code is missing Context7' "$d" && has 'optional.*Claude Code.*superpowers' "$d" && has 'claude mcp add' "$d" \
+    && pass "D14 --check lists the missing recommended and optional tools, with their commands" || bad "D14 gaps not listed: $(printf '%s' "$d" | grep -i 'missing\|cannot')"
+  has 'Antigravity is missing Context7' "$d" && bad "D14 an unreadable Antigravity config was reported as missing" \
+    || { has 'cannot tell.*Antigravity' "$d" && pass "D14 an unreadable config is 'cannot tell', not 'missing'" || bad "D14 unreadable config not mentioned: $(printf '%s' "$d" | grep -i antigravity)"; }
+  has 'Codex is missing' "$d" && bad "D14 reported Codex although it is not installed here" || pass "D14 a tool that is not on this machine is not checked"
+  : > "$g/.gemini/config/mcp_config.json"; d=$(dr)
+  has 'Antigravity is missing Context7' "$d" && has 'agy mcp add' "$d" \
+    && pass "D14 an empty Antigravity MCP file is a readable, empty config: Context7 is missing" || bad "D14 empty Antigravity config misjudged: $(printf '%s' "$d" | grep -i antigravity)"
+  rm -rf "$g" "$u"
+fi
+
 # ---------- install.sh --update-rules ----------
 echo "== install.sh --update-rules =="
 w=$(mktemp -d) || exit 2; cd "$w" || exit 2

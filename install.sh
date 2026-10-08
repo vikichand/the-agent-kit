@@ -777,6 +777,9 @@ doctor() {
     say "  NOTE: session-start update check is switched off (AGENT_KIT_NO_UPDATE_CHECK=1)"
   else
     say "  OK:   hooks/kit-check.py present (session-start update check; wired if you merged SessionStart)"
+    # The recommended-tools gaps, optional ones included, which the session reminder never carries.
+    # kit-check reads ~ through USERPROFILE on Windows, so hand it the same home this script uses.
+    [ -n "$py" ] && HOME="$HOME" USERPROFILE="$(nat "$HOME")" $py "$KIT/hooks/kit-check.py" --doctor 2>/dev/null || true
   fi
   for h in mcp-orphans.py mcp-wrap.py tidy-procs.py tidy-scan.py; do
     if [ -f "$KIT/hooks/$h" ]; then say "  OK:   hooks/$h present"; else say "  NOTE: hooks/$h unavailable in this kit copy"; fi

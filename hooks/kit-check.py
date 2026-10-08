@@ -27,7 +27,7 @@ including every error, so it can never block a session.
 Opt out entirely:  AGENT_KIT_NO_UPDATE_CHECK=1  (the adherence harness sets it, so the with-arm of an
 eval never receives an instruction the control arm does not).
 """
-import json, os, re, subprocess, sys, time
+import glob, json, os, re, subprocess, sys, time
 
 REPO = os.environ.get("AGENT_KIT_REPO") or "https://github.com/vikichand/the-agent-kit.git"
 SHARE = os.path.join(os.path.expanduser("~"), ".the-agent-kit")
@@ -89,9 +89,55 @@ def load_json(path):
         return None
 
 
+def installed_antigravity(kind, name, top, home):
+    """Antigravity's global root is ~/.gemini/config (built-in docs agy-customizations: SKILL.md,
+    skills.md, mcp_servers.md, json_configs.md). A skill is found in its skills folder, in a folder named
+    by a skills.json entry, in a plugin, or in the project's .agents/skills; an MCP server in
+    mcp_config.json (global or a plugin's)."""
+    cfg = os.path.join(home, ".gemini", "config")
+    if kind == "skill":
+        roots = [os.path.join(cfg, "skills")] + glob.glob(os.path.join(cfg, "plugins", "*", "skills"))
+        if top:
+            roots.append(os.path.join(top, ".agents", "skills"))
+        unreadable = False
+        sj = os.path.join(cfg, "skills.json")
+        if os.path.exists(sj):
+            d = load_json(sj)
+            unreadable = not isinstance(d, dict)
+            for e in (d.get("entries") or []) if isinstance(d, dict) else []:
+                p = e.get("path") if isinstance(e, dict) else None
+                if not isinstance(p, str) or (e.get("include_only") and name not in e["include_only"]):
+                    continue
+                roots.append(os.path.join(home, p[2:]) if p.startswith("~/") else
+                             p if os.path.isabs(p) or not top else os.path.join(top, p))
+        if any(os.path.isfile(os.path.join(r, name, "SKILL.md")) for r in roots):
+            return True
+        return None if unreadable else False
+    if kind == "mcp":
+        names = set()
+        for path in [os.path.join(cfg, "mcp_config.json")] + glob.glob(os.path.join(cfg, "plugins", "*", "mcp_config.json")):
+            text = read(path) if os.path.exists(path) else ""
+            if text is None:
+                return None
+            if text.strip():   # an empty file is a readable, empty config
+                try:
+                    d = json.loads(text.lstrip("﻿"))
+                except ValueError:
+                    return None
+                if not isinstance(d, dict):
+                    return None
+                names |= set(d.get("mcpServers") or {})
+        return name in names
+    if kind == "plugin":
+        return os.path.isdir(os.path.join(cfg, "plugins", name))
+    return None
+
+
 def installed(tool, kind, name, top):
     """True / False, or None when this machine's config cannot be read (never nag on a guess)."""
     home = os.path.expanduser("~")
+    if tool == "antigravity":
+        return installed_antigravity(kind, name, top, home)
     if kind == "skill":
         roots = ([os.path.join(home, ".claude", "skills")] if tool == "claude" else
                  [os.path.join(home, ".agents", "skills"), os.path.join(home, ".codex", "skills")])
@@ -134,18 +180,63 @@ def is_web_project(top):
                 re.search(r"(?im)^\*\*[^*\n]*platform[^*\n]*:\*\*[^\n]*\b(web|mobile|desktop|tv)\b", block))
 
 
-def missing_tools(tool, top):
-    """One line naming what the user's list recommends for this tool and is not installed."""
-    items = (load_json(os.path.join(SHARE, "recommended.json")) or {}).get("items") or []
+WHO = {"claude": "Claude Code", "codex": "Codex", "antigravity": "Antigravity"}
+
+
+def recommended_items():
+    items = (load_json(os.path.join(SHARE, "recommended.json")) or {}).get("items")
+    return [i for i in items if isinstance(i, dict)] if isinstance(items, list) else []
+
+
+def check_items(tool, top, optional):
+    """[(item, state, install command)] for what the list recommends this tool (optional items only when
+    asked for); state is False (missing) or None (this machine's config cannot be read)."""
     web = is_web_project(top)
-    gaps = []
-    for it in items:
-        spec = it.get(tool) if isinstance(it, dict) else None
-        if not isinstance(spec, dict) or it.get("optional") or (it.get("when") == "web" and not web):
+    out = []
+    for it in recommended_items():
+        spec = it.get(tool)
+        if not isinstance(spec, dict) or bool(it.get("optional")) != optional or (it.get("when") == "web" and not web):
             continue
         kind = next((k for k in ("mcp", "plugin", "skill") if spec.get(k)), None)
-        if kind and installed(tool, kind, spec[kind], top) is False:
-            gaps.append("%s (%s)" % (it.get("name", spec[kind]), spec.get("install", "see the environment setup prompt")))
+        state = installed(tool, kind, spec[kind], top) if kind else True
+        if state is not True:
+            cmd = (spec.get("install_windows") if os.name == "nt" else None) or \
+                spec.get("install", "see the environment setup prompt")
+            out.append((it, state, cmd))
+    return out
+
+
+def doctor(top):
+    """What `install.sh --check` prints about the recommended list: every tool installed on this machine,
+    its missing recommended and optional items, and entries that are not the kit's."""
+    home = os.path.expanduser("~")
+    lines, checked = [], []
+    for tool, d in (("claude", ".claude"), ("codex", ".codex"), ("antigravity", ".gemini")):
+        if not (os.path.isdir(os.path.join(home, d)) or (tool == "claude" and os.path.isfile(os.path.join(home, ".claude.json")))):
+            continue
+        checked.append(WHO[tool])
+        for optional in (False, True):
+            for it, state, cmd in check_items(tool, top, optional):
+                label = "%s%s" % ("optional, " if optional else "", WHO[tool])
+                name = it.get("name", it.get("id", "?"))
+                if state is None:
+                    lines.append("  NOTE: cannot tell whether %s has %s: its config could not be read" % (label, name))
+                else:
+                    lines.append("  NOTE: %s is missing %s: %s" % (label, name, cmd))
+    for it in recommended_items():
+        if not it.get("id"):
+            lines.append("  NOTE: recommended.json entry \"%s\" has no kit id: it is yours, or the kit retired it" % it.get("name", "?"))
+    if not os.path.isfile(os.path.join(SHARE, "recommended.json")):
+        lines.append("  NOTE: no recommended-tools list yet; install.sh --setup creates ~/.the-agent-kit/recommended.json")
+    elif checked and not lines:
+        lines.append("  OK:   recommended tools present for %s" % ", ".join(checked))
+    return lines
+
+
+def missing_tools(tool, top):
+    """One line naming what the user's list recommends for this tool and is not installed."""
+    gaps = ["%s (%s)" % (it.get("name", it.get("id", "?")), cmd)
+            for it, state, cmd in check_items(tool, top, False) if state is False]
     if not gaps:
         return None
     marker = os.path.join(SHARE, ".tools-check")
@@ -159,14 +250,23 @@ def missing_tools(tool, top):
             json.dump(seen, f)
     except OSError:
         pass
-    who = "Claude Code" if tool == "claude" else "Codex"
     return ("the-agent-kit: tell the user once, in one line, that these recommended tools are not installed "
             "for %s, with the command to install each: %s. Install nothing without their yes, and let them "
             "run any command that needs a key. To stop a reminder, list its id under \"dismissed\" in "
-            "~/.the-agent-kit/recommended.json." % (who, "; ".join(gaps)))
+            "~/.the-agent-kit/recommended.json." % (WHO[tool], "; ".join(gaps)))
+
+
+def repo_top(cwd):
+    try:
+        return run(["git", "rev-parse", "--show-toplevel"], timeout=2, cwd=cwd).strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
 
 
 def main():
+    if "--doctor" in sys.argv:   # asked for by install.sh --check: local files only, nothing throttled
+        print("\n".join(doctor(repo_top(os.getcwd()))))
+        return
     if os.environ.get("AGENT_KIT_NO_UPDATE_CHECK") == "1" or not os.path.isdir(SHARE):
         return
     tool = sys.argv[sys.argv.index("--tool") + 1] if "--tool" in sys.argv[:-1] else None
@@ -184,10 +284,7 @@ def main():
             notes.append(f"the-agent-kit: a newer release is on main (installed {installed}, latest "
                          f"{latest[:7]}). To update the machine: ~/.the-agent-kit/install.sh --update")
 
-    try:
-        top = run(["git", "rev-parse", "--show-toplevel"], timeout=2, cwd=cwd).strip()
-    except (OSError, subprocess.SubprocessError):
-        top = ""
+    top = repo_top(cwd)
     if top:
         is_kit_repo = os.path.isfile(os.path.join(top, "hooks", "kit-check.py")) and \
             os.path.isfile(os.path.join(top, "install.sh"))
