@@ -257,12 +257,36 @@ def detect_grants(prompt):
     return g
 
 
+TIDY_ASK = ("this deletes branches, worktrees or files, or kills processes, and none of it can be undone. "
+            "Approve only if you chose these items in /tidy.")
+
+
+def kit_destructive(toks):
+    """The kit's own cleanup scripts, in the step that removes things: tidy-scan/tidy-procs `apply` (not a
+    --dry-run) and mcp-orphans `--kill`. Matched by file name anywhere in the command, so `uv run python`,
+    `py -3` and unquoted Windows paths (shlex eats their backslashes) are all seen."""
+    for i, t in enumerate(toks):
+        name, rest = base(t).lower(), toks[i + 1:]
+        if name.endswith(("tidy-scan.py", "tidy-procs.py")) and "apply" in rest and "--dry-run" not in rest:
+            return True
+        if name.endswith("mcp-orphans.py") and "--kill" in rest:
+            return True
+        if name.endswith("install.sh") and "--tidy" in rest and "--kill" in rest:  # it execs mcp-orphans.py
+            return True
+    return False
+
+
 def classify(tokens, decision, grants=frozenset()):
     toks = verb_tokens(tokens)
     if not toks:
         return None
     verb = base(toks[0]).lower()
     rest = toks[1:]
+
+    # Codex hooks cannot ask ("permissionDecision: ask ... parsed but not supported yet"), and a deny would
+    # break /tidy there, so this is Claude and Antigravity only.
+    if decision == "ask" and kit_destructive(toks):
+        return "ask", TIDY_ASK
 
     if verb == "git":
         j = 0
