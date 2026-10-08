@@ -87,7 +87,9 @@ only the short `description` sits in context, and the body loads when a task mat
 the same SKILL.md format, so the installer writes each skill to `.claude/skills/` for Claude Code and
 `.agents/skills/` for Codex and Antigravity, and `--update-rules` keeps the two copies identical. Skills
 route to detail in `references/`, opened only when the task needs it, and the installer copies the whole
-folder.
+folder. `--setup` also installs the four machine-wide, once: one real copy in `~/.agents/skills`, a
+directory link per skill in `~/.claude/skills` (a junction on Windows, no admin), and a `skills.json` entry
+for Antigravity, so `/tidy` works in projects where `install.sh` never ran.
 
 - **`orchestrating-work`** - when to fan out and when not to: pick the shape first (do it, delegate a
   read or a slice, fan out, hand off), give each worker an **outcome contract** (objective, scope,
@@ -202,7 +204,7 @@ projects); silent otherwise; never updates or installs anything itself. Off with
   list (Codex excludes secret names by default, and a broad one strips `DATABASE_URL` and breaks builds invisibly).
   **`codex/hooks.json`** wires the deny-mode hook.
 - **`install.sh`**: six modes, default (full rules) · `--extension` (lean, extends global) · `--setup` (machine-wide: copies the kit, turns on the
-  git hooks and adds the kit to your Claude Code and Codex settings, add-only, asked and backed up; `setup/merge-settings.py`; Antigravity is wired per project) ·
+  git hooks and adds the kit to your Claude Code and Codex settings, add-only, asked and backed up; `setup/merge-settings.py`; also installs the kit's four skills once for all three tools: a real copy in `~/.agents/skills`, a directory link per skill for Claude Code, a `skills.json` entry for Antigravity; `--undo` removes them; Antigravity's guard is wired per project) ·
   `--global` (machine-wide by hand: prints the snippets) ·
   `--update` (**also the installer**: a lone `install.sh` with no kit beside it bootstraps the whole thing,
   so distribution is one curl-able file - no clone, no package manager. Pulls the latest kit from GitHub

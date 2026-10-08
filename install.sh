@@ -5,7 +5,9 @@
 #                             imports it, so nothing is duplicated) + git hooks in THIS repo
 #   ./install.sh --extension  per-project (extends global): project-config stub + git hooks
 #   ./install.sh --setup      machine-wide, all of it: copy the kit to ~/.the-agent-kit, turn on the git
-#                             hooks, and add the kit to your Claude Code and Codex settings (asks first)
+#                             hooks, add the kit to your Claude Code and Codex settings, and install its
+#                             skills once for all three tools (asks first)
+#   ./install.sh --undo       remove the machine-wide skill links, copies and skills.json names it made
 #   ./install.sh --global     machine-wide, by hand: copy the kit and PRINT the snippets to merge yourself
 #   ./install.sh --update     pull the latest kit from GitHub into ~/.the-agent-kit, then run --setup
 #   ./install.sh --update-rules  refresh THIS repo's AGENTS.md to the kit's current rules; the
@@ -498,6 +500,13 @@ install_global() {  # copy the kit, then PRINT the settings snippets for a hand 
   cat "$KIT/codex/config.toml"
 
   hr
+  say "THE KIT'S SKILLS - one real copy for all three tools (--setup does this for you, after asking):"
+  say "  copy each folder in $share/skills to ~/.agents/skills/<name>   (Codex reads it there)"
+  say "  link ~/.claude/skills/<name> to that copy: ln -s on macOS and Linux; on Windows a junction, which needs no admin:"
+  say "      cmd //c mklink /J <link> <target>      (remove it later with rmdir, never rm -rf)"
+  say "  add {\"path\": \"~/.agents/skills\", \"include_only\": [<the skill names>]} to \"entries\" in ~/.gemini/config/skills.json (Antigravity)"
+
+  hr
   # $share, never $KIT. Under --update, $KIT is a temp clone this run deletes on its way out, so a
   # command printed with that path is already broken by the time anyone reads it. $share is where
   # the kit actually lives afterwards.
@@ -536,6 +545,215 @@ confirm() {  # consent to write the user's settings: a terminal answer, or AGENT
   return 1
 }
 
+wire_machine() {  # $1 = plan | apply | undo. The kit's own skills, installed once for all three tools.
+  # plan prints what apply would do (exit 10 when there is something to do); undo removes what apply made.
+  #   ~/.agents/skills/<name>        the one real copy (Codex reads it); the kit marks its copies
+  #   ~/.claude/skills/<name>        a directory link to it (Claude Code has no setting for another folder)
+  #   ~/.gemini/config/skills.json   Antigravity's entry for ~/.agents/skills, limited to the kit's names
+  # Only what the kit made is ever changed or removed. A folder, link or entry of the user's with the same
+  # name is left as it is and reported. A tool that is not on the machine (no ~/.claude, no
+  # ~/.gemini/config) is not set up, and nothing is created for it.
+  share="$HOME/.the-agent-kit"
+  py=$(detect_py)
+  [ -n "$py" ] || { say "  ! no working Python 3 found - the kit's skills were not installed machine-wide."; return 1; }
+  $py - "$1" "$(nat "$HOME")" "$(nat "$share")" <<'WIRE'
+import json, os, shutil, subprocess, sys, tempfile, time
+mode, home, share = sys.argv[1:4]
+KIT_SKILLS = ("generating-reports", "orchestrating-work", "tidy", "writing-docs")
+MARK = ".the-agent-kit"            # a file inside every skill folder the kit copied: that is what "ours" means
+canon_root = os.path.join(home, ".agents", "skills")
+claude_skills = os.path.join(home, ".claude", "skills")
+cfg = os.path.join(home, ".gemini", "config")
+sj_path = os.path.join(cfg, "skills.json")
+SJ_PATH = "~/.agents/skills"
+src_root = os.path.join(share, "skills")
+names = sorted(n for n in (os.listdir(src_root) if os.path.isdir(src_root) else [])
+               if os.path.isfile(os.path.join(src_root, n, "SKILL.md")))
+if mode == "undo":
+    names = sorted(set(names) | set(KIT_SKILLS))
+elif not names:
+    sys.exit(0)                      # no kit skills on this machine yet: nothing to install
+stamp = time.strftime("%Y%m%d-%H%M%S")
+actions, lines, rc = [], [], 0
+
+def norm(p):
+    return os.path.normcase(os.path.normpath(os.path.abspath(p)))
+
+def is_link(p):                      # a symlink, or a Windows junction (os.path.islink is False for those)
+    if os.path.islink(p):
+        return True
+    if os.name == "nt":
+        try:
+            st = os.lstat(p)
+        except OSError:
+            return False
+        return bool(getattr(st, "st_file_attributes", 0) & 0x400) and getattr(st, "st_reparse_tag", 0) == 0xA0000003
+    return False
+
+def points_to(link, target):
+    return norm(os.path.realpath(link)) == norm(os.path.realpath(target))
+
+def make_link(link, target):
+    # AGENT_KIT_LINK_KIND=symlink|junction overrides the platform default (symlink; junction on Windows,
+    # which needs no admin rights and no Developer Mode). It exists so the other kind can be tested.
+    kind = os.environ.get("AGENT_KIT_LINK_KIND") or ("junction" if os.name == "nt" else "symlink")
+    if kind == "junction":
+        r = subprocess.run(["cmd", "/c", "mklink", "/J", os.path.normpath(link), os.path.normpath(target)],
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            raise OSError((r.stderr or r.stdout).strip() or "mklink /J failed")
+    else:
+        os.symlink(target, link, target_is_directory=True)
+
+def drop_link(link):                 # never rmtree: that could follow the link into the one real copy
+    if os.name == "nt":
+        os.rmdir(link)               # removes a junction or directory symlink, not what it points at
+    else:
+        os.unlink(link)
+
+def tree(p):
+    out = {}
+    for d, _, fs in os.walk(p):
+        for f in fs:
+            full = os.path.join(d, f)
+            rel = os.path.relpath(full, p).replace(os.sep, "/")
+            if rel != MARK:
+                with open(full, "rb") as fh:
+                    out[rel] = fh.read()
+    return out
+
+def owned_copy(p):
+    return os.path.isfile(os.path.join(p, MARK)) and not is_link(p)
+
+def copy_skill(n):
+    src, dst = os.path.join(src_root, n), os.path.join(canon_root, n)
+    tmp = dst + ".agent-kit-new"
+    shutil.rmtree(tmp, ignore_errors=True)
+    shutil.copytree(src, tmp)
+    with open(os.path.join(tmp, MARK), "w", encoding="utf-8") as f:
+        f.write("This folder is a copy made by the-agent-kit's install.sh; --setup refreshes it and --undo removes it.\n")
+    if os.path.isdir(dst):
+        shutil.rmtree(dst)
+    os.makedirs(canon_root, exist_ok=True)
+    os.rename(tmp, dst)
+
+def write_json(path, data):
+    if os.path.exists(path):
+        shutil.copy2(path, "%s.bak-agent-kit-%s" % (path, stamp))
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(path)), prefix=".skills.", suffix=".tmp")
+    with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False); f.write("\n")
+    os.replace(tmp, path)            # a kill mid-write must never leave the user's skills.json half written
+
+def kit_entry(e):
+    return isinstance(e, dict) and isinstance(e.get("path"), str) and (
+        e["path"].rstrip("/\\") == SJ_PATH or norm(os.path.expanduser(e["path"].replace("~/", home + "/", 1))) == norm(canon_root))
+
+def warn(s):
+    lines.append("  ! " + s)
+
+if mode in ("plan", "apply"):
+    ok = []                          # skills whose one real copy is ours (made now or already)
+    todo_copy, todo_link = [], []
+    for n in names:
+        dst = os.path.join(canon_root, n)
+        if not os.path.lexists(dst):
+            todo_copy.append(n); ok.append(n)
+        elif is_link(dst) or not owned_copy(dst):
+            warn("~/.agents/skills/%s is not the kit's copy; left as it is, and nothing is linked to it" % n)
+        else:
+            ok.append(n)
+            if tree(dst) != tree(os.path.join(src_root, n)):
+                todo_copy.append(n)
+    if todo_copy:
+        lines.append("  + copy to ~/.agents/skills (the one real copy, read by Codex): " + ", ".join(todo_copy))
+        actions += [("copy " + n, (lambda n=n: copy_skill(n))) for n in todo_copy]
+    if os.path.isdir(os.path.join(home, ".claude")):
+        for n in ok:
+            link, dst = os.path.join(claude_skills, n), os.path.join(canon_root, n)
+            if not os.path.lexists(link):
+                todo_link.append(n)
+            elif is_link(link) and points_to(link, dst):
+                pass
+            elif is_link(link):
+                warn("~/.claude/skills/%s is a link to somewhere else; left as it is" % n)
+            else:
+                warn("~/.claude/skills/%s is a folder of yours; left as it is (it wins over the kit's skill of the same name)" % n)
+        if todo_link:
+            lines.append("  + link in ~/.claude/skills (a directory link to the one copy): " + ", ".join(todo_link))
+            def do_links(todo=tuple(todo_link)):
+                os.makedirs(claude_skills, exist_ok=True)
+                for n in todo:
+                    make_link(os.path.join(claude_skills, n), os.path.join(canon_root, n))
+            actions.append(("link", do_links))
+    if os.path.isdir(cfg) and ok:
+        data, bad = {"entries": []}, False
+        if os.path.exists(sj_path):
+            try:
+                with open(sj_path, encoding="utf-8-sig") as f:
+                    data = json.load(f)
+                bad = not isinstance(data, dict) or not isinstance(data.get("entries", []), list)
+            except ValueError:
+                bad = True
+        if bad:
+            warn("~/.gemini/config/skills.json is not a JSON object with an entries list; left untouched, so Antigravity does not get the kit's skills from it")
+        else:
+            entries = data.setdefault("entries", [])
+            mine = next((e for e in entries if kit_entry(e)), None)
+            if mine is None:
+                entries.append({"path": SJ_PATH, "include_only": list(ok)})
+                lines.append("  + add ~/.agents/skills (limited to the kit's skills) to ~/.gemini/config/skills.json for Antigravity")
+                actions.append(("skills.json", lambda: write_json(sj_path, data)))
+            elif isinstance(mine.get("include_only"), list):
+                missing = [n for n in ok if n not in mine["include_only"]]
+                if missing:
+                    mine["include_only"] += missing
+                    lines.append("  + add the kit's skills to your ~/.agents/skills entry in ~/.gemini/config/skills.json: " + ", ".join(missing))
+                    actions.append(("skills.json", lambda: write_json(sj_path, data)))
+    if mode == "apply":
+        for what, fn in actions:
+            try:
+                fn()
+            except (OSError, shutil.Error) as e:
+                lines.append("  ! %s failed: %s" % (what, e)); rc = 1
+        lines = [l for l in lines if l.startswith("  !")] + ["  done: " + ", ".join(w for w, _ in actions)] * bool(actions)
+    elif actions:
+        rc = 10
+else:                                # undo
+    gone = []
+    for n in names:
+        link, dst = os.path.join(claude_skills, n), os.path.join(canon_root, n)
+        if os.path.lexists(link) and is_link(link) and points_to(link, dst) and (owned_copy(dst) or not os.path.lexists(dst)):
+            try:
+                drop_link(link); gone.append("~/.claude/skills/" + n)
+            except OSError as e:
+                lines.append("  ! could not remove ~/.claude/skills/%s: %s" % (n, e)); rc = 1
+    for n in names:
+        dst = os.path.join(canon_root, n)
+        if os.path.lexists(dst) and owned_copy(dst):
+            shutil.rmtree(dst); gone.append("~/.agents/skills/" + n)
+    if os.path.exists(sj_path):
+        try:
+            with open(sj_path, encoding="utf-8-sig") as f:
+                data = json.load(f)
+            entries = data["entries"]
+            mine = next((e for e in entries if kit_entry(e) and isinstance(e.get("include_only"), list)), None)
+            if mine is not None:
+                left = [n for n in mine["include_only"] if n not in names]
+                if left != mine["include_only"]:
+                    if left:
+                        mine["include_only"] = left
+                    else:
+                        entries.remove(mine)
+                    write_json(sj_path, data); gone.append("the kit's skills in ~/.gemini/config/skills.json")
+        except (ValueError, KeyError, TypeError, OSError):
+            lines.append("  ! ~/.gemini/config/skills.json could not be read; left as it is")
+    lines.insert(0, "  - removed: " + (", ".join(gone) if gone else "nothing (the kit made none of it, or it is already gone)"))
+print("\n".join(lines))
+sys.exit(rc)
+WIRE
+}
+
 setup_machine() {  # --setup: everything a machine needs, applied with the user's consent
   share="$HOME/.the-agent-kit"
   [ "$KIT" = "$share" ] || copy_share
@@ -557,8 +775,11 @@ setup_machine() {  # --setup: everything a machine needs, applied with the user'
        say "  To add the kit's hooks, copy $share/git-hooks/* into that folder." ;;
   esac
   hr
-  say "Antigravity is wired per project: --setup changes nothing under ~/.gemini."
-  if [ "$mrc" != 10 ] && [ "$sethooks" = 0 ]; then
+  say "SKILLS - the kit's own skills, installed once for all three tools"
+  wrc=0; wplan=$(wire_machine plan 2>&1) || wrc=$?
+  if [ -n "$wplan" ]; then say "$wplan"; else say "  already in place"; fi
+  say "Antigravity's command guard is still wired per project: run $share/install.sh inside each project."
+  if [ "$mrc" != 10 ] && [ "$sethooks" = 0 ] && [ "$wrc" != 10 ]; then
     [ "$mrc" = 1 ] && { say "Fix the file named above (it could not be read safely), then run this again."; exit 1; }
     say "Already set up: your settings and git hooks carry the kit."
     return 0
@@ -568,6 +789,10 @@ setup_machine() {  # --setup: everything a machine needs, applied with the user'
     [ "$mrc" = 10 ] && { AGENT_KIT_APPLY=1 merge_settings "$share" "$py" --apply >/dev/null 2>&1 || arc=$?; }
     [ "$sethooks" = 1 ] && git config --global core.hooksPath "$want"
     [ "$arc" = 0 ] || [ "$mrc" = 1 ] || { say "  ! the settings merge did not finish (exit $arc) - run $share/install.sh --check"; exit 1; }
+    if [ "$wrc" = 10 ]; then
+      wout=$(wire_machine apply 2>&1) || say "  ! the skills step did not finish cleanly:"
+      [ -n "$wout" ] && say "$wout"
+    fi
     say "Done. Backups of changed files sit beside them as *.bak-agent-kit-<time>."
     say "Restart Claude Code and Codex: hooks load when a session starts."
     say "Then in each project:   $share/install.sh     (and run the setup prompt once)"
@@ -789,6 +1014,10 @@ doctor() {
   if { [ -d .claude/skills/tidy ] || [ -d .agents/skills/tidy ]; } && [ ! -f "$HOME/.the-agent-kit/hooks/tidy-scan.py" ]; then
     say "  NOTE: /tidy is installed in this project but its scripts are missing; run install.sh --setup"
   fi
+  if [ -n "$py" ] && [ -d "$HOME/.the-agent-kit/skills" ]; then
+    wrc=0; wire_machine plan >/dev/null 2>&1 || wrc=$?
+    [ "$wrc" = 10 ] && say "  NOTE: the kit's machine-wide skills are not all in place (one copy in ~/.agents/skills, linked for Claude Code and Antigravity); run install.sh --setup"
+  fi
   # The settings are where the tool guard and the session-start check are wired. Checking the scripts
   # alone reported all OK on a machine whose Codex had no guard at all (2026-09-29).
   share="$HOME/.the-agent-kit"
@@ -948,13 +1177,14 @@ print("  WARN: %d orphaned MCP processes (%.1f MB) - run: install.sh --tidy (add
 # this line runs when sourced that way.
 if [ "${AGENT_KIT_LIB:-0}" = 1 ]; then return 0 2>/dev/null || exit 0; fi
 
-USAGE="Usage: ./install.sh [--setup | --update | --update-rules | --check | --tidy [--kill] [reaper options] | --extension | --global]"
+USAGE="Usage: ./install.sh [--setup | --update | --update-rules | --undo | --check | --tidy [--kill] [reaper options] | --extension | --global]"
 case "$MODE" in
   --setup|setup)                setup_machine ;;
   --global|global)              install_global ;;
   --extension|extension)        install_extension ;;
   --update|update)              update_kit ;;
   --update-rules|update-rules)  update_rules ;;
+  --undo|undo)                  wire_machine undo ;;
   --check|check|doctor)         doctor ;;
   --tidy|tidy)
     shift

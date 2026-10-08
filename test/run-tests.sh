@@ -280,7 +280,8 @@ if [ -n "$PY" ]; then
   # missing and the command for each - not an invitation to a conversation about installing.
   has 'tell the user once, in one line' "$o" && has 'claude mcp add --transport http context7' "$o" && has 'claude mcp add chrome-devtools' "$o" \
     && [ "$(printf '%s\n' "$o" | wc -l | tr -d ' ')" = 1 ] \
-    && pass "K19 one line, telling the agent to relay the missing tools and their commands once" || bad "K19 reminder wording or length wrong: $o"  rm -rf "$k"
+    && pass "K19 one line, telling the agent to relay the missing tools and their commands once" || bad "K19 reminder wording or length wrong: $o"
+  rm -rf "$k"
 else
   bad "no python - kit-check.py NOT tested"
 fi
@@ -741,10 +742,13 @@ else
   has '~/.gemini/AGENTS.md' "$o" \
     && pass "U21 --global names Antigravity's global rules file" \
     || bad "U21 --global omits Antigravity's global rules file"
+  has 'mklink /J' "$o" && has 'skills.json' "$o" && [ ! -e "$g/.agents" ] && [ ! -e "$g/.gemini" ] \
+    && pass "U21b --global prints how to install the kit's skills once for all three tools, and writes none of it" \
+    || bad "U21b --global omits the machine-wide skills steps, or wrote them"
   o=$(HOME="$g" AGENT_KIT_APPLY= sh "$KIT/install.sh" --setup </dev/null 2>&1)
-  has 'Antigravity.*per project.*nothing under ~/.gemini' "$o" && [ ! -e "$g/.gemini" ] \
-    && pass "U21 --setup says Antigravity stays per project and leaves ~/.gemini alone" \
-    || bad "U21 --setup omits Antigravity's per-project scope or writes ~/.gemini"
+  has "Antigravity's command guard is still wired per project" "$o" && [ ! -e "$g/.gemini" ] \
+    && pass "U21 --setup says the Antigravity guard stays per project and, without consent or a ~/.gemini, writes nothing there" \
+    || bad "U21 --setup omits Antigravity's per-project guard scope or writes ~/.gemini"
   rm -rf "$g"
   # U18: the machine-wide share must hold the rules with an EMPTY block too. The README tells users who
   # prefer global rules to append the share's AGENTS.md to ~/.claude/CLAUDE.md, so a leak here would put
@@ -1011,6 +1015,134 @@ else
   bad "no python - the recommended list refresh NOT tested"
 fi
 
+# ---------- machine-wide skills: one real copy, linked into the other tools ----------
+# The kit's four skills are installed once per machine: a real copy in ~/.agents/skills (Codex reads it),
+# one directory link per skill in ~/.claude/skills (a junction on Windows, which needs no admin; a symlink
+# elsewhere), and a skills.json entry for Antigravity. The installer creates and removes only what it
+# owns: a folder of the user's with the same name is left alone and reported. Everything runs in a temp HOME.
+echo "== machine-wide skills =="
+if [ -n "$PY" ]; then
+  wq() { cygpath -m "$1" 2>/dev/null || printf '%s' "$1"; }
+  SK=$(ls "$KIT/claude/skills" | tr '\n' ' ')
+  nsk=$(ls "$KIT/claude/skills" | wc -l | tr -d ' ')
+  home_() { g=$(mktemp -d) || exit 2; G=$(wq "$g"); mkdir -p "$g/.claude" "$g/.gemini/config"; }
+  su() {  # $1 = AGENT_KIT_APPLY ("" = no consent), $2 = link kind override ("" = platform default)
+    src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY="$1" AGENT_KIT_LINK_KIND="${2:-}" sh "$KIT/install.sh" --setup </dev/null 2>&1) || src=$?; }
+  undo_() { src=0; o=$(env HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --undo </dev/null 2>&1) || src=$?; }
+  lnk() {  # $1 = path -> "link ok" when it is a symlink or junction resolving to the same-named folder in ~/.agents/skills
+    $PY - "$(wq "$1")" <<'EOF'
+import os, sys
+p = sys.argv[1]
+st = os.lstat(p)
+j = bool(getattr(st, "st_file_attributes", 0) & 0x400)
+rp = os.path.realpath(p).replace("\\", "/").lower()
+print("link" if (os.path.islink(p) or j) else "plain", "ok" if rp.endswith("/.agents/skills/" + os.path.basename(p).lower()) else "elsewhere")
+EOF
+  }
+  sj_() { $PY -c "import json,sys; d=json.load(open(sys.argv[1],encoding='utf-8')); print($2)" "$(wq "$1")" 2>/dev/null; }
+  # W1-W3: a fresh machine with all three tools: copy, links, skills.json; a second run changes nothing.
+  home_
+  su ""
+  [ ! -e "$g/.agents" ] && [ ! -e "$g/.gemini/config/skills.json" ] && has 'AGENT_KIT_APPLY' "$o" \
+    && pass "W0 no consent: no skill copy, link or skills.json is written" || bad "W0 wrote skills without consent: $o"
+  su 1
+  m=""; for n in $SK; do [ -f "$g/.agents/skills/$n/SKILL.md" ] && [ "$(lnk "$g/.agents/skills/$n")" = "plain ok" ] || m="$m $n"; done
+  [ -z "$m" ] && pass "W1 ~/.agents/skills holds one real copy of each of the $nsk kit skills (Codex reads it)" || bad "W1 canonical copies missing or linked:$m: $o"
+  m=""; for n in $SK; do [ "$(lnk "$g/.claude/skills/$n")" = "link ok" ] && [ -f "$g/.claude/skills/$n/SKILL.md" ] || m="$m $n"; done
+  [ -z "$m" ] && pass "W2 ~/.claude/skills/<name> is a directory link to the one copy, and the skill reads through it" || bad "W2 links wrong:$m: $o"
+  [ "$(sj_ "$g/.gemini/config/skills.json" "d['entries'][0]['path']")" = '~/.agents/skills' ] \
+    && [ "$(sj_ "$g/.gemini/config/skills.json" "sorted(d['entries'][0]['include_only']) == sorted('$SK'.split())")" = True ] \
+    && pass "W3 skills.json points Antigravity at ~/.agents/skills, limited to the kit's skills" || bad "W3 skills.json wrong: $(cat "$g/.gemini/config/skills.json" 2>/dev/null)"
+  cp "$g/.gemini/config/skills.json" "$g/sj.before"; before=$(ls -R "$g/.agents" "$g/.claude" "$g/.gemini" | md5sum); su 1
+  [ "$(ls -R "$g/.agents" "$g/.claude" "$g/.gemini" | md5sum)" = "$before" ] && cmp -s "$g/.gemini/config/skills.json" "$g/sj.before" \
+    && pass "W4 a second --setup changes nothing (no new file, backup or rewrite)" || bad "W4 re-run not idempotent: $o"
+  # W5: the canonical copy is kit-owned: a drifted file is restored, and a link keeps working through it.
+  printf 'drifted\n' > "$g/.agents/skills/tidy/SKILL.md"; su 1
+  cmp -s "$g/.agents/skills/tidy/SKILL.md" "$KIT/claude/skills/tidy/SKILL.md" && [ "$(lnk "$g/.claude/skills/tidy")" = "link ok" ] \
+    && pass "W5 a drifted kit copy is refreshed and its link still resolves" || bad "W5 drifted copy not refreshed: $o"
+  # W6: undo removes what the installer made and nothing else.
+  mkdir -p "$g/.agents/skills/mine" "$g/.claude/skills/theirs"; printf 'x\n' > "$g/.agents/skills/mine/SKILL.md"; printf 'y\n' > "$g/.claude/skills/theirs/SKILL.md"
+  $PY - "$(wq "$g/.gemini/config/skills.json")" <<'EOF'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); d["entries"].insert(0, {"path": "~/my-skills"})
+json.dump(d, open(p, "w", encoding="utf-8"))
+EOF
+  undo_
+  m=""; for n in $SK; do [ -e "$g/.claude/skills/$n" ] || [ -L "$g/.claude/skills/$n" ] || [ -e "$g/.agents/skills/$n" ] && m="$m $n"; done
+  [ -z "$m" ] && [ -f "$g/.agents/skills/mine/SKILL.md" ] && [ -f "$g/.claude/skills/theirs/SKILL.md" ] \
+    && [ "$(sj_ "$g/.gemini/config/skills.json" "[e['path'] for e in d['entries']]")" = "['~/my-skills']" ] \
+    && pass "W6 --undo removes the kit's links, copies and skills.json entry, and leaves the user's own skills and entries" || bad "W6 undo wrong (left:$m): $o"
+  rm -rf "$g"
+  # W7-W9: what the installer does not own it does not touch, and it says so.
+  home_
+  mkdir -p "$g/.claude/skills/tidy" "$g/.agents/skills/writing-docs" "$g/elsewhere"
+  printf 'mine\n' > "$g/.claude/skills/tidy/SKILL.md"; printf 'mine\n' > "$g/.agents/skills/writing-docs/SKILL.md"
+  $PY - "$(wq "$g")" <<'EOF'
+import os, subprocess, sys
+g = sys.argv[1]
+target = os.path.join(g, "elsewhere"); link = os.path.join(g, ".claude", "skills", "orchestrating-work")
+if os.name == "nt":
+    subprocess.run(["cmd", "/c", "mklink", "/J", os.path.normpath(link), os.path.normpath(target)], check=True, capture_output=True)
+else:
+    os.symlink(target, link)
+EOF
+  su 1
+  [ "$(cat "$g/.claude/skills/tidy/SKILL.md")" = mine ] && [ "$(lnk "$g/.claude/skills/tidy")" = "plain elsewhere" ] && has 'tidy' "$(printf '%s' "$o" | grep -i 'WARN\|!')" \
+    && pass "W7 a folder of the user's with a kit skill's name is left alone, with a warning" || bad "W7 user folder touched or not reported: $o"
+  [ "$(cat "$g/.agents/skills/writing-docs/SKILL.md")" = mine ] && [ ! -e "$g/.claude/skills/writing-docs" ] \
+    && pass "W8 a ~/.agents/skills folder that is not the kit's is left alone, and no link points at it" || bad "W8 foreign canonical folder touched or linked: $o"
+  [ "$(lnk "$g/.claude/skills/orchestrating-work")" = "link elsewhere" ] \
+    && pass "W9 a link of the user's pointing elsewhere is left alone" || bad "W9 foreign link replaced: $(lnk "$g/.claude/skills/orchestrating-work")"
+  undo_
+  [ -d "$g/elsewhere" ] && [ "$(lnk "$g/.claude/skills/orchestrating-work")" = "link elsewhere" ] && [ "$(cat "$g/.claude/skills/tidy/SKILL.md")" = mine ] \
+    && [ "$(cat "$g/.agents/skills/writing-docs/SKILL.md")" = mine ] \
+    && pass "W9b --undo leaves a foreign link, a foreign folder and the foreign target untouched" || bad "W9b undo removed something it does not own: $o"
+  rm -rf "$g"
+  # W10: an existing skills.json keeps every entry; the kit's entry is added, or extended when the user
+  # already has one for ~/.agents/skills; one that exposes the whole folder already covers the kit.
+  home_
+  printf '{"entries":[{"path":"~/mine"},{"path":"~/.agents/skills","include_only":["other"]}],"inherits":[{"path":"/x/skills.json"}]}\n' > "$g/.gemini/config/skills.json"
+  su 1
+  [ "$(sj_ "$g/.gemini/config/skills.json" "d['entries'][0]['path'], sorted(d['entries'][1]['include_only']) == sorted('other $SK'.split()), len(d['entries']), d['inherits'][0]['path']")" = "~/mine True 2 /x/skills.json" ] \
+    && ls "$g/.gemini/config/"skills.json.bak-agent-kit-* >/dev/null 2>&1 \
+    && pass "W10 an existing skills.json keeps its entries and inherits; the user's own entry is extended; a backup is left" || bad "W10 skills.json merge wrong: $(cat "$g/.gemini/config/skills.json")"
+  printf '{"entries":[{"path":"~/.agents/skills"}]}\n' > "$g/.gemini/config/skills.json"; cp "$g/.gemini/config/skills.json" "$g/sj.before"; su 1
+  cmp -s "$g/.gemini/config/skills.json" "$g/sj.before" && pass "W10b an entry that already exposes all of ~/.agents/skills is left as it is" || bad "W10b whole-folder entry rewritten"
+  printf '{ not json' > "$g/.gemini/config/skills.json"; su 1
+  [ "$(cat "$g/.gemini/config/skills.json")" = '{ not json' ] && has 'skills.json' "$(printf '%s' "$o" | grep -i 'WARN\|!')" \
+    && pass "W10c an unreadable skills.json is left untouched and named" || bad "W10c unreadable skills.json handled wrongly: $o"
+  rm -rf "$g"
+  # W11: a tool that is not installed is not set up: no ~/.claude or ~/.gemini is created for it, while
+  # the one real copy still lands where Codex reads it.
+  g=$(mktemp -d) || exit 2; G=$(wq "$g")
+  su 1
+  [ -f "$g/.agents/skills/tidy/SKILL.md" ] && [ ! -e "$g/.claude" ] && [ ! -e "$g/.gemini" ] \
+    && pass "W11 without Claude Code or Antigravity on the machine, only the ~/.agents/skills copy is made" || bad "W11 created folders for absent tools: $(ls -A "$g")"
+  rm -rf "$g"
+  # W12: the symlink path (POSIX default; forced here so Windows exercises it too when it may make symlinks).
+  home_
+  su 1 symlink
+  if [ "$(lnk "$g/.claude/skills/tidy")" = "link ok" ]; then
+    $PY -c "import os,sys; sys.exit(0 if os.path.islink(sys.argv[1]) else 1)" "$(wq "$g/.claude/skills/tidy")" \
+      && pass "W12 the symlink path makes real symlinks that resolve to the one copy" || bad "W12 AGENT_KIT_LINK_KIND=symlink did not make a symlink"
+    undo_
+    [ ! -e "$g/.claude/skills/tidy" ] && [ ! -L "$g/.claude/skills/tidy" ] && [ ! -e "$g/.agents/skills/tidy" ] \
+      && pass "W12b --undo removes symlinks it made" || bad "W12b symlink not removed: $o"
+  else
+    case "$o" in *WARN*|*'!'*) pass "W12 (this platform may not create symlinks; the failure was reported, not hidden)" ;; *) bad "W12 symlink creation failed silently: $o" ;; esac
+  fi
+  rm -rf "$g"
+  # W13: the doctor says when the machine-wide skills are not in place, and stops once they are.
+  home_
+  mkdir -p "$g/.the-agent-kit"; cp -r "$KIT/claude/skills" "$g/.the-agent-kit/skills"
+  d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
+  has 'machine-wide skills.*install.sh --setup' "$d" && pass "W13 --check notes the kit's skills are not installed machine-wide" || bad "W13 --check silent about missing machine-wide skills"
+  su 1; d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
+  has 'machine-wide skills' "$d" && bad "W13 --check still notes it after setup" || pass "W13 --check is quiet once they are in place"
+  rm -rf "$g"
+else
+  bad "no python - machine-wide skills NOT tested"
+fi
 # H1-H5: the eval harness's own oracles. Both were silently wrong until 2026-09-27: provider errors
 # scored as ordinary FAILs, and a red-then-fix run scored as "edited before any failing test".
 # The functions are lifted out of run.sh so the checks run offline, with no agent and no tokens.

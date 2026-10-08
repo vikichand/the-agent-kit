@@ -33,7 +33,7 @@
       },
       "antigravity": {
         "skill": "playwright-cli",
-        "install": "npm install -g @playwright/cli@latest && playwright-cli install --skills=agents -g, then copy ~/.agents/skills/playwright-cli to ~/.gemini/config/skills/"
+        "install": "npm install -g @playwright/cli@latest && playwright-cli install --skills=agents -g, then add playwright-cli to the ~/.agents/skills entry's include_only list in ~/.gemini/config/skills.json"
       }
     },
     {
@@ -77,7 +77,7 @@
       "when": "web",
       "claude": {
         "skill": "frontend-design",
-        "install": "copy skills/frontend-design from github.com/anthropics/skills into ~/.claude/skills/"
+        "install": "copy skills/frontend-design from github.com/anthropics/skills into ~/.agents/skills/, then link it into ~/.claude/skills/ (steps in the environment setup prompt)"
       },
       "codex": {
         "skill": "frontend-design",
@@ -85,7 +85,7 @@
       },
       "antigravity": {
         "skill": "frontend-design",
-        "install": "copy skills/frontend-design from github.com/anthropics/skills into ~/.gemini/config/skills/"
+        "install": "copy skills/frontend-design from github.com/anthropics/skills into ~/.agents/skills/, then add frontend-design to the ~/.agents/skills entry's include_only list in ~/.gemini/config/skills.json"
       }
     },
     {

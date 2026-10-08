@@ -117,10 +117,22 @@ see ([Limits](#limits)).
    It only adds. A setting you already chose is kept, the kit's own older entries are updated in place,
    a file it cannot read safely is left untouched, and a tool you do not have is skipped. Each changed
    file is backed up beside itself as `<file>.bak-agent-kit-<time>`.
+4. **Installs the kit's four skills once for all three tools**, so `/tidy` and the others work in every
+   project, not only where `install.sh` ran:
+
+   | Tool | Where | How |
+   |---|---|---|
+   | Codex | `~/.agents/skills/<name>` | the one real copy, marked as the kit's so a later `--setup` can refresh it |
+   | Claude Code | `~/.claude/skills/<name>` | a directory link to that copy: a junction on Windows (no admin rights), a symlink elsewhere |
+   | Antigravity | `~/.gemini/config/skills.json` | an entry for `~/.agents/skills`, limited to the kit's four names |
+
+   It creates and removes only what it made. A folder or link of yours with the same name is left as it
+   is, with a warning; a tool you do not have gets nothing. `install.sh --undo` removes the kit's links,
+   copies and `skills.json` names (a junction goes with `rmdir`, never `rm -rf`).
 
 Nothing is written until you answer yes. Run it again at any time: when everything is in place it says
 so and changes nothing. Prefer to merge by hand? `install.sh --global` copies the kit and prints the
-snippets instead.
+snippets, and the skill steps, instead.
 
 ### What a project gets
 
@@ -165,8 +177,7 @@ does not refresh it: after an update, delete the old block from the global file 
 again. The depth tier in each project still updates through `--update-rules`.
 
 Antigravity reads `~/.gemini/AGENTS.md` in every project. Its guard hook stays per project: run
-`~/.the-agent-kit/install.sh` inside each project. `--setup` changes nothing under `~/.gemini`,
-and Antigravity has no documented session-start update check.
+`~/.the-agent-kit/install.sh` inside each project. `--setup` touches `~/.gemini/config` only for the skills entry above.
 
 ### Check it worked
 
@@ -182,7 +193,8 @@ carrying the kit. A `WARN` about `PROJECT-CONFIG` is expected until you run the 
 Every settings file `--setup` changed has a backup beside it (`*.bak-agent-kit-<time>`): copy it back.
 To turn the git hooks off: `git config --global --unset core.hooksPath`, run in a normal terminal. The
 kit itself is the `~/.the-agent-kit` folder, and a project's rules are its `AGENTS.md`, `CLAUDE.md`,
-`.claude/` and `.agents/skills/`.
+`.claude/` and `.agents/skills/`. `install.sh --undo` removes the machine-wide skill links, the copies
+in `~/.agents/skills` and the `skills.json` names, and only those the kit made.
 
 ### Your shell
 
@@ -302,7 +314,7 @@ and the installer is the adapter between them:
 |---|---|---|---|
 | Floor (`AGENTS.md`) | via the one-line `CLAUDE.md` import | read directly | read directly |
 | Depth tier (6 rules) | `.claude/rules/`, loads by file path | 4 of 6 as `.agents/skills/`, loads by task match; the 2 path-shaped ones (`code-correctness`, `tests`) don't port and stay one-liners in the floor | the same 4 skills, plus the 2 path-shaped ones as glob rules in `.agents/rules/` |
-| Task tier (4 skills) | `.claude/skills/` | `.agents/skills/`, same files | `.agents/skills/`, shared with Codex |
+| Task tier (4 skills) | `.claude/skills/`, and machine-wide by link from `--setup` | `.agents/skills/`, same files, and the machine-wide copy in `~/.agents/skills` | `.agents/skills/`, shared with Codex, and `skills.json` for the machine-wide copy |
 | Git-layer guards | yes | yes | yes |
 | Tool-layer guard | `ask`, machine-wide | `deny`, machine-wide | asks every time, per project (`.agents/hooks.json`) |
 | Turn-scoped git grants | yes | no (deny mode; you push) | no (it asks; you approve) |
@@ -468,7 +480,8 @@ Quick Start covers the usual path. The installer's modes:
 
 | Mode | Scope | What it does |
 |---|---|---|
-| `--setup` | machine | Copy the kit to `~/.the-agent-kit`, turn on its git hooks, and add it to your Claude Code and Codex settings: listed, asked, backed up. Safe to re-run. Antigravity is wired per project, so this changes nothing under `~/.gemini`. |
+| `--setup` | machine | Copy the kit to `~/.the-agent-kit`, turn on its git hooks, and add it to your Claude Code and Codex settings, and install its four skills once for all three tools: listed, asked, backed up. Safe to re-run. Antigravity's command guard is still wired per project. |
+| `--undo` | machine | Remove the machine-wide skill links, copies and `skills.json` names that `--setup` made. Only what the kit made; your settings come back from their `.bak-agent-kit-*` files. |
 | `--update` | machine | Fetch the latest kit, check it is the kit, then run `--setup` from it. Needs no kit beside it, so one downloaded `install.sh` bootstraps everything. |
 | `--global` | machine | By hand: copy the kit and **print** the settings snippets and the git-hooks command for you to apply. |
 | *(none)* | project | Full rules - `AGENTS.md` plus a `CLAUDE.md` that imports it - the depth tier and skills for all three tools (`.claude/` for Claude Code, `.agents/` for Codex and Antigravity), and this repo's git hooks. |
