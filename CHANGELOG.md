@@ -32,8 +32,9 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 - **The pre-commit hook blocks `continue-on-error: true`** added to a workflow file, which lets a failing step
   pass the build. `# gate-exempt: <reason>` on the same line allows it.
 - **Eval case 41, and a `cleanup.sh` hook for the adherence harness** to run after each case.
-- **Eval cases 42 to 45**: finish every part of a three-part ask (42), atomic commits (43), check a
-  second-hand claim at its source (44), and a one-line rename where the kit should add nothing (45).
+- **Eval cases 42 to 46**: finish every part of a three-part ask (42), atomic commits (43), check a
+  second-hand claim at its source (44), a one-line rename where the kit should add nothing (45), and bring
+  the researched, sourced fix instead of a list of options (46).
 - **Speed measurement in the adherence harness**: a true vanilla arm (its own logged-in config folder),
   pinned effort, rotating arm order, duration columns, last-turn telemetry for multi-turn cases, and a
   speed panel of eight cases.
@@ -69,7 +70,8 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 - **Pushing back no longer means stopping.** When the safer version still does what was asked, the agent
   builds it and says why; the high-risk question round builds when no decision is open.
 - **Open decisions are asked in one numbered round**, each worded so "yes" accepts the agent's
-  recommended answer (Section 1).
+  recommended answer: the current standard or best-supported option it researched, with its source. A
+  problem is raised only with the fix the agent recommends (Section 1).
 - **A claim is unverified until its source is checked.** What a subagent, summary, memory or earlier turn
   says is a lead, not a fact; "X does not exist" needs a search for X itself; when the user questions a
   claim, the agent re-checks the primary source before answering (Section 1).
