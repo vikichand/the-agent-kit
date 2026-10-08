@@ -191,12 +191,19 @@ newsid() {
 # Claude under --output-format stream-json --verbose emits one event per line too. The `result`
 # event carries duration, turn count, token usage and cost; `assistant` events carry the text the
 # judge reads and the tool calls the trace check reads. Fields: messages | usage | tools.
-claude_field() {  # $1 = events file  $2 = messages|usage|tools
+#
+# `usage` may be given further events files (turn 2, 3 ...) after the first: tool calls and edits are
+# counted over all of them, everything else is read from the LAST result event, because a resumed
+# session's result carries the session's whole spend (Claude Code v2.1.277 and later; summing the turns
+# would count turn 1 again). A file that does not exist is skipped.
+claude_field() {  # $1 = events file  $2 = messages|usage|tools  $3... = later turns' events files (usage only)
   for p in python python3; do
-    r=$("$p" - "$1" "$2" <<'PY' 2>/dev/null
-import json, sys
+    r=$("$p" - "$@" <<'PY' 2>/dev/null
+import json, os, sys
 want = sys.argv[2]; msgs = []; tools = []; res = None
-for line in open(sys.argv[1], encoding="utf-8", errors="replace"):
+for path in [sys.argv[1]] + sys.argv[3:]:
+  if not os.path.exists(path): continue
+  for line in open(path, encoding="utf-8", errors="replace"):
     try: e = json.loads(line)
     except ValueError: continue
     t = e.get("type")
@@ -219,7 +226,8 @@ elif want == "usage":
     print("\t".join(str(x) for x in [
         (res or {}).get("num_turns", ""), len(tools), sum(1 for x in tools if x["name"] in ("Edit", "Write", "MultiEdit", "NotebookEdit")),
         u.get("input_tokens", ""), u.get("output_tokens", ""), u.get("cache_read_input_tokens", ""), u.get("cache_creation_input_tokens", ""),
-        (res or {}).get("total_cost_usd", "")]))
+        (res or {}).get("total_cost_usd", ""),
+        (res or {}).get("duration_ms", ""), (res or {}).get("duration_api_ms", ""), (res or {}).get("ttft_ms", "")]))
 PY
 ) || continue
     printf '%s' "$r"; return 0
@@ -746,9 +754,74 @@ that the rubric did not ask for, and do not penalise anything the rubric did not
 }
 
 # One TSV row per cell. $1 case $2 arm $3 run $4 verdict $5 elapsed $6 censored $7 telemetry (8 tab
-# columns) $8 rules ref. Written before the verdict is printed, so a killed run still leaves its rows.
+# columns, or 11 from Claude: the last three are duration_ms, duration_api_ms, ttft_ms) $8 rules ref.
+# The three duration columns go LAST so a file written before they existed still has its columns in place;
+# they are empty for a tool that reports none. Written before the verdict is printed, so a killed run still
+# leaves its rows.
 record_row() {
-  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$(date +%Y-%m-%dT%H:%M:%S)" "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$TOOL" "${MODEL:-default}${EFFORT:+/$EFFORT}" "${JUDGE:-default}" "$8" >> "$TSV"
+  t8=$(printf '%s\n' "$7" | awk -F'\t' -v OFS='\t' '{print $1,$2,$3,$4,$5,$6,$7,$8}')
+  t3=$(printf '%s\n' "$7" | awk -F'\t' -v OFS='\t' '{print $9,$10,$11}')
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$(date +%Y-%m-%dT%H:%M:%S)" "$1" "$2" "$3" "$4" "$5" "$6" "$t8" "$TOOL" "${MODEL:-default}${EFFORT:+/$EFFORT}" "${JUDGE:-default}" "$8" "$t3" >> "$TSV"
+}
+
+# The order the arms run in for run number $2 (1-based): the list in $1 rotated left by one per run, so
+# no arm is always first (a warm cache, a rate-limit window, the machine's load all drift within a run).
+rotate_arms() {  # $1 = comma separated arms  $2 = run number  -> space separated
+  printf '%s' "$1" | awk -F, -v r="$2" '{n=NF; k=(r-1)%n; for(i=0;i<n;i++) printf "%s%s", (i?" ":""), $(((i+k)%n)+1)}'
+}
+
+# THE VANILLA ARM (Claude only). A Claude Code config folder that holds a login and nothing else - no
+# CLAUDE.md, hooks, plugins, MCP servers or advisor - made once by the owner with
+# `CLAUDE_CONFIG_DIR=<dir> claude` and /login. This only checks it; it never creates or edits the login.
+# claude.ai connectors, skills and plugins sync from the account on login, so their three switches must be off.
+vanilla_check() {  # $1 = folder  -> prints why it is unusable (and returns 1), or prints nothing
+  hint="Set AGENT_KIT_VANILLA_DIR to a Claude config folder made for this (see test/adherence/README.md)."
+  [ -d "$1" ] || { echo "the vanilla folder '$1' does not exist. $hint"; return 1; }
+  [ -s "$1/.credentials.json" ] || { echo "the vanilla folder '$1' has no .credentials.json (log in once with CLAUDE_CONFIG_DIR set to it). $hint"; return 1; }
+  for p in python python3; do
+    r=$("$p" - "$1/settings.json" <<'PY' 2>/dev/null
+import json, sys
+try: s = json.load(open(sys.argv[1], encoding="utf-8"))
+except (OSError, ValueError): s = None
+need = {"disableClaudeAiConnectors": True, "syncClaudeAiSkills": False, "syncClaudeAiPlugins": False}
+bad = list(need) if not isinstance(s, dict) else [k for k, v in need.items() if s.get(k) is not v]
+print(", ".join("%s=%s" % (k, str(need[k]).lower()) for k in bad))
+PY
+) || continue
+    [ -z "$r" ] && return 0
+    echo "the vanilla folder's settings.json must set: $r. $hint"; return 1
+  done
+  echo "cannot read the vanilla folder's settings.json: no working python. $hint"; return 1
+}
+
+# Between cells: nothing a previous cell wrote may reach the next. The login, settings and .claude.json stay.
+vanilla_reset() {  # $1 = folder
+  [ -n "$1" ] || return 1
+  rm -rf "$1/projects" "$1/sessions" "$1/history.jsonl"
+}
+
+# Two runs sharing the folder would clear each other's sessions mid-cell, so one run holds it at a time.
+# mkdir is the atomic step; a lock whose process is gone is taken over.
+vanilla_lock() {  # $1 = folder  -> 0 if this run now holds it
+  lk="$1/.harness-lock"
+  if mkdir "$lk" 2>/dev/null; then echo "$$" > "$lk/pid"; return 0; fi
+  op=$(cat "$lk/pid" 2>/dev/null)
+  if [ -n "$op" ] && kill -0 "$op" 2>/dev/null; then
+    echo "another adherence run (pid $op) is using the vanilla folder '$1'; wait for it, or point this one at its own folder with AGENT_KIT_VANILLA_DIR."; return 1
+  fi
+  rm -rf "$lk"; mkdir "$lk" 2>/dev/null && { echo "$$" > "$lk/pid"; return 0; }
+  echo "could not take the lock on the vanilla folder '$1'."; return 1
+}
+
+# A panel file lists case ids, one per line (# comments and blank lines skipped). Prints the ids; an id
+# that is not a case directory stops the run, so a typo cannot quietly shrink a measurement.
+panel_ids() {  # $1 = panel file  $2 = cases dir
+  [ -f "$1" ] || { echo "panel file '$1' not found."; return 1; }
+  ids=$(sed -e 's/[[:space:]]*$//' -e 's/^[[:space:]]*//' "$1" | grep -v '^#' | grep -v '^$')
+  for id in $ids; do
+    [ -d "$2/$id" ] || { echo "panel '$1' names '$id', which is not a case in $2."; return 1; }
+  done
+  printf '%s\n' "$ids"
 }
 
 printf '%s\n' "------------------------------------------------------------"
