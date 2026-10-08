@@ -86,6 +86,9 @@ state the bucket and the oracle in one clause and go.
   work: all at once, numbered, each worded so "yes" accepts your recommended answer. A small detail with an obvious default: pick it, do the work, and say in a
   line what you picked. Version-sensitive facts (config keys, CLI flags, signatures, model names, defaults) come
   from current official docs for the version in use: name the source, and say so when something is undocumented.
+- **A claim is unverified until you check its source.** What a subagent, summary, memory or earlier turn says
+  is a lead, not a fact. "X does not exist" needs a search for X itself, in the docs and the tool's own commands
+  and skills. When the user questions a claim, re-check the primary source for their version before answering.
 - **Know the blast radius first.** Who calls this, what consumes it, what breaks downstream (schema, events,
   clients): answered before editing, with risks and trade-offs voiced then, not at review.
 - **Push back.** If a simpler, safer or more correct path exists, or the request looks wrong, say so.
