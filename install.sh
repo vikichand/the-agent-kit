@@ -334,16 +334,17 @@ install_extension() { # lean: project-config stub + git hooks
   install_git_hooks "$root"
 }
 
-merge_recommended() {  # $1 = the kit's list  $2 = the user's list (~/.the-agent-kit/recommended.json)
+merge_recommended() {  # $1 = the kit's list  $2 = the user's list (~/.the-agent-kit/recommended.json)  $3 = plan | apply (default)
+  # plan only describes the change (exit 10 when there is one): --setup shows it and writes after consent.
   # Items are matched by id. New upstream items are added and changed ones replaced; an item the user
   # removed (it was offered before, so it is in `seeded`) or dismissed never comes back; entries without
   # an id are the user's own and are never touched. A list from before ids existed is matched by name,
   # and its missing originals count as deleted, which is what deleting an entry meant then.
   py=$(detect_py)
   [ -n "$py" ] || return 1
-  $py - "$(nat "$1")" "$(nat "$2")" <<'RECO'
+  $py - "$(nat "$1")" "$(nat "$2")" "${3:-apply}" <<'RECO'
 import json, os, shutil, sys, tempfile, time
-up_path, path = sys.argv[1], sys.argv[2]
+up_path, path, mode = sys.argv[1], sys.argv[2], sys.argv[3]
 try:
     with open(up_path, encoding="utf-8-sig") as f:
         up = json.load(f)
@@ -393,8 +394,13 @@ new = {"_about": up.get("_about", cur.get("_about")), "items": items, "seeded": 
 new.update({k: v for k, v in cur.items() if k not in new})
 if not fresh and json.dumps(new, sort_keys=True) == json.dumps(cur, sort_keys=True):
     sys.exit(0)
+if mode == "plan" and not fresh:   # the list comes off the network on --update: show it, write only after a yes
+    bits = [("add", added), ("update", updated), ("retire", dropped)]
+    print("  + recommended tools: " + ("; ".join("%s %s" % (k, ", ".join(v)) for k, v in bits if v)
+          if any(v for _, v in bits) else "bring the list up to date") + " (items you removed or dismissed stay gone)")
+    sys.exit(10)
 if not fresh:
-    bak, n = "%s.bak-agent-kit-%s" % (path, time.strftime("%Y%m%d-%H%M%S")), 1
+    bak, n ="%s.bak-agent-kit-%s" % (path, time.strftime("%Y%m%d-%H%M%S")), 1
     while os.path.exists(bak):   # two runs in one second must not overwrite the first backup
         n += 1; bak = "%s.bak-agent-kit-%s-%d" % (path, time.strftime("%Y%m%d-%H%M%S"), n)
     shutil.copy2(path, bak)
@@ -402,10 +408,6 @@ fd, tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(path)), prefix=".
 with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
     json.dump(new, f, indent=2, ensure_ascii=False); f.write("\n")
 os.replace(tmp, path)   # a kill mid-write must never leave the user's list half written
-if not fresh:
-    bits = [("added", added), ("updated", updated), ("retired", dropped)]
-    print("  + recommended tools: " + "; ".join("%s %s" % (k, ", ".join(v)) for k, v in bits if v)
-          if any(v for _, v in bits) else "  + recommended tools: list brought up to date")
 RECO
 }
 
@@ -890,7 +892,6 @@ setup_machine() {  # --setup: everything a machine needs, applied with the user'
   [ "$KIT" = "$share" ] || copy_share
   py=$(detect_py)
   [ -n "$py" ] || { say "  ! no working Python 3 found - the kit's guard and this setup both need it. Install it and re-run."; exit 2; }
-  merge_recommended "$KIT/hooks/recommended.json" "$share/recommended.json" || true
   hr
   say "SETTINGS - the kit's entries are added to yours; nothing of yours is removed or changed"
   mrc=0; plan=$(merge_settings "$share" "$py" 2>&1) || mrc=$?
@@ -906,11 +907,17 @@ setup_machine() {  # --setup: everything a machine needs, applied with the user'
        say "  To add the kit's hooks, copy $share/git-hooks/* into that folder." ;;
   esac
   hr
-  say "SKILLS AND THE ANTIGRAVITY CHECK - the kit's own skills installed once for all three tools, and the session-start check for Antigravity"
+  # The kit's list may have just come off the network (--update), and its text ends up in the agent's
+  # context, so it is shown first and merged only after the same yes as the settings.
+  say "RECOMMENDED TOOLS - the list the session-start check reminds from (~/.the-agent-kit/recommended.json)"
+  rrc=0; rplan=$(merge_recommended "$KIT/hooks/recommended.json" "$share/recommended.json" plan 2>&1) || rrc=$?
+  if [ -n "$rplan" ]; then say "$rplan"; else say "  already current"; fi
+  hr
+  say "SKILLS AND THE ANTIGRAVITY CHECK -the kit's own skills installed once for all three tools, and the session-start check for Antigravity"
   wrc=0; wplan=$(wire_machine plan 2>&1) || wrc=$?
   if [ -n "$wplan" ]; then say "$wplan"; else say "  already in place"; fi
   say "Antigravity's command guard is still wired per project: run $share/install.sh inside each project."
-  if [ "$mrc" != 10 ] && [ "$sethooks" = 0 ] && [ "$wrc" != 10 ]; then
+  if [ "$mrc" != 10 ] && [ "$sethooks" = 0 ] && [ "$wrc" != 10 ] && [ "$rrc" != 10 ]; then
     [ "$mrc" = 1 ] && { say "Fix the file named above (it could not be read safely), then run this again."; exit 1; }
     say "Already set up: your settings and git hooks carry the kit."
     return 0
@@ -920,6 +927,9 @@ setup_machine() {  # --setup: everything a machine needs, applied with the user'
     [ "$mrc" = 10 ] && { AGENT_KIT_APPLY=1 merge_settings "$share" "$py" --apply >/dev/null 2>&1 || arc=$?; }
     [ "$sethooks" = 1 ] && git config --global core.hooksPath "$want"
     [ "$arc" = 0 ] || [ "$mrc" = 1 ] || { say "  ! the settings merge did not finish (exit $arc) - run $share/install.sh --check"; exit 1; }
+    if [ "$rrc" = 10 ]; then
+      merge_recommended "$KIT/hooks/recommended.json" "$share/recommended.json" apply || say "  ! the recommended-tools list could not be updated"
+    fi
     if [ "$wrc" = 10 ]; then
       wout=$(wire_machine apply 2>&1) || say "  ! the skills step did not finish cleanly:"
       [ -n "$wout" ] && say "$wout"

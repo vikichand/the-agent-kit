@@ -454,6 +454,11 @@ if [ -n "$PY" ]; then
   : > "$g/.gemini/config/mcp_config.json"; d=$(dr)
   has 'Antigravity is missing Context7' "$d" && has 'agy mcp add' "$d" \
     && pass "D14 an empty Antigravity MCP file is a readable, empty config: Context7 is missing" || bad "D14 empty Antigravity config misjudged: $(printf '%s' "$d" | grep -i antigravity)"
+  # D14c: an entry without a kit id is named only when the kit does not know it; one it knows by name is merged by --setup.
+  printf '{"items":[{"name":"Context7 MCP (library docs)","when":"always","claude":{"mcp":"context7","install":"x"}},{"name":"my own tool","when":"always","claude":{"mcp":"mine","install":"y"}}]}' > "$g/.the-agent-kit/recommended.json"
+  d=$(dr)
+  has 'entry "my own tool" has no kit id' "$d" && ! has 'entry "Context7 MCP (library docs)" has no kit id' "$d" \
+    && pass "D14c only an id-less entry the kit does not know is called out" || bad "D14c id-less entry notes wrong: $(printf '%s' "$d" | grep -i 'kit id')"
   rm -rf "$g" "$u"
 fi
 
@@ -1054,6 +1059,15 @@ EOF
   [ "$(rj "len(d['items'])")" = 8 ] && [ "$(rj "sorted(d['seeded']) == sorted(i['id'] for i in d['items'])")" = True ] \
     && [ "$(rj "d['dismissed']")" = "[]" ] \
     && pass "R5 a fresh machine is seeded with every item and the record of them" || bad "R5 fresh seed wrong: $(cat "$RL" 2>/dev/null | head -c 200)"
+  # R5b: the kit's list may have just come off the network (--update), and its text lands in the agent's
+  # context, so without a yes the merge is only described: the user's list stays byte-identical.
+  cat > "$RL" <<'EOF'
+{"items":[{"name":"Context7 MCP (library docs)","when":"always","claude":{"mcp":"context7","install":"old command"}}]}
+EOF
+  cp "$RL" "$g/before.json"
+  src=0; o=$(HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY= sh "$KIT/install.sh" --setup </dev/null 2>&1) || src=$?
+  cmp -s "$RL" "$g/before.json" && has 'recommended tools:.*update Context7' "$o" && has 'AGENT_KIT_APPLY' "$o" \
+    && pass "R5b without consent the merge is listed, not applied: the list is byte-identical" || bad "R5b the list changed (or the change was not listed) without consent: $o"
   # R6: a kit list with no usable items (a bad download) retires nothing from the user's list.
   printf '{"items":[]}' > "$g/empty.json"; cp "$RL" "$g/before.json"
   HOME="$g" USERPROFILE="$G" AGENT_KIT_LIB=1 sh -c '. "$0"; merge_recommended "$1" "$2"' "$KIT/install.sh" "$(wq "$g/empty.json")" "$(wq "$RL")" >/dev/null 2>&1

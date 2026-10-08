@@ -226,8 +226,12 @@ def doctor(top):
                     lines.append("  NOTE: cannot tell whether %s has %s: its config could not be read" % (label, name))
                 else:
                     lines.append("  NOTE: %s is missing %s: %s" % (label, name, cmd))
+    # The kit's own list sits beside this script (hooks/ in the repo, ~/.the-agent-kit/hooks/ once installed).
+    kit = (load_json(os.path.join(os.path.dirname(os.path.abspath(__file__)), "recommended.json")) or {}).get("items")
+    kit_names = {n for k in (kit if isinstance(kit, list) else []) if isinstance(k, dict)
+                 for n in [k.get("name")] + list(k.get("replaces") or [])}
     for it in recommended_items():
-        if not it.get("id"):
+        if not it.get("id") and it.get("name") not in kit_names:   # one the kit knows by name is merged by --setup
             lines.append("  NOTE: recommended.json entry \"%s\" has no kit id: it is yours, or the kit retired it" % it.get("name", "?"))
     if not os.path.isfile(os.path.join(SHARE, "recommended.json")):
         lines.append("  NOTE: no recommended-tools list yet; install.sh --setup creates ~/.the-agent-kit/recommended.json")
