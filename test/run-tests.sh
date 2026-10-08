@@ -269,6 +269,62 @@ if [ -n "$PY" ]; then
   printf '{"items":[]}' > "$k/home/.the-agent-kit/recommended.json"; printf '{}' > "$k/home/.claude.json"
   o=$(kt claude "$k/proj"); o2=$(kc "$k/proj")
   [ -z "$o" ] && [ -z "$o2" ] && pass "K17 declined (removed) items and sessions without --tool stay silent" || bad "K17 not silent: [$o] [$o2]"
+  # K18: optional items (superpowers, ponytail, headroom) are for install.sh --check, never the reminder.
+  cp "$KIT/hooks/recommended.json" "$k/home/.the-agent-kit/recommended.json"
+  printf '# rules v2\n<!-- PROJECT-CONFIG:START -->\n**Platform / intent:** web - production\n<!-- PROJECT-CONFIG:END -->\n' > "$k/proj/AGENTS.md"
+  mkdir -p "$k/home/.claude/plugins"; printf '{"plugins":{}}' > "$k/home/.claude/plugins/installed_plugins.json"; : > "$k/home/.codex/config.toml"
+  o=$(kt claude "$k/proj"); o2=$(kt codex "$k/proj")
+  has 'Context7' "$o" && has 'Context7' "$o2" && ! has 'superpowers' "$o$o2" && ! has 'ponytail' "$o$o2" && ! has 'headroom' "$o$o2" \
+    && pass "K18 optional items are never in the session reminder" || bad "K18 an optional item was reminded: $o $o2"
+  # K19: the reminder is ONE line that tells the agent to tell the user once, in one line, what is
+  # missing and the command for each - not an invitation to a conversation about installing.
+  has 'tell the user once, in one line' "$o" && has 'claude mcp add --transport http context7' "$o" && has 'claude mcp add chrome-devtools' "$o" \
+    && [ "$(printf '%s\n' "$o" | wc -l | tr -d ' ')" = 1 ] \
+    && pass "K19 one line, telling the agent to relay the missing tools and their commands once" || bad "K19 reminder wording or length wrong: $o"
+  # K20-K27: Antigravity. It has no SessionStart event but a PreInvocation hook that fires before EVERY model
+  # call and answers in JSON ({} for nothing, {"injectSteps":[{"ephemeralMessage":...}]} to speak) with the
+  # conversation id and the workspace in the payload. The check must speak once per conversation, say
+  # nothing otherwise, and be cheap on the calls it skips.
+  ka() {  # $1 = conversation id (empty = none), $2 = workspace -> stdout
+    printf '{"conversationId":"%s","invocationNum":1,"workspacePaths":["%s"]}' "$1" "$(wp "$2")" \
+      | HOME="$KH" USERPROFILE="$KH" AGENT_KIT_REPO="$KS" $PY "$KIT/hooks/kit-check.py" --tool antigravity 2>/dev/null
+  }
+  msg() { printf '%s' "$1" | $PY -c "import json,sys; d=json.loads(sys.stdin.read()); print(d['injectSteps'][0]['ephemeralMessage'] if d else '')" 2>/dev/null; }
+  rm -f "$k/home/.the-agent-kit/.ag-conversations" "$k/home/.the-agent-kit/.update-check"; printf 'abc1234\n' > "$k/home/.the-agent-kit/.kit-version"
+  rm -f "$k/proj/AGENTS.md"
+  o=$(ka conv-1 "$k/proj")
+  has 'install.sh --update' "$(msg "$o")" && pass "K20 Antigravity: the first call of a conversation injects the note, as JSON" || bad "K20 no injected note: $o"
+  o=$(ka conv-1 "$k/proj"); [ "$o" = '{}' ] && pass "K21 the same conversation's next call is silent: {}" || bad "K21 spoke twice in one conversation: $o"
+  o=$(ka conv-2 "$k/proj"); has 'install.sh --update' "$(msg "$o")" && pass "K22 a new conversation gets the note again" || bad "K22 new conversation not served: $o"
+  printf '%s\n' "$(printf '%s' "$latest" | cut -c1-7)" > "$k/home/.the-agent-kit/.kit-version"
+  o=$(ka conv-3 "$k/proj"); [ "$o" = '{}' ] && pass "K23 nothing to say is a valid {} (Antigravity expects JSON)" || bad "K23 not {} when current: $o"
+  o=$(ka "" "$k/proj"); o2=$(printf 'not json' | HOME="$KH" USERPROFILE="$KH" $PY "$KIT/hooks/kit-check.py" --tool antigravity 2>/dev/null); rc=$?
+  [ "$o" = '{}' ] && [ "$o2" = '{}' ] && [ "$rc" = 0 ] && pass "K24 no conversation id, or a payload that is not JSON: {} and exit 0, never a note on every call" || bad "K24 unsafe on a bad payload: [$o] [$o2]"
+  o=$(printf '{"conversationId":"conv-9","workspacePaths":[]}' | AGENT_KIT_NO_UPDATE_CHECK=1 HOME="$KH" USERPROFILE="$KH" $PY "$KIT/hooks/kit-check.py" --tool antigravity 2>/dev/null)
+  [ "$o" = '{}' ] && pass "K25 AGENT_KIT_NO_UPDATE_CHECK=1: {}" || bad "K25 opt-out ignored for Antigravity: $o"
+  # K26: a conversation already seen costs nothing: no network call (the cache file is never written) and no rules lookup.
+  rm -f "$k/home/.the-agent-kit/.update-check"; printf 'abc1234\n' > "$k/home/.the-agent-kit/.kit-version"
+  o=$(ka conv-1 "$k/proj")
+  [ "$o" = '{}' ] && [ ! -e "$k/home/.the-agent-kit/.update-check" ] && pass "K26 a conversation already seen is answered before any network or git work" || bad "K26 a seen conversation still did work: $o"
+  # K27: the ledger of seen conversations stays bounded.
+  $PY - "$(wp "$k/home/.the-agent-kit/.ag-conversations")" <<'EOF'
+import json, sys
+json.dump({"ids": ["old-%d" % i for i in range(400)]}, open(sys.argv[1], "w"))
+EOF
+  ka conv-new "$k/proj" >/dev/null
+  [ "$($PY -c "import json,sys; d=json.load(open(sys.argv[1])); print(len(d['ids']) <= 200 and d['ids'][-1] == 'conv-new')" "$(wp "$k/home/.the-agent-kit/.ag-conversations")")" = True ] \
+    && pass "K27 the seen-conversations ledger is capped, keeping the newest" || bad "K27 ledger unbounded or lost the newest id"
+  # K28: missing recommended tools reach an Antigravity conversation too, from its own config.
+  cp "$KIT/hooks/recommended.json" "$k/home/.the-agent-kit/recommended.json"; rm -f "$k/home/.the-agent-kit/.tools-check"
+  printf '%s\n' "$(printf '%s' "$latest" | cut -c1-7)" > "$k/home/.the-agent-kit/.kit-version"
+  mkdir -p "$k/home/.gemini/config"; : > "$k/home/.gemini/config/mcp_config.json"
+  o=$(ka conv-tools "$k/proj"); m=$(msg "$o")
+  has 'tell the user once, in one line' "$m" && has 'Antigravity' "$m" && has 'agy mcp add' "$m" && [ "$(printf '%s\n' "$m" | wc -l | tr -d ' ')" = 1 ] \
+    && pass "K28 Antigravity: the missing Context7 is named with its agy command, in one line" || bad "K28 Antigravity tool reminder wrong: $m"
+  printf '{"mcpServers":{"context7":{"url":"https://mcp.context7.com/mcp"}}}' > "$k/home/.gemini/config/mcp_config.json"; rm -f "$k/home/.the-agent-kit/.tools-check"
+  o=$(ka conv-tools2 "$k/proj"); [ "$o" = '{}' ] && pass "K29 Antigravity: Context7 present in mcp_config.json: silent" || bad "K29 spoke although Context7 is configured: $o"
+  printf 'not json' > "$k/home/.gemini/config/mcp_config.json"; rm -f "$k/home/.the-agent-kit/.tools-check"
+  o=$(ka conv-tools3 "$k/proj"); [ "$o" = '{}' ] && pass "K30 Antigravity: an unreadable mcp_config.json is 'cannot tell', not 'missing'" || bad "K30 reported missing from an unreadable config: $o"
   rm -rf "$k"
 else
   bad "no python - kit-check.py NOT tested"
@@ -358,6 +414,53 @@ grep -q '^\*\*Branches:\*\*' AGENTS.md || bad "D12b setup: the Branches line was
 d=$(sh "$KIT/install.sh" --check 2>&1)
 has 'no \*\*Branches:\*\* line' "$d" && bad "D12b Branches warning still shown (false positive)" || pass "D12b block with a Branches line is silent"
 cd "$KIT"; rm -rf "$w"
+
+# D13: a project that has the /tidy skill but whose machine has no tidy scripts is told, by name, what to run.
+if [ -n "$PY" ]; then
+  g=$(mktemp -d) || exit 2; u=$(mktemp -d) || exit 2
+  G=$(cygpath -m "$g" 2>/dev/null || printf '%s' "$g")
+  dr() { (cd "$u" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1); }
+  git init -q "$u"; git -C "$u" config core.hooksPath .git/hooks
+  mkdir -p "$u/.claude/skills/tidy" "$g/.the-agent-kit/hooks"; : > "$u/.claude/skills/tidy/SKILL.md"
+  d=$(dr)
+  has 'NOTE: /tidy is installed in this project but its scripts are missing; run install.sh --setup' "$d" \
+    && pass "D13 /tidy in the project but no scripts on the machine: the note names the fix" || bad "D13 no /tidy note: $(printf '%s' "$d" | grep -i tidy)"
+  : > "$g/.the-agent-kit/hooks/tidy-scan.py"; d=$(dr)
+  has '/tidy is installed in this project' "$d" && bad "D13 note shown although the scripts are there" || pass "D13 no note once the scripts are installed"
+  rm -rf "$u/.claude"; rm -f "$g/.the-agent-kit/hooks/tidy-scan.py"; d=$(dr)
+  has '/tidy is installed in this project' "$d" && bad "D13 note shown in a project without /tidy" || pass "D13 no note in a project without /tidy"
+  mkdir -p "$u/.agents/skills/tidy"; : > "$u/.agents/skills/tidy/SKILL.md"; d=$(dr)
+  has '/tidy is installed in this project' "$d" && pass "D13 the Codex and Antigravity copy (.agents/skills/tidy) counts too" || bad "D13 .agents/skills/tidy not noticed"
+  rm -rf "$g" "$u"
+fi
+
+# D14: the doctor lists the recommended tools missing for each tool installed on this machine, and the
+# optional ones (the session reminder never carries those); a config it cannot read is "cannot tell",
+# never "missing". A temp HOME stands in for the machine.
+if [ -n "$PY" ]; then
+  g=$(mktemp -d) || exit 2; u=$(mktemp -d) || exit 2
+  G=$(cygpath -m "$g" 2>/dev/null || printf '%s' "$g")
+  dr() { (cd "$u" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1); }
+  git init -q "$u"; git -C "$u" config core.hooksPath .git/hooks
+  mkdir -p "$g/.the-agent-kit/hooks"
+  cp "$KIT/hooks/recommended.json" "$g/.the-agent-kit/recommended.json"; cp "$KIT/hooks/kit-check.py" "$g/.the-agent-kit/hooks/kit-check.py"
+  mkdir -p "$g/.claude" "$g/.gemini/config"; printf '{"mcpServers":{}}' > "$g/.claude.json"; printf 'not json' > "$g/.gemini/config/mcp_config.json"
+  d=$(dr)
+  has 'Claude Code is missing Context7' "$d" && has 'optional.*Claude Code.*superpowers' "$d" && has 'claude mcp add' "$d" \
+    && pass "D14 --check lists the missing recommended and optional tools, with their commands" || bad "D14 gaps not listed: $(printf '%s' "$d" | grep -i 'missing\|cannot')"
+  has 'Antigravity is missing Context7' "$d" && bad "D14 an unreadable Antigravity config was reported as missing" \
+    || { has 'cannot tell.*Antigravity' "$d" && pass "D14 an unreadable config is 'cannot tell', not 'missing'" || bad "D14 unreadable config not mentioned: $(printf '%s' "$d" | grep -i antigravity)"; }
+  has 'Codex is missing' "$d" && bad "D14 reported Codex although it is not installed here" || pass "D14 a tool that is not on this machine is not checked"
+  : > "$g/.gemini/config/mcp_config.json"; d=$(dr)
+  has 'Antigravity is missing Context7' "$d" && has 'agy mcp add' "$d" \
+    && pass "D14 an empty Antigravity MCP file is a readable, empty config: Context7 is missing" || bad "D14 empty Antigravity config misjudged: $(printf '%s' "$d" | grep -i antigravity)"
+  # D14c: an entry without a kit id is named only when the kit does not know it; one it knows by name is merged by --setup.
+  printf '{"items":[{"name":"Context7 MCP (library docs)","when":"always","claude":{"mcp":"context7","install":"x"}},{"name":"my own tool","when":"always","claude":{"mcp":"mine","install":"y"}}]}' > "$g/.the-agent-kit/recommended.json"
+  d=$(dr)
+  has 'entry "my own tool" has no kit id' "$d" && ! has 'entry "Context7 MCP (library docs)" has no kit id' "$d" \
+    && pass "D14c only an id-less entry the kit does not know is called out" || bad "D14c id-less entry notes wrong: $(printf '%s' "$d" | grep -i 'kit id')"
+  rm -rf "$g" "$u"
+fi
 
 # ---------- install.sh --update-rules ----------
 echo "== install.sh --update-rules =="
@@ -688,10 +791,13 @@ else
   has '~/.gemini/AGENTS.md' "$o" \
     && pass "U21 --global names Antigravity's global rules file" \
     || bad "U21 --global omits Antigravity's global rules file"
+  has 'mklink /J' "$o" && has 'skills.json' "$o" && [ ! -e "$g/.agents" ] && [ ! -e "$g/.gemini" ] \
+    && pass "U21b --global prints how to install the kit's skills once for all three tools, and writes none of it" \
+    || bad "U21b --global omits the machine-wide skills steps, or wrote them"
   o=$(HOME="$g" AGENT_KIT_APPLY= sh "$KIT/install.sh" --setup </dev/null 2>&1)
-  has 'Antigravity.*per project.*nothing under ~/.gemini' "$o" && [ ! -e "$g/.gemini" ] \
-    && pass "U21 --setup says Antigravity stays per project and leaves ~/.gemini alone" \
-    || bad "U21 --setup omits Antigravity's per-project scope or writes ~/.gemini"
+  has "Antigravity's command guard is still wired per project" "$o" && [ ! -e "$g/.gemini" ] \
+    && pass "U21 --setup says the Antigravity guard stays per project and, without consent or a ~/.gemini, writes nothing there" \
+    || bad "U21 --setup omits Antigravity's per-project guard scope or writes ~/.gemini"
   rm -rf "$g"
   # U18: the machine-wide share must hold the rules with an EMPTY block too. The README tells users who
   # prefer global rules to append the share's AGENTS.md to ~/.claude/CLAUDE.md, so a leak here would put
@@ -876,6 +982,360 @@ else
 fi
 grep -q -- '--setup' "$KIT/install.sh" && awk '/^update_kit\(\)/,/^}/' "$KIT/install.sh" | grep -q 'install.sh" --setup' \
   && pass "M10 --update hands over to --setup, so updates re-apply settings" || bad "M10 --update does not run --setup"
+
+# ---------- recommended tools list: refreshed by --setup, never re-adds what the user dismissed ----------
+# The list is seeded once and then the user's, but a list that never learns about new upstream items goes
+# stale (the machine this was found on still named the Playwright MCP the kit had retired). --setup, which
+# --update runs, merges upstream items by id: new ones in, changed ones replaced, and an item the user
+# removed or dismissed stays gone. Entries without an id are the user's own and are never touched.
+echo "== recommended tools refresh =="
+if [ -n "$PY" ]; then
+  g=$(mktemp -d) || exit 2
+  wq() { cygpath -m "$1" 2>/dev/null || printf '%s' "$1"; }
+  G=$(wq "$g")
+  su() { src=0; o=$(HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY=1 sh "$KIT/install.sh" --setup </dev/null 2>&1) || src=$?; }
+  rj() { $PY -c "import json,sys; d=json.load(open(sys.argv[1],encoding='utf-8')); print($1)" "$G/.the-agent-kit/recommended.json" 2>/dev/null; }
+  RL="$g/.the-agent-kit/recommended.json"
+  mkdir -p "$g/.the-agent-kit"
+  # R1: a list from before ids existed (the stale one). Entries are matched by name; a retired name is
+  # replaced; originals the user had deleted stay deleted; items added to the kit since are offered.
+  cat > "$RL" <<'EOF'
+{"items":[
+ {"name":"Context7 MCP (library docs)","when":"always","claude":{"mcp":"context7","install":"old command"}},
+ {"name":"Playwright MCP (drive the UI in a real browser)","when":"web","claude":{"mcp":"playwright","install":"claude mcp add playwright"}},
+ {"name":"my own tool","when":"always","claude":{"mcp":"mine","install":"x"}}
+]}
+EOF
+  su
+  [ "$(rj "[i for i in d['items'] if i.get('id')=='context7'][0]['codex']['mcp']")" = context7 ] \
+    && [ "$(rj "'old command' in open(sys.argv[1],encoding='utf-8').read()")" = False ] \
+    && pass "R1 a changed upstream entry is replaced (Context7 gained its Codex and Antigravity keys)" || bad "R1 stale entry not refreshed: $o"
+  [ "$(rj "any(i.get('claude',{}).get('mcp')=='playwright' for i in d['items'])")" = False ] \
+    && [ "$(rj "any(i.get('id')=='playwright-cli' for i in d['items'])")" = True ] \
+    && pass "R1 the retired Playwright MCP entry is replaced by the Playwright CLI one" || bad "R1 retired entry still listed"
+  [ "$(rj "any(i.get('name')=='my own tool' for i in d['items'])")" = True ] \
+    && pass "R1 the user's own entry is kept" || bad "R1 the user's own entry was lost"
+  [ "$(rj "any(i.get('id') in ('chrome-devtools','impeccable','frontend-design') for i in d['items'])")" = False ] \
+    && [ "$(rj "sorted(d['dismissed'])")" = "['chrome-devtools', 'frontend-design', 'impeccable']" ] \
+    && pass "R1 originals the user had deleted stay deleted (recorded as dismissed)" || bad "R1 a deleted original came back: $(rj "[i.get('id') for i in d['items']]")"
+  [ "$(rj "sorted(i['id'] for i in d['items'] if i.get('optional'))")" = "['headroom', 'ponytail', 'superpowers']" ] \
+    && pass "R1 items added to the kit since are offered, flagged optional" || bad "R1 new upstream items not added"
+  cp "$RL" "$g/after1.json"; su
+  cmp -s "$RL" "$g/after1.json" && pass "R2 a second --setup leaves the list byte-identical" || bad "R2 re-run rewrote the list"
+  # R3: from here the list carries its own record of what was offered. A removed item is dismissed,
+  # an explicitly dismissed one never returns, and an item the list never saw is added.
+  $PY - "$G/.the-agent-kit/recommended.json" <<'EOF'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8"))
+d["items"] = [i for i in d["items"] if i.get("id") not in ("ponytail", "superpowers", "headroom")]
+d["seeded"] = [s for s in d["seeded"] if s != "superpowers"]
+d["dismissed"].append("headroom")
+json.dump(d, open(p, "w", encoding="utf-8"))
+EOF
+  su
+  [ "$(rj "[i['id'] for i in d['items'] if i.get('id') in ('ponytail','superpowers','headroom')]")" = "['superpowers']" ] \
+    && [ "$(rj "'ponytail' in d['dismissed'] and 'headroom' in d['dismissed']")" = True ] \
+    && pass "R3 removed and dismissed items stay gone; an item the list never saw is added" || bad "R3 wrong merge: $(rj "[i.get('id') for i in d['items']]") dismissed=$(rj "d['dismissed']")"
+  # R3b: an item the kit offered and has since retired goes; one of the user's own with an id of its own stays.
+  $PY - "$G/.the-agent-kit/recommended.json" <<'EOF'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8"))
+d["items"] += [{"id": "old-thing", "name": "retired", "when": "always", "claude": {"mcp": "x", "install": "y"}},
+               {"id": "mine-1", "name": "kept", "when": "always", "claude": {"mcp": "z", "install": "y"}}]
+d["seeded"].append("old-thing")
+json.dump(d, open(p, "w", encoding="utf-8"))
+EOF
+  su
+  [ "$(rj "[i['id'] for i in d['items'] if i.get('id') in ('old-thing','mine-1')]")" = "['mine-1']" ] && has 'retired' "$o" \
+    && ls "$g/.the-agent-kit/"recommended.json.bak-agent-kit-* >/dev/null 2>&1 \
+    && pass "R3b a retired kit item is dropped, the user's own id kept, a backup left, and the run says what changed" || bad "R3b retired item handling wrong: $o"
+  # R4: a list that cannot be parsed is left exactly as it is, and the run says so.
+  printf '{ not json' > "$RL"
+  su
+  [ "$(cat "$RL")" = '{ not json' ] && has 'recommended.json' "$o" \
+    && pass "R4 an unreadable list is left untouched and named" || bad "R4 unreadable list handled wrongly: $o"
+  # R5: no list yet -> seeded from the kit, with the record the next merge needs.
+  rm -f "$RL"; su
+  [ "$(rj "len(d['items'])")" = 8 ] && [ "$(rj "sorted(d['seeded']) == sorted(i['id'] for i in d['items'])")" = True ] \
+    && [ "$(rj "d['dismissed']")" = "[]" ] \
+    && pass "R5 a fresh machine is seeded with every item and the record of them" || bad "R5 fresh seed wrong: $(cat "$RL" 2>/dev/null | head -c 200)"
+  # R5b: the kit's list may have just come off the network (--update), and its text lands in the agent's
+  # context, so without a yes the merge is only described: the user's list stays byte-identical.
+  cat > "$RL" <<'EOF'
+{"items":[{"name":"Context7 MCP (library docs)","when":"always","claude":{"mcp":"context7","install":"old command"}}]}
+EOF
+  cp "$RL" "$g/before.json"
+  src=0; o=$(HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY= sh "$KIT/install.sh" --setup </dev/null 2>&1) || src=$?
+  cmp -s "$RL" "$g/before.json" && has 'recommended tools:.*update Context7' "$o" && has 'AGENT_KIT_APPLY' "$o" \
+    && pass "R5b without consent the merge is listed, not applied: the list is byte-identical" || bad "R5b the list changed (or the change was not listed) without consent: $o"
+  # R6: a kit list with no usable items (a bad download) retires nothing from the user's list.
+  printf '{"items":[]}' > "$g/empty.json"; cp "$RL" "$g/before.json"
+  HOME="$g" USERPROFILE="$G" AGENT_KIT_LIB=1 sh -c '. "$0"; merge_recommended "$1" "$2"' "$KIT/install.sh" "$(wq "$g/empty.json")" "$(wq "$RL")" >/dev/null 2>&1
+  cmp -s "$RL" "$g/before.json" && pass "R6 an empty kit list changes nothing in the user's list" || bad "R6 an empty kit list altered the user's list"
+  # R7: a list whose seeded or dismissed is not a list is treated as unreadable, not crashed on.
+  printf '{"items":[],"seeded":"x"}' > "$RL"; cp "$RL" "$g/before.json"; su
+  cmp -s "$RL" "$g/before.json" && has 'recommended.json' "$o" && pass "R7 a malformed seeded field is left untouched and named" || bad "R7 malformed list handled wrongly: $o"
+  rm -rf "$g"
+else
+  bad "no python - the recommended list refresh NOT tested"
+fi
+
+# ---------- machine-wide skills: one real copy, linked into the other tools ----------
+# The kit's four skills are installed once per machine: a real copy in ~/.agents/skills (Codex reads it),
+# one directory link per skill in ~/.claude/skills (a junction on Windows, which needs no admin; a symlink
+# elsewhere), and a skills.json entry for Antigravity. The installer creates and removes only what it
+# owns: a folder of the user's with the same name is left alone and reported. Everything runs in a temp HOME.
+echo "== machine-wide skills =="
+if [ -n "$PY" ]; then
+  wq() { cygpath -m "$1" 2>/dev/null || printf '%s' "$1"; }
+  SK=$(ls "$KIT/claude/skills" | tr '\n' ' ')
+  nsk=$(ls "$KIT/claude/skills" | wc -l | tr -d ' ')
+  home_() { g=$(mktemp -d) || exit 2; G=$(wq "$g"); mkdir -p "$g/.claude" "$g/.gemini/config"; }
+  su() {  # $1 = AGENT_KIT_APPLY ("" = no consent), $2 = link kind override ("" = platform default)
+    src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY="$1" AGENT_KIT_LINK_KIND="${2:-}" sh "$KIT/install.sh" --setup </dev/null 2>&1) || src=$?; }
+  undo_() { src=0; o=$(env HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --undo </dev/null 2>&1) || src=$?; }
+  lnk() {  # $1 = path -> "link ok" when it is a symlink or junction resolving to the same-named folder in ~/.agents/skills
+    $PY - "$(wq "$1")" <<'EOF'
+import os, sys
+p = sys.argv[1]
+st = os.lstat(p)
+j = bool(getattr(st, "st_file_attributes", 0) & 0x400)
+rp = os.path.realpath(p).replace("\\", "/").lower()
+print("link" if (os.path.islink(p) or j) else "plain", "ok" if rp.endswith("/.agents/skills/" + os.path.basename(p).lower()) else "elsewhere")
+EOF
+  }
+  sj_() { $PY -c "import json,sys; d=json.load(open(sys.argv[1],encoding='utf-8')); print($2)" "$(wq "$1")" 2>/dev/null; }
+  # W1-W3: a fresh machine with all three tools: copy, links, skills.json; a second run changes nothing.
+  home_
+  su ""
+  [ ! -e "$g/.agents" ] && [ ! -e "$g/.gemini/config/skills.json" ] && has 'AGENT_KIT_APPLY' "$o" \
+    && pass "W0 no consent: no skill copy, link or skills.json is written" || bad "W0 wrote skills without consent: $o"
+  su 1
+  m=""; for n in $SK; do [ -f "$g/.agents/skills/$n/SKILL.md" ] && [ "$(lnk "$g/.agents/skills/$n")" = "plain ok" ] || m="$m $n"; done
+  [ -z "$m" ] && pass "W1 ~/.agents/skills holds one real copy of each of the $nsk kit skills (Codex reads it)" || bad "W1 canonical copies missing or linked:$m: $o"
+  m=""; for n in $SK; do [ "$(lnk "$g/.claude/skills/$n")" = "link ok" ] && [ -f "$g/.claude/skills/$n/SKILL.md" ] || m="$m $n"; done
+  [ -z "$m" ] && pass "W2 ~/.claude/skills/<name> is a directory link to the one copy, and the skill reads through it" || bad "W2 links wrong:$m: $o"
+  [ "$(sj_ "$g/.gemini/config/skills.json" "d['entries'][0]['path']")" = '~/.agents/skills' ] \
+    && [ "$(sj_ "$g/.gemini/config/skills.json" "sorted(d['entries'][0]['include_only']) == sorted('$SK'.split())")" = True ] \
+    && pass "W3 skills.json points Antigravity at ~/.agents/skills, limited to the kit's skills" || bad "W3 skills.json wrong: $(cat "$g/.gemini/config/skills.json" 2>/dev/null)"
+  cp "$g/.gemini/config/skills.json" "$g/sj.before"; before=$(ls -R "$g/.agents" "$g/.claude" "$g/.gemini" | md5sum); su 1
+  [ "$(ls -R "$g/.agents" "$g/.claude" "$g/.gemini" | md5sum)" = "$before" ] && cmp -s "$g/.gemini/config/skills.json" "$g/sj.before" \
+    && pass "W4 a second --setup changes nothing (no new file, backup or rewrite)" || bad "W4 re-run not idempotent: $o"
+  # W5: the canonical copy is kit-owned: a drifted file is restored, and a link keeps working through it.
+  printf 'drifted\n' > "$g/.agents/skills/tidy/SKILL.md"; su 1
+  cmp -s "$g/.agents/skills/tidy/SKILL.md" "$KIT/claude/skills/tidy/SKILL.md" && [ "$(lnk "$g/.claude/skills/tidy")" = "link ok" ] \
+    && pass "W5 a drifted kit copy is refreshed and its link still resolves" || bad "W5 drifted copy not refreshed: $o"
+  # W6: undo removes what the installer made and nothing else.
+  mkdir -p "$g/.agents/skills/mine" "$g/.claude/skills/theirs"; printf 'x\n' > "$g/.agents/skills/mine/SKILL.md"; printf 'y\n' > "$g/.claude/skills/theirs/SKILL.md"
+  $PY - "$(wq "$g/.gemini/config/skills.json")" <<'EOF'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); d["entries"].insert(0, {"path": "~/my-skills"})
+json.dump(d, open(p, "w", encoding="utf-8"))
+EOF
+  undo_
+  m=""; for n in $SK; do [ -e "$g/.claude/skills/$n" ] || [ -L "$g/.claude/skills/$n" ] || [ -e "$g/.agents/skills/$n" ] && m="$m $n"; done
+  [ -z "$m" ] && [ -f "$g/.agents/skills/mine/SKILL.md" ] && [ -f "$g/.claude/skills/theirs/SKILL.md" ] \
+    && [ "$(sj_ "$g/.gemini/config/skills.json" "[e['path'] for e in d['entries']]")" = "['~/my-skills']" ] \
+    && pass "W6 --undo removes the kit's links, copies and skills.json entry, and leaves the user's own skills and entries" || bad "W6 undo wrong (left:$m): $o"
+  rm -rf "$g"
+  # W7-W9: what the installer does not own it does not touch, and it says so.
+  home_
+  mkdir -p "$g/.claude/skills/tidy" "$g/.agents/skills/writing-docs" "$g/elsewhere"
+  printf 'mine\n' > "$g/.claude/skills/tidy/SKILL.md"; printf 'mine\n' > "$g/.agents/skills/writing-docs/SKILL.md"
+  $PY - "$(wq "$g")" <<'EOF'
+import os, subprocess, sys
+g = sys.argv[1]
+target = os.path.join(g, "elsewhere"); link = os.path.join(g, ".claude", "skills", "orchestrating-work")
+if os.name == "nt":
+    subprocess.run(["cmd", "/c", "mklink", "/J", os.path.normpath(link), os.path.normpath(target)], check=True, capture_output=True)
+else:
+    os.symlink(target, link)
+EOF
+  su 1
+  [ "$(cat "$g/.claude/skills/tidy/SKILL.md")" = mine ] && [ "$(lnk "$g/.claude/skills/tidy")" = "plain elsewhere" ] && has 'tidy' "$(printf '%s' "$o" | grep -i 'WARN\|!')" \
+    && pass "W7 a folder of the user's with a kit skill's name is left alone, with a warning" || bad "W7 user folder touched or not reported: $o"
+  [ "$(cat "$g/.agents/skills/writing-docs/SKILL.md")" = mine ] && [ ! -e "$g/.claude/skills/writing-docs" ] \
+    && pass "W8 a ~/.agents/skills folder that is not the kit's is left alone, and no link points at it" || bad "W8 foreign canonical folder touched or linked: $o"
+  [ "$(lnk "$g/.claude/skills/orchestrating-work")" = "link elsewhere" ] \
+    && pass "W9 a link of the user's pointing elsewhere is left alone" || bad "W9 foreign link replaced: $(lnk "$g/.claude/skills/orchestrating-work")"
+  undo_
+  [ -d "$g/elsewhere" ] && [ "$(lnk "$g/.claude/skills/orchestrating-work")" = "link elsewhere" ] && [ "$(cat "$g/.claude/skills/tidy/SKILL.md")" = mine ] \
+    && [ "$(cat "$g/.agents/skills/writing-docs/SKILL.md")" = mine ] \
+    && pass "W9b --undo leaves a foreign link, a foreign folder and the foreign target untouched" || bad "W9b undo removed something it does not own: $o"
+  rm -rf "$g"
+  # W10: an existing skills.json keeps every entry; the kit's entry is added, or extended when the user
+  # already has one for ~/.agents/skills; one that exposes the whole folder already covers the kit.
+  home_
+  printf '{"entries":[{"path":"~/mine"},{"path":"~/.agents/skills","include_only":["other"]}],"inherits":[{"path":"/x/skills.json"}]}\n' > "$g/.gemini/config/skills.json"
+  su 1
+  [ "$(sj_ "$g/.gemini/config/skills.json" "d['entries'][0]['path'], sorted(d['entries'][1]['include_only']) == sorted('other $SK'.split()), len(d['entries']), d['inherits'][0]['path']")" = "~/mine True 2 /x/skills.json" ] \
+    && ls "$g/.gemini/config/"skills.json.bak-agent-kit-* >/dev/null 2>&1 \
+    && pass "W10 an existing skills.json keeps its entries and inherits; the user's own entry is extended; a backup is left" || bad "W10 skills.json merge wrong: $(cat "$g/.gemini/config/skills.json")"
+  printf '{"entries":[{"path":"~/.agents/skills"}]}\n' > "$g/.gemini/config/skills.json"; cp "$g/.gemini/config/skills.json" "$g/sj.before"; su 1
+  cmp -s "$g/.gemini/config/skills.json" "$g/sj.before" && pass "W10b an entry that already exposes all of ~/.agents/skills is left as it is" || bad "W10b whole-folder entry rewritten"
+  printf '{ not json' > "$g/.gemini/config/skills.json"; su 1
+  [ "$(cat "$g/.gemini/config/skills.json")" = '{ not json' ] && has 'skills.json' "$(printf '%s' "$o" | grep -i 'WARN\|!')" \
+    && pass "W10c an unreadable skills.json is left untouched and named" || bad "W10c unreadable skills.json handled wrongly: $o"
+  rm -rf "$g"
+  # W10d: a symlinked skills.json is not replaced by a plain file; an entry with keys of its own is not undone.
+  home_; vic=$(mktemp -d); printf '{"entries":[{"path":"~/theirs"}]}\n' > "$vic/real.json"
+  if MSYS=winsymlinks:nativestrict ln -s "$vic/real.json" "$g/.gemini/config/skills.json" 2>/dev/null && [ -L "$g/.gemini/config/skills.json" ]; then
+    su 1
+    [ -L "$g/.gemini/config/skills.json" ] && [ "$(cat "$vic/real.json")" = '{"entries":[{"path":"~/theirs"}]}' ] && has 'symlink' "$(printf '%s' "$o" | grep '!')" \
+      && pass "W10d a symlinked skills.json is left a symlink, unchanged, and named" || bad "W10d symlinked skills.json replaced or written through: $o"
+  else pass "W10d (this platform cannot create symlinks; skipped)"; fi
+  rm -rf "$g" "$vic"
+  home_
+  printf '{"entries":[{"path":"~/.agents/skills","include_only":["generating-reports","orchestrating-work","tidy","writing-docs"],"exclude":["x-.*"]}]}\n' > "$g/.gemini/config/skills.json"
+  cp "$g/.gemini/config/skills.json" "$g/sj.before"; su 1; undo_
+  cmp -s "$g/.gemini/config/skills.json" "$g/sj.before" && has 'skills.json' "$(printf '%s' "$o" | grep '!')" \
+    && pass "W10e --undo keeps a skills.json entry that carries keys of the user's own, and says so" || bad "W10e undo rewrote an entry with other keys: $(cat "$g/.gemini/config/skills.json")"
+  rm -rf "$g"
+  # W11: a tool that is not installed is not set up: no ~/.claude or ~/.gemini is created for it, while
+  # the one real copy still lands where Codex reads it.
+  g=$(mktemp -d) || exit 2; G=$(wq "$g")
+  su 1
+  [ -f "$g/.agents/skills/tidy/SKILL.md" ] && [ ! -e "$g/.claude" ] && [ ! -e "$g/.gemini" ] \
+    && pass "W11 without Claude Code or Antigravity on the machine, only the ~/.agents/skills copy is made" || bad "W11 created folders for absent tools: $(ls -A "$g")"
+  rm -rf "$g"
+  # W12: the symlink path (POSIX default; forced here so Windows exercises it too when it may make symlinks).
+  home_
+  su 1 symlink
+  if [ "$(lnk "$g/.claude/skills/tidy")" = "link ok" ]; then
+    $PY -c "import os,sys; sys.exit(0 if os.path.islink(sys.argv[1]) else 1)" "$(wq "$g/.claude/skills/tidy")" \
+      && pass "W12 the symlink path makes real symlinks that resolve to the one copy" || bad "W12 AGENT_KIT_LINK_KIND=symlink did not make a symlink"
+    undo_
+    [ ! -e "$g/.claude/skills/tidy" ] && [ ! -L "$g/.claude/skills/tidy" ] && [ ! -e "$g/.agents/skills/tidy" ] \
+      && pass "W12b --undo removes symlinks it made" || bad "W12b symlink not removed: $o"
+  else
+    case "$o" in *WARN*|*'!'*) pass "W12 (this platform may not create symlinks; the failure was reported, not hidden)" ;; *) bad "W12 symlink creation failed silently: $o" ;; esac
+  fi
+  rm -rf "$g"
+  # W13: the doctor says when the machine-wide skills are not in place, and stops once they are.
+  home_
+  mkdir -p "$g/.the-agent-kit"; cp -r "$KIT/claude/skills" "$g/.the-agent-kit/skills"
+  d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
+  has 'machine-wide skills.*install.sh --setup' "$d" && pass "W13 --check notes the kit's skills are not installed machine-wide" || bad "W13 --check silent about missing machine-wide skills"
+  su 1; d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
+  has 'machine-wide skills' "$d" && bad "W13 --check still notes it after setup" || pass "W13 --check is quiet once they are in place"
+  rm -rf "$g"
+else
+  bad "no python - machine-wide skills NOT tested"
+fi
+
+# ---------- Antigravity session-start check: a global PreInvocation hook ----------
+# Antigravity has no SessionStart event. Its built-in docs (agy-customizations/docs/hooks.md) define a
+# PreInvocation hook, "Before the model is called", fed {"conversationId", "invocationNum", ...} and
+# answered with {"injectSteps":[{"ephemeralMessage":"..."}]}, in a hooks.json in the global customization
+# root ~/.gemini/config. --setup merges one named hook into that file, which other tools also write to:
+# every existing entry is kept, the write is atomic, and a second run changes nothing. The hook command
+# is split on whitespace with quotes ignored, so it calls a launcher beside hooks.json by bare name.
+echo "== Antigravity session-start check =="
+if [ -n "$PY" ]; then
+  wq() { cygpath -m "$1" 2>/dev/null || printf '%s' "$1"; }
+  home_() { g=$(mktemp -d) || exit 2; G=$(wq "$g"); mkdir -p "$g/.gemini/config"; }
+  su() { src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY="$1" sh "$KIT/install.sh" --setup </dev/null 2>&1) || src=$?; }
+  hk() { $PY -c "import json,sys; d=json.load(open(sys.argv[1],encoding='utf-8')); print($2)" "$(wq "$1")" 2>/dev/null; }
+  HJ() { printf '%s' "$g/.gemini/config/hooks.json"; }
+  orca='{"orca-status":{"PreInvocation":[{"type":"command","command":"C:/x/orca.exe -a b","timeout":10}],"Stop":[{"type":"command","command":"echo bye"}],"PreToolUse":[{"matcher":"*","hooks":[{"type":"command","command":"orca pre"}]}]}}'
+  home_
+  printf '%s\n' "$orca" > "$(HJ)"; cp "$(HJ)" "$g/orca.json"
+  su ""
+  cmp -s "$(HJ)" "$g/orca.json" && [ ! -e "$g/.gemini/config/agent-kit-check.py" ] \
+    && pass "G0 no consent: hooks.json and the config folder are untouched" || bad "G0 wrote Antigravity files without consent: $o"
+  su 1
+  $PY - "$(wq "$(HJ)")" "$(wq "$g/orca.json")" <<'EOF' && pass "G1 the check is one named PreInvocation hook; every entry that was there is kept exactly" || bad "G1 hooks.json wrong: $(cat "$(HJ)")"
+import json, re, sys
+d, o = json.load(open(sys.argv[1], encoding="utf-8")), json.load(open(sys.argv[2], encoding="utf-8"))
+assert d["orca-status"] == o["orca-status"], "existing hook changed"
+mine = d["the-agent-kit-check"]
+assert list(mine) == ["PreInvocation"], list(mine)
+h = mine["PreInvocation"][0]
+assert re.fullmatch(r"(python3?|py -3) agent-kit-check\.py --tool antigravity", h["command"]), h
+assert h["type"] == "command" and h["timeout"] == 10 and '"' not in h["command"]
+EOF
+  [ -f "$g/.gemini/config/agent-kit-check.py" ] && ls "$g/.gemini/config/"hooks.json.bak-agent-kit-* >/dev/null 2>&1 \
+    && ! ls -a "$g/.gemini/config" | grep -q '\.tmp$' \
+    && cmp -s "$(ls "$g/.gemini/config/"hooks.json.bak-agent-kit-* | head -1)" "$g/orca.json" \
+    && pass "G2 the launcher is written, the original is backed up byte for byte, no temp file is left" || bad "G2 launcher/backup/temp wrong: $(ls -a "$g/.gemini/config")"
+  # The skills entry and the hook are written by the same run into two different files: neither may carry the other's data.
+  [ "$(hk "$g/.gemini/config/skills.json" "d['entries'][0]['path'], 'the-agent-kit-check' in d")" = "~/.agents/skills False" ] \
+    && [ "$(hk "$(HJ)" "'entries' in d")" = False ] \
+    && pass "G2b skills.json and hooks.json each hold their own data when one run writes both" || bad "G2b files crossed: $(cat "$g/.gemini/config/skills.json")"
+  before=$(ls -a "$g/.gemini/config" | md5sum); cp "$(HJ)" "$g/h.before"; su 1
+  [ "$(ls -a "$g/.gemini/config" | md5sum)" = "$before" ] && cmp -s "$(HJ)" "$g/h.before" \
+    && pass "G3 a second --setup changes nothing" || bad "G3 re-run not idempotent: $o"
+  # G4: the launcher answers in Antigravity's contract from the folder hooks.json is in, and says {} without a kit.
+  ah=$(mktemp -d); AH=$(wq "$ah"); mkdir -p "$ah/.the-agent-kit/hooks"; cp "$KIT/hooks/kit-check.py" "$ah/.the-agent-kit/hooks/"; printf 'abc1234\n' > "$ah/.the-agent-kit/.kit-version"
+  git init -q -b main "$ah/src" && ( cd "$ah/src" && git -c user.email=t@e.com -c user.name=T commit -q --allow-empty -m r1 )
+  o=$(cd "$g/.gemini/config" && printf '{"conversationId":"c1","workspacePaths":["%s"]}' "$AH" | HOME="$ah" USERPROFILE="$AH" AGENT_KIT_REPO="$(wq "$ah/src")" $PY agent-kit-check.py --tool antigravity 2>/dev/null)
+  has 'install.sh --update' "$o" && has 'ephemeralMessage' "$o" \
+    && pass "G4 the launcher runs the installed check and injects its note" || bad "G4 the launcher did not reach the check: $o"
+  rm -rf "$ah/.the-agent-kit"; mkdir -p "$ah/.the-agent-kit"
+  o=$(cd "$g/.gemini/config" && printf '{"conversationId":"c2"}' | HOME="$ah" USERPROFILE="$AH" $PY agent-kit-check.py --tool antigravity 2>/dev/null)
+  [ "$o" = '{}' ] && pass "G4b without the installed check the launcher answers {} (a hook must always answer JSON)" || bad "G4b launcher without a kit: [$o]"
+  rm -rf "$ah"
+  # G5: a stale launcher and a stale kit entry are refreshed; a different entry under the same name is not ours.
+  printf '# The Agent Kit: launcher for the session-start check (old)\nstale\n' > "$g/.gemini/config/agent-kit-check.py"
+  $PY - "$(wq "$(HJ)")" <<'EOF'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); d["the-agent-kit-check"]["PreInvocation"][0]["timeout"] = 99
+json.dump(d, open(p, "w", encoding="utf-8"))
+EOF
+  su 1
+  ! grep -q '^stale$' "$g/.gemini/config/agent-kit-check.py" && [ "$(hk "$(HJ)" "d['the-agent-kit-check']['PreInvocation'][0]['timeout']")" = 10 ] && [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status', 'the-agent-kit-check']" ] \
+    && pass "G5 a stale launcher and a stale kit entry are brought current" || bad "G5 stale files not refreshed: $o"
+  $PY - "$(wq "$(HJ)")" <<'EOF'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); d["the-agent-kit-check"] = {"PreInvocation": [{"command": "echo mine"}]}
+json.dump(d, open(p, "w", encoding="utf-8"))
+EOF
+  cp "$(HJ)" "$g/h.before"; su 1
+  cmp -s "$(HJ)" "$g/h.before" && has 'the-agent-kit' "$(printf '%s' "$o" | grep '!')" \
+    && pass "G6 an entry named the-agent-kit that is not the kit's is left alone, with a warning" || bad "G6 foreign entry replaced or not reported: $o"
+  # G7: undo takes the kit's hook and launcher and nothing else.
+  printf '%s\n' "$orca" > "$(HJ)"; su 1
+  src=0; o=$(env HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --undo </dev/null 2>&1) || src=$?
+  [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status']" ] && [ ! -e "$g/.gemini/config/agent-kit-check.py" ] \
+    && pass "G7 --undo removes the kit's hook and launcher and keeps the other tool's hooks" || bad "G7 undo wrong: $(cat "$(HJ)")"
+  rm -rf "$g"
+  # G8: a hooks.json that is not a JSON object, or is a symlink, is never rewritten or written through.
+  home_; printf '{ not json' > "$(HJ)"; su 1
+  [ "$(cat "$(HJ)")" = '{ not json' ] && has 'hooks.json' "$(printf '%s' "$o" | grep '!')" \
+    && pass "G8 an unreadable hooks.json is left untouched and named" || bad "G8 unreadable hooks.json handled wrongly: $o"
+  # G8a: a file named agent-kit-check.py that is not the kit's launcher is never overwritten or removed, and
+  # then the hook is not wired (it would call someone else's file).
+  rm -rf "$g"; home_; printf 'mine\n' > "$g/.gemini/config/agent-kit-check.py"; su 1
+  [ "$(cat "$g/.gemini/config/agent-kit-check.py")" = mine ] && [ ! -e "$(HJ)" ] && has 'launcher' "$(printf '%s' "$o" | grep '!')" \
+    && pass "G8a a foreign agent-kit-check.py is left alone and the hook is not wired to it" || bad "G8a foreign launcher overwritten or wired: $o"
+  src=0; o=$(env HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --undo </dev/null 2>&1) || src=$?
+  [ "$(cat "$g/.gemini/config/agent-kit-check.py")" = mine ] && pass "G8a --undo does not remove a launcher that is not the kit's" || bad "G8a undo removed a foreign file"
+  rm -rf "$g"; home_; vic=$(mktemp -d); printf '{"keep":"me"}\n' > "$vic/victim.json"
+  if MSYS=winsymlinks:nativestrict ln -s "$vic/victim.json" "$(HJ)" 2>/dev/null && [ -L "$(HJ)" ]; then
+    su 1
+    [ "$(cat "$vic/victim.json")" = '{"keep":"me"}' ] && has 'symlink' "$(printf '%s' "$o" | grep '!')" \
+      && pass "G8b a symlinked hooks.json is not written through, and the run says so" || bad "G8b wrote through a symlink: $(cat "$vic/victim.json")"
+  else pass "G8b (this platform cannot create symlinks; skipped)"; fi
+  rm -rf "$g" "$vic"
+  # G9: no hooks.json yet -> created with just the kit's hook. No Antigravity on the machine -> nothing made.
+  home_; su 1
+  [ "$(hk "$(HJ)" "sorted(d)")" = "['the-agent-kit-check']" ] && pass "G9 no hooks.json yet: created with only the kit's hook" || bad "G9 fresh hooks.json wrong: $(cat "$(HJ)" 2>/dev/null)"
+  # G10: --check says whether it is wired (a missing hook is a NOTE with the fix, not a FAIL).
+  d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
+  has 'machine-wide.*install.sh --setup' "$d" && bad "G10 --check complains although everything is in place" || pass "G10 --check is quiet when the Antigravity check is wired"
+  printf '{}\n' > "$(HJ)"
+  d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
+  has 'machine-wide.*Antigravity.*install.sh --setup' "$d" && pass "G10b --check notes the Antigravity check is not wired and what to run" || bad "G10b --check silent about an unwired Antigravity check"
+  rm -rf "$g"
+  # G11: --global prints the hook for a hand merge and writes nothing under ~/.gemini.
+  g=$(mktemp -d) || exit 2; G=$(wq "$g"); mkdir -p "$g/.gemini/config"
+  o=$(HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --global 2>&1)
+  has 'PreInvocation' "$o" && has 'agent-kit-check.py' "$o" && [ ! -e "$g/.gemini/config/hooks.json" ] \
+    && pass "G11 --global prints the Antigravity hook and writes none of it" || bad "G11 --global omits or wrote the Antigravity hook"
+  rm -rf "$g"
+else
+  bad "no python - the Antigravity session-start check NOT tested"
+fi
 
 # H1-H5: the eval harness's own oracles. Both were silently wrong until 2026-09-27: provider errors
 # scored as ordinary FAILs, and a red-then-fix run scored as "edited before any failing test".
