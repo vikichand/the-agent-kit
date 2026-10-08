@@ -3,7 +3,10 @@
 
 Runs once when a session starts (Claude Code and Codex both call SessionStart hooks; matcher
 `startup`). Whatever it prints becomes context for the agent, so it prints NOTHING when everything is
-current - the common case costs zero tokens - and one line per thing you can act on otherwise:
+current - the common case costs zero tokens - and one line per thing you can act on otherwise.
+Antigravity has no SessionStart event; with `--tool antigravity` this runs as a PreInvocation hook
+(before every model call), acts only on the first call of each conversation id, and always answers in
+the JSON that hook expects: {} to say nothing, {"injectSteps": [{"ephemeralMessage": ...}]} to speak:
 
   1. A newer release of the kit is on `main`. Checked with `git ls-remote` (no clone, no download) at
      most once a day, with a 3-second limit; the answer is cached in ~/.the-agent-kit so the other
@@ -13,7 +16,7 @@ current - the common case costs zero tokens - and one line per thing you can act
      keeps the rules it was given until someone remembers to run `--update-rules` inside it.
 
   3. A tool the user's recommended list names is missing for the agent that started the session
-     (`--tool claude|codex`, set by the settings snippet). The list is ~/.the-agent-kit/recommended.json,
+     (`--tool claude|codex|antigravity`, set by the hook command). The list is ~/.the-agent-kit/recommended.json,
      which install.sh --setup merges the kit's list into by id: delete an entry (or list its id under
      "dismissed") to stop a reminder. Items marked "optional" are never reminded. Items marked
      "web" only count in a project whose AGENTS.md block marks a web or user-facing platform. At most
@@ -256,6 +259,26 @@ def missing_tools(tool, top):
             "~/.the-agent-kit/recommended.json." % (WHO[tool], "; ".join(gaps)))
 
 
+def first_invocation(data):
+    """True once per Antigravity conversation id; the ids seen so far are kept in a small bounded file.
+    No id, or a ledger that cannot be written, means False: staying silent beats a note on every call."""
+    cid = data.get("conversationId") if isinstance(data, dict) else None
+    if not isinstance(cid, str) or not cid:
+        return False
+    path = os.path.join(SHARE, ".ag-conversations")
+    d = load_json(path)
+    seen = d.get("ids") if isinstance(d, dict) else None
+    ids =[i for i in seen if isinstance(i, str)] if isinstance(seen, list) else []
+    if cid in ids:
+        return False
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"ids": (ids + [cid])[-200:]}, f)
+    except OSError:
+        return False
+    return True
+
+
 def repo_top(cwd):
     try:
         return run(["git", "rev-parse", "--show-toplevel"], timeout=2, cwd=cwd).strip()
@@ -267,14 +290,24 @@ def main():
     if "--doctor" in sys.argv:   # asked for by install.sh --check: local files only, nothing throttled
         print("\n".join(doctor(repo_top(os.getcwd()))))
         return
-    if os.environ.get("AGENT_KIT_NO_UPDATE_CHECK") == "1" or not os.path.isdir(SHARE):
-        return
     tool = sys.argv[sys.argv.index("--tool") + 1] if "--tool" in sys.argv[:-1] else None
+    if os.environ.get("AGENT_KIT_NO_UPDATE_CHECK") == "1" or not os.path.isdir(SHARE):
+        if tool == "antigravity":
+            print("{}")   # an Antigravity hook must always answer in JSON
+        return
     try:
         data = json.load(sys.stdin)
     except (ValueError, OSError):
         data = {}
-    cwd = (data.get("cwd") if isinstance(data, dict) else None) or os.getcwd()
+    if tool == "antigravity":
+        # PreInvocation fires before EVERY model call and blocks the loop while it runs, so a conversation
+        # that has already been served is answered here, before any git or network work.
+        if not first_invocation(data):
+            print("{}")
+            return
+        cwd = next((p for p in (data.get("workspacePaths") or []) if isinstance(p, str)), None) or os.getcwd()
+    else:
+        cwd = (data.get("cwd") if isinstance(data, dict) else None) or os.getcwd()
     notes = []
 
     installed = (read(os.path.join(SHARE, ".kit-version")) or "").strip()
@@ -302,12 +335,14 @@ def main():
                              "~/.the-agent-kit/install.sh --update-rules  (it keeps the project block and "
                              "replaces anything hand-edited above it; review with git diff AGENTS.md).")
 
-    if tool in ("claude", "codex"):
+    if tool in WHO:
         line = missing_tools(tool, top)
         if line:
             notes.append(line)
 
-    if notes:
+    if tool == "antigravity":   # the documented PreInvocation output: {} to stay silent, injectSteps to speak
+        print(json.dumps({"injectSteps": [{"ephemeralMessage": "\n".join(notes)}]} if notes else {}))
+    elif notes:
         print("\n".join(notes))
 
 
@@ -315,5 +350,6 @@ if __name__ == "__main__":
     try:
         main()
     except Exception:   # never block a session: a broken check is silent, not fatal
-        pass
+        if "antigravity" in sys.argv:
+            print("{}")
     sys.exit(0)

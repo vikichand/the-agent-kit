@@ -281,6 +281,50 @@ if [ -n "$PY" ]; then
   has 'tell the user once, in one line' "$o" && has 'claude mcp add --transport http context7' "$o" && has 'claude mcp add chrome-devtools' "$o" \
     && [ "$(printf '%s\n' "$o" | wc -l | tr -d ' ')" = 1 ] \
     && pass "K19 one line, telling the agent to relay the missing tools and their commands once" || bad "K19 reminder wording or length wrong: $o"
+  # K20-K27: Antigravity. It has no SessionStart event but a PreInvocation hook that fires before EVERY model
+  # call and answers in JSON ({} for nothing, {"injectSteps":[{"ephemeralMessage":...}]} to speak) with the
+  # conversation id and the workspace in the payload. The check must speak once per conversation, say
+  # nothing otherwise, and be cheap on the calls it skips.
+  ka() {  # $1 = conversation id (empty = none), $2 = workspace -> stdout
+    printf '{"conversationId":"%s","invocationNum":1,"workspacePaths":["%s"]}' "$1" "$(wp "$2")" \
+      | HOME="$KH" USERPROFILE="$KH" AGENT_KIT_REPO="$KS" $PY "$KIT/hooks/kit-check.py" --tool antigravity 2>/dev/null
+  }
+  msg() { printf '%s' "$1" | $PY -c "import json,sys; d=json.loads(sys.stdin.read()); print(d['injectSteps'][0]['ephemeralMessage'] if d else '')" 2>/dev/null; }
+  rm -f "$k/home/.the-agent-kit/.ag-conversations" "$k/home/.the-agent-kit/.update-check"; printf 'abc1234\n' > "$k/home/.the-agent-kit/.kit-version"
+  rm -f "$k/proj/AGENTS.md"
+  o=$(ka conv-1 "$k/proj")
+  has 'install.sh --update' "$(msg "$o")" && pass "K20 Antigravity: the first call of a conversation injects the note, as JSON" || bad "K20 no injected note: $o"
+  o=$(ka conv-1 "$k/proj"); [ "$o" = '{}' ] && pass "K21 the same conversation's next call is silent: {}" || bad "K21 spoke twice in one conversation: $o"
+  o=$(ka conv-2 "$k/proj"); has 'install.sh --update' "$(msg "$o")" && pass "K22 a new conversation gets the note again" || bad "K22 new conversation not served: $o"
+  printf '%s\n' "$(printf '%s' "$latest" | cut -c1-7)" > "$k/home/.the-agent-kit/.kit-version"
+  o=$(ka conv-3 "$k/proj"); [ "$o" = '{}' ] && pass "K23 nothing to say is a valid {} (Antigravity expects JSON)" || bad "K23 not {} when current: $o"
+  o=$(ka "" "$k/proj"); o2=$(printf 'not json' | HOME="$KH" USERPROFILE="$KH" $PY "$KIT/hooks/kit-check.py" --tool antigravity 2>/dev/null); rc=$?
+  [ "$o" = '{}' ] && [ "$o2" = '{}' ] && [ "$rc" = 0 ] && pass "K24 no conversation id, or a payload that is not JSON: {} and exit 0, never a note on every call" || bad "K24 unsafe on a bad payload: [$o] [$o2]"
+  o=$(printf '{"conversationId":"conv-9","workspacePaths":[]}' | AGENT_KIT_NO_UPDATE_CHECK=1 HOME="$KH" USERPROFILE="$KH" $PY "$KIT/hooks/kit-check.py" --tool antigravity 2>/dev/null)
+  [ "$o" = '{}' ] && pass "K25 AGENT_KIT_NO_UPDATE_CHECK=1: {}" || bad "K25 opt-out ignored for Antigravity: $o"
+  # K26: a conversation already seen costs nothing: no network call (the cache file is never written) and no rules lookup.
+  rm -f "$k/home/.the-agent-kit/.update-check"; printf 'abc1234\n' > "$k/home/.the-agent-kit/.kit-version"
+  o=$(ka conv-1 "$k/proj")
+  [ "$o" = '{}' ] && [ ! -e "$k/home/.the-agent-kit/.update-check" ] && pass "K26 a conversation already seen is answered before any network or git work" || bad "K26 a seen conversation still did work: $o"
+  # K27: the ledger of seen conversations stays bounded.
+  $PY - "$(wp "$k/home/.the-agent-kit/.ag-conversations")" <<'EOF'
+import json, sys
+json.dump({"ids": ["old-%d" % i for i in range(400)]}, open(sys.argv[1], "w"))
+EOF
+  ka conv-new "$k/proj" >/dev/null
+  [ "$($PY -c "import json,sys; d=json.load(open(sys.argv[1])); print(len(d['ids']) <= 200 and d['ids'][-1] == 'conv-new')" "$(wp "$k/home/.the-agent-kit/.ag-conversations")")" = True ] \
+    && pass "K27 the seen-conversations ledger is capped, keeping the newest" || bad "K27 ledger unbounded or lost the newest id"
+  # K28: missing recommended tools reach an Antigravity conversation too, from its own config.
+  cp "$KIT/hooks/recommended.json" "$k/home/.the-agent-kit/recommended.json"; rm -f "$k/home/.the-agent-kit/.tools-check"
+  printf '%s\n' "$(printf '%s' "$latest" | cut -c1-7)" > "$k/home/.the-agent-kit/.kit-version"
+  mkdir -p "$k/home/.gemini/config"; : > "$k/home/.gemini/config/mcp_config.json"
+  o=$(ka conv-tools "$k/proj"); m=$(msg "$o")
+  has 'tell the user once, in one line' "$m" && has 'Antigravity' "$m" && has 'agy mcp add' "$m" && [ "$(printf '%s\n' "$m" | wc -l | tr -d ' ')" = 1 ] \
+    && pass "K28 Antigravity: the missing Context7 is named with its agy command, in one line" || bad "K28 Antigravity tool reminder wrong: $m"
+  printf '{"mcpServers":{"context7":{"url":"https://mcp.context7.com/mcp"}}}' > "$k/home/.gemini/config/mcp_config.json"; rm -f "$k/home/.the-agent-kit/.tools-check"
+  o=$(ka conv-tools2 "$k/proj"); [ "$o" = '{}' ] && pass "K29 Antigravity: Context7 present in mcp_config.json: silent" || bad "K29 spoke although Context7 is configured: $o"
+  printf 'not json' > "$k/home/.gemini/config/mcp_config.json"; rm -f "$k/home/.the-agent-kit/.tools-check"
+  o=$(ka conv-tools3 "$k/proj"); [ "$o" = '{}' ] && pass "K30 Antigravity: an unreadable mcp_config.json is 'cannot tell', not 'missing'" || bad "K30 reported missing from an unreadable config: $o"
   rm -rf "$k"
 else
   bad "no python - kit-check.py NOT tested"
@@ -1143,6 +1187,7 @@ EOF
 else
   bad "no python - machine-wide skills NOT tested"
 fi
+
 # H1-H5: the eval harness's own oracles. Both were silently wrong until 2026-09-27: provider errors
 # scored as ordinary FAILs, and a red-then-fix run scored as "edited before any failing test".
 # The functions are lifted out of run.sh so the checks run offline, with no agent and no tokens.
