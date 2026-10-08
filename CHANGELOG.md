@@ -32,6 +32,11 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 - **The pre-commit hook blocks `continue-on-error: true`** added to a workflow file, which lets a failing step
   pass the build. `# gate-exempt: <reason>` on the same line allows it.
 - **Eval case 41, and a `cleanup.sh` hook for the adherence harness** to run after each case.
+- **Eval cases 42 to 45**: finish every part of a three-part ask (42), atomic commits (43), check a
+  second-hand claim at its source (44), and a one-line rename where the kit should add nothing (45).
+- **Speed measurement in the adherence harness**: a true vanilla arm (its own logged-in config folder),
+  pinned effort, rotating arm order, duration columns, last-turn telemetry for multi-turn cases, and a
+  speed panel of eight cases.
 - **`docs/performance.md`**: what is known about the cost of a rules file, how the kit measures its own
   speed against a vanilla agent, and the bar a rule must meet to ship.
 
@@ -39,7 +44,7 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 - The kit is now called **The Agent Kit** in the README, which opens with a banner that follows your GitHub light or dark theme. Generated reports
   end with "GENERATED WITH THE AGENT KIT" and the repository link, no longer a personal name.
-- **`AGENTS.md` is about a fifth shorter** (164 effective lines, from 198) with the same rules: overlapping
+- **`AGENTS.md` is shorter** (170 effective lines, from 198) with the same rules plus the 0.5.0 additions: overlapping
   bullets merged, Section 8 folded into Section 2's plan rules, so Ownership and Documentation are now
   Sections 8 and 9.
 - **Evidence by kind of change.** Section 5 has a table of what proves a bug fix, a behaviour change, a
@@ -63,6 +68,26 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   removes the old copy.
 - **Pushing back no longer means stopping.** When the safer version still does what was asked, the agent
   builds it and says why; the high-risk question round builds when no decision is open.
+- **Open decisions are asked in one numbered round**, each worded so "yes" accepts the agent's
+  recommended answer (Section 1).
+- **A claim is unverified until its source is checked.** What a subagent, summary, memory or earlier turn
+  says is a lead, not a fact; "X does not exist" needs a search for X itself; when the user questions a
+  claim, the agent re-checks the primary source before answering (Section 1).
+- **Done means every part of the ask.** Nothing left as a placeholder, a stub or "the rest is similar";
+  the agent stops early only when blocked or before a risky step, and says what is left (Section 5).
+- **Commits are atomic, with short what-and-where subjects.** One logical change per commit, a subject
+  under 72 characters, a body only for a non-obvious why (Section 7). `writing-docs` follows the
+  repository's own `git log` convention, else `area:` prefixes, replacing a Conventional Commits default
+  that contradicted `generating-reports`.
+- **`orchestrating-work`** names a model tier and effort per worker role, and a new reference,
+  `references/cross-tool.md`, gives the commands for handing a slice to Codex or Antigravity and back,
+  checked live on both CLIs.
+- **`AGENTS.md` no longer carries maintainer comments.** Claude Code strips HTML comments, but Codex and
+  Antigravity read them, so they cost tokens there on every request; the notes moved to
+  `docs/rules-manifest.md`.
+- Prompt-audit fixes (`/claude-api prompt-audit`): a frontend rule that a literal model could read as
+  "never add skeleton loaders" now says to add them; the report template no longer prints an em dash;
+  stale facts in the setup prompts are corrected.
 
 ## [0.4.0] - 2026-10-04
 
