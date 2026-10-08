@@ -31,6 +31,7 @@ if [ -n "$PY" ]; then
   $PY "$KIT/test/mcp_orphans_cases.py" || bad "mcp-orphans corpus"
   $PY "$KIT/test/tidy_procs_cases.py" || bad "tidy-procs corpus"
   $PY "$KIT/test/tidy_scan_cases.py" || bad "tidy-scan cases"
+  $PY "$KIT/test/adherence_harness_cases.py" || bad "adherence harness cases (summary, speed panel)"
 else
   bad "no working python found - command-guard NOT tested (install Python 3)"
 fi
@@ -952,6 +953,66 @@ grep -q -- '--setup' "$KIT/install.sh" && awk '/^update_kit\(\)/,/^}/' "$KIT/ins
     bpid=$(cat "$cb/by.pid" 2>/dev/null); [ -n "$bpid" ] && { taskkill //F //PID "$bpid" >/dev/null 2>&1 || kill "$bpid" 2>/dev/null; }
     rm -rf "$cb"
   fi
+) | tee "$w.h"; grep -q '^FAIL' "$w.h" 2>/dev/null && fail=1; rm -f "$w.h"
+
+# H16-H23: the speed measurement. A true vanilla Claude arm (its own config folder), the duration columns,
+# the last turn's telemetry, a rotating arm order and the panel file. Canned events only; no agent runs.
+(
+  eval "$(sed -n '/^claude_field() {/,/^}/p;/^record_row() {/,/^}/p;/^rotate_arms() {/,/^}/p;/^vanilla_check() {/,/^}/p;/^vanilla_reset() {/,/^}/p;/^vanilla_lock() {/,/^}/p;/^panel_ids() {/,/^}/p' "$KIT/test/adherence/run.sh")"
+  hf="$KIT/test/adherence/harness-fixtures"
+  u=$(claude_field "$hf/claude-vanilla-probe.jsonl" usage | tr '\t' ',')
+  [ "$u" = "1,0,0,2,4,18182,6982,0.0316084,2883,2779,2858" ] \
+    && pass "H16 claude usage: the usual eight columns, then duration_ms, duration_api_ms, ttft_ms" || bad "H16 claude usage read as '$u'"
+  u=$(claude_field "$hf/claude-vanilla-probe.jsonl" usage "$hf/claude-resumed-turn2.jsonl" "$hf/no-such-turn.jsonl" | tr '\t' ',')
+  [ "$u" = "3,1,1,6,210,52000,7300,0.0612,9120,8004,1900" ] \
+    && pass "H17 a resumed case reads the LAST turn's result; tool calls and edits add up over every turn" || bad "H17 multi-turn usage read as '$u'"
+  rb=$(mktemp -d); TSV="$rb/r.tsv"; TOOL=claude; MODEL=sonnet; EFFORT=medium; JUDGE=opus
+  record_row 02-x vanilla 1 PASS 40 0 "$(printf '1\t2\t3\t4\t5\t6\t7\t8\t2883\t2779\t2858')" none
+  TOOL=codex; record_row 02-x with 1 PASS 40 0 "$(printf '1\t2\t3\t4\t5\t6\t7\t8')" t1
+  [ "$(awk -F'\t' '{print NF}' "$TSV" | sort -u)" = 22 ] \
+    && [ "$(awk -F'\t' 'NR==1{print $19 "|" $20 "|" $21 "|" $22}' "$TSV")" = "none|2883|2779|2858" ] \
+    && [ "$(awk -F'\t' 'NR==2{print $19 "|" $20 $21 $22}' "$TSV")" = "t1|" ] \
+    && pass "H18 a TSV row ends with the three duration columns, empty for tools that report none" || bad "H18 record_row wrote: $(cat "$TSV")"
+  rm -rf "$rb"
+  [ "$(rotate_arms with,current,vanilla 1)|$(rotate_arms with,current,vanilla 2)|$(rotate_arms with,current,vanilla 3)|$(rotate_arms with,current,vanilla 4)|$(rotate_arms with,without 2)" \
+    = "with current vanilla|current vanilla with|vanilla with current|with current vanilla|without with" ] \
+    && pass "H19 the arm order rotates by run number and wraps" || bad "H19 rotate_arms wrong"
+  vb=$(mktemp -d); vd="$vb/a dir/.claude-vanilla"; mkdir -p "$vd"
+  m=$(vanilla_check "$vb/missing"); r1=$?
+  m2=$(vanilla_check "$vd"); r2=$?
+  printf '{}' > "$vd/.credentials.json"
+  printf '{"disableClaudeAiConnectors":true,"syncClaudeAiSkills":false}' > "$vd/settings.json"
+  m3=$(vanilla_check "$vd"); r3=$?
+  printf '{"disableClaudeAiConnectors":true,"syncClaudeAiSkills":true,"syncClaudeAiPlugins":false}' > "$vd/settings.json"
+  m4=$(vanilla_check "$vd"); r4=$?
+  printf '{"disableClaudeAiConnectors":true,"syncClaudeAiSkills":false,"syncClaudeAiPlugins":false}' > "$vd/settings.json"
+  before=$(find "$vd" | sort); m5=$(vanilla_check "$vd"); r5=$?; after=$(find "$vd" | sort)
+  [ "$r1" -ne 0 ] && has 'AGENT_KIT_VANILLA_DIR' "$m" && [ "$r2" -ne 0 ] && has '.credentials.json' "$m2" \
+    && [ "$r3" -ne 0 ] && has 'syncClaudeAiPlugins' "$m3" && [ "$r4" -ne 0 ] && has 'syncClaudeAiSkills' "$m4" \
+    && [ "$r5" -eq 0 ] && [ -z "$m5" ] && [ "$before" = "$after" ] \
+    && pass "H20 the vanilla folder is refused unless it has a login and the three claude.ai sync settings off; nothing is created" \
+    || bad "H20 vanilla_check wrong: [$r1 $r2 $r3 $r4 $r5] $m / $m2 / $m3 / $m4 / $m5"
+  mkdir -p "$vd/projects/p" "$vd/sessions" "$vd/plugins"; : > "$vd/history.jsonl"; : > "$vd/.claude.json"
+  vanilla_reset "$vd"
+  [ ! -e "$vd/projects" ] && [ ! -e "$vd/sessions" ] && [ ! -e "$vd/history.jsonl" ] \
+    && [ -f "$vd/.credentials.json" ] && [ -f "$vd/settings.json" ] && [ -f "$vd/.claude.json" ] \
+    && pass "H21 between cells projects/, sessions/ and history.jsonl go; the login and settings stay (path with a space)" \
+    || bad "H21 vanilla_reset left or removed the wrong things: $(find "$vd" | sort | tr '\n' ' ')"
+  vanilla_lock "$vd" >/dev/null 2>&1; l1=$?
+  m=$(vanilla_lock "$vd" 2>&1); l2=$?
+  rm -rf "$vd/.harness-lock"; mkdir "$vd/.harness-lock"; echo 999999 > "$vd/.harness-lock/pid"
+  vanilla_lock "$vd" >/dev/null 2>&1; l3=$?
+  [ "$l1" -eq 0 ] && [ "$l2" -ne 0 ] && has 'another' "$m" && [ "$l3" -eq 0 ] \
+    && pass "H22 a second run cannot share the vanilla folder; a lock left by a dead run is taken over" \
+    || bad "H22 vanilla_lock wrong: $l1 $l2 $l3 $m"
+  rm -rf "$vb"
+  pc=$(mktemp -d); mkdir "$pc/cases" "$pc/cases/02-a" "$pc/cases/16-b"
+  printf '# a comment\n\n02-a  \n  16-b\n# 99-later\n' > "$pc/ok.txt"; printf '02-a\n77-typo\n' > "$pc/bad.txt"
+  ids=$(panel_ids "$pc/ok.txt" "$pc/cases" | tr '\n' ','); m=$(panel_ids "$pc/bad.txt" "$pc/cases" 2>&1); rb=$?; panel_ids "$pc/none.txt" "$pc/cases" >/dev/null 2>&1; rn=$?
+  [ "$ids" = "02-a,16-b," ] && [ "$rb" -ne 0 ] && has '77-typo' "$m" && [ "$rn" -ne 0 ] \
+    && pass "H23 a panel file lists case ids; comments and blanks are skipped; an unknown id or a missing file stops the run" \
+    || bad "H23 panel_ids wrong: [$ids] rc $rb/$rn $m"
+  rm -rf "$pc"
 ) | tee "$w.h"; grep -q '^FAIL' "$w.h" 2>/dev/null && fail=1; rm -f "$w.h"
 
 echo "---"

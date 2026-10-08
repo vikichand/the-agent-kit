@@ -35,12 +35,94 @@ for every task - a rule the kit was breaking about itself.
 ./run.sh --tool codex --model gpt-6-astra --effort low   # pin Codex's model and reasoning effort
 ./run.sh --arms with,without,current   # third arm: the rules at --current-ref (default b79e756)
 ./run.sh --current-ref <git ref>  # which shipped rules the "current" arm deploys
+./run.sh --arms vanilla,current,with --effort medium   # Claude speed run: a true control (see "Measuring speed")
+./run.sh --panel panels/speed.txt # only the case ids listed in a file (one per line, # comments)
 ```
 
 Every cell appends one row to `results/<date>.tsv`: case, arm, run, verdict, elapsed seconds
 (with `censored=1` on a timeout), turns, tool calls, edits, tokens in and out, cache reads and
-writes, cost where the CLI reports it, tool, model, judge, and the rules revision deployed. A claim
-about speed or tokens is a row someone else can re-derive, never a sentence.
+writes, cost where the CLI reports it, tool, model, judge, the rules revision deployed, and, from
+Claude's result event only, `duration_ms`, `duration_api_ms` and `ttft_ms` (empty for other tools).
+The three duration columns come last, so files written before they existed keep every column in
+place; `summarize.py` reads a row by position and accepts both widths. A claim about speed or tokens
+is a row someone else can re-derive, never a sentence.
+
+## Measuring speed
+
+`docs/performance.md` holds the bar (kit against vanilla: no case worse on quality, at most 1.25x the
+time and the cost; a rules change against the last release: at most 10% slower) and the evidence. This
+section is how the harness measures it.
+
+**The vanilla arm (`--tool claude` only).** `--arms vanilla,...` adds an arm with no rules *and* none of
+your own Claude setup: it runs with `CLAUDE_CONFIG_DIR` pointing at a separate folder that holds a login
+and nothing else (no user CLAUDE.md, hooks, plugins, MCP servers, advisor or session history). It is not
+`--bare`, which also drops CLAUDE.md and the system reminders. Set the folder once:
+
+1. Pick a folder: `$AGENT_KIT_VANILLA_DIR`, default `$HOME/.claude-vanilla`. Any path works, spaces included.
+2. Log in once with that folder set: `CLAUDE_CONFIG_DIR=<folder> claude`, then `/login`. The harness never
+   creates or edits the login.
+3. In the folder's `settings.json` turn the claude.ai sync off, because a login otherwise pulls the
+   account's connectors, skills and plugins into every run:
+   `{"disableClaudeAiConnectors": true, "syncClaudeAiSkills": false, "syncClaudeAiPlugins": false}`.
+
+Before the first cell the harness refuses the arm, with the reason, unless the folder exists, has a
+non-empty `.credentials.json` (existence is all it looks at; it never reads the login) and has those three
+settings. Between cells it clears `projects/`, `sessions/` and `history.jsonl` in the folder and keeps
+`.credentials.json`, `settings.json` and `.claude.json`, so no cell sees another's memory. A second run
+sharing the folder would clear sessions under the first, so a lock (`.harness-lock` in the folder, taken
+over if its process is gone) lets one run hold it at a time; point the second run at its own folder.
+
+**All Claude arms in a `vanilla` run use that folder.** `with` and `current` carry the kit as files in the
+cell's project (`CLAUDE.md`, `.claude/rules`, `.claude/skills`), which a clean config folder does not
+change, so the three arms differ only by the kit. Without `vanilla` in `--arms` the arms load your own
+config, exactly as before; then `without` is the old control and still carries it (its numbers and a
+vanilla run's are not comparable). `vanilla` and `without` cannot be in one run: both mean no rules.
+Codex already runs `--ignore-user-config` in both arms and Antigravity cannot be isolated, so `vanilla`
+is refused for them; the Antigravity numbers stay a machine baseline.
+
+**Held fixed in every Claude arm, with or without `vanilla`:**
+
+- Effort: `--effort <level>` (default `medium`; `low`, `medium`, `high`, `xhigh`, `max`) and
+  `CLAUDE_CODE_EFFORT_LEVEL` set to the same value, because the variable outranks the flag when it is set in
+  the shell (env-vars page). The model column records `model/effort`.
+- `DISABLE_AUTOUPDATER=1`: an update mid-run has aborted a run three times.
+- `CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1`. The docs say: "To disable the advisor tool entirely, set
+  `CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1`. The `/advisor` command becomes unavailable and any configured
+  `advisorModel` is ignored" (https://code.claude.com/docs/en/advisor, "Turn the advisor off"; the
+  env-vars page repeats it and adds that `--advisor` is then accepted but has no effect). It is set
+  because each advisor call re-reads the whole transcript uncached, and whether it fires is the model's
+  choice. In a vanilla run the folder has no `advisorModel` either, so the variable is belt and braces.
+
+**Order and what is timed.** The arm order rotates left by one per run number (run 1 `vanilla,current,with`,
+run 2 `current,with,vanilla`, and so on), so no arm is always first. `elapsed_s` times the agent turns only:
+fixture setup, the rules deploy and the judge are outside it. A multi-turn case reads the **last** turn's
+result event for turns, tokens, cost and the three durations, because a resumed session's result carries the
+session total since Claude Code v2.1.277 (cost-tracking page); tool calls and edits are added up over every
+turn. The docs state the cumulative rule for cost; for `usage` and the durations they say only that a
+resumed result reports the session's "whole spend", so on a multi-turn case check `duration_ms` against
+`elapsed_s` before quoting it.
+
+**Reading it.** The speed block of `summarize.py` prints, per arm, the median elapsed time, `duration_ms`
+(the CLI's own wall time for the turn), `duration_api_ms`, `ttft_ms` and `elapsed - duration` (start-up and
+hooks). Cache hit rate is `cache_read / (cache_read + cache_write + fresh input)`. The "vs control" block
+prints, per arm, the median over cases of arm-median / control-median for time, cost and tool calls, the
+worst single case, and how many cases have a lower pass rate than the control: those are the numbers the
+bar is read from. Codex and Antigravity report tokens and no cost, so the summary computes cost as tokens
+times list price from one dated table at the top of `summarize.py` (`PRICES`); it is an estimate, absent
+for an unpriced model, and it must be re-fetched when the vendors change prices (Gemini 3.8 Flash doubles
+on 2027-01-01). Token columns leave out subagent tokens; `cost_usd` includes them.
+
+**The baseline run (W1).** Sonnet, effort medium, five runs per cell, the speed panel, three arms:
+
+```sh
+test/adherence/run.sh --arms vanilla,current,with --current-ref v0.4.0 --tool claude \
+  --model sonnet --effort medium --runs 5 --panel test/adherence/panels/speed.txt
+python test/adherence/summarize.py test/adherence/results/<date>.tsv
+```
+
+`panels/speed.txt` lists the speed cases: five bounded tasks (`02`, `07`, `32`, `34`, `35`), the one-line
+authorization case `33`, and the multi-turn case `16`; a commented line is reserved for a trivial-rename case
+once one exists. A panel id that is not a case directory stops the run before it starts.
 
 Pin `--model` and `--effort` for Codex. `--ignore-user-config` (needed to keep the machine's own plugins
 out of the arms) also drops the user's model and effort settings, so an unpinned run measures the CLI's
@@ -60,7 +142,8 @@ of `run-tests.sh`, which stays free, offline, and fast.
 
 ## How it works
 
-Each case is a throwaway repo, a realistic prompt, and a rubric. It runs in up to three arms: `with`
+Each case is a throwaway repo, a realistic prompt, and a rubric. It runs in up to three arms (four with
+`vanilla`, the speed-measurement control described under "Measuring speed"): `with`
 (the rules in this working tree: `AGENTS.md` + `CLAUDE.md` + `.claude/rules/` + `.claude/skills/`, or
 `AGENTS.md` + `.agents/skills/` under `--tool codex`), `without` (no rules, the control), and
 `current` (the rules at a pinned git ref, extracted with `git archive` so the working tree cannot
@@ -166,7 +249,9 @@ A change to the rules is graded, not argued. Before a candidate run, these are f
    repeated subset and on known-good and known-bad outputs.
 6. **Provider errors** (usage limits, auth, model unavailable) are recorded as ERROR and excluded from
    pass rates; they measure the account, not the agent.
-7. `python test/adherence/summarize.py results/<date>.tsv` prints the tables the clauses above read.
+7. `python test/adherence/summarize.py results/<date>.tsv` prints the tables the clauses above read. Its
+   elapsed medians and p90 are Kaplan-Meier estimates, so a timeout counts as "at least the budget" and a
+   quantile the timeouts hide prints as `>N`, not as a number.
 
 ### The 2026-09-17/18 measurement of the performance program (partial)
 
@@ -723,7 +808,9 @@ bitten this harness in the past week.
   agent wrote nothing at all until a checksum gate was added. Spot-check with `--keep` before
   believing a surprising verdict.
 - **The control is imperfect.** "Without rules" still carries whatever lives in `~/.claude/CLAUDE.md`
-  and any global rules on the machine, so a measured gap is a floor rather than a ceiling.
+  and any global rules on the machine, so a measured gap is a floor rather than a ceiling. Under Claude
+  the `vanilla` arm removes this (see "Measuring speed"); under Codex only the config file is left out,
+  and Antigravity cannot be isolated at all.
 - **`ERROR` is never evidence about a rule.** Read it as a lost cell and re-run. The "with" arm is
   always the slower one - it plans, tests and verifies - so anything that penalises slowness
   penalises the rules.
