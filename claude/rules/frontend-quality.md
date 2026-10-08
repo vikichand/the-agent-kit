@@ -45,8 +45,9 @@ litigation (ADA, EAA).
 
 ## Perceived performance
 
-Skeleton loaders that mirror the final layout, so the page feels fast and does not jump when data
-arrives. Agents never add this unasked; it is a product feature, not a flourish.
+Data views you build or change get skeleton loaders that mirror the final layout, so the page feels
+fast and does not jump when data arrives. Add them without being asked: they are part of the feature,
+not a flourish.
 
 **Match the indicator to the wait, because the wrong one reads as broken.** A spinner that flashes
 for 300ms looks like a glitch; a blank screen for three seconds looks like a dead app and people
@@ -63,6 +64,6 @@ Never leave a blank region with no indicator at all - that is the one that loses
 
 ## Restraint
 
-Cut the clutter agents reliably generate - most often the redundant explainer sentence under every
-heading. A page titled "My Day" does not need two lines explaining what "My Day" means. The test is
+Leave out clutter, most often a redundant explainer sentence under a heading. A page titled "My Day"
+does not need two lines explaining what "My Day" means. The test is
 tangible usefulness: if removing it loses nothing, remove it.

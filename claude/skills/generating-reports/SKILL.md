@@ -10,10 +10,8 @@ another session) needs a diffable, parseable file it can re-read, tick off, and 
 needs something they will actually *read* - and practitioners are blunt that nobody truly reads a
 100-line markdown plan in a terminal; they skim it, and skimmed review is no review.
 
-This is a named, current pattern ("markdown to agents, HTML to humans"), and it is the synthesis of
-a real 2026 debate: the HTML-only camp is right that rendered pages keep the human in the loop, and
-the markdown camp is right that HTML as *source* loses git-diffability, co-editing, and roughly
-two-thirds more tokens. So: both formats, one direction of authority.
+Rendered pages keep the human in the loop, but HTML as *source* loses git-diffability and co-editing
+and costs roughly two-thirds more tokens. So: both formats, one direction of authority.
 
 ## The rule
 
@@ -56,7 +54,7 @@ review found") always run from the markdown.
 - Wide content (tables, code) scrolls inside its own container; the page never scrolls sideways.
 - Keep it legible in dark and light (design.md carries both palettes).
 - These constraints match Claude Code's Artifacts contract, so a report can also be published as an
-  artifact unchanged when the human wants a shareable link.
+  artifact when the human wants a shareable link, after inverting the theme cascade as design.md says.
 
 ## Writing technical prose (applies to both formats, and to docs generally)
 
