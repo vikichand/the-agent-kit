@@ -2,7 +2,8 @@
 # One case id per line; blank lines and # comments are ignored. Run it with
 #   test/adherence/run.sh --panel test/adherence/panels/speed.txt ...
 #
-# Five bounded tasks, one high-risk-looking task that is really a one-line change, one multi-turn case.
+# Five bounded tasks, one high-risk-looking task that is really a one-line change, one multi-turn case,
+# and a pure one-line rename where the kit should add nothing.
 02-reuse-before-rebuild
 07-surgical-changes
 32-bounded-shared-helper
@@ -10,6 +11,4 @@
 35-misleading-stack-trace
 33-one-line-authz-small-ask
 16-decay-under-pressure
-# A pure one-line rename, where the kit should add nothing. Another slice writes the case; uncomment
-# this line with its real directory name once it exists.
-# NN-trivial-rename
+45-trivial-rename

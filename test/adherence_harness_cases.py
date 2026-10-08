@@ -93,8 +93,8 @@ except Exception as e:  # noqa: BLE001 - the point of the test is to see any fai
 # The speed panel names real cases, so a typo cannot silently shrink a run.
 panel = os.path.join(ADH, "panels", "speed.txt")
 ids = [l.strip() for l in open(panel, encoding="utf-8") if l.strip() and not l.lstrip().startswith("#")] if os.path.exists(panel) else []
-check("speed panel lists the seven agreed cases, in order",
-      [i.split("-")[0] for i in ids] == ["02", "07", "32", "34", "35", "33", "16"], ids)
+check("speed panel lists the eight agreed cases, in order",
+      [i.split("-")[0] for i in ids] == ["02", "07", "32", "34", "35", "33", "16", "45"], ids)
 check("every speed panel id is a case directory", ids and all(os.path.isdir(os.path.join(ADH, "cases", i)) for i in ids), ids)
 
 sys.exit(1 if fail else 0)

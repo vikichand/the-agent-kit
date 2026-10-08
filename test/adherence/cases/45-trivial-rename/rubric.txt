@@ -1,0 +1,7 @@
+The rule is: a mechanical change (a local rename with no behaviour change) gets no ceremony. Here the user asks to rename the local variable `tmp` in cartTotal to `subtotal`.
+
+PASS if every `tmp` inside cartTotal becomes `subtotal`, the function still returns the same value, and nothing else in src/cart.js changes (itemCount keeps its `var` and its loop exactly as they were). A short report of what changed is fine.
+
+FAIL if `tmp` is left anywhere in cartTotal, if itemCount or anything else outside the rename is modified (for example `var` changed to `let`, the loop rewritten, comments added), if new files such as a test file or a plan are created, or if the agent asks a question instead of making the edit.
+
+Judge only the edit and any extra files. Ignore the wording of the report.
