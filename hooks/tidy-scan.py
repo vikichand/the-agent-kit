@@ -297,14 +297,24 @@ def has_tracked(tracked, rel):
     return tracked.has(rel)
 
 
-def exclude_source(root, rel):
-    """Where git's ignore rule for rel comes from: '' when not ignored, None when git cannot say.
+def ignore_sources(root, rels):
+    """{path: (source, line, pattern)} for the paths git ignores (absent: not ignored); None when git cannot say.
     .git/info/exclude is the owner's private list. check-ignore rejects --literal-pathspecs, so it skips GIT_PREFIX's
-    last option; rel comes from os.walk and is sent on stdin, never parsed as a pathspec."""
-    r = run([GIT, *GIT_PREFIX[:-1], "-C", root, "check-ignore", "-v", "-z", "--stdin"], input=rel + "\0")
+    last option; the paths are sent on stdin, never parsed as pathspecs."""
+    if not rels:
+        return {}
+    r = run([GIT, *GIT_PREFIX[:-1], "-C", root, "check-ignore", "-v", "-z", "--stdin"],
+            input="".join(p + "\0" for p in rels))
     if r.returncode > 1:
         return None
-    return r.stdout.split("\0")[0].replace("\\", "/") if r.returncode == 0 else ""
+    f = r.stdout.split("\0")
+    return {f[i + 3]: (f[i].replace("\\", "/"), f[i + 1], f[i + 2]) for i in range(0, len(f) - 3, 4)}
+
+
+def exclude_source(root, rel):
+    """Where git's ignore rule for rel comes from: '' when not ignored, None when git cannot say."""
+    found = ignore_sources(root, [rel])
+    return None if found is None else found.get(rel, ("",))[0]
 
 
 def inspect_tool_dir(p, allowed):
@@ -386,6 +396,95 @@ def candidate_items(root, stale, seen):
     return out
 
 
+SECRET_NAME = re.compile(r"^\.env|\.pem$|\.key$|^id_rsa|^id_ed25519|credential|secret|^\.npmrc$|^\.pypirc$|\.p12$|\.pfx$", re.I)
+# Expensive to rebuild, or a running dev server uses them; lockfiles are never leftovers.
+NEVER_LIST = {"node_modules", ".venv", "venv", ".next", ".nuxt", ".svelte-kit", "dist", "build", "target",
+              "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".git",
+              "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "poetry.lock", "uv.lock", "Cargo.lock", "Gemfile.lock"}
+MAX_UNKNOWN = 40
+
+
+def look_inside(path):
+    """(bytes, files, newest mtime, extensions, secret-like names, holds a nested repo). Names and sizes only, never contents."""
+    if os.path.islink(path) or os.path.isfile(path):
+        st = os.lstat(path)
+        return st.st_size, 1, st.st_mtime, [os.path.splitext(path)[1].lower()], [], False
+    size, count, newest, exts, secrets, nested = 0, 0, os.lstat(path).st_mtime, {}, [], False
+    for base, dirs, files in os.walk(path):
+        nested = nested or ".git" in dirs or ".git" in files
+        for f in files:
+            if SECRET_NAME.search(f):
+                secrets.append(f)
+                continue
+            st = os.lstat(os.path.join(base, f))
+            size, count, newest = size + st.st_size, count + 1, max(newest, st.st_mtime) if count else st.st_mtime
+            ext = os.path.splitext(f)[1].lower()
+            exts[ext] = exts.get(ext, 0) + 1
+    return size, count, newest, sorted(exts, key=lambda e: -exts[e])[:3], secrets, nested
+
+
+def unknown_items(root, claimed, linked, notes):
+    """Untracked and git-ignored paths that no other group names, with facts only. The agent judges them (SKILL.md)."""
+    r = git(root, "status", "--porcelain=v1", "-z", "--ignored=matching", "--untracked-files=normal")
+    if r.returncode != 0:
+        notes.append("unknown group skipped: git status failed")
+        return []
+    entries = [(e[:2], e[3:]) for e in r.stdout.split("\0") if e[:2] in ("??", "!!")]
+    sources = ignore_sources(root, [rel for st, rel in entries if st == "!!"])
+    if sources is None:
+        notes.append("unknown group skipped: git check-ignore failed")
+        return []
+    found, secret_names, private = [], [], 0
+    for st, rel in entries:
+        parts = rel.rstrip("/").split("/")
+        p = os.path.join(root, *parts)
+        real = os.path.realpath(p)
+        cid = "path:" + "/".join(parts)
+        if (NEVER_LIST & set(parts) or any(real == w or w.startswith(real + os.sep) or real.startswith(w + os.sep)
+                                           for w in linked)
+                or any(c == cid or c.startswith(cid + "/") or cid.startswith(c + "/") for c in claimed)
+                or not os.path.lexists(p)):
+            continue
+        if sources.get(rel, ("",))[0].endswith("info/exclude"):
+            private += 1  # the owner's deliberate private list
+            continue
+        if SECRET_NAME.search(parts[-1]):
+            secret_names.append(rel)
+            continue
+        size, count, newest, exts, secrets, nested = look_inside(p)
+        if secrets:
+            secret_names.append(rel + " (holds secret-like files)")
+        if secrets or nested:
+            continue
+        found.append(dict(rel="/".join(parts), is_dir=plain_dir(p), size=size, count=count, newest=newest, exts=exts,
+                          ignored=sources.get(rel)))
+    if secret_names:
+        notes.append("secret-like files present, not listed (names only): " + ", ".join(secret_names[:5])
+                     + (f" and {len(secret_names) - 5} more" if len(secret_names) > 5 else ""))
+    if private:
+        notes.append(f"{private} entries hidden by .git/info/exclude were not listed")
+    found.sort(key=lambda f: (-f["size"], f["newest"]))  # biggest, then oldest, first
+    if len(found) > MAX_UNKNOWN:
+        notes.append(f"unknown group shows {MAX_UNKNOWN} of {len(found)}; the rest were left out")
+    out = []
+    for f in found[:MAX_UNKNOWN]:
+        base = f["rel"].rsplit("/", 1)[-1]
+        refs = git(root, "grep", "-l", "-F", "-e", base).stdout.split() if len(base) > 2 else []
+        ev = [("git-ignored " if f["ignored"] else "untracked ") + ("folder" if f["is_dir"] else "file"),
+              f"size {f['size']} bytes"]
+        if f["is_dir"]:
+            ev.append(f"{f['count']} files")
+        ev.append(f"newest file {(time.time() - f['newest']) / 86400:.0f} days old")
+        if f["ignored"]:
+            ev.append("ignored by " + ":".join(f["ignored"][:3]))
+        ev.append("referenced by " + ", ".join(refs[:3]) if refs else "not referenced by any tracked file")
+        if f["exts"] and f["is_dir"]:
+            ev.append("mostly " + ", ".join(e or "(no extension)" for e in f["exts"]))
+        out.append(item("path:" + f["rel"], "unknown", f"UNKNOWN {f['rel']}", ev, "low", f["size"], "delete_path",
+                        is_dir=f["is_dir"]))
+    return out
+
+
 def procs_script():
     override = os.environ.get("AGENT_KIT_TIDY_PROCS") if os.environ.get("AGENT_KIT_TIDY_TEST") == "1" else None
     return override or os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -451,6 +550,8 @@ def scan_all(root, stale, folder=None):
         items += branch_items(root, default, wts) + worktree_items(root, default, stale, notes)
         leftovers = leftover_items(root, tracked, stale, wts)
         items += leftovers + candidate_items(root, stale, {i["id"] for i in leftovers})
+        items += unknown_items(root, {i["id"] for i in items if i["id"].startswith("path:")},
+                               {os.path.realpath(w["path"]) for w in wts[1:]}, notes)
         # ids travel in a comma-separated --ids list; a comma in a name could smuggle in a second id
         kept = [i for i in items if "," not in i["id"]]
         if len(kept) != len(items):
@@ -458,7 +559,7 @@ def scan_all(root, stale, folder=None):
         items = kept
     else:
         notes.append("not inside a git repository: only the process group was scanned, for this folder")
-    return dict(version=1, root=root, notes=notes, items=items + proc_items(notes, scope_roots(root, folder)))
+    return dict(version=2, root=root, notes=notes, items=items + proc_items(notes, scope_roots(root, folder)))
 
 
 def human(result):
