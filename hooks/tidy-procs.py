@@ -174,7 +174,9 @@ def scan(procs, now, patterns, min_age_s, idle_s, self_pid, net, cpu_probe, init
             if listens[p["pid"]]:  # ports are stripped from the key, so a distinct server can land here
                 ports = sorted({port for m in tree(p["pid"]) for port in net["listen"].get(m["pid"], ())})
                 evidence.append("also listening on port " + ", ".join(map(str, ports)))
-            add(make_item("processes.duplicates", "low" if listens[p["pid"]] else "medium",
+            if net is None:  # "newest" is a guess when no copy can be seen listening
+                evidence.append("socket state unknown: TCP connections could not be listed")
+            add(make_item("processes.duplicates", "low" if listens[p["pid"]] or net is None else "medium",
                           f"{p['name']}: {p['command']}", evidence, tree(p["pid"])))
 
     candidates = []

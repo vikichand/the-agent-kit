@@ -80,6 +80,10 @@ r = S([PARENT, A, B], net({20: [3000]}))
 check("duplicate: listening older kept, newer flagged", lambda r=r: groups(r) == [("processes.duplicates", 21)])
 check("duplicate: none listens keeps newest", lambda r=r: groups(S([PARENT, A, B], net()))== [("processes.duplicates", 20)])
 check("duplicate without net info keeps newest", lambda r=r: groups(S([PARENT, A, B], None)) == [("processes.duplicates", 20)])
+# Without socket info the "newest" copy may be the idle one and the older one the server the browser is on,
+# so the item is never offered in "remove all".
+check("duplicate without net info is low and says why", lambda: (lambda x: x[0][0]["confidence"] == "low"
+      and "socket state unknown: TCP connections could not be listed" in x[0][0]["evidence"])(S([PARENT, A, B], None)))
 other = proc(21, 1, NEXT.replace(r"C:\proj", r"C:\other"), 8000)
 check("same command in two projects is not grouped", lambda: not S([PARENT, A, other], net())[0])
 check("unknown project root is never grouped", lambda: not S([PARENT, proc(20, 1, "node next dev"), proc(21, 1, "node next dev", 8000)], net())[0])
