@@ -661,6 +661,40 @@ def t_scan_records_is_dir():
     return byid["path:x.bak"]["is_dir"] is False and byid["path:.playwright-mcp"]["is_dir"] is True
 
 
+# --- repo-scoped tidy: what the owner wants kept is never offered ---
+
+def ll_repo():
+    """origin/HEAD names develop; main, release/*, hotfix/* and friends are all merged into it."""
+    d = branch_repo()
+    bare = TMP / f"bare-ll{counter[0]}.git"
+    g(TMP, "init", "-q", "--bare", "-b", "main", str(bare))
+    g(d, "remote", "add", "origin", str(bare))
+    g(d, "checkout", "-q", "-b", "develop"), write(d / "dev.txt", old=False)
+    g(d, "add", "."), g(d, "commit", "-q", "-m", "dev")
+    for name in ("release/1.0", "hotfix/x", "staging", "prod", "trunk", "gh-pages", "master"):
+        g(d, "branch", name)
+    g(d, "push", "-q", "origin", "main", "develop")
+    g(d, "remote", "set-head", "origin", "develop")
+    return d
+
+
+def t_long_lived_branches_protected():
+    d = ll_repo()
+    s = ids(d)
+    kept = {"branch:" + n for n in ("main", "master", "develop", "release/1.0", "hotfix/x", "staging", "prod",
+                                    "trunk", "gh-pages")}
+    return "branch:merged-feat" in s and not (s & kept)
+
+
+def t_long_lived_worktree_branch_not_deleted():
+    d = ll_repo()
+    w = wt(d, "rel", "release/2.0")
+    it = {i["id"]: i for i in scan(d)["items"]}.get(wid(w))
+    r = tidy("apply", "--ids", wid(w), "--root", str(d))
+    return (it is not None and "and branch" not in it["label"] and r.returncode == 0 and not w.exists()
+            and "release/2.0" in branches(d))
+
+
 cases = [(n[2:], f) for n, f in sorted(globals().items()) if n.startswith("t_") and callable(f)]
 passed = 0
 for name, fn in cases:

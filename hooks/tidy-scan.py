@@ -103,6 +103,15 @@ def is_ancestor(root, rev, default):
     return git(root, "merge-base", "--is-ancestor", rev, default).returncode == 0
 
 
+LONG_LIVED = ("main", "master", "develop", "dev", "trunk", "staging", "production", "prod", "gh-pages",
+              "release/*", "hotfix/*")
+
+
+def long_lived(name, default):
+    """Branches the owner keeps on purpose: they are merged into the default by design, not leftovers."""
+    return name == default.removeprefix("origin/") or any(fnmatch.fnmatch(name, p) for p in LONG_LIVED)
+
+
 def branch_items(root, default, wts):
     if not default:
         return []
@@ -113,7 +122,7 @@ def branch_items(root, default, wts):
     fmt = "%(refname:short)\x1f%(upstream:track)\x1f%(committerdate:short)\x1f%(subject)"
     for line in git(root, "for-each-ref", "refs/heads", f"--format={fmt}").stdout.splitlines():
         name, track, date, subject = line.split("\x1f", 3)
-        if name in held or name == default.removeprefix("origin/"):
+        if name in held or long_lived(name, default):
             continue
         gone = track == "[gone]"
         if name not in merged and not gone:
@@ -149,7 +158,7 @@ def wt_branch(root, w, default):
     """The branch removing this worktree also deletes: its own, only when merged into default. The label and
     act() both read this, so what the user approved is what runs."""
     br = w.get("branch", "").removeprefix("refs/heads/")
-    if br and br != default.removeprefix("origin/") and is_ancestor(root, "refs/heads/" + br, default):
+    if br and not long_lived(br, default) and is_ancestor(root, "refs/heads/" + br, default):
         return br
     return None
 
