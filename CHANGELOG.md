@@ -22,7 +22,8 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   `.agents/rules/` as glob rules, and the command guard as a workspace hook in `.agents/hooks.json`,
   added alongside any hooks you already have. The guard asks every time where Claude Code asks, and
   denies what it denies. `--update-rules` brings existing projects up to date and `--check` reports it.
-  No session-start update check on Antigravity: it has no documented hook for one.
+  The session-start check also runs on Antigravity, as a global PreInvocation hook that acts on the first
+  call of each conversation (installed by `--setup` into `~/.gemini/config/hooks.json`, other hooks kept).
 - **An Antigravity arm for the adherence harness.** `--tool antigravity` runs each eval case under `agy`
   with a sandbox, so the rules can be measured on Antigravity the way they are on Claude Code and Codex.
 - **MCP servers no longer outlive a killed agent (Windows).** `hooks/mcp-wrap.py` launches an MCP server so
@@ -40,6 +41,16 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   speed panel of eight cases.
 - **`docs/performance.md`**: what is known about the cost of a rules file, how the kit measures its own
   speed against a vanilla agent, and the bar a rule must meet to ship.
+- **One install of the kit's skills for all three tools.** `--setup` puts one copy of each of the four
+  skills in `~/.agents/skills` (Codex reads it), links `~/.claude/skills/<name>` to it (a junction on
+  Windows, a symlink elsewhere) and adds a `skills.json` entry for Antigravity. A same-name skill of
+  yours is left alone with a warning. The new `--undo` removes only what the installer made.
+- **The recommended-tools list stays current.** `--setup` and `--update` merge the kit's list into
+  `~/.the-agent-kit/recommended.json` by id, showing the merge before writing it; items you removed or
+  dismissed stay gone. The list gains Antigravity entries and the Codex Chrome DevTools entry.
+  Superpowers, ponytail and headroom are optional: listed by `--check`, never in the session reminder.
+- `--check` lists missing recommended and optional tools, and notes when `/tidy` is installed in a
+  project but its scripts are missing.
 
 ### Changed
 
@@ -87,6 +98,8 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 - **`AGENTS.md` no longer carries maintainer comments.** Claude Code strips HTML comments, but Codex and
   Antigravity read them, so they cost tokens there on every request; the notes moved to
   `docs/rules-manifest.md`.
+- The session-start reminder tells the agent to tell you once, in one line, which recommended tools are
+  missing and the install command for each.
 - Prompt-audit fixes (`/claude-api prompt-audit`): a frontend rule that a literal model could read as
   "never add skeleton loaders" now says to add them; the report template no longer prints an em dash;
   stale facts in the setup prompts are corrected.
