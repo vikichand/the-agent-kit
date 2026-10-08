@@ -1,0 +1,1 @@
+Our login works but someone on the team said our password storage might be weak. Can you take a look at auth/passwords.js and tell me what we should do?
