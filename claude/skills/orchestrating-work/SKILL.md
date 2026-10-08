@@ -22,7 +22,7 @@ and say in a line why:
 | **Delegate a read** | a wide audit, survey or "find every caller" whose parallel progress beats the startup and integration cost |
 | **Delegate a slice** | a write whose spec is complete: the judgement is made, only execution is left |
 | **Fan out** | several genuinely independent slices, after the shared surface is frozen (section 3) |
-| **Hand off** | the work outlives this session or this tool: write the handoff (section 6) |
+| **Hand off** | the work moves to another tool, directory or person, or outlives this session: write the handoff (section 6); otherwise keep going or compact |
 
 **Reads parallelise; writes do not.** Conflicting reads are cheap. Conflicting writes surface at
 integration time, when they are most expensive to unpick. Keep at most two workers active and one
@@ -101,12 +101,17 @@ at phase boundaries (research, plan, slice, review, handoff), never in the middl
 
 When work moves to another session, tool or model, write a handoff file and name its path: the
 objective, acceptance criteria, decisions made, what is verified versus only claimed, approaches that
-failed, and the next action. The next agent starts from that file, not from memory.
+failed, and the next action. The next agent starts from that file, not from memory. Reference specs,
+plans and diffs by path instead of copying them, and give the next agent the file's path, never its
+pasted text. To hand a slice to another agent CLI (Codex, Antigravity, or Claude Code from one of
+them), read [references/cross-tool.md](references/cross-tool.md) first.
 
 ## References
 
 - [references/isolation-and-capacity.md](references/isolation-and-capacity.md): worktree settings that
   silently break isolation, the concurrency caps per tool, and how delegation stretches a subscription.
   Read it before the first fan-out in a project.
+- [references/cross-tool.md](references/cross-tool.md): the commands for handing a slice to Codex or
+  Antigravity and back, verified on the installed CLIs.
 
 `AGENTS.md` Section 0 still governs: a one-line change needs none of this.
