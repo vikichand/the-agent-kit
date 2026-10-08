@@ -110,6 +110,23 @@ def is_ancestor(root, rev, default):
     return git(root, "merge-base", "--is-ancestor", rev, default).returncode == 0
 
 
+def commit_of(root, ref):
+    r = git(root, "rev-parse", "--verify", "-q", ref + "^{commit}")
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def no_commits(default):
+    return f"no commits of its own (its tip equals {default}); it may be new"
+
+
+def checkout_age_days(path):
+    """Age of a linked worktree: its .git file is written once, when it is made. Unknown counts as brand new."""
+    try:
+        return age_days(os.path.join(path, ".git"))
+    except OSError:
+        return 0
+
+
 LONG_LIVED = ("main", "master", "develop", "dev", "trunk", "staging", "production", "prod", "gh-pages",
               "release/*", "hotfix/*")
 
@@ -126,9 +143,10 @@ def branch_items(root, default, wts):
     cur = git(root, "branch", "--show-current").stdout.strip()
     held = {w["branch"].removeprefix("refs/heads/") for w in wts if "branch" in w} | {cur}
     out = []
-    fmt = "%(refname:short)\x1f%(upstream:track)\x1f%(committerdate:short)\x1f%(subject)"
+    tip = commit_of(root, default)
+    fmt = "%(refname:short)\x1f%(objectname)\x1f%(upstream:track)\x1f%(committerdate:short)\x1f%(subject)"
     for line in git(root, "for-each-ref", "refs/heads", f"--format={fmt}").stdout.splitlines():
-        name, track, date, subject = line.split("\x1f", 3)
+        name, sha, track, date, subject = line.split("\x1f", 4)
         if name in held or long_lived(name, default):
             continue
         gone = track == "[gone]"
@@ -140,6 +158,9 @@ def branch_items(root, default, wts):
         if name not in merged:
             ev.append(f"has commits not on {default}; git branch -d may refuse")
             conf = "medium"  # ponytail: squash-merged branches land here, -d is the safety net
+        elif sha == tip:  # "merged" only because nothing was ever committed: it may be brand new
+            ev.append(no_commits(default))
+            conf = "low"
         out.append(item("branch:" + name, "branches", f"branch {name}", ev, conf, None, "delete_branch"))
     return out
 
@@ -185,8 +206,9 @@ def ignored_evidence(path, files):
     return ev
 
 
-def worktree_items(root, default):
+def worktree_items(root, default, stale):
     out = []
+    tip = commit_of(root, default)
     here = os.path.realpath(root)
     for w in worktrees(root)[1:]:
         if os.path.realpath(w["path"]) == here:
@@ -208,11 +230,17 @@ def worktree_items(root, default):
         if br and is_ancestor(root, "refs/heads/" + br, default):
             ev, conf = ["clean", f"branch {br} merged into {default}"], "high"
             label = f"worktree {path}" + (f" and branch {bd}" if bd else "")
+            same_tip = commit_of(root, "refs/heads/" + br) == tip
         elif not br and "HEAD" in w and is_ancestor(root, w["HEAD"], default):
             ev, conf = ["clean", f"detached at a commit reachable from {default}"], "medium"
             label = f"worktree {path}"
+            same_tip = w["HEAD"] == tip
         else:
             continue
+        if same_tip:  # nothing was ever committed, so "merged" is vacuous: this may be a worktree made minutes ago
+            if checkout_age_days(path) < stale:
+                continue
+            ev, conf = ev + [no_commits(default)], "low"
         files = ignored_files(path) if st.returncode == 0 else None
         if files is None:  # a failed git status is not "no ignored files"
             why = (st.stderr.strip().splitlines() or ["git status failed"])[0][:120]
@@ -385,7 +413,7 @@ def scan_all(root, stale):
             notes.append("no default branch found (origin/HEAD, main, master): branches and worktrees skipped")
         wts = worktrees(root)
         tracked = tracked_set(root)
-        items += branch_items(root, default, wts) + worktree_items(root, default)
+        items += branch_items(root, default, wts) + worktree_items(root, default, stale)
         leftovers = leftover_items(root, tracked, stale, wts)
         items += leftovers + candidate_items(root, stale, {i["id"] for i in leftovers})
         # ids travel in a comma-separated --ids list; a comma in a name could smuggle in a second id

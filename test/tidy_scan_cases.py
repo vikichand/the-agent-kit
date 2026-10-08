@@ -106,9 +106,17 @@ def t_gone():
     return "branch:open-feat" in ids(d)
 
 
-def wt(d, name, branch=None):
+def wt(d, name, branch=None, fresh=False):
+    """A linked worktree. By default the usual stale one: its branch did work that was merged into the main
+    checkout's branch (--no-ff, so the tips differ), or, detached, the main branch has moved on past it.
+    fresh=True is the brand-new one an agent has just made: same tip as the default, no commits."""
     p = TMP / f"{d.name}-{name}"
     g(d, "worktree", "add", "-q", *(["-b", branch] if branch else ["--detach"]), str(p))
+    if not fresh and branch:
+        g(p, "commit", "-q", "--allow-empty", "-m", "work")
+        g(d, "merge", "-q", "--no-ff", branch, "-m", "merge")
+    elif not fresh:
+        g(d, "commit", "-q", "--allow-empty", "-m", "main moves on")
     return p
 
 
@@ -689,7 +697,8 @@ def t_long_lived_branches_protected():
 def t_long_lived_worktree_branch_not_deleted():
     d = ll_repo()
     w = wt(d, "rel", "release/2.0")
-    it = {i["id"]: i for i in scan(d)["items"]}.get(wid(w))
+    g(d, "push", "-q", "origin", "develop")  # the default here is origin/develop: publish the merge
+    it ={i["id"]: i for i in scan(d)["items"]}.get(wid(w))
     r = tidy("apply", "--ids", wid(w), "--root", str(d))
     return (it is not None and "and branch" not in it["label"] and r.returncode == 0 and not w.exists()
             and "release/2.0" in branches(d))
@@ -740,6 +749,34 @@ def t_tool_dir_in_subfolder_found():
     write(d / "packages/web/test-results/a.png")
     it = tool_item(d, "packages/web/test-results")
     return it is not None and it["confidence"] == "high"
+
+
+def wt_item(d, w):
+    return {i["id"]: i for i in scan(d)["items"]}.get(wid(w))
+
+
+def t_fresh_worktree_not_offered():
+    d = mk()
+    w, det = wt(d, "fresh", "fresh-agent", fresh=True), wt(d, "freshdet", fresh=True)
+    s = ids(d)
+    return wid(w) not in s and wid(det) not in s
+
+
+def t_old_worktree_without_commits_is_low():
+    d = mk()
+    w = wt(d, "oldfresh", "oldfresh", fresh=True)
+    os.utime(w / ".git", (OLD, OLD))  # the checkout is older than the stale age
+    it = wt_item(d, w)
+    return it is not None and it["confidence"] == "low" and any("no commits of its own" in e for e in it["evidence"])
+
+
+def t_branch_without_own_commits_is_low():
+    d = branch_repo()
+    g(d, "branch", "just-made")
+    byid = {i["id"]: i for i in scan(d)["items"]}
+    it = byid["branch:just-made"]
+    return (it["confidence"] == "low" and any("no commits of its own" in e for e in it["evidence"])
+            and byid["branch:merged-feat"]["confidence"] == "high")
 
 
 cases = [(n[2:], f) for n, f in sorted(globals().items()) if n.startswith("t_") and callable(f)]
