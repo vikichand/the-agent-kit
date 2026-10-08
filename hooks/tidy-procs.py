@@ -97,6 +97,63 @@ def clean(text):
     return reaper.clean(text)
 
 
+# Scope: a process is this repository's only when its working folder (or an absolute path in its command line)
+# is inside the repository or one of its linked worktrees.
+
+SHELLS = re.compile(r"^(?:sh|bash|zsh|fish|dash|pwsh|powershell|cmd|wt|windowsterminal|conhost|openconsole)$")
+MAX_UNKNOWN = 20
+EDITORS = re.compile(r"^(?:code(?:-insiders)?|cursor|windsurf|zed|idea.*|explorer)$")
+# claude, codex and antigravity all run as node.exe on Windows: they are told apart by the script they run,
+# never by the executable name (that would also catch every dev server).
+AGENT_CLIS = {"claude", "claude-code", "codex", "agy", "antigravity"}
+
+
+def exe_name(p):
+    return p["name"].lower().removesuffix(".exe")
+
+
+def command_tokens(command):
+    try:
+        tokens = shlex.split(command, posix=False)
+    except ValueError:
+        tokens = command.split()
+    return [t.strip("\"'") for t in tokens]
+
+
+def agent_cli(command):
+    """True when one of the first arguments is an agent CLI's script or program (claude, codex, antigravity)."""
+    for t in command_tokens(command)[:4]:
+        if t.startswith("-"):
+            continue
+        parts = t.replace("\\", "/").split("/")
+        base = re.sub(r"\.(?:exe|cmd|js|mjs|ps1)$", "", parts[-1], flags=re.I).lower()
+        if base in AGENT_CLIS or (len(parts) > 1 and parts[-2].lower() == "claude-code"):
+            return True
+    return False
+
+
+def interactive(p):
+    """An editor or an agent session is the user's own working environment: never a leftover."""
+    return bool(EDITORS.match(exe_name(p))) or agent_cli(p["command"])
+
+
+def norm(path):
+    return os.path.normcase(os.path.realpath(path))
+
+
+def under(path, scope):
+    return any(path == r or path.startswith(r.rstrip(os.sep) + os.sep) for r in scope)
+
+
+def argv_in_scope(command, scope):
+    """An absolute path in the command line (also after `--flag=`) that is inside the scope."""
+    for t in command_tokens(command):
+        for v in (t, t.partition("=")[2]):
+            if v and os.path.isabs(v) and under(os.path.normcase(os.path.normpath(v)), scope):
+                return True
+    return False
+
+
 def make_item(group, confidence, label, evidence, members):
     root = members[0]
     return {"id": f"proc:{root['pid']}:{int(root['created'])}", "group": group,
@@ -105,8 +162,10 @@ def make_item(group, confidence, label, evidence, members):
             "pids": [m["pid"] for m in members], "_processes": members}
 
 
-def scan(procs, now, patterns, min_age_s, idle_s, self_pid, net, cpu_probe, init_pids=(), init_names=()):
-    """Pure over its arguments. Returns (items, notes). net is None when listing sockets was unavailable."""
+def scan(procs, now, patterns, min_age_s, idle_s, self_pid, net, cpu_probe, init_pids=(), init_names=(),
+         scope=None, cwds=None):
+    """Pure over its arguments. Returns (items, notes). net is None when listing sockets was unavailable.
+    scope: normalised folders of the repository (None: no filter); cwds(pids) -> {pid: folder or None}."""
     by_pid = {p["pid"]: p for p in procs}
     kids = {}
     for p in procs:
@@ -141,18 +200,76 @@ def scan(procs, now, patterns, min_age_s, idle_s, self_pid, net, cpu_probe, init
     def age_h(p):
         return (now - p["created"]) / 3600
 
-    for t in reaper.find_orphans(procs, now, patterns, min_age_s, self_pid, init_pids, init_names):
+    trees = [t for t in reaper.find_orphans(procs, now, patterns, min_age_s, self_pid, init_pids, init_names)
+             if not interactive(by_pid[t["pid"]])]
+    dev = sorted((p for p in procs if is_dev(p["command"]) and not is_mcp(p["command"], patterns)
+                  and p["pid"] not in protected and not interactive(p)), key=lambda p: p["created"])
+
+    def ancestors(p):
+        out, seen = [], {p["pid"]}
+        while (parent := by_pid.get(p["ppid"])) and parent["pid"] not in seen and parent["created"] <= p["created"]:
+            out.append(parent)
+            seen.add(parent["pid"])
+            p = parent
+        return out
+
+    verdict = {}  # pid -> "in" | "out" | "unknown"
+    found = {}  # pid -> working folder, for the pids that were asked and could be read
+
+    def own(p):  # None when this process alone cannot say
+        if argv_in_scope(p["command"], scope):
+            return "in"
+        folder = found.get(p["pid"])
+        return None if folder is None else "in" if under(norm(folder), scope) else "out"
+
+    if scope is None:
+        verdict = {p["pid"]: "in" for p in procs}
+    else:
+        wanted = {p["pid"]: p for p in dev + [m for t in trees for m in t["processes"]]}
+        found.update(cwds(sorted(wanted)))
+        first = {pid: own(p) for pid, p in wanted.items()}
+        # A process whose own folder is unreadable (elevated, 32-bit) still belongs to its owner's tree. A readable
+        # folder outside the repository is final: a parent in the repository does not pull it in.
+        found.update(cwds(sorted({a["pid"] for pid, v in first.items() if v is None for a in ancestors(wanted[pid])}
+                                 - found.keys())))
+        for pid, p in wanted.items():
+            v = first[pid]
+            verdict[pid] = v or ("in" if any(own(a) == "in" for a in ancestors(p)) else "unknown")
+
+    def tree_verdict(members):
+        vs = {verdict[m["pid"]] for m in members}
+        return "in" if "in" in vs else "unknown" if "unknown" in vs else "out"
+
+    unreadable = sum(verdict[p["pid"]] == "unknown" for p in dev)
+    dev = [p for p in dev if verdict[p["pid"]] == "in"]
+    elsewhere = []
+    for t in trees:
+        v = tree_verdict(t["processes"])
+        if v == "out":
+            elsewhere.append(t)
+            continue
+        if v == "unknown":
+            unreadable += 1
+            continue
         root = by_pid[t["pid"]]
         parent = by_pid.get(root["ppid"])
         why = (f"parent pid {root['ppid']} is gone" if not parent else
                f"parent pid {root['ppid']} was reused by a newer process" if parent["created"] > root["created"]
                else f"adopted by {parent['name']} after its parent exited")
-        add(make_item("processes.strays", "high", f"{root['name']}: {root['command']}",
-                      ["MCP server tree with no live owner", why, f"started {age_h(root):.1f} h ago",
-                       f"{len(t['pids'])} processes, {t['mb']:.1f} MB"], t["processes"]))
+        evidence = ["MCP server tree with no live owner", why, f"started {age_h(root):.1f} h ago",
+                    f"{len(t['pids'])} processes, {t['mb']:.1f} MB"]
+        ports = sorted({port for pid in t["pids"] for port in (net or {"listen": {}})["listen"].get(pid, ())})
+        if ports:  # an HTTP or SSE server someone started on purpose looks exactly like an orphan
+            evidence.append("listening on port " + ", ".join(map(str, ports)))
+        add(make_item("processes.strays", "low" if ports else "high", f"{root['name']}: {root['command']}",
+                      evidence, t["processes"]))
+    if elsewhere:
+        notes.append(f"{len(elsewhere)} orphaned MCP trees elsewhere on this machine "
+                     f"({sum(t['mb'] for t in elsewhere):.0f} MB), not listed: run "
+                     "~/.the-agent-kit/install.sh --tidy to review them")
+    if unreadable:
+        notes.append(f"{unreadable} processes with an unreadable working folder were skipped")
 
-    dev = sorted((p for p in procs if is_dev(p["command"]) and not is_mcp(p["command"], patterns)
-                  and p["pid"] not in protected), key=lambda p: p["created"])
     groups = {}
     for p in dev:
         root = project_root(p["command"])
@@ -174,7 +291,9 @@ def scan(procs, now, patterns, min_age_s, idle_s, self_pid, net, cpu_probe, init
             if listens[p["pid"]]:  # ports are stripped from the key, so a distinct server can land here
                 ports = sorted({port for m in tree(p["pid"]) for port in net["listen"].get(m["pid"], ())})
                 evidence.append("also listening on port " + ", ".join(map(str, ports)))
-            add(make_item("processes.duplicates", "low" if listens[p["pid"]] else "medium",
+            if net is None:  # "newest" is a guess when no copy can be seen listening
+                evidence.append("socket state unknown: TCP connections could not be listed")
+            add(make_item("processes.duplicates", "low" if listens[p["pid"]] or net is None else "medium",
                           f"{p['name']}: {p['command']}", evidence, tree(p["pid"])))
 
     candidates = []
@@ -185,19 +304,49 @@ def scan(procs, now, patterns, min_age_s, idle_s, self_pid, net, cpu_probe, init
         ports = sorted({port for m in members for port in net["listen"].get(m["pid"], ())})
         if ports and not any(net["established"].get(port) for port in ports):
             candidates.append((p, members, ports))
-    if candidates:
+
+    # Processes in the repository that match no known pattern but listen on a port or have run for hours: shown
+    # at low with facts, for the agent to name or leave. Editors, shells and agents are never among them.
+    unknown = []
+    if scope is not None:
+        known = {m["pid"] for p in dev for m in tree(p["pid"])} | {m["pid"] for t in trees for m in t["processes"]}
+        pool = [p for p in procs if p["pid"] not in known | protected and not interactive(p)
+                and not SHELLS.match(exe_name(p)) and not is_mcp(p["command"], patterns)
+                and now - p["created"] >= min_age_s]
+        found.update(cwds([p["pid"] for p in pool if p["pid"] not in found]))
+        pool = [p for p in pool if own(p) == "in"]  # no inheritance here: an unreadable folder is not listed
+        listening = lambda p: net is not None and any(m["pid"] in net["listen"] for m in tree(p["pid"]))
+        picked = {p["pid"]: p for p in pool if listening(p) or now - p["created"] >= idle_s}
+        unknown = sorted((p for p in picked.values() if p["ppid"] not in picked), key=lambda p: p["created"])[:MAX_UNKNOWN]
+    want = [m["pid"] for _, members, _ in candidates for m in members] + [m["pid"] for p in unknown for m in tree(p["pid"])]
+    cpu = {}
+    if want:
         try:
-            cpu = cpu_probe([m["pid"] for _, members, _ in candidates for m in members])
+            cpu = cpu_probe(want)
         except (OSError, ValueError, subprocess.SubprocessError) as exc:
-            cpu = {}
             notes.append(f"idle check unavailable: cannot sample CPU: {exc}")
-        for p, members, ports in candidates:
-            used = sum(cpu[m["pid"]][1] - cpu[m["pid"]][0] for m in members if m["pid"] in cpu)
-            if p["pid"] in cpu and used < CPU_EPSILON_S:
-                where = ("port " if len(ports) == 1 else "ports ") + ", ".join(map(str, ports))
-                add(make_item("processes.idle", "low", f"{p['name']}: {p['command']}",
-                              [f"no connection to {where}", f"no CPU in {SAMPLE_S} s",
-                               f"started {age_h(p):.1f} h ago"], members))
+    for p, members, ports in candidates:
+        used = sum(cpu[m["pid"]][1] - cpu[m["pid"]][0] for m in members if m["pid"] in cpu)
+        if p["pid"] in cpu and used < CPU_EPSILON_S:
+            where = ("port " if len(ports) == 1 else "ports ") + ", ".join(map(str, ports))
+            add(make_item("processes.idle", "low", f"{p['name']}: {p['command']}",
+                          [f"no connection to {where}", f"no CPU in {SAMPLE_S} s",
+                           f"started {age_h(p):.1f} h ago"], members))
+    for p in unknown:
+        members = tree(p["pid"])
+        ports = sorted({port for m in members for port in (net or {"listen": {}})["listen"].get(m["pid"], ())})
+        used = sum(cpu[m["pid"]][1] - cpu[m["pid"]][0] for m in members if m["pid"] in cpu)
+        parent = by_pid.get(p["ppid"])
+        evidence = [f"no known server, watcher or MCP pattern matches; working folder {clean(found[p['pid']])}"
+                    if p["pid"] in found else "no known server, watcher or MCP pattern matches",
+                    f"started {age_h(p):.1f} h ago",
+                    ("listening on port " + ", ".join(map(str, ports)) + "; " + (
+                        "a connection is open" if any(net["established"].get(x) for x in ports) else "no connection"))
+                    if ports else "not listening on any port",
+                    (f"used {used:.2f} s CPU in {SAMPLE_S} s" if p["pid"] in cpu else "CPU not sampled"),
+                    (f"started by {parent['name']} (pid {parent['pid']}, still running)" if parent
+                     and parent["created"] <= p["created"] else f"its parent (pid {p['ppid']}) is gone")]
+        add(make_item("processes.unknown", "low", f"{p['name']}: {p['command']}", evidence, members))
     return items, notes
 
 
@@ -303,7 +452,101 @@ def probe_live(pids):
     return {pid: (before[pid], after[pid]) for pid in before if pid in after}
 
 
-def run_scan(min_age_minutes, idle_hours):
+# Working folders. A pid missing from the result is unknown (access denied, gone, or not supported here).
+
+def win_cwd(pid):
+    """Windows: read CurrentDirectory from the target's PEB. Needs no admin for same-user processes. x64 targets
+    only (a 32-bit process has a different PEB layout and counts as unknown)."""
+    import ctypes
+    import ctypes.wintypes as w
+    if ctypes.sizeof(ctypes.c_void_p) != 8:
+        return None
+    k32, ntdll = ctypes.WinDLL("kernel32", use_last_error=True), ctypes.WinDLL("ntdll")
+
+    class PBI(ctypes.Structure):
+        _fields_ = [("Reserved1", ctypes.c_void_p), ("PebBaseAddress", ctypes.c_void_p),
+                    ("Reserved2", ctypes.c_void_p * 2), ("UniqueProcessId", ctypes.c_void_p),
+                    ("Reserved3", ctypes.c_void_p)]
+
+    def read(h, addr, n):
+        buf, got = ctypes.create_string_buffer(n), ctypes.c_size_t()
+        if not k32.ReadProcessMemory(h, ctypes.c_void_p(addr), buf, n, ctypes.byref(got)):
+            raise OSError("ReadProcessMemory")
+        return buf.raw
+
+    h = k32.OpenProcess(0x0400 | 0x0010, False, pid)  # PROCESS_QUERY_INFORMATION | PROCESS_VM_READ
+    if not h:
+        return None
+    try:
+        wow64 = w.BOOL()
+        if not k32.IsWow64Process(h, ctypes.byref(wow64)) or wow64.value:
+            return None
+        pbi = PBI()
+        if ntdll.NtQueryInformationProcess(h, 0, ctypes.byref(pbi), ctypes.sizeof(pbi), None):
+            return None
+        # PEB+0x20 = ProcessParameters; RTL_USER_PROCESS_PARAMETERS+0x38 = CurrentDirectory.DosPath (a UNICODE_STRING)
+        params = int.from_bytes(read(h, pbi.PebBaseAddress + 0x20, 8), "little")
+        us = read(h, params + 0x38, 16)
+        text = read(h, int.from_bytes(us[8:16], "little"), int.from_bytes(us[0:2], "little")).decode("utf-16-le")
+        return text if len(text) <= 3 else text.rstrip("\\")  # keep the drive root "C:\"
+    except (OSError, ValueError):
+        return None
+    finally:
+        k32.CloseHandle(h)
+
+
+def lsof_cwds(pids):
+    lsof = which("lsof")
+    if not lsof or not pids:
+        return {}
+    try:
+        out = subprocess.run([lsof, "-a", "-p", ",".join(map(str, pids)), "-d", "cwd", "-Fn"], capture_output=True,
+                             text=True, timeout=20).stdout  # exits 1 when some pids are gone
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    result, pid = {}, None
+    for line in out.splitlines():
+        if line[:1] == "p" and line[1:].isdigit():
+            pid = int(line[1:])
+        elif line[:1] == "n" and pid is not None:
+            result[pid] = line[1:]
+    return result
+
+
+def read_cwds(pids):
+    if os.name == "nt":
+        return {pid: c for pid in pids if (c := win_cwd(pid))}
+    if not pathlib.Path("/proc/self").exists():
+        return lsof_cwds(pids)  # macOS
+    result = {}
+    for pid in pids:
+        try:
+            result[pid] = os.readlink(f"/proc/{pid}/cwd").removesuffix(" (deleted)")  # a removed folder still counts
+        except OSError:
+            pass
+    return result
+
+
+def memoised(probe):
+    """Wrap a {pid: folder} reader: each pid is read once; the answer for an unreadable pid is None."""
+    memo = {}
+
+    def get(pids):
+        todo = [p for p in pids if p not in memo]
+        if todo:
+            got = probe(todo)
+            memo.update({p: got.get(p) for p in todo})
+        return {p: memo[p] for p in pids}
+    return get
+
+
+def occupied(procs, roots, cwds):
+    """The roots that some process (any: a shell, an agent session, a server) is working inside."""
+    folders = [norm(f) for f in cwds(sorted(p["pid"] for p in procs)).values() if f]
+    return [r for r in roots if any(under(f, [norm(r)]) for f in folders)]
+
+
+def run_scan(min_age_minutes, idle_hours, roots):
     notes = []
     try:
         procs = reaper.list_processes()
@@ -312,7 +555,8 @@ def run_scan(min_age_minutes, idle_hours):
     net, note = net_snapshot()
     items, more = scan(procs, time.time(), reaper.patterns_from_env(os.environ), min_age_minutes * 60,
                        idle_hours * 3600, os.getpid(), net, probe_live,
-                       () if os.name == "nt" else (0, 1), () if os.name == "nt" else reaper.INIT_NAMES)
+                       () if os.name == "nt" else (0, 1), () if os.name == "nt" else reaper.INIT_NAMES,
+                       scope=sorted({norm(r) for r in roots}), cwds=memoised(read_cwds))
     return items, ([note] if note else []) + more
 
 
@@ -340,8 +584,13 @@ def apply_ids(ids, items, kill, dry_run=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("occupied", help="print the --root folders that a running process works inside, as JSON") \
+        .add_argument("--root", action="append", required=True)
     for name in ("scan", "apply"):
         p = sub.add_parser(name)
+        p.add_argument("--root", action="append", required=True,
+                       help="a folder of the repository (repeat for each linked worktree); only processes working "
+                            "in these folders are listed or killed")
         p.add_argument("--min-age-minutes", type=float, default=5)
         p.add_argument("--idle-hours", type=float, default=4)
         if name == "scan":
@@ -350,9 +599,20 @@ def main():
             p.add_argument("--ids", required=True)
             p.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
-    if not all(math.isfinite(v) and v >= 0 for v in (args.min_age_minutes, args.idle_hours)):
+    if args.command != "occupied" and not all(math.isfinite(v) and v >= 0 for v in (args.min_age_minutes, args.idle_hours)):
         parser.error("ages must be finite nonnegative numbers")
-    items, notes = run_scan(args.min_age_minutes, args.idle_hours)
+    home = norm(os.path.expanduser("~"))
+    for r in args.root:
+        if os.path.dirname(norm(r)) == norm(r) or norm(r) == home:  # a scope this wide is the whole machine
+            parser.error(f"--root {r} is the home folder or a filesystem root: too broad to scope processes")
+    if args.command == "occupied":
+        try:
+            print(json.dumps(occupied(reaper.list_processes(), args.root, read_cwds)))
+        except (OSError, ValueError, subprocess.SubprocessError) as exc:
+            print(f"process listing unavailable: {exc}", file=sys.stderr)
+            return 1
+        return 0
+    items, notes = run_scan(args.min_age_minutes, args.idle_hours, args.root)
     if args.command == "scan":
         if args.json:
             print(json.dumps({"version": 1, "notes": notes, "items": [

@@ -80,6 +80,10 @@ r = S([PARENT, A, B], net({20: [3000]}))
 check("duplicate: listening older kept, newer flagged", lambda r=r: groups(r) == [("processes.duplicates", 21)])
 check("duplicate: none listens keeps newest", lambda r=r: groups(S([PARENT, A, B], net()))== [("processes.duplicates", 20)])
 check("duplicate without net info keeps newest", lambda r=r: groups(S([PARENT, A, B], None)) == [("processes.duplicates", 20)])
+# Without socket info the "newest" copy may be the idle one and the older one the server the browser is on,
+# so the item is never offered in "remove all".
+check("duplicate without net info is low and says why", lambda: (lambda x: x[0][0]["confidence"] == "low"
+      and "socket state unknown: TCP connections could not be listed" in x[0][0]["evidence"])(S([PARENT, A, B], None)))
 other = proc(21, 1, NEXT.replace(r"C:\proj", r"C:\other"), 8000)
 check("same command in two projects is not grouped", lambda: not S([PARENT, A, other], net())[0])
 check("unknown project root is never grouped", lambda: not S([PARENT, proc(20, 1, "node next dev"), proc(21, 1, "node next dev", 8000)], net())[0])
@@ -179,6 +183,127 @@ check("clean strips C1, bidi and line-separator characters", lambda: all(
     tidy.clean(f"a{c}b") == "a b" for c in "\x9b\x85‮⁦⁩‎‏  "))
 
 
+# repo scope: only processes working inside the repository (or a linked worktree) are ever listed
+BASE = os.path.join(os.path.realpath(tempfile.gettempdir()), "tidyprocs-scope")  # a short 8.3 temp name would not match
+RA, RB = os.path.join(BASE, "a"), os.path.join(BASE, "b")
+WT_A = os.path.join(BASE, "a-wt")  # a linked worktree of repo A
+SCOPE = sorted({tidy.norm(RA), tidy.norm(WT_A)})
+
+
+def SC(procs, folders, n=None, cpu=None, patterns=None):
+    """Scoped scan; folders is {pid: working folder}, a missing pid is an unreadable one."""
+    probe = lambda pids: {p: cpu[p] for p in pids if cpu and p in cpu}
+    return tidy.scan(procs, NOW, patterns or tidy.reaper.DEFAULT_PATTERNS, 300, 4 * 3600, 9999, n, probe,
+                     scope=SCOPE, cwds=lambda pids: {p: folders[p] for p in pids if p in folders})
+
+
+SERVER = proc(40, 1, "npm run dev", age=27000)
+r = SC([PARENT, SERVER], {40: RA}, LISTEN, CPU)
+check("cwd-in-repo dev server listed", lambda r=r: groups(r) == [("processes.idle", 40)])
+check("cwd in a linked worktree is in the repo", lambda: groups(SC([PARENT, SERVER], {40: WT_A}, LISTEN, CPU)) == [("processes.idle", 40)])
+check("cwd in another repo is not listed", lambda: not SC([PARENT, SERVER], {40: RB}, LISTEN, CPU)[0])
+check("a sibling folder with the same prefix is not inside", lambda: not SC([PARENT, SERVER], {40: RA + "-other"}, LISTEN, CPU)[0])
+check("argv path in the repo is listed when the cwd is unreadable", lambda: groups(SC(
+    [PARENT, proc(40, 1, f'node "{os.path.join(RA, "node_modules", ".bin", "vite")}"', age=27000)], {}, LISTEN, CPU)) == [("processes.idle", 40)])
+check("argv path in another repo with an unreadable cwd is not listed", lambda: not SC(
+    [PARENT, proc(40, 1, f'node "{os.path.join(RB, "node_modules", ".bin", "vite")}"', age=27000)], {}, LISTEN, CPU)[0])
+r = SC([PARENT, SERVER], {}, LISTEN, CPU)
+check("unknown cwd is never listed and is counted in a note", lambda r=r: not r[0]
+      and "1 processes with an unreadable working folder were skipped" in r[1])
+check("a readable cwd outside the repo is final, a parent inside does not pull it in", lambda: not SC(
+    [PARENT, proc(39, 1, "bash", 27100), proc(40, 39, "npm run dev", 27000)], {39: RA, 40: RB}, LISTEN, CPU)[0])
+check("an unreadable child inherits an in-repo parent", lambda: groups(SC(
+    [PARENT, proc(39, 1, "bash", 27100), proc(40, 39, "npm run dev", 27000)], {39: RA}, LISTEN, CPU)) == [("processes.idle", 40)])
+OTHER = proc(20, 1, f"node {os.path.join(RB, 'node_modules', 'next', 'dist', 'bin', 'next')} dev -p 3000", 9000)
+OTHER2 = proc(21, 1, f"node {os.path.join(RB, 'node_modules', 'next', 'dist', 'bin', 'next')} dev -p 3001", 8000)
+check("out-of-repo duplicate is not listed", lambda: not SC([PARENT, OTHER, OTHER2], {20: RB, 21: RB}, net({21: [3001]}))[0])
+check("the same duplicate inside the repo is listed", lambda: groups(SC(
+    [PARENT, OTHER, OTHER2], {20: RA, 21: RA}, net({21: [3001]}))) == [("processes.duplicates", 20)])
+STRAY = [orphan, proc(11, 10, "node worker")]
+check("in-repo stray is listed high", lambda: (lambda x: groups(x) == [("processes.strays", 10)]
+      and x[0][0]["confidence"] == "high")(SC(STRAY, {10: RA, 11: RA})))
+check("stray tree is in scope when any member is", lambda: groups(SC(STRAY, {11: RA})) == [("processes.strays", 10)])
+r = SC(STRAY, {10: RB, 11: RB})
+check("out-of-repo stray becomes one note", lambda r=r: not r[0] and len(r[1]) == 1
+      and "1 orphaned MCP trees elsewhere" in r[1][0] and "install.sh --tidy" in r[1][0])
+check("a listening stray is low", lambda: (lambda x: x[0][0]["confidence"] == "low"
+      and "listening on port 8080" in x[0][0]["evidence"])(SC(STRAY, {10: RA}, net({10: [8080]}))))
+check("editor exe is never listed", lambda: not SC([PARENT, proc(40, 1, r"C:\Apps\Code.exe --ext vite", 27000, name="Code.exe")],
+      {40: RA}, LISTEN, CPU)[0])
+CLAUDE = r"C:\Users\v\AppData\Roaming\npm\node_modules\@anthropic-ai\claude-code\cli.js"
+check("an agent CLI is never listed, found by its script", lambda: not SC(
+    [PARENT, proc(40, 1, f"node {CLAUDE} --resume vite", 27000, name="node.exe")], {40: RA}, LISTEN, CPU)[0])
+check("node.exe itself is not excluded: a dev server on node is listed", lambda: groups(SC(
+    [PARENT, proc(40, 1, "node server.js nodemon", 27000, name="node.exe")], {40: RA}, LISTEN, CPU)) == [("processes.idle", 40)])
+for command, expected in [("claude", True), (r"C:\bin\claude.exe --x", True), (CLAUDE, True), ("node /x/@openai/codex/bin/codex.js", True),
+                          ("agy chat", True), ("node C:/code/codex/server.js", False), ("node C:/code/claude/node_modules/.bin/vite", False),
+                          ("npm run dev", False)]:
+    check("agent cli " + command, lambda c=command, e=expected: tidy.agent_cli(c) == e)
+check("under() compares whole path segments", lambda: tidy.under(tidy.norm(RA), SCOPE) and tidy.under(tidy.norm(os.path.join(RA, "x", "y")), SCOPE)
+      and not tidy.under(tidy.norm(RA + "x"), SCOPE))
+# apply: the fresh scan is scoped too, so an id from another repo no longer matches
+ITEMS_B = SC([PARENT, SERVER], {40: RB}, LISTEN, CPU)[0]
+ITEMS_A = SC([PARENT, SERVER], {40: RA}, LISTEN, CPU)[0]
+check("apply refuses an id whose process is outside the scope", lambda: (lambda c, rep, left: not c and "skipped" in rep[0])(
+    *applied([good], items=ITEMS_B)))
+check("apply kills an id whose process is in scope", lambda: [t["pid"] for t in applied([good], items=ITEMS_A)[0][0]] == [40])
+
+
+check("occupied lists the roots a process works inside, any process", lambda: tidy.occupied(
+    [PARENT, proc(5, 1, "bash"), proc(6, 1, "vim x")], [RA, WT_A, RB], lambda pids: {
+        p: {5: os.path.join(WT_A, "sub"), 6: RB + "-other"}.get(p) for p in pids}) == [WT_A])
+check("occupied is empty when no folder can be read", lambda: tidy.occupied([PARENT], [RA], lambda pids: {1: None}) == [])
+
+
+# processes.unknown: in the repo, matching no pattern, listening or old; low, with facts, never an editor or shell
+PG = proc(50, 1, "postgres -D data", age=27000, name="postgres")
+r = SC([PARENT, PG], {50: RA}, net(), {50: (1.0, 1.0)})
+check("unknown: an old unmatched process in the repo is listed low with facts", lambda r=r: groups(r) == [("processes.unknown", 50)]
+      and r[0][0]["confidence"] == "low" and r[0][0]["action"] == "kill"
+      and any("working folder" in e for e in r[0][0]["evidence"]) and "not listening on any port" in r[0][0]["evidence"]
+      and "used 0.00 s CPU in 3 s" in r[0][0]["evidence"] and any("started by bash (pid 1" in e for e in r[0][0]["evidence"]))
+check("unknown: a young listening process is listed, a young silent one is not", lambda: groups(
+    SC([PARENT, proc(50, 1, "postgres", age=600, name="postgres")], {50: RA}, net({50: [5432]}))) == [("processes.unknown", 50)]
+    and not SC([PARENT, proc(50, 1, "postgres", age=600, name="postgres")], {50: RA}, net())[0])
+check("unknown: another repo and an unreadable folder are not listed", lambda: not SC([PARENT, PG], {50: RB}, net())[0]
+      and not SC([PARENT, PG], {}, net())[0])
+check("unknown: shells, editors and agents are not listed", lambda: not SC(
+    [PARENT, proc(51, 1, "bash", 27000), proc(52, 1, r"C:\Apps\Code.exe", 27000, name="Code.exe"),
+     proc(53, 1, f"node {CLAUDE}", 27000, name="node.exe"), proc(54, 1, "pwsh -NoLogo", 27000, name="pwsh.exe")],
+    {51: RA, 52: RA, 53: RA, 54: RA}, net())[0])
+check("unknown: a live MCP server and a dev server are not unknown", lambda: not SC(
+    [PARENT, proc(52, 1, "node mcp-server --x", 27000)], {52: RA}, net())[0] and groups(SC(
+        [PARENT, SERVER], {40: RA}, LISTEN, CPU)) == [("processes.idle", 40)])
+check("unknown: only the root of a process tree is an item", lambda: (lambda x: groups(x) == [("processes.unknown", 50)]
+      and x[0][0]["pids"] == [50, 51])(SC([PARENT, PG, proc(51, 50, "postgres: worker", 27000, name="postgres")], {50: RA, 51: RA}, net())))
+check("unknown: capped at 20", lambda: len(SC([PARENT] + [proc(100 + k, 1, "svc", 27000 + k, name="svc") for k in range(25)],
+                                              {100 + k: RA for k in range(25)}, net())[0]) == 20)
+check("unknown: not produced without a scope", lambda: not S([PARENT, PG], net())[0])
+
+
+def child_cwd():
+    tmp = pathlib.Path(tempfile.mkdtemp(prefix="tidyprocs_cwd_"))
+    p = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], cwd=tmp)
+    try:
+        time.sleep(1)
+        got = tidy.read_cwds([p.pid, 2 ** 22 + 1]).get(p.pid)
+        if got is None and os.name != "nt" and not pathlib.Path("/proc/self").exists() and not tidy.which("lsof"):
+            return True  # ponytail: no /proc and no lsof here, so cwd is unknown by design
+        return got is not None and tidy.norm(got) == tidy.norm(str(tmp)) and (2 ** 22 + 1) not in tidy.read_cwds([2 ** 22 + 1])
+    finally:
+        p.kill()
+        p.wait()
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+check("a child's working folder is read back exactly", child_cwd)
+check("a scope that is the home folder or a filesystem root is refused", lambda: all(subprocess.run(
+    [sys.executable, str(path), "scan", "--root", r], capture_output=True, text=True).returncode == 2
+    for r in (os.path.expanduser("~"), os.path.abspath(os.sep))))
+check("--root is required", lambda: subprocess.run([sys.executable, str(path), "scan"], capture_output=True,
+                                                   text=True).returncode == 2)
+
+
 def which_ignores_cwd():
     tmp = pathlib.Path(tempfile.mkdtemp(prefix="tidyprocs_which_"))
     old_cwd, old_path = os.getcwd(), os.environ["PATH"]
@@ -198,7 +323,7 @@ check("which never resolves through the cwd", which_ignores_cwd)
 src = path.read_text()
 check("no bare executable names or shutil.which", lambda: not re.search(r'\["(?:ss|lsof|ps)"', src) and "shutil.which" not in src)
 check("nan and negative ages are rejected", lambda: all(subprocess.run(
-    [sys.executable, str(path), "scan", flag, v], capture_output=True, text=True).returncode == 2
+    [sys.executable, str(path), "scan", "--root", str(path.parent), flag, v], capture_output=True, text=True).returncode == 2
     for flag in ("--idle-hours", "--min-age-minutes") for v in ("nan", "-1", "inf")))
 
 passed = 0
@@ -235,18 +360,29 @@ def live():
         assert (pid_a, pid_b) == (started[0].pid, started[1].pid), "unexpected node pids"
         flags = ["--idle-hours", "0", "--min-age-minutes", "0"]
         env = dict(os.environ, AGENT_KIT_MCP_PATTERNS_ONLY="1")
-        out = subprocess.run([sys.executable, str(path), "scan", "--json"] + flags, env=env,
-                             capture_output=True, text=True, check=True, timeout=90).stdout
-        items = json.loads(out)["items"]
-        mine = [i for i in items if i["pids"][0] == pid_a]
-        assert mine and mine[0]["group"] == "processes.idle", f"throwaway server not listed idle: {out[:300]}"
-        assert not any(i["pids"][0] == pid_b and i["group"] != "processes.idle" for i in items)
-        subprocess.run([sys.executable, str(path), "apply", "--ids", mine[0]["id"]] + flags, env=env,
-                       capture_output=True, text=True, check=True, timeout=90)
+
+        def scan_in(folder):
+            out = subprocess.run([sys.executable, str(path), "scan", "--json", "--root", str(folder)] + flags, env=env,
+                                 capture_output=True, text=True, check=True, timeout=90).stdout
+            return json.loads(out)["items"]
+
+        # Repo A is the scope: A's server is listed, B's (same command, other folder) is not.
+        items_a, items_b = scan_in(root / "a"), scan_in(root / "b")
+        mine = [i for i in items_a if i["pids"][0] == pid_a]
+        assert mine and mine[0]["group"] == "processes.idle", f"throwaway server not listed idle: {items_a}"
+        assert not any(i["pids"][0] == pid_b for i in items_a), "scope A listed B's server"
+        theirs = [i for i in items_b if i["pids"][0] == pid_b]
+        assert theirs and not any(i["pids"][0] == pid_a for i in items_b), "scope B did not isolate B"
+        # An id from repo B is refused while the scope is A.
+        refused = subprocess.run([sys.executable, str(path), "apply", "--ids", theirs[0]["id"], "--root", str(root / "a")]
+                                 + flags, env=env, capture_output=True, text=True, check=True, timeout=90).stdout
+        assert "skipped" in refused and pid_b in {p["pid"] for p in tidy.reaper.list_processes()}, f"B id not refused: {refused}"
+        subprocess.run([sys.executable, str(path), "apply", "--ids", mine[0]["id"], "--root", str(root / "a")] + flags,
+                       env=env, capture_output=True, text=True, check=True, timeout=90)
         alive = {p["pid"] for p in tidy.reaper.list_processes()}
         assert pid_a not in alive, "target survived apply"
         assert pid_b in alive, "apply killed a process it was not given"
-        print("PASS: tidy-procs Windows live idle server listed, apply killed only that id")
+        print("PASS: tidy-procs Windows live: A's idle server listed, B's not, a B id refused, apply killed only A's")
         return True
     except Exception as exc:
         print(f"FAIL: windows live: {exc!r}")

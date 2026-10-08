@@ -106,9 +106,17 @@ def t_gone():
     return "branch:open-feat" in ids(d)
 
 
-def wt(d, name, branch=None):
+def wt(d, name, branch=None, fresh=False):
+    """A linked worktree. By default the usual stale one: its branch did work that was merged into the main
+    checkout's branch (--no-ff, so the tips differ), or, detached, the main branch has moved on past it.
+    fresh=True is the brand-new one an agent has just made: same tip as the default, no commits."""
     p = TMP / f"{d.name}-{name}"
     g(d, "worktree", "add", "-q", *(["-b", branch] if branch else ["--detach"]), str(p))
+    if not fresh and branch:
+        g(p, "commit", "-q", "--allow-empty", "-m", "work")
+        g(d, "merge", "-q", "--no-ff", branch, "-m", "merge")
+    elif not fresh:
+        g(d, "commit", "-q", "--allow-empty", "-m", "main moves on")
     return p
 
 
@@ -149,7 +157,8 @@ def t_tool_leftovers():
     write(d / "Screenshot-tracked.png"), g(d, "add", "Screenshot-tracked.png"), g(d, "commit", "-q", "-m", "t")
     write(d / "sub/run.trace.zip")
     (d / ".claude/worktrees/empty").mkdir(parents=True)
-    s = ids(d)
+    # tool_leftovers only: the unknown group lists the fresh untracked screenshot at low, by design
+    s = {i["id"] for i in scan(d)["items"] if i["group"] == "tool_leftovers"}
     return ({"path:.playwright-mcp", "path:Screenshot-1.png", "path:sub/run.trace.zip",
              "path:.claude/worktrees/empty"} <= s
             and "path:Screenshot-new.png" not in s and "path:Screenshot-tracked.png" not in s)
@@ -203,12 +212,17 @@ def cand_repo():
 
 def t_candidates():
     d = cand_repo()
-    items = {i["id"]: i for i in scan(d)["items"]}
+    everything = scan(d)["items"]
+    items = {i["id"]: i for i in everything if i["group"] == "candidates"}
     rel = items["path:release-plan.md"]
+    # The candidates group still never takes ignored or fresh files. They are no longer invisible: the unknown
+    # group lists the untracked and ignored ones at low for the agent to judge (tracked old-plan.md stays out).
+    unknown_ids = {i["id"] for i in everything if i["group"] == "unknown"}
     return ("path:notes.bak" in items and rel["confidence"] == "low" and "CANDIDATE" in rel["label"]
             and any("README.md" in e for e in rel["evidence"])
             and not ({"path:old-plan.md", "path:ignored-plan.md", "path:lessons.md", "path:enhancements.md",
-                      "path:scratch-ign.tmp", "path:fresh-plan.md"} & set(items)))
+                      "path:scratch-ign.tmp", "path:fresh-plan.md"} & set(items))
+            and {"path:lessons.md", "path:fresh-plan.md"} <= unknown_ids and "path:old-plan.md" not in unknown_ids)
 
 
 def t_apply_exact():
@@ -302,7 +316,7 @@ def t_procs():
     miss = scan(d, env=dict(ENV, AGENT_KIT_TIDY_PROCS=str(TMP / "nope.py"), AGENT_KIT_TIDY_TEST="1"))
     return (len(p) == 1 and p[0]["group"] == "processes.strays" and p[0]["action"] == "kill"
             and "proc:42" in (log.read_text() if log.exists() else "") and r.returncode == 0
-            and miss["notes"] and miss["version"] == 1)
+            and miss["notes"] and miss["version"] == 2)
 
 
 def t_not_repo():
@@ -487,14 +501,14 @@ def t_commands_use_resolved_git():
     def rec(args, *a, **k):
         seen.append(list(args))
         return real(args, *a, **k)
-    keep = mod.proc_items
-    mod.subprocess.run, mod.proc_items = rec, lambda notes: []
+    keep, keep_occ = mod.proc_items, mod.occupied_folders
+    mod.subprocess.run, mod.proc_items, mod.occupied_folders = rec, lambda notes, roots: [], lambda paths: set()
     try:
         mod.scan_all(str(d), 14)
         mod.toplevel(str(d))
         mod.act(str(d), dict(id="branch:nope", action="delete_branch"), False)
     finally:
-        mod.subprocess.run, mod.proc_items = real, keep
+        mod.subprocess.run, mod.proc_items, mod.occupied_folders = real, keep, keep_occ
     pre = ["-c", "core.fsmonitor=false", "--no-optional-locks", "--literal-pathspecs"]
     return len(seen) > 10 and all(c[0] == mod.GIT and os.path.isabs(c[0]) and c[1:5] == pre for c in seen)
 
@@ -576,7 +590,7 @@ def t_apply_requires_root():
 def t_apply_other_root_leaves_first_repo():
     d1, d2 = mk(), mk()
     for d in (d1, d2):
-        write(d / "test-results/a.txt", old=False)
+        write(d / "test-results/a.txt")  # old: a folder touched in the last hour is not offered
     r = tidy("apply", "--ids", "path:test-results", "--root", str(d2), cwd=d1)
     return r.returncode == 0 and (d1 / "test-results/a.txt").exists() and not (d2 / "test-results").exists()
 
@@ -659,6 +673,276 @@ def t_scan_records_is_dir():
     write(d / "x.bak"), write(d / ".playwright-mcp/y.txt")
     byid = {i["id"]: i for i in scan(d)["items"]}
     return byid["path:x.bak"]["is_dir"] is False and byid["path:.playwright-mcp"]["is_dir"] is True
+
+
+# --- repo-scoped tidy: what the owner wants kept is never offered ---
+
+def ll_repo():
+    """origin/HEAD names develop; main, release/*, hotfix/* and friends are all merged into it."""
+    d = branch_repo()
+    bare = TMP / f"bare-ll{counter[0]}.git"
+    g(TMP, "init", "-q", "--bare", "-b", "main", str(bare))
+    g(d, "remote", "add", "origin", str(bare))
+    g(d, "checkout", "-q", "-b", "develop"), write(d / "dev.txt", old=False)
+    g(d, "add", "."), g(d, "commit", "-q", "-m", "dev")
+    for name in ("release/1.0", "hotfix/x", "staging", "prod", "trunk", "gh-pages", "master"):
+        g(d, "branch", name)
+    g(d, "push", "-q", "origin", "main", "develop")
+    g(d, "remote", "set-head", "origin", "develop")
+    return d
+
+
+def t_long_lived_branches_protected():
+    d = ll_repo()
+    s = ids(d)
+    kept = {"branch:" + n for n in ("main", "master", "develop", "release/1.0", "hotfix/x", "staging", "prod",
+                                    "trunk", "gh-pages")}
+    return "branch:merged-feat" in s and not (s & kept)
+
+
+def t_long_lived_worktree_branch_not_deleted():
+    d = ll_repo()
+    w = wt(d, "rel", "release/2.0")
+    g(d, "push", "-q", "origin", "develop")  # the default here is origin/develop: publish the merge
+    it ={i["id"]: i for i in scan(d)["items"]}.get(wid(w))
+    r = tidy("apply", "--ids", wid(w), "--root", str(d))
+    return (it is not None and "and branch" not in it["label"] and r.returncode == 0 and not w.exists()
+            and "release/2.0" in branches(d))
+
+
+def tool_item(d, rel="test-results"):
+    """The tool_leftovers item for rel. (The unknown group may list a fresh folder at low; that is its job.)"""
+    return {i["id"]: i for i in scan(d)["items"] if i["group"] == "tool_leftovers"}.get("path:" + rel)
+
+
+def t_tool_dir_with_notes_is_low():
+    d = mk()
+    write(d / ".gitignore", "test-results/\n", old=False), g(d, "add", "."), g(d, "commit", "-q", "-m", "ign")
+    write(d / "test-results/a.png"), write(d / "test-results/analysis.md", "my real notes\n")
+    it = tool_item(d)
+    return it is not None and it["confidence"] == "low" and any("analysis.md" in e for e in it["evidence"])
+
+
+def t_tool_dir_artefacts_stay_high():
+    d = mk()
+    write(d / "test-results/a.png"), write(d / "test-results/.last-run.json", "{}")
+    it = tool_item(d)
+    return it is not None and it["confidence"] == "high"
+
+
+def t_tool_dir_fresh_not_listed():
+    d = mk()
+    write(d / "test-results/a.png", old=False)
+    return tool_item(d) is None
+
+
+def t_tool_dir_nested_git_refused():
+    d = mk()
+    (d / "test-results/proj").mkdir(parents=True), g(d / "test-results/proj", "init", "-q")
+    write(d / "test-results/a.png")
+    return tool_item(d) is None
+
+
+def t_tool_dir_info_exclude_not_listed():
+    d = mk()
+    (d / ".git/info").mkdir(exist_ok=True)
+    (d / ".git/info/exclude").write_text("test-results/\n")
+    write(d / "test-results/a.png")
+    return tool_item(d) is None
+
+
+def t_tool_dir_in_subfolder_found():
+    d = mk()
+    write(d / "packages/web/test-results/a.png")
+    it = tool_item(d, "packages/web/test-results")
+    return it is not None and it["confidence"] == "high"
+
+
+def recording_procs(logfile):
+    p = TMP / "recording-procs.py"
+    p.write_text(f"""import json, sys
+open({str(logfile)!r}, "a").write(json.dumps(sys.argv[1:]) + "\\n")
+if sys.argv[1] == "scan":
+    print(json.dumps({{"version": 1, "notes": ["from procs"], "items": []}}))
+""")
+    return p
+
+
+def logged_roots(logfile):
+    calls = [json.loads(line) for line in logfile.read_text().splitlines()]
+    return calls, [{os.path.normcase(os.path.realpath(c[i + 1])) for i, a in enumerate(c) if a == "--root"} for c in calls]
+
+
+def t_scope_roots_reach_both_hops():
+    d = mk()
+    w = wt(d, "scope", "wscope")
+    log = TMP / "scope-args.txt"
+    env = dict(ENV, AGENT_KIT_TIDY_PROCS=str(recording_procs(log)), AGENT_KIT_TIDY_TEST="1")
+    j = scan(d, env=env)
+    tidy("apply", "--ids", "proc:42:1", "--root", str(d), env=env)
+    calls, roots = logged_roots(log)
+    want = {os.path.normcase(os.path.realpath(x)) for x in (d, w)}
+    hops = [(c[0], r) for c, r in zip(calls, roots) if c[0] in ("scan", "apply")]  # 'occupied' is a third call
+    return hops == [("scan", want), ("apply", want)] and "from procs" in j["notes"]
+
+
+def t_scope_outside_a_repo_is_the_folder():
+    plain = TMP / "plain-scope"
+    plain.mkdir()
+    log = TMP / "scope-args2.txt"
+    env = dict(ENV, AGENT_KIT_TIDY_PROCS=str(recording_procs(log)), AGENT_KIT_TIDY_TEST="1", GIT_CEILING_DIRECTORIES=str(TMP))
+    tidy("scan", "--json", "--root", str(plain), env=env)
+    calls, roots = logged_roots(log)
+    return roots == [{os.path.normcase(os.path.realpath(plain))}]
+
+
+def t_worktree_with_a_running_process_is_skipped():
+    d = mk()
+    w, other = wt(d, "busy", "wbusy"), wt(d, "idle", "widle")
+    p = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"], cwd=w)
+    try:
+        time.sleep(1)
+        j = scan(d)
+        busy_skipped = wid(w) not in {i["id"] for i in j["items"]} and any(w.name in n for n in j["notes"])
+        other_listed = wid(other) in {i["id"] for i in j["items"]}
+    finally:
+        p.kill()
+        p.wait()
+    return busy_skipped and other_listed and wid(w) in ids(d)
+
+
+def t_worktree_busy_check_failure_is_low():
+    d = mk()
+    w = wt(d, "unchecked", "wunchecked")
+    env = dict(ENV, AGENT_KIT_TIDY_PROCS=str(fake_procs(TMP / "z.txt")), AGENT_KIT_TIDY_TEST="1")
+    it = {i["id"]: i for i in scan(d, env=env)["items"]}[wid(w)]  # the fake answers 'occupied' with nothing usable
+    return it["confidence"] == "low" and any("could not check" in e for e in it["evidence"])
+
+
+# --- the unknown group: facts about leftovers no pattern names, for the agent to judge ---
+
+def unk_repo():
+    d = mk()
+    write(d / ".gitignore", "coverage/\nnode_modules/\n.env*\n", old=False), g(d, "add", "."), g(d, "commit", "-q", "-m", "ign")
+    write(d / ".kilo/worktrees/x/file.txt"), write(d / "debug-output.txt"), write(d / "coverage/lcov.info", "x" * 10)
+    write(d / ".env.backup", "SECRET=hunter2\n"), write(d / "node_modules/pkg/index.js")
+    n = d / "vendor/clone"
+    n.mkdir(parents=True), g(n, "init", "-q", "-b", "main"), write(n / "a.txt")
+    return d
+
+
+def unknown(d, *extra):
+    j = scan(d, *extra)
+    return {i["id"]: i for i in j["items"] if i["group"] == "unknown"}, j
+
+
+def t_unknown_lists_odd_leftovers():
+    d = unk_repo()
+    u, _ = unknown(d)
+    return ({"path:.kilo", "path:debug-output.txt", "path:coverage"} <= set(u)
+            and all(i["confidence"] == "low" and i["action"] == "delete_path" for i in u.values()))
+
+
+def t_unknown_states_facts():
+    d = unk_repo()
+    u, _ = unknown(d)
+    f, cov, kilo = u["path:debug-output.txt"], u["path:coverage"], u["path:.kilo"]
+    return ("untracked file" in f["evidence"] and f"size {(d / 'debug-output.txt').stat().st_size} bytes" in f["evidence"]
+            and any(e.startswith("newest file 40 days old") for e in f["evidence"])
+            and "not referenced by any tracked file" in f["evidence"]
+            and "git-ignored folder" in cov["evidence"] and "1 files" in cov["evidence"]
+            and any(e.startswith("ignored by .gitignore:") for e in cov["evidence"])
+            and "untracked folder" in kilo["evidence"] and any("mostly .txt" in e for e in kilo["evidence"]))
+
+
+def t_unknown_never_secret():
+    d = unk_repo()
+    u, j = unknown(d)
+    raw = tidy("scan", "--json", "--root", str(d)).stdout
+    return (not any(".env" in k for k in u) and any(".env.backup" in n and "not listed" in n for n in j["notes"])
+            and "hunter2" not in raw and "SECRET" not in raw)
+
+
+def t_unknown_secret_inside_a_folder_hides_the_folder():
+    d = mk()
+    write(d / "config/.env.local", "K=v\n"), write(d / "config/a.txt")
+    u, j = unknown(d)
+    return "path:config" not in u and any("config" in n and "not listed" in n for n in j["notes"])
+
+
+def t_unknown_skips_info_exclude():
+    d = mk()
+    (d / ".git/info").mkdir(exist_ok=True)
+    (d / ".git/info/exclude").write_text("private-notes/\n")
+    write(d / "private-notes/a.txt"), write(d / "other.dat")
+    u, j = unknown(d)
+    return ("path:private-notes" not in u and "path:other.dat" in u
+            and any("1 entries hidden by .git/info/exclude" in n for n in j["notes"]))
+
+
+def t_unknown_skips_node_modules_and_nested_repo():
+    d = unk_repo()
+    u, _ = unknown(d)
+    return not any(k.startswith(("path:node_modules", "path:vendor")) for k in u)
+
+
+def t_unknown_skips_linked_worktree_and_claimed_paths():
+    d = mk()
+    n = d / ".claude/worktrees/w1"
+    g(d, "worktree", "add", "-q", "-b", "nestw", str(n))
+    write(d / "scratch.log")  # a candidate: the candidates group owns it
+    write(d / ".playwright-mcp/a.png")  # a tool folder: tool_leftovers owns it
+    u, j = unknown(d)
+    claimed = {i["id"] for i in j["items"] if i["group"] != "unknown"}
+    return (not any(k.startswith("path:.claude") for k in u) and "path:scratch.log" in claimed
+            and "path:scratch.log" not in u and "path:.playwright-mcp" not in u)
+
+
+def t_unknown_is_capped_with_a_note():
+    d = mk()
+    for k in range(45):
+        write(d / f"junk{k:02}.dat", "x" * (k + 1))
+    u, j = unknown(d)
+    return len(u) == 40 and "path:junk44.dat" in u and "path:junk00.dat" not in u and any("40 of 45" in n for n in j["notes"])
+
+
+def t_unknown_item_is_applied_like_any_path():
+    d = mk()
+    write(d / "debug-output.txt"), write(d / "keep.dat")
+    r = tidy("apply", "--id", "path:debug-output.txt", "--root", str(d))
+    return r.returncode == 0 and not (d / "debug-output.txt").exists() and (d / "keep.dat").exists()
+
+
+def t_scan_version_is_2():
+    return scan(mk())["version"] == 2
+
+
+def wt_item(d, w):
+    return {i["id"]: i for i in scan(d)["items"]}.get(wid(w))
+
+
+def t_fresh_worktree_not_offered():
+    d = mk()
+    w, det = wt(d, "fresh", "fresh-agent", fresh=True), wt(d, "freshdet", fresh=True)
+    s = ids(d)
+    return wid(w) not in s and wid(det) not in s
+
+
+def t_old_worktree_without_commits_is_low():
+    d = mk()
+    w = wt(d, "oldfresh", "oldfresh", fresh=True)
+    os.utime(w / ".git", (OLD, OLD))  # the checkout is older than the stale age
+    it = wt_item(d, w)
+    return it is not None and it["confidence"] == "low" and any("no commits of its own" in e for e in it["evidence"])
+
+
+def t_branch_without_own_commits_is_low():
+    d = branch_repo()
+    g(d, "branch", "just-made")
+    byid = {i["id"]: i for i in scan(d)["items"]}
+    it = byid["branch:just-made"]
+    return (it["confidence"] == "low" and any("no commits of its own" in e for e in it["evidence"])
+            and byid["branch:merged-feat"]["confidence"] == "high")
 
 
 cases = [(n[2:], f) for n, f in sorted(globals().items()) if n.startswith("t_") and callable(f)]

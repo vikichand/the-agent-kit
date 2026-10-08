@@ -11,7 +11,13 @@ import subprocess
 import sys
 import time
 
-TOOL_DIRS = (".playwright-mcp", "playwright-report", "test-results")
+_MEDIA = {"png", "jpg", "jpeg", "webm", "zip", "json", "xml", "html", "yml"}
+# Folder name -> file types that are tool output in it. Anything else inside may be the user's (notes in a
+# generic name like test-results), so the folder drops to low and the odd files are named.
+TOOL_DIRS = {".playwright-mcp": _MEDIA | {"yaml", "md", "log", "txt"},
+             "playwright-report": _MEDIA | {"js", "css", "svg", "woff", "woff2", "ico", "map"},
+             "test-results": _MEDIA}
+FRESH_S = 3600  # a tool folder written in the last hour may belong to a run the user has not looked at yet
 SCREENSHOTS = ("Screenshot*.png", "screenshot-*.png", "page-*.png", "*-snapshot.yml")
 CANDIDATES = ("*-plan.md", "*_plan.md", "plan-*.md", "*.orig", "*.rej", "*.bak", "*.tmp", "*~",
               "scratch*", "Untitled*", "*.log")
@@ -44,18 +50,19 @@ def clean(text):
     return re.sub(r"[\x00-\x1f\x7f-\x9f\u200e\u200f\u2028-\u202e\u2066-\u2069]", " ", str(text))
 
 
-def run(args, cwd=None):
-    return subprocess.run(args, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+def run(args, cwd=None, input=None):
+    return subprocess.run(args, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                          input=input)
 
 
-def run_git(args, cwd=None):
+def run_git(args, cwd=None, input=None):
     if not GIT:
         raise SystemExit("tidy-scan: git not found on PATH")
-    return run([GIT, *GIT_PREFIX, *args], cwd=cwd)
+    return run([GIT, *GIT_PREFIX, *args], cwd=cwd, input=input)
 
 
-def git(root, *args):
-    return run_git(["-C", root, *args])
+def git(root, *args, input=None):
+    return run_git(["-C", root, *args], input=input)
 
 
 def toplevel(cwd):
@@ -103,6 +110,32 @@ def is_ancestor(root, rev, default):
     return git(root, "merge-base", "--is-ancestor", rev, default).returncode == 0
 
 
+def commit_of(root, ref):
+    r = git(root, "rev-parse", "--verify", "-q", ref + "^{commit}")
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def no_commits(default):
+    return f"no commits of its own (its tip equals {default}); it may be new"
+
+
+def checkout_age_days(path):
+    """Age of a linked worktree: its .git file is written once, when it is made. Unknown counts as brand new."""
+    try:
+        return age_days(os.path.join(path, ".git"))
+    except OSError:
+        return 0
+
+
+LONG_LIVED = ("main", "master", "develop", "dev", "trunk", "staging", "production", "prod", "gh-pages",
+              "release/*", "hotfix/*")
+
+
+def long_lived(name, default):
+    """Branches the owner keeps on purpose: they are merged into the default by design, not leftovers."""
+    return name == default.removeprefix("origin/") or any(fnmatch.fnmatch(name, p) for p in LONG_LIVED)
+
+
 def branch_items(root, default, wts):
     if not default:
         return []
@@ -110,10 +143,11 @@ def branch_items(root, default, wts):
     cur = git(root, "branch", "--show-current").stdout.strip()
     held = {w["branch"].removeprefix("refs/heads/") for w in wts if "branch" in w} | {cur}
     out = []
-    fmt = "%(refname:short)\x1f%(upstream:track)\x1f%(committerdate:short)\x1f%(subject)"
+    tip = commit_of(root, default)
+    fmt = "%(refname:short)\x1f%(objectname)\x1f%(upstream:track)\x1f%(committerdate:short)\x1f%(subject)"
     for line in git(root, "for-each-ref", "refs/heads", f"--format={fmt}").stdout.splitlines():
-        name, track, date, subject = line.split("\x1f", 3)
-        if name in held or name == default.removeprefix("origin/"):
+        name, sha, track, date, subject = line.split("\x1f", 4)
+        if name in held or long_lived(name, default):
             continue
         gone = track == "[gone]"
         if name not in merged and not gone:
@@ -124,6 +158,9 @@ def branch_items(root, default, wts):
         if name not in merged:
             ev.append(f"has commits not on {default}; git branch -d may refuse")
             conf = "medium"  # ponytail: squash-merged branches land here, -d is the safety net
+        elif sha == tip:  # "merged" only because nothing was ever committed: it may be brand new
+            ev.append(no_commits(default))
+            conf = "low"
         out.append(item("branch:" + name, "branches", f"branch {name}", ev, conf, None, "delete_branch"))
     return out
 
@@ -149,7 +186,7 @@ def wt_branch(root, w, default):
     """The branch removing this worktree also deletes: its own, only when merged into default. The label and
     act() both read this, so what the user approved is what runs."""
     br = w.get("branch", "").removeprefix("refs/heads/")
-    if br and br != default.removeprefix("origin/") and is_ancestor(root, "refs/heads/" + br, default):
+    if br and not long_lived(br, default) and is_ancestor(root, "refs/heads/" + br, default):
         return br
     return None
 
@@ -169,8 +206,9 @@ def ignored_evidence(path, files):
     return ev
 
 
-def worktree_items(root, default):
-    out = []
+def worktree_items(root, default, stale, notes):
+    out, busy = [], []
+    tip = commit_of(root, default)
     here = os.path.realpath(root)
     for w in worktrees(root)[1:]:
         if os.path.realpath(w["path"]) == here:
@@ -192,11 +230,24 @@ def worktree_items(root, default):
         if br and is_ancestor(root, "refs/heads/" + br, default):
             ev, conf = ["clean", f"branch {br} merged into {default}"], "high"
             label = f"worktree {path}" + (f" and branch {bd}" if bd else "")
+            same_tip = commit_of(root, "refs/heads/" + br) == tip
         elif not br and "HEAD" in w and is_ancestor(root, w["HEAD"], default):
             ev, conf = ["clean", f"detached at a commit reachable from {default}"], "medium"
             label = f"worktree {path}"
+            same_tip = w["HEAD"] == tip
         else:
             continue
+        if same_tip:  # nothing was ever committed, so "merged" is vacuous: this may be a worktree made minutes ago
+            if checkout_age_days(path) < stale:
+                continue
+            ev, conf = ev + [no_commits(default)], "low"
+        if not busy:  # one process listing for all linked worktrees, and only when one would be offered
+            busy.append(occupied_folders([x["path"] for x in worktrees(root)[1:]]))
+        if busy[0] is not None and path in busy[0]:  # an agent or a terminal is working in it right now
+            notes.append(f"worktree {clean(path)} skipped: a process is running in it")
+            continue
+        if busy[0] is None:
+            ev, conf = ev + ["could not check whether a process is running in it"], "low"
         files = ignored_files(path) if st.returncode == 0 else None
         if files is None:  # a failed git status is not "no ignored files"
             why = (st.stderr.strip().splitlines() or ["git status failed"])[0][:120]
@@ -246,22 +297,68 @@ def has_tracked(tracked, rel):
     return tracked.has(rel)
 
 
+def ignore_sources(root, rels):
+    """{path: (source, line, pattern)} for the paths git ignores (absent: not ignored); None when git cannot say.
+    .git/info/exclude is the owner's private list. check-ignore rejects --literal-pathspecs, so it skips GIT_PREFIX's
+    last option; the paths are sent on stdin, never parsed as pathspecs."""
+    if not rels:
+        return {}
+    r = run([GIT, *GIT_PREFIX[:-1], "-C", root, "check-ignore", "-v", "-z", "--stdin"],
+            input="".join(p + "\0" for p in rels))
+    if r.returncode > 1:
+        return None
+    f = r.stdout.split("\0")
+    return {f[i + 3]: (f[i].replace("\\", "/"), f[i + 1], f[i + 2]) for i in range(0, len(f) - 3, 4)}
+
+
+def exclude_source(root, rel):
+    """Where git's ignore rule for rel comes from: '' when not ignored, None when git cannot say."""
+    found = ignore_sources(root, [rel])
+    return None if found is None else found.get(rel, ("",))[0]
+
+
+def inspect_tool_dir(p, allowed):
+    """(newest mtime inside, files that are not tool output, holds a nested .git)."""
+    newest, odd, nested = 0, [], False
+    for base, dirs, files in os.walk(p):
+        nested = nested or ".git" in dirs or ".git" in files
+        for f in files:
+            full = os.path.join(base, f)
+            newest = max(newest, os.lstat(full).st_mtime)  # the folder's own mtime says nothing about its files
+            ext = f.rsplit(".", 1)[-1].lower() if "." in f else ""
+            if ext not in allowed and f != "error-context.md":  # Playwright writes this one into test-results
+                odd.append(os.path.relpath(full, p).replace(os.sep, "/"))
+    return newest or os.lstat(p).st_mtime, odd, nested
+
+
 def leftover_items(root, tracked, stale, wts):
     out = []
     linked = {os.path.realpath(w["path"]) for w in wts[1:]}  # nested checkouts hold their own tracked files
 
-    def add(rel, why, conf):
+    def add(rel, why, conf, extra=()):
         p = os.path.join(root, rel)
         out.append(item("path:" + rel, "tool_leftovers", f"{rel} ({why})",
-                        [why, f"size {size_of(p)} bytes", f"age {age_days(p):.0f} days"], conf,
+                        [why, f"size {size_of(p)} bytes", f"age {age_days(p):.0f} days", *extra], conf,
                         size_of(p), "delete_path", is_dir=plain_dir(p)))
 
-    for d in TOOL_DIRS:
-        if os.path.isdir(os.path.join(root, d)) and not has_tracked(tracked, d):
-            add(d, "generated tool output folder", "high")
+    def add_tool_dir(rel, name):
+        newest, odd, nested = inspect_tool_dir(os.path.join(root, rel), TOOL_DIRS[name])
+        source = exclude_source(root, rel)
+        if nested or time.time() - newest < FRESH_S or has_tracked(tracked, rel) or source is None \
+                or source.endswith("info/exclude"):
+            return
+        if odd:
+            names = ", ".join(odd[:5]) + (f" and {len(odd) - 5} more" if len(odd) > 5 else "")
+            add(rel, "tool output folder that also holds other files", "low", [f"not tool output: {names}"])
+        else:
+            add(rel, "generated tool output folder", "high")
+
     for base, dirs, files in os.walk(root):
         dirs[:] = [d for d in dirs if d not in SKIP_WALK and os.path.realpath(os.path.join(base, d)) not in linked
                    and not os.path.lexists(os.path.join(base, d, ".git"))]  # a nested clone tracks its own files
+        for d in [d for d in dirs if d in TOOL_DIRS]:
+            add_tool_dir(os.path.relpath(os.path.join(base, d), root).replace(os.sep, "/"), d)
+            dirs.remove(d)  # its contents are part of that one item
         for f in files:
             rel = os.path.relpath(os.path.join(base, f), root).replace(os.sep, "/")
             loose = base == root and any(fnmatch.fnmatch(f, p) for p in SCREENSHOTS)
@@ -299,18 +396,134 @@ def candidate_items(root, stale, seen):
     return out
 
 
+SECRET_NAME = re.compile(r"^\.env|\.pem$|\.key$|^id_rsa|^id_ed25519|credential|secret|^\.npmrc$|^\.pypirc$|\.p12$|\.pfx$", re.I)
+# Expensive to rebuild, or a running dev server uses them; lockfiles are never leftovers.
+NEVER_LIST = {"node_modules", ".venv", "venv", ".next", ".nuxt", ".svelte-kit", "dist", "build", "target",
+              "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".git",
+              "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "poetry.lock", "uv.lock", "Cargo.lock", "Gemfile.lock"}
+MAX_UNKNOWN = 40
+
+
+def look_inside(path):
+    """(bytes, files, newest mtime, extensions, secret-like names, holds a nested repo). Names and sizes only, never contents."""
+    if os.path.islink(path) or os.path.isfile(path):
+        st = os.lstat(path)
+        return st.st_size, 1, st.st_mtime, [os.path.splitext(path)[1].lower()], [], False
+    size, count, newest, exts, secrets, nested = 0, 0, os.lstat(path).st_mtime, {}, [], False
+    for base, dirs, files in os.walk(path):
+        nested = nested or ".git" in dirs or ".git" in files
+        for f in files:
+            if SECRET_NAME.search(f):
+                secrets.append(f)
+                continue
+            st = os.lstat(os.path.join(base, f))
+            size, count, newest = size + st.st_size, count + 1, max(newest, st.st_mtime) if count else st.st_mtime
+            ext = os.path.splitext(f)[1].lower()
+            exts[ext] = exts.get(ext, 0) + 1
+    return size, count, newest, sorted(exts, key=lambda e: -exts[e])[:3], secrets, nested
+
+
+def unknown_items(root, claimed, linked, notes):
+    """Untracked and git-ignored paths that no other group names, with facts only. The agent judges them (SKILL.md)."""
+    r = git(root, "status", "--porcelain=v1", "-z", "--ignored=matching", "--untracked-files=normal")
+    if r.returncode != 0:
+        notes.append("unknown group skipped: git status failed")
+        return []
+    entries = [(e[:2], e[3:]) for e in r.stdout.split("\0") if e[:2] in ("??", "!!")]
+    sources = ignore_sources(root, [rel for st, rel in entries if st == "!!"])
+    if sources is None:
+        notes.append("unknown group skipped: git check-ignore failed")
+        return []
+    found, secret_names, private = [], [], 0
+    for st, rel in entries:
+        parts = rel.rstrip("/").split("/")
+        p = os.path.join(root, *parts)
+        real = os.path.realpath(p)
+        cid = "path:" + "/".join(parts)
+        if (NEVER_LIST & set(parts) or any(real == w or w.startswith(real + os.sep) or real.startswith(w + os.sep)
+                                           for w in linked)
+                or any(c == cid or c.startswith(cid + "/") or cid.startswith(c + "/") for c in claimed)
+                or not os.path.lexists(p)):
+            continue
+        if sources.get(rel, ("",))[0].endswith("info/exclude"):
+            private += 1  # the owner's deliberate private list
+            continue
+        if SECRET_NAME.search(parts[-1]):
+            secret_names.append(rel)
+            continue
+        size, count, newest, exts, secrets, nested = look_inside(p)
+        if secrets:
+            secret_names.append(rel + " (holds secret-like files)")
+        if secrets or nested:
+            continue
+        found.append(dict(rel="/".join(parts), is_dir=plain_dir(p), size=size, count=count, newest=newest, exts=exts,
+                          ignored=sources.get(rel)))
+    if secret_names:
+        notes.append("secret-like files present, not listed (names only): " + ", ".join(secret_names[:5])
+                     + (f" and {len(secret_names) - 5} more" if len(secret_names) > 5 else ""))
+    if private:
+        notes.append(f"{private} entries hidden by .git/info/exclude were not listed")
+    found.sort(key=lambda f: (-f["size"], f["newest"]))  # biggest, then oldest, first
+    if len(found) > MAX_UNKNOWN:
+        notes.append(f"unknown group shows {MAX_UNKNOWN} of {len(found)}; the rest were left out")
+    out = []
+    for f in found[:MAX_UNKNOWN]:
+        base = f["rel"].rsplit("/", 1)[-1]
+        refs = git(root, "grep", "-l", "-F", "-e", base).stdout.split() if len(base) > 2 else []
+        ev = [("git-ignored " if f["ignored"] else "untracked ") + ("folder" if f["is_dir"] else "file"),
+              f"size {f['size']} bytes"]
+        if f["is_dir"]:
+            ev.append(f"{f['count']} files")
+        ev.append(f"newest file {(time.time() - f['newest']) / 86400:.0f} days old")
+        if f["ignored"]:
+            ev.append("ignored by " + ":".join(f["ignored"][:3]))
+        ev.append("referenced by " + ", ".join(refs[:3]) if refs else "not referenced by any tracked file")
+        if f["exts"] and f["is_dir"]:
+            ev.append("mostly " + ", ".join(e or "(no extension)" for e in f["exts"]))
+        out.append(item("path:" + f["rel"], "unknown", f"UNKNOWN {f['rel']}", ev, "low", f["size"], "delete_path",
+                        is_dir=f["is_dir"]))
+    return out
+
+
 def procs_script():
     override = os.environ.get("AGENT_KIT_TIDY_PROCS") if os.environ.get("AGENT_KIT_TIDY_TEST") == "1" else None
     return override or os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                                                    "tidy-procs.py")
 
 
-def proc_items(notes):
+def scope_roots(root, folder):
+    """The folders whose processes are this repository's: its root and every linked worktree (a dev server in an
+    agent's worktree belongs to the repo). Outside a repository: just the folder."""
+    if not root:
+        return [os.path.abspath(folder or os.getcwd())]
+    return list(dict.fromkeys([root] + [w["path"] for w in worktrees(root)]))
+
+
+def root_args(roots):
+    return [a for r in roots for a in ("--root", r)]
+
+
+def occupied_folders(paths):
+    """The paths a process is working inside right now (any process); None when that cannot be checked."""
+    script = procs_script()
+    if not os.path.isfile(script):
+        return None
+    r = run([sys.executable, script, "occupied", *root_args(paths)])
+    try:
+        assert r.returncode == 0
+        found = json.loads(r.stdout)
+        assert isinstance(found, list)
+        return set(found)
+    except Exception:
+        return None
+
+
+def proc_items(notes, roots):
     script = procs_script()
     if not os.path.isfile(script):
         notes.append(f"process group skipped: {script} not found")
         return []
-    r = run([sys.executable, script, "scan", "--json"])
+    r = run([sys.executable, script, "scan", "--json", *root_args(roots)])
     try:
         assert r.returncode == 0
         items = json.loads(r.stdout)["items"]
@@ -318,13 +531,14 @@ def proc_items(notes):
         for i in items:
             i["label"] = clean(i.get("label", ""))
             i["evidence"] = [clean(e) for e in i.get("evidence", [])]
+        notes.extend(clean(n) for n in json.loads(r.stdout).get("notes", []))
         return items
     except Exception:
         notes.append(f"process group skipped: tidy-procs scan failed ({clean(r.stderr.strip()[:200]) or 'bad output'})")
         return []
 
 
-def scan_all(root, stale):
+def scan_all(root, stale, folder=None):
     notes = []
     items = []
     if root:
@@ -333,17 +547,19 @@ def scan_all(root, stale):
             notes.append("no default branch found (origin/HEAD, main, master): branches and worktrees skipped")
         wts = worktrees(root)
         tracked = tracked_set(root)
-        items += branch_items(root, default, wts) + worktree_items(root, default)
+        items += branch_items(root, default, wts) + worktree_items(root, default, stale, notes)
         leftovers = leftover_items(root, tracked, stale, wts)
         items += leftovers + candidate_items(root, stale, {i["id"] for i in leftovers})
+        items += unknown_items(root, {i["id"] for i in items if i["id"].startswith("path:")},
+                               {os.path.realpath(w["path"]) for w in wts[1:]}, notes)
         # ids travel in a comma-separated --ids list; a comma in a name could smuggle in a second id
         kept = [i for i in items if "," not in i["id"]]
         if len(kept) != len(items):
             notes.append(f"skipped {len(items) - len(kept)} items with a comma in the name")
         items = kept
     else:
-        notes.append("not inside a git repository: only the process group was scanned")
-    return dict(version=1, root=root, notes=notes, items=items + proc_items(notes))
+        notes.append("not inside a git repository: only the process group was scanned, for this folder")
+    return dict(version=2, root=root, notes=notes, items=items + proc_items(notes, scope_roots(root, folder)))
 
 
 def human(result):
@@ -484,7 +700,9 @@ def apply(args):
         log_line(i, it["label"], result, root)
     if procs:
         script = procs_script()
-        cmd = [sys.executable, script, "apply", "--ids", ",".join(procs)] + (["--dry-run"] if args.dry_run else [])
+        # The same scope as the scan: tidy-procs re-scans inside it, so an id from another repo is refused.
+        cmd = [sys.executable, script, "apply", "--ids", ",".join(procs), *root_args(scope_roots(root, args.root))]
+        cmd += ["--dry-run"] if args.dry_run else []
         if not os.path.isfile(script):
             print(f"failed {procs}: {script} not found")
             failed += len(procs)
@@ -528,7 +746,7 @@ def main():
     if args.cmd == "apply":
         return apply(args)
     root = repo_root(args.root)
-    result = scan_all(root, args.stale_days)
+    result = scan_all(root, args.stale_days, args.root)
     if root is None:
         print("tidy-scan: not inside a git repository", file=sys.stderr)
     if args.json:

@@ -89,6 +89,21 @@ CASES = [
     ("git branch --delete --force feature", "ask", "ask"), ("git branch -d -f feature", "ask", "ask"),
     ("git branch -d merged", "ask", "silent"), ("git branch --delete merged", "ask", "silent"),
     ("git branch -a", "ask", "silent"), ("git branch new-feature", "ask", "silent"),
+    # /tidy's destructive steps always prompt on Claude and Antigravity, whatever the chat said; reading, a dry run
+    # and Codex (its hooks cannot ask, and a deny would break the skill) stay silent
+    ("python ~/.the-agent-kit/hooks/tidy-scan.py apply --root R --id path:x", "ask", "ask"),
+    ("python ~/.the-agent-kit/hooks/tidy-scan.py apply --root R --id path:x", "deny", "silent"),
+    ("python ~/.the-agent-kit/hooks/tidy-scan.py apply --root R --id path:x --dry-run", "ask", "silent"),
+    ("uv run python hooks/tidy-scan.py scan --json --root R", "ask", "silent"),
+    ("uv run python hooks/tidy-procs.py apply --ids proc:1:2 --root R", "ask", "ask"),
+    ("uv run python hooks/tidy-procs.py apply --ids proc:1:2 --root R --dry-run", "ask", "silent"),
+    ("python hooks/tidy-procs.py scan --root R", "ask", "silent"),
+    ("python hooks/mcp-orphans.py --kill", "ask", "ask"), ("python3 hooks/mcp-orphans.py --kill --json", "ask", "ask"),
+    ("python hooks/mcp-orphans.py --json", "ask", "silent"), ("python hooks/mcp-orphans.py", "ask", "silent"),
+    ("sh ~/.the-agent-kit/install.sh --tidy", "ask", "silent"),
+    ("sh ~/.the-agent-kit/install.sh --tidy --kill", "ask", "ask"),
+    (r"py -3 C:\Users\v\.the-agent-kit\hooks\tidy-scan.py apply --root C:\r --id path:x", "ask", "ask"),
+    ("cd R && python hooks/tidy-scan.py apply --root R --id path:x", "ask", "ask"),
     # hard denies
     ("git push origin main --force", "ask", "deny"), ("git push --force-with-lease", "ask", "deny"),
     ("git push origin :main", "ask", "deny"), ("git commit -m x --no-verify", "ask", "deny"),
