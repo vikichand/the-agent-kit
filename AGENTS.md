@@ -82,8 +82,8 @@ state the bucket and the oracle in one clause and go.
 
 - **Never assume: look facts up, ask decisions.** Anything the code, tests, docs, tools or current documentation
   can answer is yours to find, never a guess and never a question; if it can't be found, say so. What only the
-  user can decide (scope, product behaviour, risk, authorization) is asked, with your recommended answer, when
-  the answers would change the work. A small detail with an obvious default: pick it, do the work, and say in a
+  user can decide (scope, product behaviour, risk, authorization) is asked when the answers would change the
+  work: all at once, numbered, each worded so "yes" accepts your recommended answer. A small detail with an obvious default: pick it, do the work, and say in a
   line what you picked. Version-sensitive facts (config keys, CLI flags, signatures, model names, defaults) come
   from current official docs for the version in use: name the source, and say so when something is undocumented.
 - **Know the blast radius first.** Who calls this, what consumes it, what breaks downstream (schema, events,
