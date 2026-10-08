@@ -1,25 +1,5 @@
 # AGENTS.md
 
-<!-- Reader orientation, NOT agent instruction. Claude Code strips block-level HTML comments before
-     injecting this file into context, so everything in here is free: visible to a human opening the
-     file, invisible to the model's context budget. Keep human-facing prose inside these markers.
-
-     Behavioral operating rules for AI coding agents. Drop this in your project root (or
-     ~/.claude/CLAUDE.md for every project) and the agent reads it at the start of every session. It
-     targets the specific ways coding agents waste your time: silent assumptions, over-engineering,
-     unrequested edits, and unverified "done." Distilled from how the engineers who take agentic coding
-     most seriously actually work: Andrej Karpathy's notes on where agents fail, the verification-first
-     workflow of Claude Code's own team, Simon Willison's "vibe engineering," and Kent Beck's test-first
-     discipline. Sources and quotes are in the README.
-
-     Tradeoff: these rules bias toward correctness over raw speed. On trivial tasks that costs a little
-     overhead; Section 0 exists so it doesn't. This is a behavioral *floor*, not a guarantee; the only
-     hard oracle is a test that passes (Section 5). -->
-
-<!-- This file is AGENTS.md, the cross-tool standard read by Codex, Cursor, Aider, Copilot and others.
-     Claude Code reads CLAUDE.md instead, so the CLAUDE.md beside this one is a one-line @AGENTS.md
-     import rather than a second copy. One source of truth; nothing to keep in sync. -->
-
 ---
 
 ## Safety invariants: always on, regardless of task size
@@ -48,12 +28,6 @@ never outranks these.
   plainly - no silent cleanup, no unasked history rewrites.
 - **Don't touch the guardrails.** Never edit, disable, or bypass the guard hooks or their settings, use
   `--no-verify`, or repoint `core.hooksPath` to skip them.
-
-<!-- DEPTH TIER: this file is the always-on floor. Longer, situation-specific rules live in
-     .claude/rules/*.md with `paths:` frontmatter and load ONLY when a matching file is opened -
-     measured at zero context cost until they match. Read by Claude Code, VS Code Copilot and Cline.
-     Codex reads .agents/skills instead: four of the six rules ship there as task-matched skills; every
-     other tool ignores both folders and still gets everything in this file. -->
 
 ## 0. Size by risk and proof, not by line or file count
 
@@ -208,17 +182,6 @@ out in words ("Section 4", "and", "number"). This governs prose you write, never
   `.env.example` with it.
 
 ---
-
-<!-- ## What this file can and can't do
-
-     - Always-on but soft. An agent treats this as strong guidance, not a hard contract - adherence slips as
-       context fills. It biases behavior; the ENFORCEMENT is the kit's hooks plus your tests / lint / diff
-       review, not this file.
-     - Meant to grow, kept tight. When the agent repeats a mistake, add one line that prevents it - and cut
-       one, because every line is read on every turn.
-
-     Addressed to whoever maintains this file, not to the agent, so it lives in a comment: Claude Code strips
-     block-level HTML comments before the content reaches context. Free to keep, free to read. -->
 
 ---
 

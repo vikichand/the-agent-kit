@@ -145,3 +145,25 @@ research notes, not from a per-rule record kept at the time.
 Enforced elsewhere, not in `AGENTS.md`: a pinned CI action (pre-commit, since 0.2.0 after eval case 23) and a
 CI step that cannot fail (pre-commit, since 0.5.0 after eval case 29). Both are structural because wording
 alone did not move the case.
+
+## Notes for maintainers of `AGENTS.md`
+
+These notes used to live in HTML comments inside `AGENTS.md`. Claude Code strips HTML comments, even
+through the `@AGENTS.md` import, but Codex and Antigravity read them as text (both checked live on
+2026-10-09), so the comments cost tokens on every request there. They live here now.
+
+- **What the file is.** The always-on floor of operating rules for coding agents, aimed at the ways
+  agents waste time: silent assumptions, over-engineering, unrequested edits and unverified "done". It
+  biases toward correctness over raw speed; Section 0 keeps that overhead off trivial tasks. It is a
+  floor, not a guarantee: the hard oracle is a passing test (Section 5).
+- **One source of truth.** `AGENTS.md` is the cross-tool file read by Codex, Antigravity, Cursor, Aider,
+  Copilot and others. Claude Code reads `CLAUDE.md`, which is a one-line `@AGENTS.md` import, never a
+  second copy.
+- **The depth tier.** Longer, situational rules live in `claude/rules/*.md` with `paths:` frontmatter and
+  load only when a matching file is opened. Codex and Antigravity get four of the six as task-matched
+  skills in `.agents/skills/`; Antigravity also gets the two path-shaped ones as glob rules.
+- **Soft, not enforced.** An agent treats the file as strong guidance, and adherence slips as context
+  fills. Enforcement is the kit's hooks plus tests, lint and diff review.
+- **Grow it tight.** When an agent repeats a mistake, add the one line that prevents it, measure it, and
+  cut a line to pay for it: every line is read on every turn.
+
