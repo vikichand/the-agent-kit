@@ -26,8 +26,9 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   `.agents/rules/` as glob rules, and the command guard as a workspace hook in `.agents/hooks.json`,
   added alongside any hooks you already have. The guard asks every time where Claude Code asks, and
   denies what it denies. `--update-rules` brings existing projects up to date and `--check` reports it.
-  The session-start check also runs on Antigravity, as a global PreInvocation hook that acts on the first
-  call of each conversation (installed by `--setup` into `~/.gemini/config/hooks.json`, other hooks kept).
+  The session-start check is wired for Antigravity too, as a global PreInvocation hook that acts on the
+  first call of each conversation (installed by `--setup` into `~/.gemini/config/hooks.json`, other hooks
+  kept; built from Antigravity's hook docs and verified live in the end-to-end run).
 - **An Antigravity arm for the adherence harness.** `--tool antigravity` runs each eval case under `agy`
   with a sandbox, so the rules can be measured on Antigravity the way they are on Claude Code and Codex.
 - **MCP servers no longer outlive a killed agent (Windows).** `hooks/mcp-wrap.py` launches an MCP server so
