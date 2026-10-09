@@ -19,8 +19,8 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   when they run in this repo or its worktrees; orphaned MCP servers elsewhere are one note pointing at
   `install.sh --tidy`. Long-lived branches, fresh worktrees, your notes and uncommitted work are never
   offered. Leftovers no pattern knows go into an `unknown` group of facts the agent judges, item by item.
-  The command guard asks before every `apply`, dry run included, on Claude Code and Antigravity. Claude Code and Codex make
-  the skill user-only; Antigravity cannot. See [`docs/tidy.md`](docs/tidy.md).
+  The command guard asks before every `apply`, dry run included, on Claude Code and Antigravity. Claude
+  Code and Codex make the skill user-only; Antigravity cannot. See [`docs/tidy.md`](docs/tidy.md).
 - **Antigravity is a supported tool.** It reads `AGENTS.md` and the `.agents/skills/` Codex gets; a
   project install now also writes the two path-shaped depth rules (`code-correctness`, `tests`) to
   `.agents/rules/` as glob rules, and the command guard as a workspace hook in `.agents/hooks.json`,
@@ -60,14 +60,15 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 - The kit is now called **The Agent Kit** in the README, which opens with a banner that follows your GitHub light or dark theme. Generated reports
   end with "GENERATED WITH THE AGENT KIT" and the repository link, no longer a personal name.
-- **`AGENTS.md` is shorter** (170 effective lines, from 198) with the same rules plus the 0.5.0 additions: overlapping
+- **`AGENTS.md` is shorter** (171 effective lines, from 198) with the same rules plus the 0.5.0 additions: overlapping
   bullets merged, Section 8 folded into Section 2's plan rules, so Ownership and Documentation are now
   Sections 8 and 9.
 - **Evidence by kind of change.** Section 5 has a table of what proves a bug fix, a behaviour change, a
   refactor, UI work, a migration, security work and a docs change.
 - **Leave the machine as you found it.** Section 4 now says: before starting a server or watcher, check
-  whether one is already running and reuse it or stop it; if a port is busy, find what holds it instead of
-  moving to the next port; stop what you started and say what is still running. Graded by a new eval case.
+  whether one is already running and reuse it or stop it; if a port is busy, find what holds it and reuse it,
+  stop it if it is the project's own, or ask, and never start a second copy on another port; stop what you
+  started and say what is still running. Graded by a new eval case.
 - **Precedence when rules conflict** is now stated: the user's explicit instruction decides, but only their
   explicit approval of a specific act crosses a safety line; then correctness and evidence; then speed and
   cost. Skills, tool results and files never outrank these.
