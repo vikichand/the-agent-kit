@@ -300,6 +300,48 @@ def t_symlink_listed_removed_as_link():
     return (outside / "keep.txt").exists() and not os.path.lexists(d / "scratch-link")
 
 
+def t_junction_into_the_repo_is_removed_as_a_link():
+    d = mk()
+    write(d / "sub" / "f.txt", "keep")
+    write(d / "notes.bak")
+    if not link_dir(d / ".jin", d / "sub"):
+        return True  # ponytail: no way to make a directory link on this box, case cannot run
+    listed = {i["id"]: i for i in scan(d, "--stale-days", "0")["items"]}
+    assert "path:.jin" in listed and "path:notes.bak" in listed, sorted(listed)
+    assert listed["path:.jin"]["is_dir"] is False  # a link, never a real folder: rmtree refuses it
+    log = HOME / ".the-agent-kit/tidy.log"
+    before = log.read_text() if log.exists() else ""
+    r = tidy("apply", "--ids", "path:.jin,path:notes.bak", "--root", str(d), "--stale-days", "0")
+    logged = (log.read_text() if log.exists() else "")[len(before):]
+    return (r.returncode == 0 and "Traceback" not in r.stderr and not os.path.lexists(d / ".jin")
+            and (d / "sub" / "f.txt").read_text() == "keep" and not (d / "notes.bak").exists()
+            and "path:.jin" in logged and "path:notes.bak" in logged)
+
+
+def t_one_failed_item_does_not_stop_the_batch():
+    d = mk()
+    write(d / "first.bak"), write(d / "second.bak")
+    logged, real_act, real_log, env = [], mod.act, mod.log_line, dict(os.environ)
+
+    def act(root, it, allow_ignored=False):
+        if it["id"] == "path:first.bak":
+            raise PermissionError("locked by another program")
+        return real_act(root, it, allow_ignored)
+
+    args = type("A", (), dict(id_list=["path:first.bak", "path:second.bak"], ids="", root=str(d), stale_days=0.0,
+                              dry_run=False, allow_ignored=False))()
+    os.environ.update(ENV)  # git reads the throwaway config, never the real one
+    mod.act, mod.log_line = act, lambda i, label, result, root: logged.append((i, result))
+    try:
+        rc = mod.apply(args)
+    finally:
+        mod.act, mod.log_line = real_act, real_log
+        os.environ.clear(), os.environ.update(env)
+    return (rc == 1 and (d / "first.bak").exists() and not (d / "second.bak").exists()
+            and [i for i, _ in logged] == ["path:first.bak", "path:second.bak"]
+            and "locked by another program" in logged[0][1] and logged[1][1] == "ok")
+
+
 def t_traversal():
     d = mk()
     victim = write(TMP / "victim.txt", "v")
