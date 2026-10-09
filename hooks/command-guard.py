@@ -270,6 +270,11 @@ _VALUE_OPTS = {"-X", "-W", "-c", "-m", "-p", "-f", "--with", "--with-requirement
 _PS_CMD = re.compile(r"^-c(o(m(m(a(n(d)?)?)?)?)?)?$", re.I)
 
 
+def has_word(rest, word):
+    """`word` as its own token, or glued to a redirect/operator (`apply>out.txt` is one shlex token)."""
+    return any(t == word or re.match(re.escape(word) + r"[<>|&;]", t) for t in rest)
+
+
 def shell_payload(prog, toks):
     """Segments a Windows shell wrapper runs (`cmd /c ...`, `pwsh -Command ...`), as token lists, or None."""
     if prog == "cmd":
@@ -321,11 +326,11 @@ def kit_destructive(toks):
         return False
     name, rest = base(toks[i]).lower(), toks[i + 1:]
     if name.endswith(("tidy-scan.py", "tidy-procs.py")):
-        return "apply" in rest
+        return has_word(rest, "apply")
     if name.endswith("mcp-orphans.py"):
-        return "--kill" in rest
+        return has_word(rest, "--kill")
     if name.endswith("install.sh"):                 # --tidy --kill execs mcp-orphans.py
-        return "--tidy" in rest and "--kill" in rest
+        return has_word(rest, "--tidy") and has_word(rest, "--kill")
     return False
 
 

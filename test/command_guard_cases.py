@@ -147,6 +147,17 @@ CASES = [
     ("python hooks/tidy-scan.py apply --id x; git commit -n -m tidy", "ask", "deny"),
     ("pythonw hooks/tidy-scan.py apply --id x && git commit --no-verify -m tidy", "ask", "deny"),
     ("git push --force -o tidy-scan.py -o apply origin main && cmd /c python hooks/tidy-scan.py apply", "ask", "deny"),
+    # a redirect glued to the subcommand is one shlex token (`apply>out.txt`), not `apply`
+    ("python hooks/tidy-scan.py apply>out.txt", "ask", "ask"),
+    ("python hooks/tidy-scan.py apply<in.txt --id x", "ask", "ask"),
+    ("python hooks/tidy-scan.py apply>out.txt --root R --id path:x", "ask", "ask"),
+    ("python hooks/tidy-procs.py apply>out.txt --ids proc:1:2", "ask", "ask"),
+    ("python hooks/mcp-orphans.py --kill>out.txt", "ask", "ask"),
+    ("python hooks/tidy-scan.py apply|cat", "ask", "ask"),
+    ("python hooks/tidy-scan.py apply>out.txt", "deny", "silent"),
+    ("python hooks/tidy-scan.py scan>out.txt --root R", "ask", "silent"),
+    ("python hooks/tidy-scan.py applyfoo", "ask", "silent"),
+    ("python hooks/mcp-orphans.py --killed>out.txt", "ask", "silent"),
     # hard denies
     ("git push origin main --force", "ask", "deny"), ("git push --force-with-lease", "ask", "deny"),
     ("git push origin :main", "ask", "deny"), ("git commit -m x --no-verify", "ask", "deny"),
