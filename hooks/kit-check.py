@@ -269,16 +269,23 @@ def first_invocation(data):
     cid = data.get("conversationId") if isinstance(data, dict) else None
     if not isinstance(cid, str) or not cid:
         return False
+    cid = cid[:128]   # the ledger is bounded by count above and by id length here
     path = os.path.join(SHARE, ".ag-conversations")
     d = load_json(path)
     seen = d.get("ids") if isinstance(d, dict) else None
     ids =[i for i in seen if isinstance(i, str)] if isinstance(seen, list) else []
     if cid in ids:
         return False
+    tmp = path + ".tmp%d" % os.getpid()
     try:
-        with open(path, "w", encoding="utf-8") as f:
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump({"ids": (ids + [cid])[-200:]}, f)
+        os.replace(tmp, path)   # a failed or killed write must not leave a half-written ledger
     except OSError:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
         return False
     return True
 

@@ -39,13 +39,17 @@ a guess you must judge. What each group never lists is in
 
 ## How a process counts as this repository's
 
-A process is in scope when its working folder is inside the repo or one of its linked worktrees, or when an
-absolute path in its command line is. The scanner reads another process's working folder through the Windows
-process block, `/proc/<pid>/cwd` on Linux and `lsof` on macOS. A folder it cannot read means the process is not
-listed (a note counts them), and an orphaned MCP tree working somewhere else becomes one note that points to
+A process is in scope when its working folder is inside the repo or one of its linked worktrees. A working
+folder that can be read decides alone; an absolute path in the command line inside the repo counts only when the
+folder cannot be read. The scanner reads another process's working folder through the Windows
+process block, `/proc/<pid>/cwd` on Linux and `lsof` on macOS. A folder it cannot read, with no such path, means
+the process is not listed (a note counts them), and an orphaned MCP tree working somewhere else becomes one note that points to
 `~/.the-agent-kit/install.sh --tidy`. Editors and agent CLIs are never listed; the agent CLIs are recognised by
-the script they run, because on Windows `claude`, `codex` and every dev server are all `node.exe`. A home folder
-or a filesystem root is refused as a scope.
+the script they run, because on Windows `claude`, `codex` and every dev server are all `node.exe`. A scope is
+refused when it is the home folder, a folder that holds it (`C:\Users`, `/home`), a filesystem root or a system folder
+(the Windows folder, Program Files, `/usr` and similar). Outside a repository the scope is the folder you ran
+`/tidy` in, unless a repository sits one or two levels below it: then no process is scoped and a note says to run
+`/tidy` inside one of them.
 
 ## Unknown items
 
@@ -90,7 +94,7 @@ as `.env.backup` are never listed (the scan says that secret-like files exist, b
 - `apply` passes the same repository scope to the process scanner and re-scans inside it, so an id copied from
   another repo's scan no longer matches and is skipped.
 - On Claude Code and Antigravity the command guard asks before `tidy-scan.py apply`, `tidy-procs.py apply`
-  (dry runs excepted) and `mcp-orphans.py --kill`, so the prompt does not depend on the model following the
+  (dry runs included, so a stray `--dry-run` token cannot buy silence) and `mcp-orphans.py --kill`, so the prompt does not depend on the model following the
   skill. Codex hooks cannot ask, so there the skill's own confirmation is the gate.
 - Removing a worktree also deletes its merged branch, and only when the item's label names it (this holds for
   missing worktrees too). Missing worktrees are pruned all together, so `apply` skips them unless you approved

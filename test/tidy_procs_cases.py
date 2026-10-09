@@ -205,6 +205,8 @@ check("cwd in another repo is not listed", lambda: not SC([PARENT, SERVER], {40:
 check("a sibling folder with the same prefix is not inside", lambda: not SC([PARENT, SERVER], {40: RA + "-other"}, LISTEN, CPU)[0])
 check("argv path in the repo is listed when the cwd is unreadable", lambda: groups(SC(
     [PARENT, proc(40, 1, f'node "{os.path.join(RA, "node_modules", ".bin", "vite")}"', age=27000)], {}, LISTEN, CPU)) == [("processes.idle", 40)])
+check("a readable cwd outside the repo beats an argv path inside it", lambda: not SC(
+    [PARENT, proc(40, 1, f'node "{os.path.join(RA, "node_modules", ".bin", "vite")}"', age=27000)], {40: RB}, LISTEN, CPU)[0])
 check("argv path in another repo with an unreadable cwd is not listed", lambda: not SC(
     [PARENT, proc(40, 1, f'node "{os.path.join(RB, "node_modules", ".bin", "vite")}"', age=27000)], {}, LISTEN, CPU)[0])
 r = SC([PARENT, SERVER], {}, LISTEN, CPU)
@@ -300,6 +302,35 @@ check("a child's working folder is read back exactly", child_cwd)
 check("a scope that is the home folder or a filesystem root is refused", lambda: all(subprocess.run(
     [sys.executable, str(path), "scan", "--root", r], capture_output=True, text=True).returncode == 2
     for r in (os.path.expanduser("~"), os.path.abspath(os.sep))))
+
+
+def refused_with(root, **env):
+    """tidy-procs scan on `root` under a temp HOME / SystemRoot: (exit code, stderr)."""
+    r = subprocess.run([sys.executable, str(path), "scan", "--root", str(root)], capture_output=True, text=True,
+                       env=dict(os.environ, **env))
+    return r.returncode, r.stderr
+
+
+def too_broad():
+    tmp = pathlib.Path(tempfile.mkdtemp(prefix="tidyprocs_broad_"))
+    try:
+        home = tmp / "users" / "me"
+        win = tmp / "win" / "System32"
+        for d in (home, win, tmp / "repos" / "a"):
+            d.mkdir(parents=True)
+        h = dict(HOME=str(home), USERPROFILE=str(home))
+        # an ancestor of the home folder (C:\Users, /home) holds every user's projects
+        up = refused_with(tmp / "users", **h)
+        # a system folder (Windows dir and below, Program Files) is never a repository's own processes
+        sysf = refused_with(win, SystemRoot=str(tmp / "win"), windir=str(tmp / "win"), **h)
+        ok = refused_with(tmp / "repos" / "a", **h)  # a normal folder is not refused for being broad
+        return (up[0] == 2 and "too broad" in up[1] and sysf[0] == 2 and "too broad" in sysf[1]
+                and "too broad" not in ok[1])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+check("a scope that is an ancestor of the home folder or a system folder is refused", too_broad)
 check("--root is required", lambda: subprocess.run([sys.executable, str(path), "scan"], capture_output=True,
                                                    text=True).returncode == 2)
 

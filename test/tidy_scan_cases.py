@@ -255,6 +255,38 @@ def t_symlink():
     return (outside / "keep.txt").exists()
 
 
+def link_dir(link, target):
+    """A directory link: a junction on Windows (no privilege needed, and os.walk does not skip it), else a symlink.
+    False when it cannot be made, so the case is skipped."""
+    if os.name == "nt":
+        return subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(target)], capture_output=True).returncode == 0
+    try:
+        os.symlink(target, link, target_is_directory=True)
+        return True
+    except OSError:
+        return False
+
+
+def t_walks_never_enter_a_junction():
+    d = mk()
+    outside = TMP / "outside-junction"
+    write(outside / "big.bin", "x" * 5000)
+    write(outside / "test-results" / "a.png", "p")
+    (d / "scratch").mkdir()
+    write(d / "scratch" / "in.txt", "abc")
+    if not link_dir(d / "scratch" / "j", outside):
+        return True  # ponytail: no way to make a directory link on this box, case cannot run
+    size, count = mod.look_inside(str(d / "scratch"))[:2]
+    tool_dir = d / "test-results"
+    tool_dir.mkdir()
+    write(tool_dir / "a.png", "p")
+    link_dir(tool_dir / "j", outside)
+    odd = mod.inspect_tool_dir(str(tool_dir), {"png"})[1]
+    top = mod.look_inside(str(d / "scratch" / "j"))
+    return (size == 3 and count == 1 and mod.size_of(str(d / "scratch")) == 3 and odd == []
+            and top[1] == 1 and top[0] < 5000 and mod.size_of(str(d / "scratch" / "j")) < 5000)
+
+
 def t_symlink_listed_removed_as_link():
     d = mk()
     outside = TMP / "outside2"
@@ -796,6 +828,38 @@ def t_scope_outside_a_repo_is_the_folder():
     tidy("scan", "--json", "--root", str(plain), env=env)
     calls, roots = logged_roots(log)
     return roots == [{os.path.normcase(os.path.realpath(plain))}]
+
+
+def holder(name, depth):
+    """A plain folder (no repo above it) holding a repository `depth` levels down."""
+    h = TMP / name
+    nested = h.joinpath(*[f"d{i}" for i in range(depth - 1)], "proj")
+    nested.mkdir(parents=True)
+    g(nested, "init", "-q", "-b", "main")
+    return h
+
+
+def t_outside_a_repo_holding_repos_has_no_process_scope():
+    log = TMP / "scope-args3.txt"
+    env = dict(ENV, AGENT_KIT_TIDY_PROCS=str(recording_procs(log)), AGENT_KIT_TIDY_TEST="1", GIT_CEILING_DIRECTORIES=str(TMP))
+    notes = []
+    for name, depth in (("holder1", 1), ("holder2", 2)):  # a repo one and two levels down
+        h = holder(name, depth)
+        j = json.loads(tidy("scan", "--json", "--root", str(h), env=env).stdout)
+        notes.append(any("holds other repositories: run /tidy inside one" in n for n in j["notes"]))
+        r = tidy("apply", "--ids", "proc:42:1", "--root", str(h), env=env)
+        notes.append(r.returncode != 0 and "holds other repositories" in r.stdout)
+    return all(notes) and not log.exists()  # tidy-procs was never called, so nothing could be scoped or killed
+
+
+def t_broad_scope_is_refused_by_the_process_scanner():
+    # the home folder and a folder holding it: the real tidy-procs refuses them and the scan says why in a note
+    up = TMP / "broad-up"
+    (up / "me").mkdir(parents=True)
+    env = dict(ENV, HOME=str(up / "me"), USERPROFILE=str(up / "me"), GIT_CEILING_DIRECTORIES=str(TMP))
+    out = [json.loads(tidy("scan", "--json", "--root", str(r), env=env).stdout) for r in (up, up / "me")]
+    return all(any("too broad" in n for n in x["notes"]) and not any(i["id"].startswith("proc:") for i in x["items"])
+               for x in out)
 
 
 def t_worktree_with_a_running_process_is_skipped():

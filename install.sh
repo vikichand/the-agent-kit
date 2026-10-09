@@ -650,7 +650,8 @@ def owned_copy(p):
 def copy_skill(n):
     src, dst = os.path.join(src_root, n), os.path.join(canon_root, n)
     tmp = dst + ".agent-kit-new"
-    shutil.rmtree(tmp, ignore_errors=True)
+    if os.path.lexists(tmp):         # re-checked here: we cannot tell who made it, so we never delete it
+        raise OSError("%s already exists; left as it is" % tmp)
     shutil.copytree(src, tmp, symlinks=True)   # a link inside a kit skill is copied as a link, never followed
     with open(os.path.join(tmp, MARK), "w", encoding="utf-8") as f:
         f.write("This folder is a copy made by the-agent-kit's install.sh; --setup refreshes it and --undo removes it.\n")
@@ -715,6 +716,13 @@ if mode in ("plan", "apply"):
                 differs = True
             if differs:
                 todo_refresh.append(n)
+    for n in todo_copy + todo_refresh:   # copy_skill builds in <n>.agent-kit-new; one already there is not ours to delete
+        if os.path.lexists(os.path.join(canon_root, n) + ".agent-kit-new"):
+            warn("~/.agents/skills/%s.agent-kit-new already exists; left as it is, so %s is not copied or refreshed (remove it to retry)" % (n, n))
+            todo_copy[:] = [x for x in todo_copy if x != n]
+            todo_refresh[:] = [x for x in todo_refresh if x != n]
+            if n in ok and not os.path.lexists(os.path.join(canon_root, n)):
+                ok.remove(n)
     if todo_copy:
         lines.append("  + copy to ~/.agents/skills (the one real copy, read by Codex): " + ", ".join(todo_copy))
     if todo_refresh:
@@ -824,6 +832,7 @@ if mode in ("plan", "apply"):
         rc = 10
 else:                                # undo
     gone = []
+    mine_names = []                  # skills whose ~/.agents/skills folder was the kit's: the only names skills.json may lose
     for n in names:
         link, dst = os.path.join(claude_skills, n), os.path.join(canon_root, n)
         if os.path.lexists(link) and is_link(link) and points_to(link, dst) and (owned_copy(dst) or not os.path.lexists(dst)):
@@ -835,7 +844,7 @@ else:                                # undo
         dst = os.path.join(canon_root, n)
         if os.path.lexists(dst) and owned_copy(dst):
             try:
-                shutil.rmtree(dst); gone.append("~/.agents/skills/" + n)
+                shutil.rmtree(dst); gone.append("~/.agents/skills/" + n); mine_names.append(n)
             except OSError as e:
                 lines.append("  ! could not remove ~/.agents/skills/%s: %s" % (n, e)); rc = 1
     if os.path.exists(sj_path):
@@ -847,7 +856,7 @@ else:                                # undo
             entries = data["entries"]
             mine = next((e for e in entries if kit_entry(e) and isinstance(e.get("include_only"), list)), None)
             if mine is not None:
-                left = [n for n in mine["include_only"] if n not in names]
+                left = [n for n in mine["include_only"] if n not in mine_names]
                 if left != mine["include_only"]:
                     if left:
                         mine["include_only"] = left
