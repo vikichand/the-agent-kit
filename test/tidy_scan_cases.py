@@ -798,6 +798,38 @@ def t_scope_outside_a_repo_is_the_folder():
     return roots == [{os.path.normcase(os.path.realpath(plain))}]
 
 
+def holder(name, depth):
+    """A plain folder (no repo above it) holding a repository `depth` levels down."""
+    h = TMP / name
+    nested = h.joinpath(*[f"d{i}" for i in range(depth - 1)], "proj")
+    nested.mkdir(parents=True)
+    g(nested, "init", "-q", "-b", "main")
+    return h
+
+
+def t_outside_a_repo_holding_repos_has_no_process_scope():
+    log = TMP / "scope-args3.txt"
+    env = dict(ENV, AGENT_KIT_TIDY_PROCS=str(recording_procs(log)), AGENT_KIT_TIDY_TEST="1", GIT_CEILING_DIRECTORIES=str(TMP))
+    notes = []
+    for name, depth in (("holder1", 1), ("holder2", 2)):  # a repo one and two levels down
+        h = holder(name, depth)
+        j = json.loads(tidy("scan", "--json", "--root", str(h), env=env).stdout)
+        notes.append(any("holds other repositories: run /tidy inside one" in n for n in j["notes"]))
+        r = tidy("apply", "--ids", "proc:42:1", "--root", str(h), env=env)
+        notes.append(r.returncode != 0 and "holds other repositories" in r.stdout)
+    return all(notes) and not log.exists()  # tidy-procs was never called, so nothing could be scoped or killed
+
+
+def t_broad_scope_is_refused_by_the_process_scanner():
+    # the home folder and a folder holding it: the real tidy-procs refuses them and the scan says why in a note
+    up = TMP / "broad-up"
+    (up / "me").mkdir(parents=True)
+    env = dict(ENV, HOME=str(up / "me"), USERPROFILE=str(up / "me"), GIT_CEILING_DIRECTORIES=str(TMP))
+    out = [json.loads(tidy("scan", "--json", "--root", str(r), env=env).stdout) for r in (up, up / "me")]
+    return all(any("too broad" in n for n in x["notes"]) and not any(i["id"].startswith("proc:") for i in x["items"])
+               for x in out)
+
+
 def t_worktree_with_a_running_process_is_skipped():
     d = mk()
     w, other = wt(d, "busy", "wbusy"), wt(d, "idle", "widle")

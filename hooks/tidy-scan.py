@@ -512,11 +512,47 @@ def procs_script():
                                                                    "tidy-procs.py")
 
 
-def scope_roots(root, folder):
+HOLDS_REPOS = "not a repository and it holds other repositories: run /tidy inside one"
+
+
+def holds_repos(folder, limit=2000):
+    """True when a repository sits one or two levels below `folder` (a parent folder of projects).
+    ponytail: stops after `limit` folders looked at, so a huge plain folder reads as holding none."""
+    seen = 0
+    try:
+        for a in os.scandir(folder):
+            if a.is_dir(follow_symlinks=False) and a.name not in SKIP_WALK:
+                if os.path.lexists(os.path.join(a.path, ".git")):
+                    return True
+                try:
+                    for b in os.scandir(a.path):
+                        seen += 1
+                        if seen > limit:
+                            return False
+                        if b.is_dir(follow_symlinks=False) and b.name not in SKIP_WALK \
+                                and os.path.lexists(os.path.join(b.path, ".git")):
+                            return True
+                except OSError:
+                    pass
+                seen += 1
+                if seen > limit:
+                    return False
+    except OSError:
+        pass
+    return False
+
+
+def scope_roots(root, folder, notes=None):
     """The folders whose processes are this repository's: its root and every linked worktree (a dev server in an
-    agent's worktree belongs to the repo). Outside a repository: just the folder."""
+    agent's worktree belongs to the repo). Outside a repository: just the folder, unless it holds other
+    repositories, because then every project in it would be in scope: no folders at all."""
     if not root:
-        return [os.path.abspath(folder or os.getcwd())]
+        folder = os.path.abspath(folder or os.getcwd())
+        if holds_repos(folder):
+            if notes is not None:
+                notes.append("process group skipped: " + HOLDS_REPOS)
+            return []
+        return [folder]
     return list(dict.fromkeys([root] + [w["path"] for w in worktrees(root)]))
 
 
@@ -540,6 +576,8 @@ def occupied_folders(paths):
 
 
 def proc_items(notes, roots):
+    if not roots:  # scope_roots refused the folder and said why
+        return []
     script = procs_script()
     if not os.path.isfile(script):
         notes.append(f"process group skipped: {script} not found")
@@ -580,7 +618,7 @@ def scan_all(root, stale, folder=None):
         items = kept
     else:
         notes.append("not inside a git repository: only the process group was scanned, for this folder")
-    return dict(version=2, root=root, notes=notes, items=items + proc_items(notes, scope_roots(root, folder)))
+    return dict(version=2, root=root, notes=notes, items=items + proc_items(notes, scope_roots(root, folder, notes)))
 
 
 def human(result):
@@ -722,9 +760,13 @@ def apply(args):
     if procs:
         script = procs_script()
         # The same scope as the scan: tidy-procs re-scans inside it, so an id from another repo is refused.
-        cmd = [sys.executable, script, "apply", "--ids", ",".join(procs), *root_args(scope_roots(root, args.root))]
+        roots = scope_roots(root, args.root)
+        cmd = [sys.executable, script, "apply", "--ids", ",".join(procs), *root_args(roots)]
         cmd += ["--dry-run"] if args.dry_run else []
-        if not os.path.isfile(script):
+        if not roots:
+            print(f"refused {procs}: {HOLDS_REPOS}")
+            failed += len(procs)
+        elif not os.path.isfile(script):
             print(f"failed {procs}: {script} not found")
             failed += len(procs)
         else:

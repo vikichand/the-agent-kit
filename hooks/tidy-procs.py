@@ -145,6 +145,20 @@ def under(path, scope):
     return any(path == r or path.startswith(r.rstrip(os.sep) + os.sep) for r in scope)
 
 
+def too_broad(folder):
+    """Why a scope folder is the wrong size, or None. Processes are matched by working folder, so the home
+    folder, a folder holding it (C:\\Users, /home), a filesystem root or a system folder would claim other
+    projects' processes and the system's own."""
+    f = norm(folder)
+    if os.path.dirname(f) == f or under(norm(os.path.expanduser("~")), [f]):
+        return "the home folder, a filesystem root or a folder that holds the home folder"
+    system = ([os.environ.get(v) for v in ("SystemRoot", "windir", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432")]
+              if os.name == "nt" else ["/bin", "/sbin", "/etc", "/usr", "/lib", "/System"])
+    if under(f, [norm(s) for s in system if s]):
+        return "a system folder"
+    return None
+
+
 def argv_in_scope(command, scope):
     """An absolute path in the command line (also after `--flag=`) that is inside the scope."""
     for t in command_tokens(command):
@@ -601,10 +615,11 @@ def main():
     args = parser.parse_args()
     if args.command != "occupied" and not all(math.isfinite(v) and v >= 0 for v in (args.min_age_minutes, args.idle_hours)):
         parser.error("ages must be finite nonnegative numbers")
-    home = norm(os.path.expanduser("~"))
     for r in args.root:
-        if os.path.dirname(norm(r)) == norm(r) or norm(r) == home:  # a scope this wide is the whole machine
-            parser.error(f"--root {r} is the home folder or a filesystem root: too broad to scope processes")
+        why = too_broad(r)
+        if why:  # a scope this wide is the whole machine; printed plainly so tidy-scan can quote it in a note
+            print(f"tidy-procs: --root {r} is {why}: too broad to scope processes", file=sys.stderr)
+            return 2
     if args.command == "occupied":
         try:
             print(json.dumps(occupied(reaper.list_processes(), args.root, read_cwds)))
