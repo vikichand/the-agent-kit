@@ -1191,6 +1191,14 @@ EOF
   cmp -s "$g/.gemini/config/skills.json" "$g/sj.before" && has 'skills.json' "$(printf '%s' "$o" | grep '!')" \
     && pass "W10e --undo keeps a skills.json entry that carries keys of the user's own, and says so" || bad "W10e undo rewrote an entry with other keys: $(cat "$g/.gemini/config/skills.json")"
   rm -rf "$g"
+  # W10f: a skills.json entry naming a skill whose folder is the USER'S (no kit marker) is theirs: --undo keeps both.
+  home_
+  mkdir -p "$g/.agents/skills/tidy"; printf 'mine\n' > "$g/.agents/skills/tidy/SKILL.md"
+  printf '{"entries":[{"path":"~/.agents/skills","include_only":["tidy"]}]}\n' > "$g/.gemini/config/skills.json"
+  cp "$g/.gemini/config/skills.json" "$g/sj.before"; undo_
+  cmp -s "$g/.gemini/config/skills.json" "$g/sj.before" && [ "$(cat "$g/.agents/skills/tidy/SKILL.md")" = mine ] \
+    && pass "W10f --undo leaves a user-owned skill and the skills.json entry that lists it" || bad "W10f undo removed a user-owned skill's entry: $(cat "$g/.gemini/config/skills.json")"
+  rm -rf "$g"
   # W11: a tool that is not installed is not set up: no ~/.claude or ~/.gemini is created for it, while
   # the one real copy still lands where Codex reads it.
   g=$(mktemp -d) || exit 2; G=$(wq "$g")

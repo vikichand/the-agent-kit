@@ -824,6 +824,7 @@ if mode in ("plan", "apply"):
         rc = 10
 else:                                # undo
     gone = []
+    mine_names = []                  # skills whose ~/.agents/skills folder was the kit's: the only names skills.json may lose
     for n in names:
         link, dst = os.path.join(claude_skills, n), os.path.join(canon_root, n)
         if os.path.lexists(link) and is_link(link) and points_to(link, dst) and (owned_copy(dst) or not os.path.lexists(dst)):
@@ -835,7 +836,7 @@ else:                                # undo
         dst = os.path.join(canon_root, n)
         if os.path.lexists(dst) and owned_copy(dst):
             try:
-                shutil.rmtree(dst); gone.append("~/.agents/skills/" + n)
+                shutil.rmtree(dst); gone.append("~/.agents/skills/" + n); mine_names.append(n)
             except OSError as e:
                 lines.append("  ! could not remove ~/.agents/skills/%s: %s" % (n, e)); rc = 1
     if os.path.exists(sj_path):
@@ -847,7 +848,7 @@ else:                                # undo
             entries = data["entries"]
             mine = next((e for e in entries if kit_entry(e) and isinstance(e.get("include_only"), list)), None)
             if mine is not None:
-                left = [n for n in mine["include_only"] if n not in names]
+                left = [n for n in mine["include_only"] if n not in mine_names]
                 if left != mine["include_only"]:
                     if left:
                         mine["include_only"] = left
