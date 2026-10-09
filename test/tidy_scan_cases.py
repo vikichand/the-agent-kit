@@ -215,14 +215,16 @@ def t_candidates():
     everything = scan(d)["items"]
     items = {i["id"]: i for i in everything if i["group"] == "candidates"}
     rel = items["path:release-plan.md"]
-    # The candidates group still never takes ignored or fresh files. They are no longer invisible: the unknown
-    # group lists the untracked and ignored ones at low for the agent to judge (tracked old-plan.md stays out).
+    # The candidates group never takes ignored or fresh files, and documents (git-ignored notes, a fresh plan)
+    # are never unknown items either: they may be the user's own, so they are only counted in a note.
     unknown_ids = {i["id"] for i in everything if i["group"] == "unknown"}
     return ("path:notes.bak" in items and rel["confidence"] == "low" and "CANDIDATE" in rel["label"]
             and any("README.md" in e for e in rel["evidence"])
             and not ({"path:old-plan.md", "path:ignored-plan.md", "path:lessons.md", "path:enhancements.md",
                       "path:scratch-ign.tmp", "path:fresh-plan.md"} & set(items))
-            and {"path:lessons.md", "path:fresh-plan.md"} <= unknown_ids and "path:old-plan.md" not in unknown_ids)
+            and not ({"path:lessons.md", "path:enhancements.md", "path:fresh-plan.md", "path:old-plan.md"}
+                     & unknown_ids)
+            and "path:scratch-ign.tmp" in unknown_ids)
 
 
 def t_apply_exact():
@@ -896,6 +898,23 @@ def t_unknown_skips_linked_worktree_and_claimed_paths():
     claimed = {i["id"] for i in j["items"] if i["group"] != "unknown"}
     return (not any(k.startswith("path:.claude") for k in u) and "path:scratch.log" in claimed
             and "path:scratch.log" not in u and "path:.playwright-mcp" not in u)
+
+
+def t_unknown_never_lists_documents_or_uncommitted_work():
+    d = mk()
+    (d / ".gitignore").write_text("notes/\ncoverage/\n")
+    g(d, "add", ".gitignore"), g(d, "commit", "-q", "-m", "ignore")
+    write(d / "notes/2026-10-01.md"), write(d / "notes/ideas.md")  # git-ignored notes: the user's
+    write(d / "design.docx"), write(d / "plan-v2.md")  # untracked documents
+    write(d / "src/new_feature.py"), write(d / "newpkg/a.ts"), write(d / "newpkg/b.ts")  # uncommitted work
+    write(d / "coverage/index.html")  # ignored build output: still judged
+    write(d / "trace-output.dat"), write(d / ".kilo/worktrees/x/notes.md")  # leftovers, including a tool dot-folder
+    u, j = unknown(d)
+    hidden = {"path:notes", "path:design.docx", "path:plan-v2.md", "path:src", "path:src/new_feature.py",
+              "path:newpkg"}
+    return (not (hidden & set(u)) and {"path:coverage", "path:trace-output.dat", "path:.kilo"} <= set(u)
+            and any("documents" in n and "not listed" in n for n in j["notes"])
+            and any("uncommitted" in n and "not listed" in n for n in j["notes"]))
 
 
 def t_unknown_is_capped_with_a_note():

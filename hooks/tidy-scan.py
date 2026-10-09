@@ -402,6 +402,15 @@ NEVER_LIST = {"node_modules", ".venv", "venv", ".next", ".nuxt", ".svelte-kit", 
               "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".git",
               "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "poetry.lock", "uv.lock", "Cargo.lock", "Gemfile.lock"}
 MAX_UNKNOWN = 40
+# Outside a dot-folder, documents (ignored or not) and untracked source are the user's notes and uncommitted work,
+# not leftovers: they are counted in a note, never listed. Tool leftovers live in dot-folders (.kilo, .cursor).
+DOC_EXTS = {".md", ".markdown", ".rst", ".doc", ".docx", ".odt", ".rtf", ".pdf", ".xls", ".xlsx", ".ods",
+            ".ppt", ".pptx", ".key", ".pages", ".numbers"}
+SOURCE_EXTS = {".py", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".go", ".rs", ".java", ".kt", ".kts", ".rb",
+               ".php", ".cs", ".c", ".h", ".cc", ".cpp", ".hpp", ".swift", ".m", ".scala", ".sh", ".bash", ".ps1",
+               ".sql", ".vue", ".svelte", ".css", ".scss", ".sass", ".less", ".html", ".htm", ".toml", ".yml",
+               ".yaml", ".ini", ".cfg", ".gradle", ".tf", ".lua", ".dart", ".ex", ".exs", ".erl", ".hs", ".clj",
+               ".r", ".jl", ".zig", ".proto", ".graphql"}
 
 
 def look_inside(path):
@@ -434,7 +443,7 @@ def unknown_items(root, claimed, linked, notes):
     if sources is None:
         notes.append("unknown group skipped: git check-ignore failed")
         return []
-    found, secret_names, private = [], [], 0
+    found, secret_names, private, docs, work = [], [], 0, 0, 0
     for st, rel in entries:
         parts = rel.rstrip("/").split("/")
         p = os.path.join(root, *parts)
@@ -456,6 +465,14 @@ def unknown_items(root, claimed, linked, notes):
             secret_names.append(rel + " (holds secret-like files)")
         if secrets or nested:
             continue
+        if not any(part.startswith(".") for part in parts[:-1] + ([parts[-1]] if plain_dir(p) else [])):
+            main = exts[0] if exts else ""
+            if main in DOC_EXTS:
+                docs += 1
+                continue
+            if st == "??" and main in SOURCE_EXTS:
+                work += 1
+                continue
         found.append(dict(rel="/".join(parts), is_dir=plain_dir(p), size=size, count=count, newest=newest, exts=exts,
                           ignored=sources.get(rel)))
     if secret_names:
@@ -463,6 +480,10 @@ def unknown_items(root, claimed, linked, notes):
                      + (f" and {len(secret_names) - 5} more" if len(secret_names) > 5 else ""))
     if private:
         notes.append(f"{private} entries hidden by .git/info/exclude were not listed")
+    if docs:
+        notes.append(f"{docs} documents (notes, plans, office files) were not listed: they may be the user's own")
+    if work:
+        notes.append(f"{work} untracked source or config entries were not listed: they look like uncommitted work")
     found.sort(key=lambda f: (-f["size"], f["newest"]))  # biggest, then oldest, first
     if len(found) > MAX_UNKNOWN:
         notes.append(f"unknown group shows {MAX_UNKNOWN} of {len(found)}; the rest were left out")

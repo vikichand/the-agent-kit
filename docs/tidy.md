@@ -74,9 +74,9 @@ as `.env.backup` are never listed (the scan says that secret-like files exist, b
 - Long-lived branches (`main`, `master`, `develop`, `release/*`, `hotfix/*`, whatever `origin/HEAD` names), the
   current branch, dirty or locked worktrees, and a worktree or branch with no commits of its own that is newer
   than the stale age (it may have just been made). A worktree some process is working in is skipped.
-- Git-ignored private notes. Paths hidden by `.git/info/exclude` are never listed; a git-ignored file or folder
-  in `.gitignore` can appear only in the `unknown` group, at low, item by item, and the agent is told not to
-  propose notes or documents. A tool folder such as `test-results` is deleted only when it holds nothing but tool
+- Your notes and uncommitted work. Paths hidden by `.git/info/exclude` are never listed. Outside dot-folders,
+  documents (notes, plans, office files), git-ignored or not, and untracked source or config are never listed
+  either: the scan only counts them in a note. A tool folder such as `test-results` is deleted only when it holds nothing but tool
   output and has not been written in the last hour; otherwise it is low and the odd files are named.
 - A process with a live parent (another open agent session owns it), editors, shells and agent sessions.
 - Nothing runs with force flags. The agent does not run `rm`, `kill`, `git branch -D` or `git clean` itself.
@@ -137,7 +137,7 @@ run without one.
 
 ## What was measured
 
-The process scanner has 98 cases and the git and files scanner has 79. They include real throwaway repos and a
+The process scanner has 98 cases and the git and files scanner has 80. They include real throwaway repos and a
 live Windows test that starts two listeners in two folders and checks that a scan scoped to one lists only its
 server, refuses the other's id, and kills only the approved one. No adherence eval applies: `/tidy` is
 user-invoked, not an always-on rule.
