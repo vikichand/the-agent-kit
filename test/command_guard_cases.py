@@ -89,11 +89,13 @@ CASES = [
     ("git branch --delete --force feature", "ask", "ask"), ("git branch -d -f feature", "ask", "ask"),
     ("git branch -d merged", "ask", "silent"), ("git branch --delete merged", "ask", "silent"),
     ("git branch -a", "ask", "silent"), ("git branch new-feature", "ask", "silent"),
-    # /tidy's destructive steps always prompt on Claude and Antigravity, whatever the chat said; reading, a dry run
-    # and Codex (its hooks cannot ask, and a deny would break the skill) stay silent
+    # /tidy's destructive steps always prompt on Claude and Antigravity, whatever the chat said, a --dry-run
+    # included (it was an exemption once; a redirect target named --dry-run walked through it). Reading and
+    # Codex (its hooks cannot ask, and a deny would break the skill) stay silent
     ("python ~/.the-agent-kit/hooks/tidy-scan.py apply --root R --id path:x", "ask", "ask"),
     ("python ~/.the-agent-kit/hooks/tidy-scan.py apply --root R --id path:x", "deny", "silent"),
-    ("python ~/.the-agent-kit/hooks/tidy-scan.py apply --root R --id path:x --dry-run", "ask", "silent"),
+    ("python ~/.the-agent-kit/hooks/tidy-scan.py apply --root R --id path:x --dry-run", "ask", "ask"),
+    ("python ~/.the-agent-kit/hooks/tidy-scan.py apply --root . --id a > --dry-run", "ask", "ask"),
     # a tidy script name smuggled into another command's arguments must not earn the tidy prompt over a deny
     ("git push --force -o tidy-scan.py -o apply origin main", "ask", "deny"),
     ("git commit -n -m tidy-scan.py -m apply", "ask", "deny"),
@@ -106,7 +108,7 @@ CASES = [
     # (README: the guard is not a sandbox). The guard does not parse nested shells.
     ("uv run python hooks/tidy-scan.py scan --json --root R", "ask", "silent"),
     ("uv run python hooks/tidy-procs.py apply --ids proc:1:2 --root R", "ask", "ask"),
-    ("uv run python hooks/tidy-procs.py apply --ids proc:1:2 --root R --dry-run", "ask", "silent"),
+    ("uv run python hooks/tidy-procs.py apply --ids proc:1:2 --root R --dry-run", "ask", "ask"),
     ("python hooks/tidy-procs.py scan --root R", "ask", "silent"),
     ("python hooks/mcp-orphans.py --kill", "ask", "ask"), ("python3 hooks/mcp-orphans.py --kill --json", "ask", "ask"),
     ("python hooks/mcp-orphans.py --json", "ask", "silent"), ("python hooks/mcp-orphans.py", "ask", "silent"),

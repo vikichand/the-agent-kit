@@ -265,11 +265,13 @@ _LAUNCHER = re.compile(r"^(python[\d.]*|py|pypy[\d.]*|uv|uvx|pipx)$")
 
 
 def kit_destructive(toks):
-    """The kit's own cleanup scripts, in the step that removes things: tidy-scan/tidy-procs `apply` (not a
-    --dry-run) and mcp-orphans `--kill`. Only the command's own script counts: the program itself, or the
+    """The kit's own cleanup scripts, in the step that removes things: tidy-scan/tidy-procs `apply` and
+    mcp-orphans `--kill`. Only the command's own script counts: the program itself, or the
     first .py/.sh argument of a python launcher (`uv run python`, `py -3`). A tidy name sitting in another
     command's arguments (`git push -o tidy-scan.py -o apply`) is not a tidy run. Matched by file name, so
-    unquoted Windows paths (shlex eats their backslashes) are seen."""
+    unquoted Windows paths (shlex eats their backslashes) are seen. A --dry-run is NOT exempt: a token that
+    only reads like one (a redirect target: `apply ... > --dry-run`) would buy silence, and one extra
+    prompt on a dry run is cheap."""
     prog = base(toks[0]).lower()
     if prog.endswith((".py", ".sh")):
         i = 0
@@ -281,7 +283,7 @@ def kit_destructive(toks):
         return False
     name, rest = base(toks[i]).lower(), toks[i + 1:]
     if name.endswith(("tidy-scan.py", "tidy-procs.py")):
-        return "apply" in rest and "--dry-run" not in rest
+        return "apply" in rest
     if name.endswith("mcp-orphans.py"):
         return "--kill" in rest
     if name.endswith("install.sh"):                 # --tidy --kill execs mcp-orphans.py

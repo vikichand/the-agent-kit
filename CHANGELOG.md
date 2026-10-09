@@ -19,7 +19,7 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   when they run in this repo or its worktrees; orphaned MCP servers elsewhere are one note pointing at
   `install.sh --tidy`. Long-lived branches, fresh worktrees, your notes and uncommitted work are never
   offered. Leftovers no pattern knows go into an `unknown` group of facts the agent judges, item by item.
-  The command guard asks before a real `apply` on Claude Code and Antigravity. Claude Code and Codex make
+  The command guard asks before every `apply`, dry run included, on Claude Code and Antigravity. Claude Code and Codex make
   the skill user-only; Antigravity cannot. See [`docs/tidy.md`](docs/tidy.md).
 - **Antigravity is a supported tool.** It reads `AGENTS.md` and the `.agents/skills/` Codex gets; a
   project install now also writes the two path-shaped depth rules (`code-correctness`, `tests`) to

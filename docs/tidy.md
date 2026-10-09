@@ -90,7 +90,7 @@ as `.env.backup` are never listed (the scan says that secret-like files exist, b
 - `apply` passes the same repository scope to the process scanner and re-scans inside it, so an id copied from
   another repo's scan no longer matches and is skipped.
 - On Claude Code and Antigravity the command guard asks before `tidy-scan.py apply`, `tidy-procs.py apply`
-  (dry runs excepted) and `mcp-orphans.py --kill`, so the prompt does not depend on the model following the
+  (dry runs included, so a stray `--dry-run` token cannot buy silence) and `mcp-orphans.py --kill`, so the prompt does not depend on the model following the
   skill. Codex hooks cannot ask, so there the skill's own confirmation is the gate.
 - Removing a worktree also deletes its merged branch, and only when the item's label names it (this holds for
   missing worktrees too). Missing worktrees are pruned all together, so `apply` skips them unless you approved
