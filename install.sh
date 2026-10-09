@@ -650,7 +650,8 @@ def owned_copy(p):
 def copy_skill(n):
     src, dst = os.path.join(src_root, n), os.path.join(canon_root, n)
     tmp = dst + ".agent-kit-new"
-    shutil.rmtree(tmp, ignore_errors=True)
+    if os.path.lexists(tmp):         # re-checked here: we cannot tell who made it, so we never delete it
+        raise OSError("%s already exists; left as it is" % tmp)
     shutil.copytree(src, tmp, symlinks=True)   # a link inside a kit skill is copied as a link, never followed
     with open(os.path.join(tmp, MARK), "w", encoding="utf-8") as f:
         f.write("This folder is a copy made by the-agent-kit's install.sh; --setup refreshes it and --undo removes it.\n")
@@ -715,6 +716,13 @@ if mode in ("plan", "apply"):
                 differs = True
             if differs:
                 todo_refresh.append(n)
+    for n in todo_copy + todo_refresh:   # copy_skill builds in <n>.agent-kit-new; one already there is not ours to delete
+        if os.path.lexists(os.path.join(canon_root, n) + ".agent-kit-new"):
+            warn("~/.agents/skills/%s.agent-kit-new already exists; left as it is, so %s is not copied or refreshed (remove it to retry)" % (n, n))
+            todo_copy[:] = [x for x in todo_copy if x != n]
+            todo_refresh[:] = [x for x in todo_refresh if x != n]
+            if n in ok and not os.path.lexists(os.path.join(canon_root, n)):
+                ok.remove(n)
     if todo_copy:
         lines.append("  + copy to ~/.agents/skills (the one real copy, read by Codex): " + ", ".join(todo_copy))
     if todo_refresh:

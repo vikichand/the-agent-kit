@@ -1199,6 +1199,14 @@ EOF
   cmp -s "$g/.gemini/config/skills.json" "$g/sj.before" && [ "$(cat "$g/.agents/skills/tidy/SKILL.md")" = mine ] \
     && pass "W10f --undo leaves a user-owned skill and the skills.json entry that lists it" || bad "W10f undo removed a user-owned skill's entry: $(cat "$g/.gemini/config/skills.json")"
   rm -rf "$g"
+  # W10g: a leftover ~/.agents/skills/<n>.agent-kit-new the kit cannot vouch for is never deleted: that skill is skipped, with a warning.
+  home_
+  mkdir -p "$g/.agents/skills/tidy.agent-kit-new"; printf 'precious\n' > "$g/.agents/skills/tidy.agent-kit-new/notes.txt"
+  su 1
+  [ "$(cat "$g/.agents/skills/tidy.agent-kit-new/notes.txt")" = precious ] && [ ! -e "$g/.agents/skills/tidy" ] \
+    && [ -f "$g/.agents/skills/writing-docs/SKILL.md" ] && has 'agent-kit-new' "$(printf '%s' "$o" | grep -i 'WARN\|!')" \
+    && pass "W10g an existing <skill>.agent-kit-new is left alone and named; that skill is skipped, the others still install" || bad "W10g temp-folder name reused or not reported: $o"
+  rm -rf "$g"
   # W11: a tool that is not installed is not set up: no ~/.claude or ~/.gemini is created for it, while
   # the one real copy still lands where Codex reads it.
   g=$(mktemp -d) || exit 2; G=$(wq "$g")
