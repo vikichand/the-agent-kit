@@ -47,9 +47,11 @@ the process is not listed (a note counts them), and an orphaned MCP tree working
 `~/.the-agent-kit/install.sh --tidy`. Editors and agent CLIs are never listed; the agent CLIs are recognised by
 the script they run, because on Windows `claude`, `codex` and every dev server are all `node.exe`. A scope is
 refused when it is the home folder, a folder that holds it (`C:\Users`, `/home`), a filesystem root or a system folder
-(the Windows folder, Program Files, `/usr` and similar). Outside a repository the scope is the folder you ran
-`/tidy` in, unless a repository sits one or two levels below it: then no process is scoped and a note says to run
-`/tidy` inside one of them.
+(the Windows folder, Program Files, `/usr/bin`, `/usr/lib` and similar; `/usr/src/app` is allowed). Outside a
+repository the scope is the folder you ran `/tidy` in, unless a repository sits one or two levels below it: then no
+process is scoped and a note says to run `/tidy` inside one of them. That check looks only one and two levels down,
+so a folder whose repositories sit three or more levels deep is not detected (a known limit): run `/tidy` inside a
+repository.
 
 ## Unknown items
 

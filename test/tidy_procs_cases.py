@@ -331,7 +331,23 @@ def too_broad():
 
 
 check("a scope that is an ancestor of the home folder or a system folder is refused", too_broad)
-check("--root is required", lambda: subprocess.run([sys.executable, str(path), "scan"], capture_output=True,
+
+
+def posix_system_folders():
+    """The POSIX list through the classifier's own `under`, with / turned into os.sep so it runs on any box."""
+    def conv(p):
+        return p.replace("/", os.sep)
+
+    sysf = [conv(s) for s in tidy.POSIX_SYSTEM]
+    refused = [p for p in ("/usr/bin", "/usr/bin/env", "/usr/sbin", "/usr/lib/x", "/usr/libexec", "/bin", "/sbin",
+                           "/etc", "/lib", "/System/Library") if tidy.under(conv(p), sysf)]
+    # /usr/src/app is a common container working folder, so /usr itself must not be on the list
+    allowed = [p for p in ("/usr/src/app", "/usr/local/src/app", "/usr/share/proj", "/opt/app") if not tidy.under(conv(p), sysf)]
+    return len(refused) == 10 and len(allowed) == 4
+
+
+check("a repo under /usr/src/app is allowed and /usr/bin is refused", posix_system_folders)
+check("--root is required", lambda:subprocess.run([sys.executable, str(path), "scan"], capture_output=True,
                                                    text=True).returncode == 2)
 
 
