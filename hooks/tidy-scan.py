@@ -263,8 +263,8 @@ def age_days(path):
 
 
 def plain_dir(path):
-    """A real directory; a link to one is not (it is removed as a link). Used at scan and at delete time."""
-    return os.path.isdir(path) and not os.path.islink(path)
+    """A real directory; a link or a junction to one is not (it is removed as a link). Used at scan and at delete time."""
+    return os.path.isdir(path) and not is_link(path)
 
 
 def is_link(path):
@@ -678,7 +678,7 @@ def safe_delete(root, rel, was_dir=None):
     parent = os.path.realpath(os.path.dirname(p))
     if parent != real_root and not parent.startswith(real_root + os.sep):
         return "outside repo root"
-    if not os.path.islink(p):
+    if not is_link(p):
         real = os.path.realpath(p)
         if real == real_root or not real.startswith(real_root + os.sep):
             return "outside repo root"
@@ -687,8 +687,13 @@ def safe_delete(root, rel, was_dir=None):
         return "tracked or not checkable"
     if os.path.lexists(p) and was_dir is not None and plain_dir(p) != was_dir:
         return "type changed since the scan"
-    if os.path.islink(p) or os.path.isfile(p):
-        os.unlink(p)  # a symlink is removed as a link, never followed
+    if is_link(p):
+        try:
+            os.unlink(p)  # a symlink is removed as a link, never followed
+        except OSError:
+            os.rmdir(p)  # a junction refuses unlink; rmdir removes the link, not the folder behind it
+    elif os.path.isfile(p):
+        os.unlink(p)
     elif os.path.isdir(p):
         shutil.rmtree(p)
     else:
@@ -764,7 +769,10 @@ def apply(args):
         if args.dry_run:
             print(f"dry-run {i}: would {it['action']}")
             continue
-        err = act(root, it, args.allow_ignored)
+        try:
+            err = act(root, it, args.allow_ignored)
+        except OSError as exc:  # one locked or vanished item must not end the batch unlogged
+            err = clean(exc)
         result = "ok" if err is None else f"failed: {err}"
         failed += err is not None
         print(f"{i}: {result}")

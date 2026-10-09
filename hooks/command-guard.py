@@ -261,33 +261,76 @@ TIDY_ASK = ("this deletes branches, worktrees or files, or kills processes, and 
             "Approve only if you chose these items in /tidy.")
 
 
-_LAUNCHER = re.compile(r"^(python[\d.]*|py|pypy[\d.]*|uv|uvx|pipx)$")
+_LAUNCHER = re.compile(r"^(python[\d.]*|pythonw[\d.]*|py|pypy[\d.]*|uv|uvx|pipx)$")
+# Launcher options that consume the NEXT token; its value (`-X pycache_prefix=a.py`, `--with-requirements r.py`)
+# is not the script. Not exhaustive: an unlisted value flag whose value ends in .py still hides the script.
+_VALUE_OPTS = {"-X", "-W", "-c", "-m", "-p", "-f", "--with", "--with-requirements", "--with-editable", "--python",
+               "--project", "--directory", "--env-file", "--package", "--extra", "--group", "--index", "--spec",
+               "--pip-args", "--find-links"}
+_PS_CMD = re.compile(r"^-c(o(m(m(a(n(d)?)?)?)?)?)?$", re.I)
+
+
+def has_word(rest, word):
+    """`word` as its own token, or glued to a redirect/operator (`apply>out.txt` is one shlex token)."""
+    return any(t == word or re.match(re.escape(word) + r"[<>|&;]", t) for t in rest)
+
+
+def shell_payload(prog, toks):
+    """Segments a Windows shell wrapper runs (`cmd /c ...`, `pwsh -Command ...`), as token lists, or None."""
+    if prog == "cmd":
+        i = next((k for k, t in enumerate(toks) if k and t.lower() in ("/c", "/k")), None)
+    elif prog in ("pwsh", "powershell"):
+        i = next((k for k, t in enumerate(toks) if k and _PS_CMD.match(t)), None)
+    else:
+        return None
+    if i is None:
+        return None
+    rest = toks[i + 1:]
+    out = []
+    for part in split_ops(rest[0] if len(rest) == 1 else " ".join(rest)):   # a quoted payload is ONE token
+        try:
+            out.append([s for s in (x.strip("(){}") for x in shlex.split(part)) if s])
+        except ValueError:
+            out.append(part.split())
+    return out
 
 
 def kit_destructive(toks):
     """The kit's own cleanup scripts, in the step that removes things: tidy-scan/tidy-procs `apply` and
     mcp-orphans `--kill`. Only the command's own script counts: the program itself, or the
-    first .py/.sh argument of a python launcher (`uv run python`, `py -3`). A tidy name sitting in another
+    first .py/.sh argument of a python launcher (`uv run python`, `py -3`) that is not an option or an
+    option's value, or the payload of a `cmd /c` / `pwsh -Command` wrapper. A tidy name sitting in another
     command's arguments (`git push -o tidy-scan.py -o apply`) is not a tidy run. Matched by file name, so
     unquoted Windows paths (shlex eats their backslashes) are seen. A --dry-run is NOT exempt: a token that
     only reads like one (a redirect target: `apply ... > --dry-run`) would buy silence, and one extra
     prompt on a dry run is cheap."""
     prog = base(toks[0]).lower()
+    inner = shell_payload(prog, toks)
+    if inner is not None:
+        return any(t and kit_destructive(verb_tokens(t) or [""]) for t in inner)
     if prog.endswith((".py", ".sh")):
         i = 0
     elif _LAUNCHER.match(prog):
-        i = next((k for k, t in enumerate(toks) if k and base(t).lower().endswith((".py", ".sh"))), None)
+        i, skip = None, False
+        for k, t in enumerate(toks[1:], 1):
+            if skip:
+                skip = False
+            elif t.startswith("-"):
+                skip = t in _VALUE_OPTS
+            elif "=" not in t and base(t).lower().endswith((".py", ".sh")):
+                i = k
+                break
         if i is None:
             return False
     else:
         return False
     name, rest = base(toks[i]).lower(), toks[i + 1:]
     if name.endswith(("tidy-scan.py", "tidy-procs.py")):
-        return "apply" in rest
+        return has_word(rest, "apply")
     if name.endswith("mcp-orphans.py"):
-        return "--kill" in rest
+        return has_word(rest, "--kill")
     if name.endswith("install.sh"):                 # --tidy --kill execs mcp-orphans.py
-        return "--tidy" in rest and "--kill" in rest
+        return has_word(rest, "--tidy") and has_word(rest, "--kill")
     return False
 
 

@@ -145,6 +145,10 @@ def under(path, scope):
     return any(path == r or path.startswith(r.rstrip(os.sep) + os.sep) for r in scope)
 
 
+# Not /usr itself: /usr/src/app is a common container working folder, and /usr/local holds user installs.
+POSIX_SYSTEM = ["/bin", "/sbin", "/etc", "/usr/bin", "/usr/sbin", "/usr/lib", "/usr/libexec", "/lib", "/System"]
+
+
 def too_broad(folder):
     """Why a scope folder is the wrong size, or None. Processes are matched by working folder, so the home
     folder, a folder holding it (C:\\Users, /home), a filesystem root or a system folder would claim other
@@ -153,7 +157,7 @@ def too_broad(folder):
     if os.path.dirname(f) == f or under(norm(os.path.expanduser("~")), [f]):
         return "the home folder, a filesystem root or a folder that holds the home folder"
     system = ([os.environ.get(v) for v in ("SystemRoot", "windir", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432")]
-              if os.name == "nt" else ["/bin", "/sbin", "/etc", "/usr", "/lib", "/System"])
+              if os.name == "nt" else POSIX_SYSTEM)
     if under(f, [norm(s) for s in system if s]):
         return "a system folder"
     return None
