@@ -205,6 +205,8 @@ check("cwd in another repo is not listed", lambda: not SC([PARENT, SERVER], {40:
 check("a sibling folder with the same prefix is not inside", lambda: not SC([PARENT, SERVER], {40: RA + "-other"}, LISTEN, CPU)[0])
 check("argv path in the repo is listed when the cwd is unreadable", lambda: groups(SC(
     [PARENT, proc(40, 1, f'node "{os.path.join(RA, "node_modules", ".bin", "vite")}"', age=27000)], {}, LISTEN, CPU)) == [("processes.idle", 40)])
+check("a readable cwd outside the repo beats an argv path inside it", lambda: not SC(
+    [PARENT, proc(40, 1, f'node "{os.path.join(RA, "node_modules", ".bin", "vite")}"', age=27000)], {40: RB}, LISTEN, CPU)[0])
 check("argv path in another repo with an unreadable cwd is not listed", lambda: not SC(
     [PARENT, proc(40, 1, f'node "{os.path.join(RB, "node_modules", ".bin", "vite")}"', age=27000)], {}, LISTEN, CPU)[0])
 r = SC([PARENT, SERVER], {}, LISTEN, CPU)

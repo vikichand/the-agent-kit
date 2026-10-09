@@ -39,10 +39,11 @@ a guess you must judge. What each group never lists is in
 
 ## How a process counts as this repository's
 
-A process is in scope when its working folder is inside the repo or one of its linked worktrees, or when an
-absolute path in its command line is. The scanner reads another process's working folder through the Windows
-process block, `/proc/<pid>/cwd` on Linux and `lsof` on macOS. A folder it cannot read means the process is not
-listed (a note counts them), and an orphaned MCP tree working somewhere else becomes one note that points to
+A process is in scope when its working folder is inside the repo or one of its linked worktrees. A working
+folder that can be read decides alone; an absolute path in the command line inside the repo counts only when the
+folder cannot be read. The scanner reads another process's working folder through the Windows
+process block, `/proc/<pid>/cwd` on Linux and `lsof` on macOS. A folder it cannot read, with no such path, means
+the process is not listed (a note counts them), and an orphaned MCP tree working somewhere else becomes one note that points to
 `~/.the-agent-kit/install.sh --tidy`. Editors and agent CLIs are never listed; the agent CLIs are recognised by
 the script they run, because on Windows `claude`, `codex` and every dev server are all `node.exe`. A home folder
 or a filesystem root is refused as a scope.

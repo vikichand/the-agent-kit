@@ -217,10 +217,10 @@ def scan(procs, now, patterns, min_age_s, idle_s, self_pid, net, cpu_probe, init
     found = {}  # pid -> working folder, for the pids that were asked and could be read
 
     def own(p):  # None when this process alone cannot say
-        if argv_in_scope(p["command"], scope):
-            return "in"
         folder = found.get(p["pid"])
-        return None if folder is None else "in" if under(norm(folder), scope) else "out"
+        if folder is not None:  # a readable folder is final: an argv path naming this repo cannot pull it in
+            return "in" if under(norm(folder), scope) else "out"
+        return "in" if argv_in_scope(p["command"], scope) else None
 
     if scope is None:
         verdict = {p["pid"]: "in" for p in procs}
