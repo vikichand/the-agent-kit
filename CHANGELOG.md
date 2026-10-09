@@ -13,10 +13,14 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ### Added
 
-- **`/tidy`, a user-invoked cleanup skill.** It lists leftovers (stray and duplicate dev servers, merged
-  branches, stale worktrees, Playwright output, scratch files) and asks per group before removing anything,
-  with a dry run and a log. Claude Code and Codex make it user-only; Antigravity cannot. See
-  [`docs/tidy.md`](docs/tidy.md).
+- **`/tidy`, a user-invoked cleanup skill for the repository you are in.** It lists leftovers (stray,
+  duplicate and idle dev servers started for this repo, merged branches, stale worktrees, Playwright output,
+  scratch files) and asks per group before removing anything, with a dry run and a log. Processes count only
+  when they run in this repo or its worktrees; orphaned MCP servers elsewhere are one note pointing at
+  `install.sh --tidy`. Long-lived branches, fresh worktrees, your notes and uncommitted work are never
+  offered. Leftovers no pattern knows go into an `unknown` group of facts the agent judges, item by item.
+  The command guard asks before a real `apply` on Claude Code and Antigravity. Claude Code and Codex make
+  the skill user-only; Antigravity cannot. See [`docs/tidy.md`](docs/tidy.md).
 - **Antigravity is a supported tool.** It reads `AGENTS.md` and the `.agents/skills/` Codex gets; a
   project install now also writes the two path-shaped depth rules (`code-correctness`, `tests`) to
   `.agents/rules/` as glob rules, and the command guard as a workspace hook in `.agents/hooks.json`,
