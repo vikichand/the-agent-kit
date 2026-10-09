@@ -255,6 +255,38 @@ def t_symlink():
     return (outside / "keep.txt").exists()
 
 
+def link_dir(link, target):
+    """A directory link: a junction on Windows (no privilege needed, and os.walk does not skip it), else a symlink.
+    False when it cannot be made, so the case is skipped."""
+    if os.name == "nt":
+        return subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(target)], capture_output=True).returncode == 0
+    try:
+        os.symlink(target, link, target_is_directory=True)
+        return True
+    except OSError:
+        return False
+
+
+def t_walks_never_enter_a_junction():
+    d = mk()
+    outside = TMP / "outside-junction"
+    write(outside / "big.bin", "x" * 5000)
+    write(outside / "test-results" / "a.png", "p")
+    (d / "scratch").mkdir()
+    write(d / "scratch" / "in.txt", "abc")
+    if not link_dir(d / "scratch" / "j", outside):
+        return True  # ponytail: no way to make a directory link on this box, case cannot run
+    size, count = mod.look_inside(str(d / "scratch"))[:2]
+    tool_dir = d / "test-results"
+    tool_dir.mkdir()
+    write(tool_dir / "a.png", "p")
+    link_dir(tool_dir / "j", outside)
+    odd = mod.inspect_tool_dir(str(tool_dir), {"png"})[1]
+    top = mod.look_inside(str(d / "scratch" / "j"))
+    return (size == 3 and count == 1 and mod.size_of(str(d / "scratch")) == 3 and odd == []
+            and top[1] == 1 and top[0] < 5000 and mod.size_of(str(d / "scratch" / "j")) < 5000)
+
+
 def t_symlink_listed_removed_as_link():
     d = mk()
     outside = TMP / "outside2"
