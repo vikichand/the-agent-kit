@@ -1,0 +1,7 @@
+# The cases added in 0.5.0, run in the vanilla arm alongside the speed baseline (docs/performance.md),
+# so each new rule can be read against a true control, not only against the last release.
+42-finish-every-part
+43-atomic-commits
+44-check-the-claim
+45-trivial-rename
+46-bring-the-fix
