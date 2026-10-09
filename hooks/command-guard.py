@@ -261,32 +261,52 @@ TIDY_ASK = ("this deletes branches, worktrees or files, or kills processes, and 
             "Approve only if you chose these items in /tidy.")
 
 
+_LAUNCHER = re.compile(r"^(python[\d.]*|py|pypy[\d.]*|uv|uvx|pipx)$")
+
+
 def kit_destructive(toks):
     """The kit's own cleanup scripts, in the step that removes things: tidy-scan/tidy-procs `apply` (not a
-    --dry-run) and mcp-orphans `--kill`. Matched by file name anywhere in the command, so `uv run python`,
-    `py -3` and unquoted Windows paths (shlex eats their backslashes) are all seen."""
-    for i, t in enumerate(toks):
-        name, rest = base(t).lower(), toks[i + 1:]
-        if name.endswith(("tidy-scan.py", "tidy-procs.py")) and "apply" in rest and "--dry-run" not in rest:
-            return True
-        if name.endswith("mcp-orphans.py") and "--kill" in rest:
-            return True
-        if name.endswith("install.sh") and "--tidy" in rest and "--kill" in rest:  # it execs mcp-orphans.py
-            return True
+    --dry-run) and mcp-orphans `--kill`. Only the command's own script counts: the program itself, or the
+    first .py/.sh argument of a python launcher (`uv run python`, `py -3`). A tidy name sitting in another
+    command's arguments (`git push -o tidy-scan.py -o apply`) is not a tidy run. Matched by file name, so
+    unquoted Windows paths (shlex eats their backslashes) are seen."""
+    prog = base(toks[0]).lower()
+    if prog.endswith((".py", ".sh")):
+        i = 0
+    elif _LAUNCHER.match(prog):
+        i = next((k for k, t in enumerate(toks) if k and base(t).lower().endswith((".py", ".sh"))), None)
+        if i is None:
+            return False
+    else:
+        return False
+    name, rest = base(toks[i]).lower(), toks[i + 1:]
+    if name.endswith(("tidy-scan.py", "tidy-procs.py")):
+        return "apply" in rest and "--dry-run" not in rest
+    if name.endswith("mcp-orphans.py"):
+        return "--kill" in rest
+    if name.endswith("install.sh"):                 # --tidy --kill execs mcp-orphans.py
+        return "--tidy" in rest and "--kill" in rest
     return False
 
 
 def classify(tokens, decision, grants=frozenset()):
+    res = _classify(tokens, decision, grants)
+    if res:
+        return res                                   # every deny (and other ask) wins over the tidy prompt
+    toks = verb_tokens(tokens)
+    # Codex hooks cannot ask ("permissionDecision: ask ... parsed but not supported yet"), and a deny would
+    # break /tidy there, so this is Claude and Antigravity only.
+    if toks and decision == "ask" and kit_destructive(toks):
+        return "ask", TIDY_ASK
+    return None
+
+
+def _classify(tokens, decision, grants):
     toks = verb_tokens(tokens)
     if not toks:
         return None
     verb = base(toks[0]).lower()
     rest = toks[1:]
-
-    # Codex hooks cannot ask ("permissionDecision: ask ... parsed but not supported yet"), and a deny would
-    # break /tidy there, so this is Claude and Antigravity only.
-    if decision == "ask" and kit_destructive(toks):
-        return "ask", TIDY_ASK
 
     if verb == "git":
         j = 0

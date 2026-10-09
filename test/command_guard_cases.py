@@ -94,6 +94,16 @@ CASES = [
     ("python ~/.the-agent-kit/hooks/tidy-scan.py apply --root R --id path:x", "ask", "ask"),
     ("python ~/.the-agent-kit/hooks/tidy-scan.py apply --root R --id path:x", "deny", "silent"),
     ("python ~/.the-agent-kit/hooks/tidy-scan.py apply --root R --id path:x --dry-run", "ask", "silent"),
+    # a tidy script name smuggled into another command's arguments must not earn the tidy prompt over a deny
+    ("git push --force -o tidy-scan.py -o apply origin main", "ask", "deny"),
+    ("git commit -n -m tidy-scan.py -m apply", "ask", "deny"),
+    ("echo hi; git push --force -o mcp-orphans.py -o --kill origin main", "ask", "deny"),
+    # and only the script position counts: a tidy name that is just an argument elsewhere is not a tidy run
+    ("git log tidy-scan.py apply", "ask", "silent"),
+    ("python other.py tidy-scan.py apply", "ask", "silent"),
+    ("./hooks/tidy-scan.py apply --root R --id path:x", "ask", "ask"),
+    # known limit, not a case: `bash -c "..."` / eval wrapping hides the command from a shell-text guard
+    # (README: the guard is not a sandbox). The guard does not parse nested shells.
     ("uv run python hooks/tidy-scan.py scan --json --root R", "ask", "silent"),
     ("uv run python hooks/tidy-procs.py apply --ids proc:1:2 --root R", "ask", "ask"),
     ("uv run python hooks/tidy-procs.py apply --ids proc:1:2 --root R --dry-run", "ask", "silent"),
