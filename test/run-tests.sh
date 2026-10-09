@@ -314,6 +314,34 @@ EOF
   ka conv-new "$k/proj" >/dev/null
   [ "$($PY -c "import json,sys; d=json.load(open(sys.argv[1])); print(len(d['ids']) <= 200 and d['ids'][-1] == 'conv-new')" "$(wp "$k/home/.the-agent-kit/.ag-conversations")")" = True ] \
     && pass "K27 the seen-conversations ledger is capped, keeping the newest" || bad "K27 ledger unbounded or lost the newest id"
+  # K27b: the ledger is written atomically (a failed write leaves the old one intact, no temp file behind) and
+  # a stored id is capped, so a hostile conversation id cannot bloat it; the capped id still dedupes.
+  r=$(KIT_DIR="$(wp "$KIT")" $PY - "$KH" <<'EOF' 2>&1
+import importlib.util, json, os, sys
+h = sys.argv[1]
+os.environ["HOME"] = os.environ["USERPROFILE"] = h
+spec = importlib.util.spec_from_file_location("kc", os.path.join(os.environ["KIT_DIR"], "hooks", "kit-check.py"))
+kc = importlib.util.module_from_spec(spec); spec.loader.exec_module(kc)
+ledger = os.path.join(kc.SHARE, ".ag-conversations")
+json.dump({"ids": ["keep-1"]}, open(ledger, "w"))
+before = sorted(os.listdir(kc.SHARE))
+real = json.dump
+def boom(*a, **k):
+    real({"ids": ["partial"]}, a[1]); raise OSError("disk full")
+kc.json.dump = boom
+assert kc.first_invocation({"conversationId": "c-fail"}) is False
+kc.json.dump = real
+assert json.load(open(ledger))["ids"] == ["keep-1"], "a failed write damaged the ledger"
+assert sorted(os.listdir(kc.SHARE)) == before, "a temp file was left behind"
+big = "x" * 5000
+assert kc.first_invocation({"conversationId": big}) is True
+ids = json.load(open(ledger))["ids"]
+assert ids[-1] and all(len(i) <= 128 for i in ids), "stored id not capped"
+assert kc.first_invocation({"conversationId": big}) is False, "capped id does not dedupe"
+print("OK")
+EOF
+)
+  [ "$r" = OK ] && pass "K27b the seen-conversations ledger is written atomically and its ids are capped" || bad "K27b ledger write unsafe: $r"
   # K28: missing recommended tools reach an Antigravity conversation too, from its own config.
   cp "$KIT/hooks/recommended.json" "$k/home/.the-agent-kit/recommended.json"; rm -f "$k/home/.the-agent-kit/.tools-check"
   printf '%s\n' "$(printf '%s' "$latest" | cut -c1-7)" > "$k/home/.the-agent-kit/.kit-version"
