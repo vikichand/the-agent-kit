@@ -18,7 +18,8 @@
 #   ./install.sh --tidy       list orphaned MCP trees; add --kill to terminate them
 #
 # Safe by design: never overwrites an existing CLAUDE.md / AGENTS.md / git hook. Your tool settings are
-# only ever ADDED to, after you say yes, with a backup first; --global prints them for a hand merge
+# only ever ADDED to (bar rules the kit itself once added and has retired), after you say yes, with a
+# backup first; --global prints them for a hand merge
 # instead. Run --check to confirm what is actually live.
 set -eu
 
@@ -902,7 +903,7 @@ setup_machine() {  # --setup: everything a machine needs, applied with the user'
   py=$(detect_py)
   [ -n "$py" ] || { say "  ! no working Python 3 found - the kit's guard and this setup both need it. Install it and re-run."; exit 2; }
   hr
-  say "SETTINGS - the kit's entries are added to yours; nothing of yours is removed or changed"
+  say "SETTINGS - the kit's entries are added to yours; only rules the kit once added and has retired are removed"
   mrc=0; plan=$(merge_settings "$share" "$py" 2>&1) || mrc=$?
   [ -n "$plan" ] && say "$plan"
   [ "$mrc" = 0 ] && [ -z "$plan" ] && say "  already current (or no Claude Code / Codex settings folder found)"

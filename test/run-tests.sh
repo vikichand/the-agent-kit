@@ -905,7 +905,7 @@ fi
 
 # ---------- install.sh --setup (one-command machine setup) ----------
 # The installer, run by the user, merges the kit into their settings. It only ever ADDS (plus updating
-# the kit's own older entries in place), backs up first, refuses a malformed file, and writes nothing
+# the kit's own older entries in place and removing rules it retired), backs up first, refuses a malformed file, and writes nothing
 # without consent: a terminal answer, or AGENT_KIT_APPLY=1, which the tool guard asks about.
 echo "== install.sh --setup =="
 if [ -n "$PY" ]; then
@@ -994,6 +994,28 @@ EOF
   [ "$(jq_ "$g/.claude/settings.json" "[b['matcher'] for b in d['hooks']['SessionStart'] if any('headroom' in h['command'] for h in b['hooks'])][0]")" = 'startup|resume' ] \
     && [ "$(jq_ "$g/.claude/settings.json" "sum('kit-check.py' in h['command'] for b in d['hooks']['SessionStart'] for h in b['hooks'])")" = 1 ] \
     && pass "M12 a shared block keeps the user's matcher; the old kit hook moves out, not duplicated" || bad "M12 shared block mutated: $o"
+  # Claude Code ignores Write(...) rules and warns on each one ("Edit rules cover all file-editing tools").
+  # The kit shipped two; --setup retires exactly those, with the usual consent and backup.
+  grep -q 'Write(' "$KIT/claude/settings.json" && bad "M13 the template still ships a Write(...) rule" \
+    || pass "M13 the template ships no Write(...) rule (Edit rules cover every file-editing tool)"
+  printf '{"permissions":{"ask":["Bash(foo *)"]}}' > "$g/.claude/settings.json"
+  su 1   # a current install, then the two rules an older kit added, and one of the user's own
+  $PY - "$(wq "$g/.claude/settings.json")" <<'EOF'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p, encoding='utf-8')); ask = d['permissions']['ask']
+ask += [r for r in ("Write(**/AGENTS.md)", "Write(**/CLAUDE.md)", "Write(**/mine.md)") if r not in ask]
+json.dump(d, open(p, 'w', encoding='utf-8'))
+EOF
+  d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
+  has 'install.sh --setup' "$d" && pass "M13 --check flags the kit's retired Write rules" || bad "M13 --check silent about retired rules: $(printf '%s' "$d" | grep -i setting)"
+  rm -f "$g/.claude/"settings.json.bak-agent-kit-*
+  su 1
+  [ "$(jq_ "$g/.claude/settings.json" "[r for r in d['permissions']['ask'] if r.startswith('Write(')]")" = "['Write(**/mine.md)']" ] \
+    && [ "$(jq_ "$g/.claude/settings.json" "'Bash(foo *)' in d['permissions']['ask']")" = True ] \
+    && ls "$g/.claude/"settings.json.bak-agent-kit-* >/dev/null 2>&1 \
+    && pass "M13 --setup removes the kit's two Write rules, keeps the user's, backs up first" || bad "M13 retired rules not handled: $o"
+  su 1
+  has 'already' "$o" && pass "M13 a second run is already current" || bad "M13 retiring is not idempotent: $o"
   HOME="$g" git config --global core.hooksPath .husky
   su 1
   [ "$(gh_)" = .husky ] && has 'is .husky' "$o" \

@@ -116,6 +116,14 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   "never add skeleton loaders" now says to add them; the report template no longer prints an em dash;
   stale facts in the setup prompts are corrected.
 
+### Fixed
+
+- **Claude Code no longer warns about the kit's permission rules on every start.** It reads no `Write(...)`
+  rules, because `Edit` rules cover every file-editing tool, so the kit's `Write(**/AGENTS.md)` and
+  `Write(**/CLAUDE.md)` did nothing (the matching `Edit` rules still ask). The template drops them, and
+  `install.sh --setup` (and so `--update`) lists and removes those two exact entries from your
+  `~/.claude/settings.json`, after you say yes and with a backup. Any `Write(...)` rule of your own is kept.
+
 ## [0.4.0] - 2026-10-04
 
 ### Changed

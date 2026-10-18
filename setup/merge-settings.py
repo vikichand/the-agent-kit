@@ -2,8 +2,9 @@
 """Merge the-agent-kit into a user's Claude Code and Codex settings.
 
 Run by install.sh --setup (and --update), never by an agent on its own: the installer asks the user
-first. It only ADDS what the kit needs, and updates the kit's own older entries in place (a hook whose
-command runs a script from `.the-agent-kit/hooks/`). It never removes or changes anything else, backs a
+first. It only ADDS what the kit needs, updates the kit's own older entries in place (a hook whose
+command runs a script from `.the-agent-kit/hooks/`) and removes the exact rules the kit once shipped and
+has retired (RETIRED). It never removes or changes anything else, backs a
 file up before writing it, refuses a file it cannot parse, and checks the result before replacing the
 original.
 
@@ -14,7 +15,7 @@ original.
   --share-cmd  the kit's path as hook commands should spell it (what the shell sees)
   --py         the Python command the hooks should run
   --apply      write the changes (default: only describe them)
-  --check      exit 10 when the kit's entries are missing, 0 when present, 1 on error; print one line
+  --check      exit 10 when the kit's entries are missing or stale, 0 when current, 1 on error; print one line
 
 Exit: 0 nothing to change, 10 changes pending (not applied), 1 a file could not be merged.
 Standard library only; Codex's config.toml needs Python 3.11 or later (tomllib).
@@ -25,6 +26,10 @@ import argparse, json, os, re, shutil, sys, time
 # plain flags. A user's own command that merely mentions the script (a wrapper, a chain) is the user's.
 KIT_HOOK = re.compile(r'^\s*(?:\S+\s+(?:-3\s+)?)?(?:"[^"]*|\S*)\.the-agent-kit[\\/]+hooks[\\/]+([\w.-]+\.py)"?'
                       r'(?:\s+--?[\w-]+(?:\s+[\w-]+)?)*\s*$')
+
+# Permission rules older kits added that Claude Code now ignores, with a warning on every start: it reads
+# no Write(...) rules, because Edit rules cover all file-editing tools (code.claude.com/docs/en/permissions).
+RETIRED = ("Write(**/AGENTS.md)", "Write(**/CLAUDE.md)")
 
 
 def load_template(path, share_cmd, py):
@@ -93,6 +98,10 @@ def merge_json(path, template, is_claude):
         perms = mine.setdefault("permissions", {})
         for kind in ("ask", "deny"):
             lst = perms.setdefault(kind, [])
+            retired = [r for r in lst if r in RETIRED]
+            if retired:
+                lst[:] = [r for r in lst if r not in RETIRED]
+                changes.append("removed %d %s rule(s) Claude Code ignores: %s" % (len(retired), kind, ", ".join(retired)))
             added = [r for r in template.get("permissions", {}).get(kind, []) if r not in lst]
             lst.extend(added)
             if added:
@@ -215,7 +224,7 @@ def main():
         if errors:
             print("settings: " + "; ".join(errors)); return 1
         if pending:
-            print("settings: missing kit entries in " + ", ".join(p[0] for p in pending)); return 10
+            print("settings: missing or stale kit entries in " + ", ".join(p[0] for p in pending)); return 10
         print("settings: %s carry the kit entries" % (", ".join(t[0] for t in targets) or "no Claude Code or Codex settings found;"))
         return 0
     for label, _, _, changes in pending:
