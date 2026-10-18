@@ -59,6 +59,12 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ### Changed
 
+- **`docs/branches-and-releases.md` follows current practice:** releases get annotated tags and `gh release create
+  --verify-tag`, short-lived branches are allowed from `develop` and merge back with a message that says what they
+  add, commit subjects are `area: what changed` as the rules ask, and the adoption steps cover a tag-push release
+  workflow, Dependabot's `target-branch` and the private-repository ruleset limit. The `writing-docs` skill carries
+  the same branch, tag and release defaults to every project, and the project setup prompt now records a project's
+  commit convention and tag style, and flags a bot that opens pull requests against a release-only branch.
 - The kit is now called **The Agent Kit** in the README, which opens with a banner that follows your GitHub light or dark theme. Generated reports
   end with "GENERATED WITH THE AGENT KIT" and the repository link, no longer a personal name.
 - **`AGENTS.md` is shorter** (171 effective lines, from 198) with the same rules plus the 0.5.0 additions: overlapping

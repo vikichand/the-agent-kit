@@ -42,6 +42,19 @@ thorough.
   commit, never one per file. A subject that needs a bracketed list or a second "and" is two commits.
 - For a squash merge, the pull request description becomes the commit message: write it as one.
 
+**Branches, tags and releases** (the project block's **Branches** line decides; this is the default)
+
+- A short-lived branch starts from the working branch, is named for its work (`ci/supply-chain`),
+  merges back there and is deleted. It never targets a release-only branch. Fast-forward when you can;
+  a merge commit's message says what the branch adds, never git's default "Merge branch ...".
+- A release is one `release: X.Y.Z` commit that versions the changelog section and bumps any version
+  files, then a pull request titled with the project and version whose description is that section.
+- Tag the release commit with an annotated tag, `git tag -a vX.Y.Z -m "<project> X.Y.Z"` (git: annotated
+  tags "are meant for release"), and create the release with `gh release create vX.Y.Z --verify-tag
+  --draft`, so `gh` never makes a tag of its own. The owner publishes it.
+- After a squash-merged release, merge the release branch back into the working branch, or the next
+  pull request carries the old commits again.
+
 **Pull request descriptions**
 
 - **Title:** what the change does, in the imperative, under 72 characters. A release pull request is

@@ -47,6 +47,9 @@ Set up the AGENTS.md in this project for me.
      (branch names, tags, a CONTRIBUTING or release doc, recent history) and ASK if it is not obvious -
      never guess, because guessing wrong means an agent pushes to the wrong branch. If the project has
      one branch and no release ritual, record that: it is a real answer and it stops the agent inventing one.
+     Also record the commit subject convention `git log` shows (none: `area: what changed`) and the tag style.
+     If Dependabot or another bot opens pull requests against a release-only branch, say so and recommend
+     its fix (Dependabot: `target-branch` set to the working branch).
      If a branch is release-only, ALSO write the marker line shown in the block below. The kit's pre-push hook
      reads it and refuses any push to that branch that is not a release, so the rule is enforced, not just
      stated. Write no marker for a single-branch project.
@@ -84,7 +87,7 @@ Use this shape for the block (include the CODE part, the AGENT part, or both, de
 iteration, run the narrowest check that proves the change (one test file, the typecheck); the full set
 runs before "done" and before a commit or PR.
 **Branches:** work on `<branch>`; `<release branch or "none">` is release-only; releases are cut by
-`<how>`, and only `<who>` may cut one.
+`<how>`, and only `<who>` may cut one. Commits: `<convention>`; tags: `<annotated vX.Y.Z | none>`.
 <!-- agent-kit: release-branch=<release branch> -->   (ONLY when a branch is release-only; omit otherwise)
 **Follow these patterns:** <canonical files>
 **Careful zones / do-not-touch:** ...
