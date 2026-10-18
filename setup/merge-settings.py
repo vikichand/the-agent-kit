@@ -98,7 +98,7 @@ def merge_json(path, template, is_claude):
         perms = mine.setdefault("permissions", {})
         for kind in ("ask", "deny"):
             lst = perms.setdefault(kind, [])
-            retired = [r for r in lst if r in RETIRED]
+            retired = [r for r in lst if r in RETIRED] if kind == "ask" else []   # shipped in ask only
             if retired:
                 lst[:] = [r for r in lst if r not in RETIRED]
                 changes.append("removed %d %s rule(s) Claude Code ignores: %s" % (len(retired), kind, ", ".join(retired)))

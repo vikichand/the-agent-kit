@@ -1004,6 +1004,7 @@ EOF
 import json, sys
 p = sys.argv[1]; d = json.load(open(p, encoding='utf-8')); ask = d['permissions']['ask']
 ask += [r for r in ("Write(**/AGENTS.md)", "Write(**/CLAUDE.md)", "Write(**/mine.md)") if r not in ask]
+d['permissions']['deny'].append("Write(**/CLAUDE.md)")   # the kit only shipped them in ask: a deny is the user's
 json.dump(d, open(p, 'w', encoding='utf-8'))
 EOF
   d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
@@ -1012,6 +1013,7 @@ EOF
   su 1
   [ "$(jq_ "$g/.claude/settings.json" "[r for r in d['permissions']['ask'] if r.startswith('Write(')]")" = "['Write(**/mine.md)']" ] \
     && [ "$(jq_ "$g/.claude/settings.json" "'Bash(foo *)' in d['permissions']['ask']")" = True ] \
+    && [ "$(jq_ "$g/.claude/settings.json" "'Write(**/CLAUDE.md)' in d['permissions']['deny']")" = True ] \
     && ls "$g/.claude/"settings.json.bak-agent-kit-* >/dev/null 2>&1 \
     && pass "M13 --setup removes the kit's two Write rules, keeps the user's, backs up first" || bad "M13 retired rules not handled: $o"
   su 1
