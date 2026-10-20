@@ -113,9 +113,9 @@ an agent writes fail it.
   time the line changes, and readers believe comments - human readers and agents alike. An accurate
   "why" helps whoever opens the file next; a stale or obvious one steers them wrong harder than no
   comment would. Fewer, truer comments is the target, not zero.
-- Out, as generated-code tells: banner separators (`// ===== Auth =====`), numbered steps
-  (`// Step 1:`), empty labels (`// Main logic`, `// Note: important`), a TODO with no task, emoji,
-  `} // end if`, and a one-line fact padded into a paragraph. One line, two at most.
+- Keep a comment to one or two lines that state the fact. Banners (`// ===== Auth =====`), numbered
+  steps (`// Step 1:`), labels (`// Main logic`), a TODO with no task, emoji and `} // end if` add
+  nothing the code does not already say, and read as generated.
 
 ## Delete, do not comment out
 
