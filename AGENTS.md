@@ -47,8 +47,7 @@ state the bucket and the oracle in one clause and go.
   consumers and failure modes. Before writing code, put the decisions the request leaves open to the user
   in one round, each with your recommended answer, and wait; if none are open, build. Ask only what the
   code, docs and data cannot answer: a question the repository already settles is a failure, not diligence.
-  If risk is unclear,
-  use this tier.
+  If risk is unclear, use this tier.
 - Stop when the selected checks prove the change, and name what you skipped in a clause: an unstated
   omission looks the same as a forgotten one.
 
@@ -149,11 +148,9 @@ state the bucket and the oracle in one clause and go.
 
 ## 7. Context is the scarce resource
 
-- **The session is disposable; the conversation is never the only record of a decision.** Checkpoint
-  long-running work and every constraint the user states (files not to touch, contracts to keep), plus
-  what is verified versus only claimed and which approaches failed, into the plan or checkpoint file
-  before any handoff or expected compaction, and name its path so it is re-read on resume. A task finished
-  in one short session needs no checkpoint file. When the thread degrades, clear it and reload from there.
+- **The conversation is never the only record of a decision.** Before a handoff or an expected compaction,
+  write the user's constraints, what is verified versus only claimed, and the approaches that failed into
+  the plan or checkpoint file, and name its path. A task finished in one short session needs none.
 - **Commit, push, and open PRs only when the user asks.** Offer the next step; each action is authorized
   only by being named ("commit this" is not permission to push). One logical change per commit: the subject
   says what and where in under 72 characters, the body says why only when it is not obvious. When asked to
@@ -184,15 +181,10 @@ out in words ("Section 4", "and", "number"). This governs prose you write, never
 
 ---
 
----
-
 ## Project setup
 
-The rules above are the universal floor. To make this file sharp for *this* project, run the setup prompt in
-`~/.the-agent-kit/docs/project-setup-prompt.md`: it works out whether this is a code project or a research/agent project, reads your repo
-(or asks a few questions if it's greenfield), and writes a tailored block between the markers below - your stack and
-the exact checks that define "done" for code, or the sources and evidence bar for research/agent work. It edits only
-between the markers; everything above stays exactly as it is. Re-run it any time the project changes.
+The block below is filled by the setup prompt in `~/.the-agent-kit/docs/project-setup-prompt.md`, which edits only
+between the markers.
 
 <!-- PROJECT-CONFIG:START -->
 ## This project: CODE - the-agent-kit (rules and guardrails for coding agents)
