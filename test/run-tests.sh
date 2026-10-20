@@ -1541,6 +1541,40 @@ fi
     && pass "H23 a panel file lists case ids; comments and blanks are skipped; an unknown id or a missing file stops the run" \
     || bad "H23 panel_ids wrong: [$ids] rc $rb/$rn $m"
   rm -rf "$pc"
+  # H24: a case's check.sh grades the sandbox without the judge; anything but a PASS or FAIL line is an ERROR.
+  eval "$(sed -n '/^case_check() {/,/^}/p' "$KIT/test/adherence/run.sh")"
+  cc=$(mktemp -d); mkdir "$cc/case" "$cc/w"; echo "slop" > "$cc/w/out.md"
+  printf 'n=$(grep -c slop out.md)\n[ "$n" -eq 0 ] && echo "PASS 0 tells" || echo "FAIL $n tells"\n' > "$cc/case/check.sh"
+  v1=$(case_check "$cc/w" "$cc/case" 2>/dev/null); : > "$cc/w/out.md"; v2=$(case_check "$cc/w" "$cc/case" 2>/dev/null)
+  echo 'echo oops' > "$cc/case/check.sh"; v3=$(case_check "$cc/w" "$cc/case" 2>/dev/null)
+  [ "$v1" = "FAIL 1 tells" ] && [ "$v2" = "PASS 0 tells" ] && has 'ERROR' "$v3" \
+    && pass "H24 a case's check.sh grades in the sandbox; output that is not PASS or FAIL is an ERROR" \
+    || bad "H24 case_check wrong: [$v1] [$v2] [$v3]"
+  rm -rf "$cc"
+  # H25: the two counting cases grade canned drafts: tells counted, code skipped, a missing file fails.
+  cs="$KIT/test/adherence/cases"; cc=$(mktemp -d); mkdir "$cc/services"
+  printf '# envcheck \342\200\224 a robust tool\n\n## Overview\n\nIt serves as a pivotal guard.\n\n```sh\nenvcheck --file robust.env\n```\n\nUse `--seamless`.\n' > "$cc/README.md"
+  p1=$(cd "$cc" && sh "$cs/47-prose-tells/check.sh" | head -1)
+  printf '# envcheck\n\nExits 1 when a variable in `.env.example` is unset.\n\n```sh\nenvcheck --json\n```\n' > "$cc/README.md"
+  p2=$(cd "$cc" && sh "$cs/47-prose-tells/check.sh" | head -1); rm "$cc/README.md"
+  p3=$(cd "$cc" && sh "$cs/47-prose-tells/check.sh" | head -1)
+  printf 'f() {\n  // Step 1: Validate input\n  // ===== Main logic =====\n  return 1;\n} // end f\n' > "$cc/services/refunds.js"
+  c1=$(cd "$cc" && sh "$cs/48-generated-comment-tells/check.sh" | head -1)
+  printf 'f() {\n  // Refunds past paidMinor would make the ledger negative.\n  return 1;\n}\n' > "$cc/services/refunds.js"
+  c2=$(cd "$cc" && sh "$cs/48-generated-comment-tells/check.sh" | head -1)
+  [ "$p1" = "FAIL 5 prose tells (old 2, new 3)" ] && [ "$p2" = "PASS 0 prose tells (old 0, new 0)" ] && has 'FAIL' "$p3" \
+    && [ "$c1" = "FAIL 3 comment tells" ] && [ "$c2" = "PASS 0 comment tell(s)" ] \
+    && pass "H25 cases 47 and 48 count prose and comment tells, skip code, and fail a missing file" \
+    || bad "H25 counting cases wrong: [$p1] [$p2] [$p3] [$c1] [$c2]"
+  rm -rf "$cc"
+  # H26: the sandbox gets each skill whole, as install_skills copies it; references/ was once left behind.
+  eval "$(sed -n '/^deploy_skills() {/,/^}/p' "$KIT/test/adherence/run.sh")"
+  ds=$(mktemp -d); deploy_skills "$KIT" "$ds"
+  [ -s "$ds/.claude/skills/writing-docs/SKILL.md" ] && [ -s "$ds/.claude/skills/writing-docs/references/prose-tells.md" ] \
+    && [ -s "$ds/.claude/skills/generating-reports/references/design.md" ] \
+    && pass "H26 the eval sandbox gets each skill whole, references/ included" \
+    || bad "H26 deploy_skills left skill files behind: $(cd "$ds" && find . -type f | tr '\n' ' ')"
+  rm -rf "$ds"
 ) | tee "$w.h"; grep -q '^FAIL' "$w.h" 2>/dev/null && fail=1; rm -f "$w.h"
 
 echo "---"

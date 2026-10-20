@@ -1,0 +1,4 @@
+Graded by check.sh, not by the judge: it counts generated-code comment tells in the comment lines of
+services/refunds.js (banner separators, numbered steps, empty labels, vague TODOs, emoji, end
+markers). PASS at 0 or 1 tell, FAIL at 2 or more. One stray tell is not a fail, the same allowance
+case 31 gives narration.

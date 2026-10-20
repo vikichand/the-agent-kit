@@ -117,7 +117,7 @@ TSV="$RESULTS/$(date +%Y-%m-%d).tsv"
 # same text, so an edit to this repo's own project block or its README cannot split one measurement
 # into two. `results/AGENTS-candidate-<id>.md` keeps the template that id refers to.
 _tpl=$(mktemp); ( KIT="$KIT"; write_rules "$_tpl" )
-CAND_REF="t$(cat "$_tpl" "$KIT"/claude/rules/*.md "$KIT"/claude/skills/*/*.md 2>/dev/null | git hash-object --stdin | cut -c1-7)"
+CAND_REF="t$(cat "$_tpl" "$KIT"/claude/rules/*.md "$KIT"/claude/skills/*/*.md "$KIT"/claude/skills/*/references/*.md 2>/dev/null | git hash-object --stdin | cut -c1-7)"
 [ -f "$RESULTS/AGENTS-candidate-$CAND_REF.md" ] || cp "$_tpl" "$RESULTS/AGENTS-candidate-$CAND_REF.md" 2>/dev/null
 rm -f "$_tpl"
 # The kit's session-start check prints into the agent's context when the sandbox's rules differ from the
@@ -171,6 +171,24 @@ ALLOW="Bash(python:*) Bash(python3:*) Bash(pytest:*) Bash(uv:*) Bash(node:*) Bas
 case_allow() {  # $1 = case dir  -> extra allowlist patterns, COMMA separated (a pattern may contain a space)
   [ -f "$1/allow" ] && grep -v '^[[:space:]]*#' "$1/allow" | grep -v '^[[:space:]]*$' | awk 'NR>1{printf ","} {printf "%s", $0}'
   return 0
+}
+
+# The kit's skills as an install puts them (install.sh install_skills): each whole folder, references/ included.
+# Until 2026-10-21 only each skill's top-level .md was copied, so a develop arm never saw a skill's references.
+deploy_skills() {  # $1 = kit source  $2 = sandbox
+  for sd in "$1"/claude/skills/*/; do
+    [ -d "$sd" ] || continue
+    mkdir -p "$2/.claude/skills/$(basename "$sd")" && cp -r "$sd." "$2/.claude/skills/$(basename "$sd")/" 2>/dev/null
+  done
+  return 0
+}
+
+# A case whose rule is a count (AI tells in prose, banner comments) ships check.sh: it runs in the sandbox and
+# its first line is PASS or FAIL and the count. A judge asked to count is the weak link; a script is not.
+case_check() {  # $1 = sandbox  $2 = case dir  -> "PASS ..." | "FAIL ..." | "ERROR ..."
+  o=$( cd "$1" && sh "$2/check.sh" 2>&1 | tr -d '\000-\010\013-\037\177' ); v=$(printf '%s\n' "$o" | head -1)
+  printf '%s\n' "$o" | tail -n +2 | sed 's/^/     | /' >&2   # the hits, for the run log
+  case "$v" in PASS*|FAIL*) printf '%s' "$v" ;; *) printf 'ERROR check.sh gave no verdict: %s' "$v" ;; esac
 }
 
 # Run one case in one condition. $1=case dir  $2=with|without  -> prints PASS / FAIL / ERROR + reason
@@ -530,10 +548,7 @@ run_cell() {
       # and the arm is only faithful to a real install with them.
       mkdir -p "$w/.claude/rules" && cp "$src"/claude/rules/*.md "$w/.claude/rules/" 2>/dev/null
       # The task skills too, since 2026-09-17: a real install has them, and cases 36-37 test one.
-      for sd in "$src"/claude/skills/*/; do
-        [ -d "$sd" ] || continue
-        mkdir -p "$w/.claude/skills/$(basename "$sd")" && cp "$sd"*.md "$w/.claude/skills/$(basename "$sd")/" 2>/dev/null
-      done
+      deploy_skills "$src" "$w"
     fi
   fi
   before=$(fingerprint "$w")
@@ -728,6 +743,13 @@ the task, or a question the files already answer is FAIL.
     # A no-change cell is exactly the one worth opening under --keep, so say where it is.
     [ "$KEEP" -eq 1 ] && echo "   (kept: $w)" >&2 || scrub "$w"
     return 0
+  fi
+  if [ -f "$cdir/check.sh" ]; then
+    verdict=$(case_check "$w" "$cdir"); vword=${verdict%% *}
+    ( JUDGE=check.sh; record_row "$cid" "$cond" "$runno" "$vword" "$elapsed" 0 "$tele" "$rules_ref" )
+    [ "$KEEP" -eq 1 ] && echo "   (kept: $w)" >&2 || scrub "$w"
+    printf '%s [%ss]' "$verdict" "$elapsed"
+    [ "$vword" = ERROR ] && return 1 || return 0
   fi
   # Cases without the marker are still judged normally - their rubrics may legitimately pass an
   # answer that writes nothing (01 accepts "investigates why", 09 accepts "proposes a test", 06

@@ -220,6 +220,8 @@ one. A trace failure is deterministic and is decided before the judge sees the c
 | `44-check-the-claim` | Section 1 | A handoff note wrongly says there is no migration tool and the user doubts it: relays the note, or hand-edits a generated schema instead of adding a migration. `must-edit` |
 | `45-trivial-rename` | Section 0 | The speed panel's control: a one-line rename where the kit should add nothing. Fails on drive-by edits, new files or a question. `must-edit` |
 | `46-bring-the-fix` | Section 1 | A fast salted-SHA-256 password hash: lists algorithms for the user to pick, or explains without a fix, instead of recommending the current standard with its source and a migration path |
+| `47-prose-tells` | Section 8, `writing-docs` | "Write the README" for a small CLI: `check.sh` counts prose tells (em dashes, stock words, chat residue, recap and scaffold headings); fails at 3 or more. `must-edit`, `check.sh` |
+| `48-generated-comment-tells` | `code-correctness.md` | A validate-then-compute refund function: `check.sh` counts banner, numbered-step, empty-label, vague-TODO, emoji and end-marker comments; fails at 2 or more. `must-edit`, `check.sh` |
 
 Cases 38-40 were added on 2026-10-04 to grade the 0.4.0 never-assume rule. Cases 32-37 were added on 2026-09-17 to grade the 2026-09-18 performance program (its decision record is in
 `docs/senior-engineer.md`). Cases 11-14 and 17-31 test the **depth tier**, not `AGENTS.md`, so their fixtures deliberately sit
@@ -884,6 +886,8 @@ cases/13-your-rule/
   allow        OPTIONAL: extra command-allowlist patterns for the Claude arm, one per line (`#` comments),
                for a case that needs commands the sandbox otherwise withholds (case 41: look at ports,
                stop a process by PID, never by image name). Other tools run with their own sandbox flags
+  check.sh     OPTIONAL: grades the cell instead of the judge, for a rule that is a count; run in the
+               sandbox, its first line is PASS or FAIL and the count, and anything else is an ERROR
   trace        OPTIONAL one line, `red-before-edit: <runner regex>`: the test runner must have run
                and failed before the first edit to a non-test source file (see How it works)
 ```

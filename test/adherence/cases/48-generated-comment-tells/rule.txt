@@ -1,0 +1,1 @@
+code-correctness.md Comments say why, not what - generated-code comment tells (banners, numbered steps, empty labels, vague TODOs, emoji, end markers)

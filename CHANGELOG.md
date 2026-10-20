@@ -41,6 +41,8 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 - **Eval cases 42 to 46**: finish every part of a three-part ask (42), atomic commits (43), check a
   second-hand claim at its source (44), a one-line rename where the kit should add nothing (45), and bring
   the researched, sourced fix instead of a list of options (46).
+- **Eval cases 47 and 48, graded by a count, not a judge.** A case can ship a `check.sh` that grades the
+  cell itself: 47 counts AI prose tells in a README the agent writes, 48 counts generated-code comment tells.
 - **Speed measurement in the adherence harness**: a true vanilla arm (its own logged-in config folder),
   pinned effort, rotating arm order, duration columns, last-turn telemetry for multi-turn cases, and a
   speed panel of eight cases.
