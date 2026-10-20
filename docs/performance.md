@@ -101,17 +101,42 @@ Still open:
 - Token columns exclude subagent tokens (`total_cost_usd` includes them).
 - The old `without` arm is unchanged for compatibility and still carries the user's config; its rows are not
   comparable with `vanilla` rows.
-- Whether Claude's `usage` and the three duration fields in a resumed result are session totals is not
-  documented (only cost is); check `duration_ms` against `elapsed_s` on the multi-turn case.
+- The three duration fields in a resumed result are the last turn's, not session totals (measured
+  2026-10-20 on Claude Code 2.1.304: case 16 `duration_ms` 9 to 24 s against 44 to 99 s elapsed), so the
+  start-up-plus-hooks split leaves multi-turn cases out. Whether `usage` is a session total is still undocumented.
 - Codex and Antigravity telemetry is still read from turn 1 only, and neither reports a duration.
-- The vanilla-folder checks and the clean-config run path are tested on canned data; the first live run is
-  the first real test of the login, the folder's path form on Windows and the lock.
+- The vanilla-folder checks and the clean-config run path were tested on canned data until the 2026-10-20
+  run, which used the login, a Windows path with a space and the lock live, without a failure.
 - Computed Codex and Antigravity costs use a price table fetched on 2026-10-09 and go stale when prices do.
 
 ## Results
 
-None yet for 0.5.0. Each run is added here with its date, model, effort, arms, cases, runs per cell and the
-spread, never as a single number.
+Each run is added here with its date, model, effort, arms, cases, runs per cell and the spread, never as a
+single number. Per-case tables are in `test/adherence/README.md`.
+
+**2026-10-20, the vanilla baseline (W1).** Sonnet 5.5, effort medium, Opus judging, Claude Code 2.1.304, the
+speed panel (8 cases), 5 runs per cell, arms vanilla, v0.4.0 and develop (`t05e08bb`), 120 cells, none lost.
+
+| Against vanilla | Quality | Time, per-case median ratio (range) | Cost, per-case mean ratio (range) | Bar |
+|---|---|---|---|---|
+| develop | 39/40 vs 20/40, no case worse | x1.43 (x0.80 to x1.75) | x1.72 (x1.48 to x1.96) | **over** on time and cost |
+| v0.4.0 | 37/40 vs 20/40, no case worse | x1.46 (x1.09 to x2.38) | x1.81 (x1.44 to x1.96) | over on time and cost |
+| develop, only the 3 cases vanilla also passes 5/5 | equal | x1.27 | x1.61 | over |
+
+- **Spread per cell, all 40 runs per arm:** elapsed interquartile range 11 to 35 s vanilla, 14 to 42 s develop;
+  cost per cell $0.051 to $0.081 vanilla, $0.087 to $0.145 develop.
+- **Time split** (cases other than the multi-turn 16, n=35 per arm, medians): start-up plus hooks 1.8 s vanilla
+  and 1.7 s develop, so the hooks add nothing measurable; model time 16.6 s against 21.4 s.
+- **Cost driver:** about 7k more tokens written to the cache in every session (median 9.9k vanilla, 17.3k
+  develop), the same on a one-line rename as on a hard task: the always-on `AGENTS.md`, the code rule that
+  loads on the first code file read, and the skill descriptions. On the bounded tasks the rest of the gap is
+  work vanilla skips and fails for (02, 32, 33, 35: 1/20 vanilla, 19/20 develop).
+- **Per passing result** develop costs $0.123 against vanilla's $0.139. This is context, not the bar: the bar
+  is per session and stays as written.
+- **Develop against v0.4.0** (rules-change bar, at most 10% slower or costlier): x0.96 time, x0.96 cost,
+  bounded-task p90 43 s against 47 s. It passes.
+
+Next: the effort sweep, then the token trims if the kit is still over, each re-measured and recorded here.
 
 ## Sources
 

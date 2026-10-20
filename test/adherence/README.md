@@ -116,7 +116,7 @@ on 2027-01-01). Token columns leave out subagent tokens; `cost_usd` includes the
 
 ```sh
 test/adherence/run.sh --arms vanilla,current,with --current-ref v0.4.0 --tool claude \
-  --model sonnet --effort medium --runs 5 --panel test/adherence/panels/speed.txt
+  --model sonnet --effort medium --judge-model opus --runs 5 --panel test/adherence/panels/speed.txt
 python test/adherence/summarize.py test/adherence/results/<date>.tsv
 ```
 
@@ -769,6 +769,49 @@ Case 41 shows a gain on Opus as well, which corrects the earlier note that the t
 there: that was true of the original 14 cases and is not true of this one. Case 33 is one run lower; no transcript
 was kept for it, so a one-run dip and a real cost cannot be told apart at this size. This was a spot check, not
 the full suite: Opus has not been run on the other 38 cases.
+
+### The 2026-10-20 speed baseline (W1): kit against vanilla
+
+Sonnet 5.5 at effort medium, Opus judging, Claude Code 2.1.304, the speed panel (8 cases), 5 runs per cell,
+three arms in one run sharing the clean config folder: `vanilla` (no rules, no user config), `current`
+(v0.4.0) and `with` (develop, `t05e08bb`). 120 cells, none lost or timed out. Rows: `results/2026-10-20.tsv`,
+judge `opus`, started 20:14 to 21:35. The file's first row (case 02, vanilla, judge `default`) is from a launch
+stopped after one cell because the W1 command above then lacked `--judge-model opus`; it is excluded, and the
+summary was run on a copy without it.
+
+| Case | vanilla pass | v0.4.0 pass | develop pass | median s (v / 0.4 / dev) | mean $ per cell (v / 0.4 / dev) |
+|---|---|---|---|---|---|
+| 02 reuse before rebuild | 0/5 | 4/5 | **5/5** | 8 / 19 / 14 | 0.050 / 0.098 / 0.097 |
+| 07 surgical changes | 5/5 | 5/5 | 5/5 | 8 / 12 / 11 | 0.047 / 0.087 / 0.084 |
+| 16 decay under pressure | 4/5 | 5/5 | 5/5 | 47 / 73 / 82 | 0.103 / 0.199 / 0.202 |
+| 32 bounded shared helper | 0/5 | **5/5** | 4/5 | 35 / 47 / 38 | 0.072 / 0.120 / 0.111 |
+| 33 one-line authorization | 0/5 | 4/5 | **5/5** | 27 / 39 / 41 | 0.088 / 0.157 / 0.149 |
+| 34 regenerated file | 5/5 | 5/5 | 5/5 | 20 / 22 / 16 | 0.066 / 0.096 / 0.098 |
+| 35 misleading stack trace | 1/5 | 4/5 | **5/5** | 23 / 34 / 34 | 0.075 / 0.146 / 0.131 |
+| 45 trivial rename | 5/5 | 5/5 | 5/5 | 11 / 12 / 14 | 0.053 / 0.090 / 0.086 |
+| **All** | **20/40** | **37/40** | **39/40** | 20 / 29 / 25 | $/pass 0.139 / 0.134 / 0.123 |
+
+- **Quality:** no case is worse than vanilla in either kit arm. Develop passes 39/40 against vanilla's 20/40.
+- **Time and cost against vanilla, per-case ratio, median over the 8 cases:** develop x1.43 time (range
+  x0.80 to x1.75) and x1.72 cost (range x1.48 to x1.96); v0.4.0 x1.46 and x1.81 (time is the per-case median, cost the per-case mean, as `summarize.py` prints them). On the three cases vanilla
+  also passes 5/5 (07, 34, 45), develop is x1.27 time and x1.61 cost. Both are over the 1.25x bar.
+- **Where the time goes** (cases other than 16, n=35 per arm, medians): start-up plus hooks is 1.8 s
+  vanilla, 1.9 s v0.4.0, 1.7 s develop (interquartile range about 1.3 to 2.2 s in every arm), so the hooks cost
+  nothing measurable. The gap is model time: `duration_ms` 16.6 s vanilla, 21.4 s develop.
+- **Where the cost goes:** every session writes more context to the cache, median `cache_write` 9.9k tokens
+  vanilla against 17.3k develop, about 7k tokens on every case including the trivial rename. That is the
+  always-on `AGENTS.md` (16.3 KB) plus `code-correctness.md` (6.2 KB), which loads as soon as a code file is
+  read, and the skill descriptions (sizes in bytes; the token split is an estimate, not a tokenizer count).
+- **Develop against v0.4.0** (the 10% bar for a rules change): per-case median x0.96 time and x0.96 cost,
+  bounded-task p90 43 s against 47 s. It passes.
+- **Multi-turn telemetry:** on case 16, `duration_ms` covers the last turn only (9 to 24 s against 44 to 99 s
+  elapsed), so on Claude Code 2.1.304 the duration fields of a resumed result are not session totals.
+
+**Vanilla on the cases added in 0.5.0**, same day and settings, 3 runs per cell (`--arms vanilla
+--panel panels/new-0.5.0.txt`, 15 cells, none lost): 42 finish every part 3/3, 43 atomic commits **0/3**,
+44 check the claim **1/3**, 45 trivial rename 3/3, 46 bring the fix 3/3. These are the control for window 2;
+42, 45 and 46 already pass without the kit, so on those the kit can only cost time, and 43 and 44 are where a
+rule has room to show a gain.
 
 ## What this does not tell you
 
