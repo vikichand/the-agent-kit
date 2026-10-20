@@ -935,4 +935,5 @@ echo "The number that matters is the GAP. A rule that passes without the file wa
 echo "a rule that fails with it is either too compressed to fire or needs enforcement, not wording."
 echo "Per-cell elapsed seconds, tokens and cost: $TSV"
 printf '%s\n' "------------------------------------------------------------"
-[ -n "$STAGE" ] && rm -rf "$STAGE"
+# An `if`, not `&&`: a run with no staged arm (vanilla only) would otherwise exit 1 after every cell ran.
+if [ -n "$STAGE" ]; then rm -rf "$STAGE"; fi
