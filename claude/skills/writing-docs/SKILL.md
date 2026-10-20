@@ -24,6 +24,8 @@ README, comment, commit body and PR description.
 - **Match length to what the reader needs.** Cover the substance; do not pad with filler sections,
   redundant summaries or boilerplate.
 - This governs prose you write, never the project's code style (that is Section 3).
+- **Before handing over** a README, a report, release notes or anything longer than a few paragraphs,
+  check it against [references/prose-tells.md](references/prose-tells.md), the full list.
 
 ## Commits, pull requests and release notes
 

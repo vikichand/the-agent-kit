@@ -115,6 +115,12 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 - Prompt-audit fixes (`/claude-api prompt-audit`): a frontend rule that a literal model could read as
   "never add skeleton loaders" now says to add them; the report template no longer prints an em dash;
   stale facts in the setup prompts are corrected.
+- **The tells of AI-written text, in full.** `writing-docs` has a new reference,
+  `references/prose-tells.md`, the full list of prose patterns readers take as machine-written, checked
+  before a README or report is handed over. The code rule adds comment tells (banners, numbered steps,
+  empty labels, vague TODOs), and the frontend rule adds the default looks of generated UI. Distilled
+  from Anthropic's prompting guide, Wikipedia's "Signs of AI writing", stop-slop, no-ai-slop,
+  avoid-ai-writing, antislop-code and kill-ai-slop.
 
 ### Fixed
 
