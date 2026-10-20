@@ -71,4 +71,7 @@ tangible usefulness: if removing it loses nothing, remove it.
 Defaults read as generated. Unless the project's design system asks for them: no indigo-to-violet
 gradient, no gradient-filled headline text, no Inter or Space Grotesk picked by habit, no emoji as
 icons, no glass panels and max-radius pills everywhere, no kicker label above every heading, no
-cards inside cards, no `hover:scale` on every element, and no invented stat row ("10k+ users").
+cards inside cards, no `hover:scale` on every element, and no invented stat row ("10k+ users"). Also
+out: a "New" pill above the hero headline, a thick coloured stripe down one edge of a card, one 12-16px
+radius and one soft grey shadow on everything, pure `#000` or `#fff` surfaces, and a fake browser bar
+around a screenshot. Removing a default is half the job: put a decision for this product in its place.

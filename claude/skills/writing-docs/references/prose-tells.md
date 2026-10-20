@@ -36,6 +36,13 @@ have learned to read as machine-written. The fix is almost always the plainer se
   number of items there actually are.
 - **Things doing people's verbs.** "The data tells us", "the decision emerges". Name who did it.
 - **Kickers.** A last line built to be quoted, an aphorism or a metaphor. End on the last concrete point.
+- **Arguing with no one.** "To be clear, this is not about...", "A tempting approach would be..." when
+  nobody raised it. State the claim; drop the defence.
+- **Vague links.** "associated with", "connected to", "tied to". Say how the two things relate.
+- **False ranges.** "From onboarding to scale to culture": no scale runs through those. List what is
+  actually covered.
+- **Invented labels.** "the supervision paradox", "scope creep trap" used as if established. Describe the
+  problem instead of naming it.
 
 ## Structure
 
@@ -45,6 +52,9 @@ have learned to read as machine-written. The fix is almost always the plainer se
 - **Diff-anchored docs.** "This function was added to replace the previous approach of..." Describe the
   thing as it is; the history goes in the commit message.
 - **The challenges-and-outlook section.** "Despite these challenges...", "The future looks bright".
+- **The heading said again.** `## Performance` followed by "Performance matters." Start with the fact.
+- **One metaphor everywhere.** Introduced once, it is a tool; carried through every paragraph, it is a
+  tic.
 
 ## Formatting
 
@@ -69,4 +79,4 @@ plainer sentence would say the same thing.
 Distilled, not copied. Anthropic, "Prompting best practices" (platform.claude.com, the
 `avoid_excessive_markdown_and_bullet_points` guidance); Wikipedia, "Signs of AI writing" (WP:AISIGNS,
 CC BY-SA 4.0); stop-slop by Hardik Pandya (MIT); no-ai-slop by Peter Yang (MIT); avoid-ai-writing by
-Conor Bronsdon (MIT).
+Conor Bronsdon (MIT); humanizer by Siqi Chen (MIT); skill-deslop by Stephen D. Turner (MIT).

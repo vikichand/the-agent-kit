@@ -122,7 +122,7 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   before a README or report is handed over. The code rule adds comment tells (banners, numbered steps,
   empty labels, vague TODOs), and the frontend rule adds the default looks of generated UI. Distilled
   from Anthropic's prompting guide, Wikipedia's "Signs of AI writing", stop-slop, no-ai-slop,
-  avoid-ai-writing, antislop-code and kill-ai-slop.
+  avoid-ai-writing, humanizer, skill-deslop, antislop-code, kill-ai-slop, hallmark and taste-skill.
 
 ### Fixed
 
