@@ -774,7 +774,7 @@ the full suite: Opus has not been run on the other 38 cases.
 
 Sonnet 5.5 at effort medium, Opus judging, Claude Code 2.1.304, the speed panel (8 cases), 5 runs per cell,
 three arms in one run sharing the clean config folder: `vanilla` (no rules, no user config), `current`
-(v0.4.0) and `with` (develop, `t05e08bb`). 120 cells, none lost or timed out. Rows: `results/2026-10-20.tsv`,
+(v0.4.0) and `with` (develop at `b71ff93`, rules tree `t05e08bb`). 120 cells, none lost or timed out. Rows: `results/2026-10-20.tsv`,
 judge `opus`, started 20:14 to 21:35. The file's first row (case 02, vanilla, judge `default`) is from a launch
 stopped after one cell because the W1 command above then lacked `--judge-model opus`; it is excluded, and the
 summary was run on a copy without it.
@@ -800,7 +800,7 @@ summary was run on a copy without it.
   nothing measurable. The gap is model time: `duration_ms` 16.6 s vanilla, 21.4 s develop.
 - **Where the cost goes:** every session writes more context to the cache, median `cache_write` 9.9k tokens
   vanilla against 17.3k develop, about 7k tokens on every case including the trivial rename. That is the
-  always-on `AGENTS.md` (16.3 KB) plus `code-correctness.md` (6.2 KB), which loads as soon as a code file is
+  always-on `AGENTS.md` (16.3 KB) plus `code-correctness.md` (6.2 KB), which loads "when Claude uses the Read, Write, or Edit tool on a matching file" (code.claude.com/docs/en/memory), as soon as a code file is
   read, and the skill descriptions (sizes in bytes; the token split is an estimate, not a tokenizer count).
 - **Develop against v0.4.0** (the 10% bar for a rules change): per-case median x0.96 time and x0.96 cost,
   bounded-task p90 43 s against 47 s. It passes.
