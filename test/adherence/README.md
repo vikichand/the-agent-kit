@@ -869,7 +869,7 @@ case 44 (3 more cells per arm) and case 26 after the reworded frontend rule (3 m
 | Both, pooled | 76/84 | 78/84 | +2.4 points | **-4.6 points**: non-inferior |
 
 Develop is ahead in both batches. Per case it is higher on 02 (1/3 to 3/3) and 23 (2/3 to 3/3), and lower
-only on 06 (1/3 to 0/3, one run; 06 has failed in both arms before). At 3 runs per cell a single batch of
+only on 06 (1/3 to 0/3, one run; 06 has failed in both arms before). At 3 runs per cell and pass rates near 90%, a single batch of
 42 cells cannot reach a 5-point lower bound even when the arms are equal, so each batch on its own is not
 certified; pooled, the bound is met. This is the same reading as the 2026-09-26/27 verdict. Every change
 of window 2 is kept on it; more runs per cell on the two batches would certify each one separately.
