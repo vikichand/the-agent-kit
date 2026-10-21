@@ -859,6 +859,21 @@ case 44 (3 more cells per arm) and case 26 after the reworded frontend rule (3 m
   The checkers grade their canned good and bad drafts correctly (`test/run-tests.sh` H25).
 - **Reworded comment and UI lists** (`8781ab0`, instructions instead of bans): 25 3/3, 26 5/6, 48 3/3. Kept.
 
+**The historical batches (contract clause 2), final text `t91f9eb6` against v0.4.0**, both arms in one run
+(rotating), 3 runs per cell, 168 cells, none lost, 12:59 to 14:50, under the maintainer's own config:
+
+| Batch | v0.4.0 | develop | difference | 90% lower bound |
+|---|---|---|---|---|
+| Cases 01-14 | 38/42 (90.5%) | 39/42 (92.9%) | +2.4 points | -7.5 points |
+| Cases 17-30 | 38/42 (90.5%) | 39/42 (92.9%) | +2.4 points | -7.5 points |
+| Both, pooled | 76/84 | 78/84 | +2.4 points | **-4.6 points**: non-inferior |
+
+Develop is ahead in both batches. Per case it is higher on 02 (1/3 to 3/3) and 23 (2/3 to 3/3), and lower
+only on 06 (1/3 to 0/3, one run; 06 has failed in both arms before). At 3 runs per cell a single batch of
+42 cells cannot reach a 5-point lower bound even when the arms are equal, so each batch on its own is not
+certified; pooled, the bound is met. This is the same reading as the 2026-09-26/27 verdict. Every change
+of window 2 is kept on it; more runs per cell on the two batches would certify each one separately.
+
 **Effort sweep, develop, cases 38, 42, 45:** high 9/9, medium 9/9. High is slower on every case (median
 42 / 60 / 17 s against 21 / 44 / 13 s) and costs more on 38 and 42 ($0.200 / $0.272 against $0.166 / $0.244).
 
