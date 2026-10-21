@@ -321,8 +321,10 @@ def too_broad():
         h = dict(HOME=str(home), USERPROFILE=str(home))
         # an ancestor of the home folder (C:\Users, /home) holds every user's projects
         up = refused_with(tmp / "users", **h)
-        # a system folder (Windows dir and below, Program Files) is never a repository's own processes
-        sysf = refused_with(win, SystemRoot=str(tmp / "win"), windir=str(tmp / "win"), **h)
+        # a system folder (Windows dir and below, Program Files) is never a repository's own processes. Only
+        # Windows reads the system folders from the environment; POSIX has a fixed list, so use a real one there.
+        sysf = (refused_with(win, SystemRoot=str(tmp / "win"), windir=str(tmp / "win"), **h) if os.name == "nt"
+                else refused_with("/usr/bin", **h))
         ok = refused_with(tmp / "repos" / "a", **h)  # a normal folder is not refused for being broad
         return (up[0] == 2 and "too broad" in up[1] and sysf[0] == 2 and "too broad" in sysf[1]
                 and "too broad" not in ok[1])
