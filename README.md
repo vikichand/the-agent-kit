@@ -323,7 +323,7 @@ and the installer is the adapter between them:
 | Tool-layer guard | `ask`, machine-wide | `deny`, machine-wide | asks every time, per project (`.agents/hooks.json`) |
 | Turn-scoped git grants | yes | no (deny mode; you push) | no (it asks; you approve) |
 | Session-start update check | yes | yes | yes, on the first call of each conversation (a global `PreInvocation` hook; Antigravity has no `SessionStart` event) |
-| Measured | 41 cases, Sonnet | 10 cases, see [Limits](#limits) | 6 cases, small sample, see [Limits](#limits) |
+| Measured | 48 cases, Sonnet | 15 cases, see [Limits](#limits) | 13 cases, small sample, see [Limits](#limits) |
 
 **The guards** - hooks at the **git layer** (reorder-proof, covering Claude Code, Codex, Antigravity, plain `git`,
 and any MCP tool that shells out to `git`) plus the **tool layer**, a fast prompt-time veto. Full map

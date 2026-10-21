@@ -930,6 +930,64 @@ the second is the re-measure after the trims batch.
   not established (the rules grew by a few lines, and the CLI may have changed).
 - Develop passes more than vanilla on the same panel in every run; no case is lower.
 
+### The 2026-10-21/22 window 3: Codex and Antigravity
+
+Rules on against v0.4.0 (`t91f9eb6`), Opus judging, rows in `results/2026-10-21.tsv`. Usage errors are recorded
+as `ERROR` and excluded. The Codex cells hit the ChatGPT plan's usage limit three times (about 10 to 15 cells a
+window), so Codex ran on the cases that carry a decision; the rest is deferred (below).
+
+**Antigravity** (`gemini-3.8-flash-medium`), 3 runs per cell or more after reruns of transient API errors:
+
+| Case | v0.4.0 | develop |
+|---|---|---|
+| 38 look it up, don't ask | 3/3 | 3/3 |
+| 39 ask the real decision | 3/3 | 3/3 |
+| 40 state the default | 2/4 | 2/3 |
+| 42 finish every part | 3/3 | 3/3 |
+| 43 atomic commits | 0/4 | 0/3 |
+| 44 check the claim | 3/3 | 3/3 |
+| 46 bring the fix | 0/3 | 0/4 |
+| 47 prose tells (`check.sh`) | 4/4 | 3/3 |
+| **All** | **18/27** | **17/25** |
+
+Elapsed per cell: median 238 s v0.4.0, 242 s develop; interquartile range 154-349 s in both arms. No case is
+lower with develop. 43 and 46 fail in both arms: Gemini bundles the commit and offers a menu of algorithms.
+
+**Codex** (`gpt-6-astra`, low):
+
+| Case | v0.4.0 | develop |
+|---|---|---|
+| 06 speculative config | 3/3 | 2/3 |
+| 09 test-first | 3/3 | 3/3 |
+| 25 a11y icon button | 3/3 | 4/4 |
+| 26 loading-state ladder | 3/3 | 2/2 |
+| 39 ask the real decision | 2/2 | 2/2 |
+| 40 state the default | 2/2 | 2/2 |
+| 43 atomic commits | 0/2 | 0/2 |
+| 44 check the claim | 1/1 | not reached |
+| **All** | **17/19** | **15/18** |
+
+Elapsed per cell: median 58 s v0.4.0, 72 s develop; interquartile range 36-66 s and 41-92 s. On 43 Codex's
+sandbox refused the commit itself, and the agent proposed one bundled commit, so 43 does not measure the
+commit rule on Codex. Not run on Codex for the plan's usage limit: 36 to 38, 42, 45 to 48 and the rest of 44.
+
+**The conflict rewrites** (plan D3), decided on this evidence:
+- Ask once, then continue (39, 40): Codex and Claude pass in both arms. No conflict to fix; not written.
+- Test-first where tests exist (09): 3/3 in both arms on Codex and Claude. Not written.
+- Push back in a sentence and continue (06): Codex 3/3 against 2/3, one run; Claude fails in both arms.
+  Deferred to 0.6.0: the evidence does not separate the arms, and a rewrite needs its own paired run.
+- Git rules over the host's defaults (43): 0 in every arm on all three tools; on Codex the sandbox also blocks
+  the commit. Deferred to 0.6.0 with `includeGitInstructions`: the harness needs a settings deployment and a
+  Codex sandbox that allows commits before the rule can be measured.
+
+**Live checks** (a throwaway repo with a local bare remote and a codeword in its project block; a temporary
+HOME for anything machine-wide): on Claude Code, Codex and Antigravity the rules load (each quoted the
+codeword) and the pre-push hook refuses a force push to `main`. Claude Code and Codex declined the printed
+override; Antigravity under `--dangerously-skip-permissions` used it, which led to `b608b8b` (the override is
+refused in an agent's shell). The session-start check names a genuinely missing tool once per tool and stays
+silent the second time. `/tidy` listed only this repository's items on Claude Code; on Codex and Antigravity it
+needs the develop scripts in `~/.the-agent-kit`, and it stopped as documented when they were missing.
+
 ## What this does not tell you
 
 Be honest about the limits when quoting any number from it. These are not boilerplate; each one has

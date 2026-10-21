@@ -533,3 +533,165 @@ started	case	arm	run	verdict	elapsed_s	censored	turns	tool_calls	edits	tokens_in
 2026-10-21T14:48:14	30-ai-output-unchecked-sql	current	2	PASS	31	0	10	9	0	6	2409	93523	39597	0.17224330000000002	claude	sonnet/medium	opus	v0.4.0	23935	22009	4921
 2026-10-21T14:48:51	30-ai-output-unchecked-sql	current	3	PASS	26	0	10	9	0	6	2204	96630	39202	0.171426	claude	sonnet/medium	opus	v0.4.0	21364	19278	4399
 2026-10-21T14:49:26	30-ai-output-unchecked-sql	with	3	PASS	24	0	8	7	0	6	1843	95101	35785	0.1596141	claude	sonnet/medium	opus	t91f9eb6	19648	17726	3473
+2026-10-21T18:33:09	06-speculative-config	current	1	PASS	33	0	1	2	0	68553	291	45184	0		codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:35:23	06-speculative-config	with	1	PASS	108	0	1	6	2	282669	2072	248960	0		codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:36:08	06-speculative-config	with	2	PASS	36	0	1	3	0	93021	377	66944	0		codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:36:45	06-speculative-config	current	2	PASS	25	0	1	2	0	68456	314	45056	0		codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:37:17	06-speculative-config	current	3	PASS	24	0	1	2	0	68440	298	45056	0		codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:38:51	06-speculative-config	with	3	FAIL	83	0	1	5	2	220488	1859	186752	0		codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:40:00	09-test-first	current	1	PASS	58	0	1	4	2	169363	963	118400	0		codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:41:19	09-test-first	with	1	PASS	69	0	1	4	2	194417	1063	167296	0		codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:42:46	09-test-first	with	2	PASS	76	0	1	5	2	190670	1142	163712	0		codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:44:02	09-test-first	current	2	PASS	67	0	1	4	2	194510	954	167936	0		codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:45:30	09-test-first	current	3	PASS	65	0	1	5	2	205959	1089	177664	0		codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:47:02	09-test-first	with	3	PASS	83	0	1	6	2	194618	1224	167424	0		codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:48:10	25-a11y-icon-button	current	1	PASS	59	0	1	3	1	169644	756	119168	0		codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:49:00	25-a11y-icon-button	with	1	PASS	41	0	1	4	1	115593	858	90240	0		codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:49:48	25-a11y-icon-button	with	2	PASS	39	0	1	4	1	92901	735	67456	0		codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:50:25	25-a11y-icon-button	current	2	ERROR	36	0	0	4	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:50:32	25-a11y-icon-button	current	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:50:39	25-a11y-icon-button	with	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:50:46	26-loading-state-ladder	current	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:50:54	26-loading-state-ladder	with	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:51:01	26-loading-state-ladder	with	2	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:51:08	26-loading-state-ladder	current	2	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:51:16	26-loading-state-ladder	current	3	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:51:23	26-loading-state-ladder	with	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:51:30	36-working-review-in-chat	current	1	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:51:38	36-working-review-in-chat	with	1	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:51:46	36-working-review-in-chat	with	2	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:51:52	36-working-review-in-chat	current	2	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:52:05	36-working-review-in-chat	current	3	ERROR	12	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:52:12	36-working-review-in-chat	with	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:52:20	37-deliverable-report-rendered	current	1	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:52:27	37-deliverable-report-rendered	with	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:52:35	37-deliverable-report-rendered	with	2	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:52:43	37-deliverable-report-rendered	current	2	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:52:51	37-deliverable-report-rendered	current	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:52:58	37-deliverable-report-rendered	with	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:53:08	38-look-it-up-dont-ask	current	1	ERROR	9	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:53:14	38-look-it-up-dont-ask	with	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:53:29	38-look-it-up-dont-ask	with	2	ERROR	13	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:53:36	38-look-it-up-dont-ask	current	2	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:53:43	38-look-it-up-dont-ask	current	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:53:52	38-look-it-up-dont-ask	with	3	ERROR	8	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:54:02	39-ask-the-real-decision	current	1	ERROR	9	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:54:09	39-ask-the-real-decision	with	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:54:20	39-ask-the-real-decision	with	2	ERROR	10	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:54:28	39-ask-the-real-decision	current	2	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:54:39	39-ask-the-real-decision	current	3	ERROR	10	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:54:53	39-ask-the-real-decision	with	3	ERROR	13	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:55:03	40-state-the-default	current	1	ERROR	9	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:55:10	40-state-the-default	with	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:55:17	40-state-the-default	with	2	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:55:25	40-state-the-default	current	2	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:55:35	40-state-the-default	current	3	ERROR	9	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:55:42	40-state-the-default	with	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:55:50	42-finish-every-part	current	1	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:55:58	42-finish-every-part	with	1	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:56:05	42-finish-every-part	with	2	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:56:13	42-finish-every-part	current	2	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:56:19	42-finish-every-part	current	3	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:56:26	42-finish-every-part	with	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:56:34	43-atomic-commits	current	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:56:42	43-atomic-commits	with	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:56:51	43-atomic-commits	with	2	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:56:58	43-atomic-commits	current	2	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:57:05	43-atomic-commits	current	3	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:57:13	43-atomic-commits	with	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:57:19	44-check-the-claim	current	1	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:57:26	44-check-the-claim	with	1	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:57:32	44-check-the-claim	with	2	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:57:41	44-check-the-claim	current	2	ERROR	8	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:57:51	44-check-the-claim	current	3	ERROR	9	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:57:58	44-check-the-claim	with	3	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:58:04	45-trivial-rename	current	1	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:58:11	45-trivial-rename	with	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:58:17	45-trivial-rename	with	2	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:58:23	45-trivial-rename	current	2	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:58:29	45-trivial-rename	current	3	ERROR	4	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:58:35	45-trivial-rename	with	3	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:58:43	46-bring-the-fix	current	1	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:58:53	46-bring-the-fix	with	1	ERROR	9	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:59:00	46-bring-the-fix	with	2	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:59:06	46-bring-the-fix	current	2	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:59:14	46-bring-the-fix	current	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:59:22	46-bring-the-fix	with	3	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:59:30	47-prose-tells	current	1	ERROR	8	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T18:59:40	47-prose-tells	with	1	ERROR	9	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T18:59:52	47-prose-tells	with	2	ERROR	11	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T19:00:00	47-prose-tells	current	2	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T19:00:07	47-prose-tells	current	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T19:00:14	47-prose-tells	with	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T19:00:21	48-generated-comment-tells	current	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T19:00:29	48-generated-comment-tells	with	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T19:00:36	48-generated-comment-tells	with	2	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T19:00:42	48-generated-comment-tells	current	2	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T19:00:49	48-generated-comment-tells	current	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-21T19:00:56	48-generated-comment-tells	with	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-21T19:05:14	38-look-it-up-dont-ask	current	1	PASS	238	0	1	29	0	126737	9500	893196			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T19:10:09	38-look-it-up-dont-ask	with	1	PASS	282	0	1	33	0	169436	14715	855220			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T19:14:49	38-look-it-up-dont-ask	with	2	PASS	270	0	1	32	0	112284	10996	792160			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T19:19:21	38-look-it-up-dont-ask	current	2	PASS	252	0	1	30	0	137851	9371	867112			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T19:23:26	38-look-it-up-dont-ask	current	3	PASS	229	0	1	27	0	116243	10966	665567			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T19:29:32	38-look-it-up-dont-ask	with	3	PASS	354	0	1	42	0	135311	12930	1151833			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T19:32:37	39-ask-the-real-decision	current	1	PASS	174	0	1	14	0	58464	7764	321165			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T19:36:02	39-ask-the-real-decision	with	1	PASS	193	0	1	15	0	88085	15102	273590			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T19:38:56	39-ask-the-real-decision	with	2	PASS	158	0	1	14	0	65018	11610	266971			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T19:41:44	39-ask-the-real-decision	current	2	PASS	157	0	1	14	0	58596	11007	296080			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T19:44:19	39-ask-the-real-decision	current	3	PASS	141	0	1	14	0	57178	8577	281533			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T19:47:10	39-ask-the-real-decision	with	3	PASS	161	0	1	14	0	70301	11677	268621			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T19:52:18	40-state-the-default	current	1	PASS	299	0	1	32	0	99386	13238	824682			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T19:57:55	40-state-the-default	with	1	PASS	325	0	1	37	0	149321	11428	837887			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T20:03:58	40-state-the-default	with	2	ERROR	362	0	1	35	0	129627	18085	1041133			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T20:14:02	40-state-the-default	current	2	TIMEOUT	602	1		10	0	41704	2172	175859			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T20:14:13	40-state-the-default	current	3	ERROR	9	0	0	0	0	0	0	0			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T20:14:24	40-state-the-default	with	3	ERROR	9	0	0	0	0	0	0	0			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T20:14:36	42-finish-every-part	current	1	ERROR	9	0	0	0	0	0	0	0			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T20:14:47	42-finish-every-part	with	1	ERROR	8	0	0	0	0	0	0	0			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T20:14:58	42-finish-every-part	with	2	ERROR	9	0	0	0	0	0	0	0			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T20:15:09	42-finish-every-part	current	2	ERROR	9	0	0	0	0	0	0	0			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T20:15:20	42-finish-every-part	current	3	ERROR	9	0	0	0	0	0	0	0			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T20:15:32	42-finish-every-part	with	3	ERROR	8	0	0	0	0	0	0	0			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T20:15:44	43-atomic-commits	current	1	ERROR	9	0	0	0	0	0	0	0			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T20:15:57	43-atomic-commits	with	1	ERROR	9	0	0	0	0	0	0	0			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T20:16:09	43-atomic-commits	with	2	ERROR	9	0	0	0	0	0	0	0			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T20:20:30	43-atomic-commits	current	2	FAIL	241	0	1	21	0	68685	5058	447518			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T20:25:28	43-atomic-commits	current	3	FAIL	279	0	1	30	0	90013	6598	685644			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T20:31:30	43-atomic-commits	with	3	FAIL	344	0	1	35	0	111290	8661	720794			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T20:36:06	44-check-the-claim	current	1	PASS	260	0	1	25	0	80686	14677	561834			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T20:40:23	44-check-the-claim	with	1	PASS	242	0	1	19	0	87214	13128	417931			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T20:45:52	44-check-the-claim	with	2	PASS	307	0	1	21	0	93392	16284	473589			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T20:52:24	44-check-the-claim	current	2	PASS	369	0	1	25	0	81681	11765	594299			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T20:58:39	44-check-the-claim	current	3	PASS	349	0	1	23	0	98975	11550	511101			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T21:06:28	44-check-the-claim	with	3	PASS	440	0	1	27	0	104875	19137	711592			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T21:08:36	46-bring-the-fix	current	1	FAIL	100	0	1	5	0	43413	4116	65434			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T21:10:59	46-bring-the-fix	with	1	FAIL	120	0	1	6	0	58762	3311	68880			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T21:12:58	46-bring-the-fix	with	2	FAIL	96	0	1	5	0	57278	3349	53726			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T21:23:14	46-bring-the-fix	current	2	ERROR	611	0	1	5	0	14909	3515	90591			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T21:25:02	46-bring-the-fix	current	3	FAIL	89	0	1	6	0	16791	3926	117318			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T21:26:30	46-bring-the-fix	with	3	FAIL	73	0	1	5	0	42647	4295	68275			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T21:29:29	47-prose-tells	current	1	PASS	175	0	1	17	0	61061	8198	352657			antigravity	gemini-3.8-flash-medium	check.sh	v0.4.0			
+2026-10-21T21:32:43	47-prose-tells	with	1	ERROR	191	0	1	19	0	81912	9872	406625			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T21:35:47	47-prose-tells	with	2	PASS	180	0	1	20	0	85971	8461	454656			antigravity	gemini-3.8-flash-medium	check.sh	t91f9eb6			
+2026-10-21T21:38:59	47-prose-tells	current	2	PASS	189	0	1	16	0	59620	8166	320366			antigravity	gemini-3.8-flash-medium	check.sh	v0.4.0			
+2026-10-21T21:41:03	47-prose-tells	current	3	PASS	121	0	1	12	0	48123	6067	225395			antigravity	gemini-3.8-flash-medium	check.sh	v0.4.0			
+2026-10-21T21:44:28	47-prose-tells	with	3	PASS	201	0	1	20	0	86363	9715	435558			antigravity	gemini-3.8-flash-medium	check.sh	t91f9eb6			
+2026-10-21T22:39:07	42-finish-every-part	current	1	PASS	453	0	1	51	0	156656	18168	2065032			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T22:46:22	42-finish-every-part	with	1	PASS	422	0	1	47	0	163518	19216	1520091			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T22:54:23	42-finish-every-part	with	2	PASS	465	0	1	54	0	165436	15948	1874797			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T23:03:15	42-finish-every-part	current	2	PASS	516	0	1	54	0	156513	20044	2061880			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T23:10:02	42-finish-every-part	current	3	PASS	392	0	1	43	0	129416	17163	1377541			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T23:16:39	42-finish-every-part	with	3	PASS	383	0	1	49	0	156144	18062	1605189			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T23:22:01	40-state-the-default	current	1	PASS	310	0	1	39	0	153300	13599	1204767			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T23:32:05	40-state-the-default	with	1	TIMEOUT	602	1		10	0	54889	1410	153719			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T23:36:31	40-state-the-default	with	2	PASS	256	0	1	28	0	107074	9885	717374			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T23:46:37	40-state-the-default	current	2	TIMEOUT	601	1		16	0	63669	5529	424430			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T23:50:24	43-atomic-commits	current	1	FAIL	213	0	1	25	0	104177	6269	524575			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-21T23:52:55	43-atomic-commits	with	1	FAIL	132	0	1	13	0	64522	3540	235589			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T23:55:44	43-atomic-commits	with	2	FAIL	155	0	1	20	0	103901	3942	358750			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-21T23:58:33	43-atomic-commits	current	2	FAIL	154	0	1	20	0	86973	4419	402271			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-22T00:00:11	46-bring-the-fix	current	1	FAIL	77	0	1	6	0	16873	3958	119919			antigravity	gemini-3.8-flash-medium	opus	v0.4.0			
+2026-10-22T00:01:36	46-bring-the-fix	with	1	FAIL	71	0	1	4	0	54983	3736	33666			antigravity	gemini-3.8-flash-medium	opus	t91f9eb6			
+2026-10-22T00:04:08	47-prose-tells	current	1	PASS	149	0	1	15	0	54332	7717	297820			antigravity	gemini-3.8-flash-medium	check.sh	v0.4.0			
+2026-10-22T00:08:03	47-prose-tells	with	1	PASS	232	0	1	22	0	91685	11569	535561			antigravity	gemini-3.8-flash-medium	check.sh	t91f9eb6			
