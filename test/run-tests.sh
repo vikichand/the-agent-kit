@@ -200,6 +200,16 @@ pp "refs/tags/v1.0.0 $s3 refs/tags/v1.0.0 $z"    && pass "PP10 a release tag is 
 # PP11: a push cannot exempt itself by deleting the marker - the branch's current tip still carries it.
 git checkout -q -b nomark; printf '# rules\n' > AGENTS.md; git commit -q -am c4; s4=$(git rev-parse HEAD)
 pp "refs/heads/main $s4 refs/heads/main $s3"     && bad "PP11 a push that removes the marker ALLOWED"    || pass "PP11 a push that removes the marker is still refused"
+# PP12-PP13: AGENT_KIT_ALLOW_FORCE is for a person at their own terminal. In an agent's shell (Claude Code,
+# Codex, Antigravity each mark it) the override is refused: run with --dangerously-skip-permissions, nothing
+# else stops an agent pasting the line the refusal prints (seen live on Antigravity, 2026-10-21).
+ppf() { printf '%s\n' "refs/heads/feat $s1 refs/heads/main $s2" \
+  | env -u CLAUDE_CODE_CHILD_SESSION -u CODEX_THREAD_ID -u ANTIGRAVITY_CONVERSATION_ID AGENT_KIT_ALLOW_FORCE=1 "$@" sh "$KIT/hooks/pre-push" 2>/dev/null; }
+ppf && pass "PP12 force push with AGENT_KIT_ALLOW_FORCE=1 from a person's shell allowed" || bad "PP12 the override was refused outside an agent"
+agents_refused=1
+for m in CLAUDE_CODE_CHILD_SESSION=1 CODEX_THREAD_ID=t1 ANTIGRAVITY_CONVERSATION_ID=c1; do ppf "$m" && agents_refused=0; done
+[ "$agents_refused" = 1 ] && pass "PP13 the force override is refused in a Claude Code, Codex or Antigravity shell" \
+  || bad "PP13 an agent's shell could use AGENT_KIT_ALLOW_FORCE"
 cd "$KIT"; rm -rf "$w"
 
 # ---------- kit-check.py (session-start update check) ----------

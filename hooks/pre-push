@@ -64,11 +64,20 @@ done
 [ "$release_blocked" = 1 ] && exit 1
 
 if [ "$blocked" = 1 ]; then
+  # The override is for a person at their own terminal. An agent's shell carries its tool's marker (Claude Code
+  # CLAUDE_CODE_CHILD_SESSION, not CLAUDECODE, which IDE terminals also set; Codex CODEX_THREAD_ID; Antigravity
+  # ANTIGRAVITY_CONVERSATION_ID), and under --dangerously-skip-permissions nothing else stops it pasting the
+  # override line below. Seen live on Antigravity, 2026-10-21.
+  if [ "${AGENT_KIT_ALLOW_FORCE:-}" = 1 ] && [ -n "${CLAUDE_CODE_CHILD_SESSION:-}${CODEX_THREAD_ID:-}${ANTIGRAVITY_CONVERSATION_ID:-}" ]; then
+    echo "the-agent-kit pre-push: AGENT_KIT_ALLOW_FORCE is refused inside an agent's shell. A force push to a" >&2
+    echo "  protected branch is the person's own act: they run it in their own terminal." >&2
+    exit 1
+  fi
   if [ "${AGENT_KIT_ALLOW_FORCE:-}" = 1 ]; then
     echo "the-agent-kit pre-push: AGENT_KIT_ALLOW_FORCE=1 set - allowing this push." >&2
     exit 0
   fi
-  echo "If this is intentional, re-run with:  AGENT_KIT_ALLOW_FORCE=1 git push ..." >&2
+  echo "If this is intentional, run it yourself in your own terminal:  AGENT_KIT_ALLOW_FORCE=1 git push ..." >&2
   exit 1
 fi
 exit 0

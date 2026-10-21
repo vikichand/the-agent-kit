@@ -152,7 +152,7 @@ Honest labelling inside the skill: the contract-freeze pattern and the verify-RE
   Also blocks a GitHub Actions step pinned to a floating tag (`@v4`, `@main`) on the workflow lines you add;
   `# pin-exempt: <reason>` for the rare step that cannot be pinned.
   Also blocks an added `continue-on-error: true` in workflow files; `# gate-exempt: <reason>` on the same line passes.
-- **`pre-push`** refuses force / non-fast-forward / delete to `main`·`master`·`release/*`. Override: `AGENT_KIT_ALLOW_FORCE=1`.
+- **`pre-push`** refuses force / non-fast-forward / delete to `main`·`master`·`release/*`. Override: `AGENT_KIT_ALLOW_FORCE=1`, refused inside an agent's shell (Claude Code, Codex, Antigravity).
   A branch a project marks release-only (`<!-- agent-kit: release-branch=main -->` in its block) refuses **every**
   push that is not a release (`AGENT_KIT_RELEASE=1`); tags and the work branch are unaffected.
 - **`commit-msg`** strips AI-authorship trailers (matched by bot *address*, so a human named "Claude" is safe);

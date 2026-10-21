@@ -561,7 +561,7 @@ A chained command takes the most restrictive verdict across its segments (deny >
 granted operation can never carry an ungranted one through with it.
 
 **pre-push** (git layer) refuses **force / non-fast-forward / delete** to a protected branch (`main`,
-`master`, `release/*`). Git runs it itself, so it's reorder-proof. Override: `AGENT_KIT_ALLOW_FORCE=1`.
+`master`, `release/*`). Git runs it itself, so it's reorder-proof. Override: `AGENT_KIT_ALLOW_FORCE=1`, from your own terminal only: inside a Claude Code, Codex or Antigravity shell it is refused.
 A project that keeps a branch for releases only marks it in its `AGENTS.md` project block with
 `<!-- agent-kit: release-branch=main -->` (the setup prompt writes it), and from then on **any** push to
 that branch is refused unless it carries `AGENT_KIT_RELEASE=1`: a plain fast-forward, a creation, all of

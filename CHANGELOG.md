@@ -126,6 +126,11 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ### Fixed
 
+- **An agent can no longer force-push past the pre-push guard.** The refusal printed its own override,
+  `AGENT_KIT_ALLOW_FORCE=1`, and under `--dangerously-skip-permissions` an agent (seen on Antigravity)
+  re-ran the push with it. The override now works only in a person's own terminal: the hook refuses it when
+  the shell is a Claude Code, Codex or Antigravity one.
+
 - **Claude Code no longer warns about the kit's permission rules on every start.** It reads no `Write(...)`
   rules, because `Edit` rules cover every file-editing tool, so the kit's `Write(**/AGENTS.md)` and
   `Write(**/CLAUDE.md)` did nothing (the matching `Edit` rules still ask). The template drops them, and
