@@ -51,7 +51,7 @@ def kit_script(cmd):
     return m.group(1) if m else None
 
 
-def merge_hooks(mine, kit, changes):
+def merge_hooks(mine, kit, changes, exact=False):
     hooks = mine.setdefault("hooks", {})
     if not isinstance(hooks, dict):
         raise ValueError('"hooks" is not an object')
@@ -63,7 +63,7 @@ def merge_hooks(mine, kit, changes):
                 found = False
                 for b in list(have):
                     for h in list(b.get("hooks", [])):
-                        if canon(h.get("command")) == canon(want):
+                        if (h.get("command") == want) if exact else (canon(h.get("command")) == canon(want)):
                             found = True
                         elif script and kit_script(h.get("command")) == script and not found:
                             # The kit's own older entry (old flags, old interpreter).
@@ -106,7 +106,8 @@ def merge_json(path, template, is_claude):
             lst.extend(added)
             if added:
                 changes.append("added %d %s rule(s)" % (len(added), kind))
-    merge_hooks(mine, template, changes)
+    # Codex runs a hook on Windows through cmd.exe, where /c/x is not C:/x: its spelling is part of the hook.
+    merge_hooks(mine, template, changes, exact=not is_claude)
     if is_claude:
         for key, val in template.items():
             if key not in ("permissions", "hooks") and key not in mine:
@@ -211,7 +212,10 @@ def main():
                     continue
                 new, changes = merge_toml(path, tpl)
             else:
-                obj, changes = merge_json(path, load_template(tpl, a.share_cmd, a.py), kind == "claude")
+                # Claude Code runs hooks in a POSIX shell; Codex on Windows runs them in cmd.exe, which
+                # needs the native path (--share), never a Git Bash one.
+                cmd_path = a.share_cmd if kind == "claude" else a.share
+                obj, changes = merge_json(path, load_template(tpl, cmd_path, a.py), kind == "claude")
                 new = None if obj is None else json.dumps(obj, indent=2, ensure_ascii=False) + "\n"
         except Exception as e:   # a file we cannot read safely is reported and left exactly as it was
             errors.append("%s: not changed - %s" % (label, e))

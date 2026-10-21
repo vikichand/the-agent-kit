@@ -130,6 +130,9 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   `AGENT_KIT_ALLOW_FORCE=1`, and under `--dangerously-skip-permissions` an agent (seen on Antigravity)
   re-ran the push with it. The override now works only in a person's own terminal: the hook refuses it when
   the shell is a Claude Code, Codex or Antigravity one.
+- **Codex's command guard and session-start check now run on Windows.** Codex runs a hook there through
+  `cmd.exe`, which cannot open a Git Bash path such as `/c/Users/...`, so both failed every time they ran. Codex entries now carry the Windows path, and `--setup` corrects an entry an earlier install wrote
+  in the Git Bash form. The git hooks were never affected.
 
 - **Claude Code no longer warns about the kit's permission rules on every start.** It reads no `Write(...)`
   rules, because `Edit` rules cover every file-editing tool, so the kit's `Write(**/AGENTS.md)` and

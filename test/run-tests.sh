@@ -983,6 +983,25 @@ EOF
   [ "$t" = "on-request workspace-write True trusted x" ] && pass "M6 Codex config: kit settings added at top level, the user's tables unchanged" || bad "M6 Codex config wrong: [$t] $o"
   [ "$(jq_ "$g/.codex/hooks.json" "any('command-guard.py' in h['command'] and '--decision deny' in h['command'] for b in d['hooks']['PreToolUse'] for h in b['hooks'])")" = True ] \
     && pass "M6 Codex hooks.json created with the guard" || bad "M6 Codex guard not wired: $o"
+  # Codex runs a hook on Windows through cmd.exe (%COMSPEC% /C), where a Git Bash path such as /c/Users/...
+  # is not found, so the guard and the session check never ran (seen live 2026-10-22). Its commands carry
+  # the native path, and an entry in the Git Bash spelling is corrected, not kept as "the same hook".
+  cn="all('$G/.the-agent-kit/hooks/' in h['command'] for e in d['hooks'].values() for b in e for h in b['hooks'])"
+  [ "$(jq_ "$g/.codex/hooks.json" "$cn")" = True ] \
+    && pass "M14 Codex hook commands name the kit by its native path" || bad "M14 Codex hooks not in native form: $(cat "$g/.codex/hooks.json")"
+  $PY - "$(wq "$g/.codex/hooks.json")" <<'EOF'
+import json, re, sys
+p = sys.argv[1]; d = json.load(open(p, encoding='utf-8'))
+for ev in d['hooks'].values():
+    for b in ev:
+        for h in b['hooks']:
+            h['command'] = re.sub(r'([A-Za-z]):/', lambda m: '/' + m.group(1).lower() + '/', h['command'])
+json.dump(d, open(p, 'w', encoding='utf-8'))
+EOF
+  su 1
+  [ "$(jq_ "$g/.codex/hooks.json" "$cn")" = True ] \
+    && [ "$(jq_ "$g/.codex/hooks.json" "sum('command-guard.py' in h['command'] for b in d['hooks']['PreToolUse'] for h in b['hooks'])")" = 1 ] \
+    && pass "M14 a Codex hook in the Git Bash spelling is corrected in place" || bad "M14 Git Bash spelling kept or duplicated: $(cat "$g/.codex/hooks.json")"
   printf 'approval_policy = "never"\n[projects.a]\ntrust_level = "trusted"\n' > "$g/.codex/config.toml"
   su 1
   t=$($PY -c "import tomllib,sys; print(tomllib.load(open(sys.argv[1],'rb'))['approval_policy'])" "$(wq "$g/.codex/config.toml")" 2>&1)

@@ -504,7 +504,7 @@ install_global() {  # copy the kit, then PRINT the settings snippets for a hand 
   subst "$share" "$py" "$KIT/claude/settings.json"
   hr
   say "TOOL GUARD - Codex          merge into  ~/.codex/hooks.json  (+ see codex/config.toml) :"
-  subst "$share" "$py" "$KIT/codex/hooks.json"
+  subst "$(nat "$share")" "$py" "$KIT/codex/hooks.json"   # Codex on Windows runs hooks in cmd.exe
   hr
   say "CODEX SANDBOX / APPROVAL    merge into  ~/.codex/config.toml :"
   cat "$KIT/codex/config.toml"
