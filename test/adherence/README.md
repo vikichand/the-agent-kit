@@ -895,6 +895,20 @@ performance profiles say so.
 | 45 trivial rename | 3/3 | 3/3 | 15 / 14 | 0.053 / 0.086 |
 | **All** | **9/24** | **22/24** | 17 / 21 | $/pass 0.173 / 0.129 |
 
+Develop at low against develop at medium in window 1 (`t05e08bb`, 5 runs per cell; the rules changed in
+between, so this is indicative):
+
+| Case | medium pass / median s / mean $ | low pass / median s / mean $ |
+|---|---|---|
+| 02 | 5/5 / 14 / 0.097 | 2/3 / 17 / 0.094 |
+| 07 | 5/5 / 11 / 0.084 | 3/3 / 13 / 0.078 |
+| 16 | 5/5 / 82 / 0.202 | 3/3 / 77 / 0.200 |
+| 32 | 4/5 / 38 / 0.111 | 3/3 / 47 / 0.113 |
+| 33 | 5/5 / 41 / 0.149 | 3/3 / 32 / 0.156 |
+| 34 | 5/5 / 16 / 0.098 | 2/3 / 16 / 0.093 |
+| 35 | 5/5 / 34 / 0.131 | 3/3 / 24 / 0.123 |
+| 45 | 5/5 / 14 / 0.086 | 3/3 / 14 / 0.086 |
+
 **Speed re-measures, medium, clean config folder, vanilla against develop, 48 cells each.** Clause 4's
 two steps: the first row is the re-measure after the effort result (medium kept, on the window 2 rules),
 the second is the re-measure after the trims batch.
