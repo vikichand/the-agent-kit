@@ -815,6 +815,70 @@ summary was run on a copy without it.
 42, 45 and 46 already pass without the kit, so on those the kit can only cost time, and 43 and 44 are where a
 rule has room to show a gain.
 
+### The 2026-10-21 window 2: behaviour, effort, C8 and the speed re-measures
+
+Sonnet 5.5, Opus judging, 3 runs per cell, rows in `results/2026-10-21.tsv`. Two settings, as noted per part:
+the behaviour cells ran under the maintainer's own Claude config (no `vanilla` arm), the speed cells in the
+clean config folder as in window 1. `current` and `with` ran in separate processes about an hour apart, so
+arm rotation did not apply between them. 80 cells lost to an account usage limit (07:59 to 08:07) are
+recorded as `ERROR` and excluded (clause 6); every one was rerun. Two dips were rerun before any decision:
+case 44 (3 more cells per arm) and case 26 after the reworded frontend rule (3 more cells).
+
+**Behaviour cases, develop (`ta72dddc`) against v0.4.0, effort medium:**
+
+| Case | v0.4.0 | develop | median s (0.4 / dev) | mean $ per cell (0.4 / dev) |
+|---|---|---|---|---|
+| 25 a11y icon button | 3/3 | 3/3 | 19 / 20 | 0.175 / 0.151 |
+| 26 loading-state ladder | 3/3 | 3/3 | 21 / 28 | 0.174 / 0.167 |
+| 36 working review in chat | 3/3 | 3/3 | 20 / 20 | 0.150 / 0.143 |
+| 37 deliverable report rendered | 3/3 | 3/3 | 104 / 109 | 0.457 / 0.478 |
+| 38 look it up, don't ask | 3/3 | 3/3 | 30 / 21 | 0.179 / 0.166 |
+| 39 ask the real decision | 3/3 | 3/3 | 21 / 26 | 0.171 / 0.171 |
+| 40 state the default | 3/3 | 3/3 | 34 / 32 | 0.173 / 0.160 |
+| 42 finish every part | 3/3 | 3/3 | 58 / 44 | 0.245 / 0.244 |
+| 43 atomic commits | 0/3 | 0/3 | 31 / 39 | 0.156 / 0.173 |
+| 44 check the claim | 6/6 | **4/6** | 36 / 33 | 0.194 / 0.187 |
+| 45 trivial rename | 3/3 | 3/3 | 20 / 13 | 0.150 / 0.144 |
+| 46 bring the fix | 2/3 | **3/3** | 21 / 24 | 0.164 / 0.159 |
+| 47 prose tells (C8, `check.sh`) | 3/3 | 3/3 | 57 / 47 | 0.206 / 0.208 |
+| 48 comment tells (C8, `check.sh`) | 3/3 | 3/3 | 42 / 43 | 0.195 / 0.192 |
+| **All** | **41/45** | **40/45** | 30 / 30 | total $8.95 / $8.79 |
+
+- **Quality, clause 2:** 88.9% against 91.1%, inside the 5-point bound. No change is reverted.
+- **Case 44:** both develop failures checked the claim, said the handoff note was wrong and added the right
+  migration, then also hand-edited the generated `db/schema.sql`. The sentence the case tests did its job;
+  the slip is the generated-file rule's. Kept; rerun on Codex in window 3.
+- **Case 43** fails in every arm, vanilla included (window 1: 0/3). Every failure is one commit holding
+  both changes. Wording has not moved it; the host's own git instructions are a likely factor, unmeasured
+  because the harness deploys no `settings.json`.
+- **C8 (cases 47, 48):** 0 tells in every cell of every arm, vanilla included (3+3 more cells). Sonnet 5.5
+  does not produce these tells on these tasks, so the cases show no gain and no loss. C8 ships on "at
+  least as good"; its lines are candidates to drop if window 3 shows the same on Codex and Antigravity.
+  The checkers grade their canned good and bad drafts correctly (`test/run-tests.sh` H25).
+- **Reworded comment and UI lists** (`8781ab0`, instructions instead of bans): 25 3/3, 26 5/6, 48 3/3. Kept.
+
+**Effort sweep, develop, cases 38, 42, 45:** high 9/9, medium 9/9. High is slower on every case (median
+42 / 60 / 17 s against 21 / 44 / 13 s) and costs more on 38 and 42 ($0.200 / $0.272 against $0.166 / $0.244).
+
+**Speed panel at effort low**, vanilla and develop (`ta72dddc`), clean config folder, 48 cells: develop
+22/24, vanilla 9/24; time x1.16 (worst x2.03), cost x1.70; elapsed interquartile range 14-27 s vanilla,
+15-46 s develop. Against develop at medium (window 1, 39/40, median 25 s, about $0.120 a cell), low is
+about $0.118 a cell, median 21 s, and drops cases 02 and 34 to 2/3. Medium stays the default.
+
+**Speed re-measures, medium, clean config folder, vanilla against develop, 48 cells each:**
+
+| Rules | develop / vanilla pass | time | cost | elapsed IQR s (v / dev) | median cache_write (v / dev) |
+|---|---|---|---|---|---|
+| before the trims (`ta72dddc`) | 23/24 / 9/24 | x1.18 (worst x1.81) | x1.71 | 10-27 / 12-36 | 10.0k / 19.2k |
+| after the trims (`t91f9eb6`) | 23/24 / 11/24 | x1.38 (worst x2.06) | x1.69 | 9-25 / 13-34 | 9.9k / 19.3k |
+
+- **Still over the bar on cost**, as in every measurement (x1.69 to x1.72). Time sits between x1.18 and
+  x1.43 across the four runs; at n=3 the per-case medians move that much on their own.
+- **The trims** (`ac95737`, about 165 tokens) do not show: cache_write is the same before and after. The
+  kit's per-session cache write is about 9k tokens over vanilla, up from about 7k in window 1; the cause is
+  not established (the rules grew by a few lines, and the CLI may have changed).
+- Develop passes more than vanilla on the same panel in every run; no case is lower.
+
 ## What this does not tell you
 
 Be honest about the limits when quoting any number from it. These are not boilerplate; each one has

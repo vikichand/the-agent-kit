@@ -70,7 +70,7 @@ means no case covers the rule yet.
 | S7.4 | Announce breaking changes | engineering | - | |
 | S8.1 | Ownership: nothing unexplained | contract | - | |
 | S8.2 | No AI in the authorship | safety | - | also the commit-msg hook, which strips trailers |
-| S8.3 | Prose style (no em dashes, filler) | style | - | full version in the `writing-docs` skill |
+| S8.3 | Prose style (no em dashes, filler) | style | 47 (0 tells in every arm, vanilla too, 2026-10-21) | full version in the `writing-docs` skill |
 | S9.1 | Load `writing-docs` for prose deliverables | workflow | - | |
 | S9.2 | Docs move in the same diff | engineering | - | |
 

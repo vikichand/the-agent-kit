@@ -136,7 +136,25 @@ speed panel (8 cases), 5 runs per cell, arms vanilla, v0.4.0 and develop (`t05e0
 - **Develop against v0.4.0** (rules-change bar, at most 10% slower or costlier): x0.96 time, x0.96 cost,
   bounded-task p90 43 s against 47 s. It passes.
 
-Next: the effort sweep, then the token trims if the kit is still over, each re-measured and recorded here.
+**2026-10-21, window 2.** Same model and judge, 3 runs per cell; per-case tables in `test/adherence/README.md`.
+
+| Measurement | develop / vanilla pass | Time | Cost | Bar |
+|---|---|---|---|---|
+| Speed panel, effort low | 22/24 / 9/24 | x1.16 (worst x2.03) | x1.70 | over on cost |
+| Speed panel, medium, before the trims | 23/24 / 9/24 | x1.18 (worst x1.81) | x1.71 | over on cost |
+| Speed panel, medium, after the trims | 23/24 / 11/24 | x1.38 (worst x2.06) | x1.69 | **over** on cost |
+
+- **Effort:** high matched medium on cases 38, 42 and 45 (9/9 each) and was slower on all three; low cost
+  about the same per cell as medium and passed less (22/24 against window 1's 39/40). The profiles keep
+  medium.
+- **The trims** (about 165 tokens: setup text, a duplicate rule, a shorter checkpoint bullet) changed
+  nothing measurable: median cache write 19.2k before, 19.3k after. The Section 3 defaults and the safety
+  lines were not cut, because `AGENTS.md` is Codex's only copy of them.
+- **Result, reported as the goal sets it:** the kit stays over the 1.25x cost bar against vanilla at the
+  same effort, by about 1.7x in all four measurements, because every session writes about 9k more tokens
+  to the cache. Time is near the bar and noisy at n=3. Closing the cost gap needs a much smaller always-on
+  floor, which is 0.6.0 work; the kit still passes the rules-change bar against v0.4.0 and costs less per
+  passing result than vanilla ($0.129 against $0.155 to $0.186).
 
 ## Sources
 
