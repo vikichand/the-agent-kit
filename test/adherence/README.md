@@ -872,6 +872,11 @@ about $0.118 a cell, median 21 s, and drops cases 02 and 34 to 2/3. Medium stays
 | before the trims (`ta72dddc`) | 23/24 / 9/24 | x1.18 (worst x1.81) | x1.71 | 10-27 / 12-36 | 10.0k / 19.2k |
 | after the trims (`t91f9eb6`) | 23/24 / 11/24 | x1.38 (worst x2.06) | x1.69 | 9-25 / 13-34 | 9.9k / 19.3k |
 
+- The second row's text is the trims plus the reworded comment and UI lists (`8781ab0`), measured as one.
+- The first attempt at the "before" row stopped at the usage limit after 25 valid cells (07:40 to 07:59;
+  cases 02, 07, 16, 32 and one vanilla cell of 33): develop 11/12, vanilla 3/13, in line with the full rerun.
+  The full rerun ran from a worktree at `eb11c34` and its rows were appended afterwards, so the file's
+  timestamps are not in order there.
 - **Still over the bar on cost**, as in every measurement (x1.69 to x1.72). Time sits between x1.18 and
   x1.43 across the four runs; at n=3 the per-case medians move that much on their own.
 - **The trims** (`ac95737`, about 165 tokens) do not show: cache_write is the same before and after. The
