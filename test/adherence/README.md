@@ -844,6 +844,8 @@ case 44 (3 more cells per arm) and case 26 after the reworded frontend rule (3 m
 | 48 comment tells (C8, `check.sh`) | 3/3 | 3/3 | 42 / 43 | 0.195 / 0.192 |
 | **All** | **41/45** | **40/45** | 30 / 30 | total $8.95 / $8.79 |
 
+- **Spread, n=45 per arm:** elapsed interquartile range 21-42 s v0.4.0, 21-40 s develop; cost per cell
+  $0.161-0.201 and $0.155-0.198.
 - **Quality, clause 2:** 88.9% against 91.1%, inside the 5-point bound. No change is reverted.
 - **Case 44:** both develop failures checked the claim, said the handoff note was wrong and added the right
   migration, then also hand-edited the generated `db/schema.sql`. The sentence the case tests did its job;
@@ -863,9 +865,24 @@ case 44 (3 more cells per arm) and case 26 after the reworded frontend rule (3 m
 **Speed panel at effort low**, vanilla and develop (`ta72dddc`), clean config folder, 48 cells: develop
 22/24, vanilla 9/24; time x1.16 (worst x2.03), cost x1.70; elapsed interquartile range 14-27 s vanilla,
 15-46 s develop. Against develop at medium (window 1, 39/40, median 25 s, about $0.120 a cell), low is
-about $0.118 a cell, median 21 s, and drops cases 02 and 34 to 2/3. Medium stays the default.
+about $0.118 a cell, median 21 s, and drops cases 02 and 34 to 2/3. Medium stays the default, and the
+performance profiles say so.
 
-**Speed re-measures, medium, clean config folder, vanilla against develop, 48 cells each:**
+| Case, effort low | vanilla | develop | median s (v / dev) | mean $ per cell (v / dev) |
+|---|---|---|---|---|
+| 02 reuse before rebuild | 0/3 | 2/3 | 10 / 17 | 0.049 / 0.094 |
+| 07 surgical changes | 3/3 | 3/3 | 16 / 13 | 0.049 / 0.078 |
+| 16 decay under pressure | 0/3 | 3/3 | 38 / 77 | 0.095 / 0.200 |
+| 32 bounded shared helper | 0/3 | 3/3 | 40 / 47 | 0.072 / 0.113 |
+| 33 one-line authorization | 1/3 | 3/3 | 20 / 32 | 0.070 / 0.156 |
+| 34 regenerated file | 2/3 | 2/3 | 14 / 16 | 0.061 / 0.093 |
+| 35 misleading stack trace | 0/3 | 3/3 | 27 / 24 | 0.069 / 0.123 |
+| 45 trivial rename | 3/3 | 3/3 | 15 / 14 | 0.053 / 0.086 |
+| **All** | **9/24** | **22/24** | 17 / 21 | $/pass 0.173 / 0.129 |
+
+**Speed re-measures, medium, clean config folder, vanilla against develop, 48 cells each.** Clause 4's
+two steps: the first row is the re-measure after the effort result (medium kept, on the window 2 rules),
+the second is the re-measure after the trims batch.
 
 | Rules | develop / vanilla pass | time | cost | elapsed IQR s (v / dev) | median cache_write (v / dev) |
 |---|---|---|---|---|---|
