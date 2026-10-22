@@ -11,6 +11,11 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- After `--update`, the session-start check no longer says a newer release is on `main` when you have
+  just installed it. It kept the day's earlier answer, from before the update, until the next day.
+
 ## [0.5.0] - 2026-10-22
 
 ### Added

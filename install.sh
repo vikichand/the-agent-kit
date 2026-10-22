@@ -992,10 +992,11 @@ update_kit() {  # refresh ~/.the-agent-kit from GitHub, so the clone stays dispo
   exec sh -c '
     AGENT_KIT_APPLY= sh "$1/install.sh" --setup || exit $?
     rm -rf "$2"
+    rm -f "$3/.update-check"   # cached before this update, it would call an older main "newer" until tomorrow
     printf "%s\n" "------------------------------------------------------------"
     printf "%s\n" "The kit in ~/.the-agent-kit is current. Then, in each project:"
     printf "%s\n" "    ~/.the-agent-kit/install.sh --update-rules     # new rules in, your PROJECT-CONFIG kept"
-  ' _ "$tmp/kit" "$tmp"
+  ' _ "$tmp/kit" "$tmp" "$share"
 }
 
 refresh_kit_owned() {  # $1 = repo root. Kit-NAMED rules and skills are kit-owned: a fix to
