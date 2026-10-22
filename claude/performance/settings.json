@@ -1,5 +1,5 @@
 {
-  "_comment": "the-agent-kit OPTIONAL performance profile (experiment, see the decision record in docs/senior-engineer.md). Merge by hand into ~/.claude/settings.json; never installed by default. Effort medium is set from the 2026-10-21 sweep (test/adherence/README.md): high matched it on quality and was slower, low cost about the same and passed less. Opus 5.5 and later models ignore the top-level effortLevel and read modelSettings instead (keys are aliases, so they follow new releases); the top-level key still covers Fable 5.1 and older. The two caps bound delegation.",
+  "_comment": "the-agent-kit OPTIONAL performance profile (experiment, see the decision record in docs/senior-engineer.md). Merge by hand into ~/.claude/settings.json; never installed by default. Effort medium is set from the 2026-10-21 sweep (test/adherence/README.md): high matched it on quality and was slower, low cost about the same and passed less. Medium is already the default on Opus 5.5, Sonnet 5.5 and Haiku 5.5 (code.claude.com/docs/en/model-config), so modelSettings only pins it against a later change; the top-level key is what lowers Fable 5.1 and Opus 5, which default to high and ignore nothing. Opus 5.5 and later read modelSettings, not the top-level key. The two caps bound delegation.",
   "effortLevel": "medium",
   "modelSettings": {
     "opus": {

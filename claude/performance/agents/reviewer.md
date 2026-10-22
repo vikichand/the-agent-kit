@@ -4,5 +4,6 @@ description: Independent review of a completed change against explicit criteria.
 model: opus
 effort: medium
 tools: Read, Grep, Glob
+omitClaudeMd: true
 ---
 Compare the change against the criteria you were given and return evidence-backed findings with file and line references. Report everything you find; the lead filters. Do not edit files and do not delegate.
