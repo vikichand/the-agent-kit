@@ -233,15 +233,18 @@ newsid() {
 # event carries duration, turn count, token usage and cost; `assistant` events carry the text the
 # judge reads and the tool calls the trace check reads. Fields: messages | usage | tools.
 #
-# `usage` may be given further events files (turn 2, 3 ...) after the first: tool calls and edits are
-# counted over all of them, everything else is read from the LAST result event, because a resumed
-# session's result carries the session's whole spend (Claude Code v2.1.277 and later; summing the turns
-# would count turn 1 again). A file that does not exist is skipped.
+# `usage` may be given further events files (turn 2, 3 ...) after the first: tool calls, edits, turns,
+# tokens and durations are added up over all of them, cost is read from the LAST result event and
+# ttft from the first. A resumed session's result carries the session's whole COST but only its own
+# turn's tokens, turn count and durations (verified 2026-10-23 with a two-turn probe: turn 2 reported
+# num_turns 1 and 3,663 cache-write tokens against a cost that included turn 1), so until then every
+# multi-turn case recorded last-turn tokens and a whole-session cost side by side. A file that does
+# not exist is skipped.
 claude_field() {  # $1 = events file  $2 = messages|usage|tools  $3... = later turns' events files (usage only)
   for p in python python3; do
     r=$("$p" - "$@" <<'PY' 2>/dev/null
 import json, os, sys
-want = sys.argv[2]; msgs = []; tools = []; res = None
+want = sys.argv[2]; msgs = []; tools = []; res = None; sums = {}; ttft = None
 for path in [sys.argv[1]] + sys.argv[3:]:
   if not os.path.exists(path): continue
   for line in open(path, encoding="utf-8", errors="replace"):
@@ -259,16 +262,22 @@ for path in [sys.argv[1]] + sys.argv[3:]:
             if c.get("type") == "tool_result" and tools:
                 body = c.get("content"); txt = body if isinstance(body, str) else " ".join(x.get("text", "") for x in (body or []) if isinstance(x, dict))
                 tools[-1]["result"] = (txt or "")[:400]; tools[-1]["is_error"] = bool(c.get("is_error"))
-    elif t == "result": res = e
+    elif t == "result":
+        res = e; u = e.get("usage") or {}
+        for k in ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"):
+            sums[k] = sums.get(k, 0) + (u.get(k) or 0)
+        for k in ("num_turns", "duration_ms", "duration_api_ms"):
+            sums[k] = sums.get(k, 0) + (e.get(k) or 0)
+        if ttft is None: ttft = e.get("ttft_ms", "")
 if want == "messages": print("\n".join(msgs))
 elif want == "tools": print(json.dumps(tools))
 elif want == "usage":
-    u = (res or {}).get("usage") or {}
+    g = lambda k: sums.get(k, "") if res else ""
     print("\t".join(str(x) for x in [
-        (res or {}).get("num_turns", ""), len(tools), sum(1 for x in tools if x["name"] in ("Edit", "Write", "MultiEdit", "NotebookEdit")),
-        u.get("input_tokens", ""), u.get("output_tokens", ""), u.get("cache_read_input_tokens", ""), u.get("cache_creation_input_tokens", ""),
+        g("num_turns"), len(tools), sum(1 for x in tools if x["name"] in ("Edit", "Write", "MultiEdit", "NotebookEdit")),
+        g("input_tokens"), g("output_tokens"), g("cache_read_input_tokens"), g("cache_creation_input_tokens"),
         (res or {}).get("total_cost_usd", ""),
-        (res or {}).get("duration_ms", ""), (res or {}).get("duration_api_ms", ""), (res or {}).get("ttft_ms", "")]))
+        g("duration_ms"), g("duration_api_ms"), "" if ttft is None else ttft]))
 PY
 ) || continue
     printf '%s' "$r"; return 0
