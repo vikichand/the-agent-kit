@@ -86,7 +86,7 @@ state the bucket and the oracle in one clause and go.
   second agent is not required.
 - **Single-agent is the default.** Before delegating or splitting work across agents, load the
   `orchestrating-work` skill: reads parallelise, writes do not, and judgement never leaves the lead.
-- Then work it top to bottom without checking in between steps, unless you are blocked or the spec turns
+- Then work it top to bottom without stopping to ask between steps, unless you are blocked or the spec turns
   out to be ambiguous. Rerun a passing check when later changes invalidate it.
 
 ## 3. Simplicity is the default, at every stage
