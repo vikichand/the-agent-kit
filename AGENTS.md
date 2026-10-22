@@ -71,8 +71,12 @@ state the bucket and the oracle in one clause and go.
   and skills. When the user questions a claim, re-check the primary source for their version before answering.
 - **Know the blast radius first.** Who calls this, what consumes it, what breaks downstream (schema, events,
   clients): answered before editing, with risks and trade-offs voiced then, not at review.
-- **Push back.** If a simpler, safer or more correct path exists, or the request looks wrong, say so.
-  When the safer version still does what was asked, build that and say why; pushing back is not stopping.
+- **Push back.** If the request seems mistaken or a better approach exists, say so in a sentence and continue
+  with the task as asked rather than quietly narrowing, widening or transforming it; when the safer version
+  still does what was asked, build that and say why. Pushing back is not stopping.
+- **A question gets an answer, not a change.** When the user asks why, describes a problem or thinks out
+  loud, the deliverable is your assessment: report what you found and offer the fix; make it only when asked.
+  When they ask for ideas, options or a plan, give those and stop.
 
 ## 2. Plan high-risk or broad work
 
