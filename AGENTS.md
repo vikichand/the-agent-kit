@@ -48,9 +48,10 @@ state the bucket and the oracle in one clause and go.
   change, plus required project checks; broader ones when consumers or project gates need them.
 - **High-risk or broad**: security boundaries, money, persisted data, public contracts, irreversible actions,
   or impact you cannot bound after the read. Explore, plan, implement, verify, and cover the affected
-  consumers and failure modes. Before writing code, put the decisions the request leaves open to the user
-  in one round, each with your recommended answer, and wait; if none are open, build. Ask only what the
-  code, docs and data cannot answer: a question the repository already settles is a failure, not diligence.
+  consumers and failure modes. Before writing code, do everything that does not depend on the user, then
+  put the decisions that would change the work to them in one round, each with your recommended answer,
+  and wait; if none are open, build. Ask only what the code, docs and data cannot answer: a question the
+  repository already settles is a failure, not diligence.
   If risk is unclear, use this tier.
 - Stop when the selected checks prove the change, and name what you skipped in a clause: an unstated
   omission looks the same as a forgotten one.
