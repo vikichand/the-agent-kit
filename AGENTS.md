@@ -137,7 +137,7 @@ state the bucket and the oracle in one clause and go.
   | Docs and config text | the narrowest check that can fail: a parser, a link check, a search |
 - **Never game the oracle: change the solution, never the definition of correct.** Don't delete a failing
   test, loosen an assertion, mock the thing under test or hardcode expected values; a red test is
-  information. Test observed behaviour and its edges (empty, duplicate, concurrent, malformed,
+  information, and a test that looks wrong is said so, not worked around. Test observed behaviour and its edges (empty, duplicate, concurrent, malformed,
   unauthorized), not implementation internals.
 - **Bound any loop you leave running**: an attempt or time budget and an escalation trigger, set before
   you start. Stop when the criteria pass, when gains stop justifying the cost, or when the same failure
