@@ -258,6 +258,9 @@ A change to the rules is graded, not argued. Before a candidate run, these are f
 4. **Performance**: bounded-task median elapsed time down at least 20% against the current arm, p90
    not worse, cost per accepted completion not higher. Elapsed time uses a survival estimator so
    censored timeouts count; a timeout is an unsuccessful completion within budget, never a runtime.
+   Against vanilla, cost is read in three parts (`docs/performance.md`, "The cost bar, in three parts"):
+   the fixed overhead in tokens against its budget, the marginal ratio on both-pass cases against 1.25x,
+   and cost per pass for both arms. The total ratio is printed too, but it is not the gate on its own.
 5. **Independence**: the runner executes trace assertions and must-edit gates itself; the judge grades
    the transcript and the resulting tree in addition, never instead. The judge is calibrated on a
    repeated subset and on known-good and known-bad outputs.
@@ -1000,6 +1003,11 @@ needs the develop scripts in `~/.the-agent-kit`, and it stopped as documented wh
 Be honest about the limits when quoting any number from it. These are not boilerplate; each one has
 bitten this harness in the past week.
 
+- **It measures behaviour, not task resolution.** Every case asks "did the agent do the senior thing";
+  none asks "did more tasks end up solved". The independent studies that exist (ETH Zurich 2026 and
+  its replications) measure resolution on SWE-bench-style tasks and find rules files are followed, cost
+  about 20% and 2-4 steps, and do not move resolution. 39/40 behaviours here is not evidence of more
+  tasks solved or fewer broken; that claim is unmeasured and stays so until a resolution benchmark runs.
 - **It measures one-shot `-p` prompts.** Adherence decay across a long session - the case the rules
   exist for, and what `AGENTS.md` S7 is written about - is structurally unmeasurable here, and no
   amount of extra runs changes that. It needs a different fixture design.

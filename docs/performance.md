@@ -10,10 +10,26 @@ Research fetched 2026-10-08. Sources are listed at the end.
 
 | Comparison | Gate |
 |---|---|
-| Kit against vanilla (same model, same effort, no rules, no user config) | no case worse on quality, and at most 1.25x the time and the cost |
+| Kit against vanilla (same model, same effort, no rules, no user config) | no case worse on quality; at most 1.25x the time; cost read in three parts (below) |
 | A new rules change against the last release | at most 10% slower or costlier on the bounded median, and the 90th percentile no worse |
 
 A rule that cannot pass both stays out of the release, however good it sounds.
+
+**The cost bar, in three parts (decided 2026-10-23).** One total ratio hid what was being paid for. The
+rules' context is written to the cache once per session (about 5,200 tokens, $0.021 on Sonnet 5.5, measured
+with a one-word prompt); on a 90-second eval task that alone is 1.30x vanilla's $0.07 before the model does
+anything, while a real session re-reads it at a tenth of the price on every later turn. So the eval reads:
+
+1. **Fixed overhead**: the extra context written per cell, in tokens, with a budget: at most 4,800 tokens
+   (today's AGENTS.md; a cut is measured like an addition).
+2. **Marginal cost**: the ratio once that overhead is taken off, over the cases both arms always pass, at
+   most 1.25x. This is what the behaviour rules cost: the checks they make the agent run.
+3. **Cost per pass**: total spend over passes, reported for both arms. A failed attempt is not free.
+
+`summarize.py` prints all three ("cost split"). The vendors document the trade-off in their own numbers:
+Sonnet 5.5's keep-working prompt "runs longer and costs more", its verification paragraph adds "a slightly
+higher cost per task", Opus 5.5's finish-the-task addition means "more tool calls and output tokens". The
+behaviours the kit enforces are the ones the model makers say cost more per task; part 2 is where that shows.
 
 ## What the evidence says
 
