@@ -39,6 +39,8 @@ sh install.sh --setup
 It copies the kit to `~/.the-agent-kit`, turns on its git hooks, and adds it to your Claude Code and
 Codex settings. It lists every change and asks before writing anything, and backs your files up first.
 Then delete the downloaded `install.sh` and restart Claude Code, Codex and Antigravity.
+In Codex, run `/hooks` once and trust the kit's two hooks: Codex skips a new or changed hook until
+you do, without a warning.
 
 **2. Set up each project:**
 

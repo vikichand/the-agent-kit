@@ -946,6 +946,11 @@ setup_machine() {  # --setup: everything a machine needs, applied with the user'
     fi
     say "Done. Backups of changed files sit beside them as *.bak-agent-kit-<time>."
     say "Restart Claude Code and Codex: hooks load when a session starts."
+    # Codex keeps a hash of each hook definition it was told to trust and skips any new or changed one.
+    case "$plan" in *".codex/hooks.json"*)
+      say "Codex runs a new or changed hook only once you trust it: in Codex, run /hooks and trust the kit's" ;
+      say "  command-guard.py and kit-check.py entries. Until then Codex skips them without a warning." ;;
+    esac
     say "Then in each project:   $share/install.sh     (and run the setup prompt once)"
   fi
   [ "$mrc" = 1 ] && exit 1

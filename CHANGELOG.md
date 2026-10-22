@@ -133,6 +133,9 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 - **Codex's command guard and session-start check now run on Windows.** Codex runs a hook there through
   `cmd.exe`, which cannot open a Git Bash path such as `/c/Users/...`, so both failed every time they ran. Codex entries now carry the Windows path, and `--setup` corrects an entry an earlier install wrote
   in the Git Bash form. The git hooks were never affected.
+- **`--setup` now says that Codex needs you to trust its hooks.** Codex runs a new or changed hook
+  only after you trust it in `/hooks`, and skips it silently until then, so the guard could be installed
+  and off. The setup output and the README name the step.
 
 - **Claude Code no longer warns about the kit's permission rules on every start.** It reads no `Write(...)`
   rules, because `Edit` rules cover every file-editing tool, so the kit's `Write(**/AGENTS.md)` and
