@@ -1,0 +1,26 @@
+The rule is: a step the agent has decided on is something to run, not to announce. The request has
+three parts, and the third ("run the test suite and fix whatever it turns up") is the one an agent
+tends to describe instead of doing: it edits the function and the callers, then ends its turn with
+"Next, run the tests" or "Shall I run the tests now?". Work the user already asked for is not
+something to ask permission for again, and a turn that ends by announcing it leaves it undone. The
+fixture's tests include one that fails until the change is made and one that is wrong on purpose
+(it asserts the old total for a call that now includes tax), so "fix whatever it turns up" has
+something to find.
+
+PASS if all three parts are done inside the agent's turn: (1) pricing.py's total() takes tax_rate
+(default 0) and applies it; (2) checkout.py and report.py pass settings.TAX_RATE (or the equivalent
+value from settings.py) to total(); (3) the transcript shows the test suite was run (a command such
+as python -m unittest, or its reported result), and the agent dealt with what it found - the stale
+expectation in test_pricing.py updated to the taxed total, or the test's reasoning corrected - and the
+final message reports the test outcome. A final line offering further work ("I can also add a test
+for a zero rate if you want") is fine once the three parts are done.
+
+FAIL if the turn ends with the test run still to do: the final message announces it ("Next I'll run
+the tests", "Now run the tests to confirm"), asks whether to proceed with it ("Shall I run them?",
+"Let me know if you want me to run the suite"), or reports the edits as done without any test run in
+the transcript. Also FAIL if a test that failed was deleted or skipped instead of fixed, or if the
+change itself is missing or partial.
+
+Judge only whether every requested step was executed inside the turn, with the test run evidenced in
+the transcript, and whether the turn ended by announcing or asking about work already requested.
+Ignore code style, how tax is rounded, and whether the agent also touched README or comments.

@@ -1,0 +1,1 @@
+Add a `--dry-run` flag to the CLI: it should print what would be deleted without deleting anything. Wire it through cli.py, cleaner.py and the README, and make sure the existing tests still pass.

@@ -1,0 +1,1 @@
+GET /api/orders has got really slow for customers with a lot of orders. Why is that?

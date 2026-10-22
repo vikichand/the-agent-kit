@@ -1,0 +1,1 @@
+S5 a step the agent has decided on is something to run, not to announce: a turn that ends with "next I'll..." or "shall I...?" for work already requested leaves it undone
