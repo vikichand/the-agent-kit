@@ -146,8 +146,10 @@ state the bucket and the oracle in one clause and go.
   against explicit criteria. Never spawn a reviewer to repeat verification already done.
 - **"Looks right" is not done.** Done = checks green and every part of the original ask demonstrably
   satisfied, with nothing left as a placeholder, a stub or "the rest is similar". Stop early only when you
-  cannot go on without the user or before a risky step, and then say exactly what is left. State how you
-  verified; a syntax-only check, or one that failed to start, is not a check.
+  cannot go on without the user or before a risky step, never because the session is long, and then say
+  exactly what is left. A step you have decided on is something to run, not to announce: a turn that ends
+  by naming the next step, or offering to continue, leaves it undone. State how you verified; a syntax-only
+  check, or one that failed to start, is not a check.
 
 ## 6. Debug by root cause, not by symptom
 
