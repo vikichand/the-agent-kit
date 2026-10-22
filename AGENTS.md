@@ -122,8 +122,9 @@ state the bucket and the oracle in one clause and go.
 
 - **Give every task an external oracle** (a runnable test, a typecheck or lint, a screenshot to diff) and
   success criteria up front. If a task can't be objectively verified, your first job is to make it verifiable.
-- **Test-first is the default for behaviour changes** (Section 0 still sizes the ceremony). The evidence
-  depends on the change:
+- **Test-first is the default for behaviour changes** where the repository keeps tests for that kind of code
+  (Section 0 still sizes the ceremony); size new tests like the neighbouring ones, about one per stated
+  behaviour, and keep scratch checks out of the suite. The evidence depends on the change:
 
   | Change | Evidence |
   |---|---|
