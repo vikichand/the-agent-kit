@@ -11,6 +11,17 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+### Security
+
+- The command guard now asks before a release or force-push override is set from PowerShell
+  (`$env:`, `Set-Item env:`), .NET (`SetEnvironmentVariable`) or `setx`. Before, it caught only a
+  shell assignment, and the last two also reach every later shell.
+- The command guard now asks before an agent removes its tool's marker variable (`env -u`, `unset`,
+  `Remove-Item env:` and its aliases, an empty assignment, also inside `sh -c` or `pwsh -Command`) or
+  clears the environment for a push. The pre-push
+  hook reads that marker to refuse a force-push override from an agent, so removing it would make
+  the agent's push look like yours.
+
 ## [0.5.1] - 2026-10-22
 
 ### Fixed

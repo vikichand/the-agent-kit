@@ -45,6 +45,8 @@ GITCFG_DENY    = "writing git config directly (.git/config or GIT_CONFIG_GLOBAL/
 OVERRIDE_ASK   = ("this sets a guard override (AGENT_KIT_RELEASE / AGENT_KIT_ALLOW_FORCE / AGENT_KIT_APPLY): it lets a "
                   "push through the pre-push hook, or lets the installer write your Claude Code and Codex settings "
                   "without asking you in a terminal. A chat request never covers it - approve only if you meant it.")
+MARKER_ASK     = ("this removes the variable that tells the pre-push hook an agent is pushing (or clears the whole "
+                  "environment), so the hook would treat the push as yours. Approve only if you meant it.")
 
 GIT_GLOBAL_VALUE = ("-c", "-C", "--git-dir", "--work-tree", "--namespace", "--super-prefix",
                     "--config-env", "--attr-source")   # git globals that consume the NEXT token as a value
@@ -488,6 +490,132 @@ def split_ops(cmd):
     return parts
 
 
+OVERRIDE_VAR = re.compile(r"AGENT_KIT_(?:RELEASE|ALLOW_FORCE|APPLY)$")
+# The pre-push hook refuses AGENT_KIT_ALLOW_FORCE in a shell carrying one of these; an agent that removes
+# its marker makes its push look like yours.
+MARKER_VAR = re.compile(r"(?:CLAUDE_CODE_CHILD_SESSION|CODEX_THREAD_ID|ANTIGRAVITY_CONVERSATION_ID)$")
+PS_ENV_SET = {"set-item", "si", "new-item", "ni", "set-content", "sc", "add-content", "ac"}
+PS_ENV_WRITE = {"remove-item", "ri", "del", "erase", "rm", "rd", "rmdir", "clear-item", "cli",
+                "clear-content", "clc"} | PS_ENV_SET
+SHELL_KEYWORDS = {"if", "then", "else", "elif", "do", "while", "until", "!", "time"}
+_ASSIGN = re.compile(r"^([A-Za-z_]\w*)(?:\[[^\]]*\])?\+?=(.*)$", re.S)   # X=v, X+=v, X[0]=v
+
+
+def _var_hit(name, removing=False):
+    if MARKER_VAR.match(name):
+        return "marker"
+    return None if removing or not OVERRIDE_VAR.match(name) else "override"
+
+
+def _assign_hit(tok):
+    """A NAME=value word: setting an override, or emptying a marker (a non-empty marker still marks)."""
+    m = _ASSIGN.match(tok)
+    if not m:
+        return None
+    h = _var_hit(m.group(1))
+    return h if h == "override" or (h == "marker" and not m.group(2)) else None
+
+
+def env_tamper(cmd, depth=0):
+    """'override' when a command sets a pre-push override, 'marker' when it removes an agent's marker,
+    else None. Read per command, by its name and arguments, so a commit message, a grep pattern or an
+    echo that only mentions a variable is not taken for setting it.
+    ponytail: literal names only; indirection (unset ${x}_ID), string building ("AGENT_KIT_"+"RELEASE"),
+    interpreters (os.environ.pop), wildcards (env:CODEX*), here-strings, tmux, git aliases and the registry
+    get through. The force-push deny and the pre-push hook stay behind it."""
+    for part in split_ops(cmd):
+        try:
+            toks = [s for s in (t.strip("(){}") for t in shlex.split(part)) if s]
+        except ValueError:
+            toks = part.split()
+        hit = _tamper(toks, depth) if toks else None
+        if hit:
+            return hit
+    return None
+
+
+def _tamper(toks, depth):
+    joined = " ".join(toks)
+    m = re.search(r"SetEnvironmentVariable\(\s*([A-Za-z_]\w*)", joined, re.I)   # .NET, persists with 'User'
+    if m and _var_hit(m.group(1)):
+        return _var_hit(m.group(1))
+    m = re.match(r"^\$\{?env:([A-Za-z_]\w*)\}?\s*(=)?", toks[0], re.I)            # PowerShell $env:X = v
+    if m and (m.group(2) or (len(toks) > 1 and toks[1].startswith("="))):
+        return _var_hit(m.group(1))
+    i = 0
+    while i < len(toks):                                                          # X=v, wrappers, env, sh -c
+        t, b = toks[i], base(toks[i]).lower()
+        if _ASSIGN.match(t):
+            if _assign_hit(t):
+                return _assign_hit(t)
+        elif b == "env":
+            return _env_tamper(toks[i + 1:], depth)
+        elif b in ("sh", "bash", "zsh", "dash"):
+            rest = toks[i + 1:]
+            k = next((j for j, a in enumerate(rest) if re.match(r"^-[A-Za-z]*c[A-Za-z]*$", a)), -1)   # -c, -lc
+            return env_tamper(rest[k + 1], depth + 1) if 0 <= k < len(rest) - 1 and depth < 3 else None
+        elif b not in WRAPPERS and b not in SHELL_KEYWORDS and not re.match(r"^-?\d+[a-z]?$", t):
+            break
+        i += 1
+    verb = toks[i:]
+    if not verb:
+        return None
+    prog, rest = base(verb[0]).lower(), verb[1:]
+    payload = shell_payload(prog, verb)
+    if payload is not None:
+        return next((h for h in (_tamper(p, depth + 1) for p in payload if p) if h), None) if depth < 3 else None
+    if prog == "eval" and depth < 3:
+        return env_tamper(" ".join(rest), depth + 1)
+    if prog == "unset":
+        return next((h for h in (_var_hit(a, removing=True) for a in rest) if h), None)
+    if prog in ("export", "declare", "typeset", "readonly", "set"):
+        if (prog == "set" and rest and rest[0] in ("-e", "--erase")) or "-n" in rest or "+x" in rest:
+            # fish set -e X; export -n X and declare +x X stop passing X to the commands that follow
+            return next((h for h in (_var_hit(a, removing=True) for a in rest if a[0] not in "-+") if h), None)
+        words = [a for a in rest if not a.startswith("-")]
+        for j, a in enumerate(words):                                             # X=v, fish set -x X v
+            h = _assign_hit(a) if "=" in a else _var_hit(a) if prog == "set" and j + 1 < len(words) else None
+            if h:
+                return h
+        return None
+    if prog == "setx":
+        names = [a for a in rest if not a.startswith("/")]
+        return _var_hit(names[0]) if names else None
+    if prog in PS_ENV_WRITE:
+        for a in rest:
+            m = re.match(r"^(?:-(?:literal)?path:)?env:\\?([A-Za-z_]\w*)$", a, re.I)
+            if m:
+                return _var_hit(m.group(1), removing=prog not in PS_ENV_SET)
+        return None
+    return None
+
+
+def _env_tamper(rest, depth):
+    """`env [-i|-] [-u X] [X=v] cmd ...`: removing a marker, setting an override, or clearing it all for a push."""
+    clears, i = False, 0
+    while i < len(rest):
+        a = rest[i]
+        if a in ("-i", "-", "--ignore-environment"):
+            clears = True
+        elif a in ("-u", "--unset") and i + 1 < len(rest):
+            i += 1
+            if _var_hit(rest[i], removing=True):
+                return "marker"
+        elif a.startswith("--unset=") or (a.startswith("-u") and len(a) > 2):
+            if _var_hit(a.split("=", 1)[-1] if "=" in a else a[2:], removing=True):
+                return "marker"
+        elif _ASSIGN.match(a):
+            if _assign_hit(a):
+                return _assign_hit(a)
+        elif not a.startswith("-"):
+            inner = rest[i:]
+            if clears and re.search(r"\bpush\b", " ".join(inner)):               # also env -i sh -c "git push"
+                return "marker"
+            return _tamper(inner, depth + 1) if depth < 3 else None
+        i += 1
+    return None
+
+
 ANTIGRAVITY = False   # set by --tool antigravity: its PreToolUse contract differs from Claude's and Codex's
 
 
@@ -543,6 +671,11 @@ def main():
     if re.search(r"(?:^|[\s;&|(])(?:export\s+)?AGENT_KIT_(?:RELEASE|ALLOW_FORCE|APPLY)\s*=",
                  re.sub(r"[\"'\\]", "", cmd)):
         emit(args.decision, OVERRIDE_ASK)
+    tamper = env_tamper(cmd)   # PowerShell, .NET, setx, fish, wrappers; and removing an agent's marker
+    if tamper == "override":
+        emit(args.decision, OVERRIDE_ASK)
+    if tamper == "marker":
+        emit(args.decision, MARKER_ASK)
 
     if re.search(r"\|\s*(sudo\s+)?(ba|z)?sh\b", cmd, re.IGNORECASE):   # curl ... | sh / SH / bash / BASH
         emit(args.decision, "piping a download straight into a shell (curl | sh) runs unreviewed code.")
