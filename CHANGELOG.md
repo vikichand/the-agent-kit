@@ -11,7 +11,51 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+### Added
+
+- Three adherence cases: `49-assessment-not-change` (a "why is this slow?" question answered, not
+  patched), `50-announce-versus-run` (a step the agent decided on is run, not announced at the end of
+  the turn) and `51-progress-updates` (a line before the work starts, a recap that leads with the
+  outcome).
+
+### Changed
+
+- The Claude Code settings now set `includeGitInstructions: false`: Claude Code's own commit and
+  pull-request instructions competed with AGENTS.md Section 7 and are where the attribution trailer
+  comes from. The git status snapshot Claude Code adds at start goes with them; the safety invariant
+  already asks for `git status` before editing. An existing install gains the key on `--setup`; a
+  value you set yourself is kept.
+- The two read-only performance agents (`bounded-reader`, `reviewer`) no longer load the project's
+  rules (`omitClaudeMd`): a lookup needs facts, not 4,800 tokens of behaviour rules, and the lead
+  already applies them. `implementer` keeps them, because it writes code.
+- The three task-matched skills describe when to use them first and no longer list their contents:
+  Codex shortens long skill descriptions before anything else, and Claude Code loads the body on use.
+- `docs/branches-and-releases.md`: the release gate now includes `/doctor prompt-audit` when the
+  rules changed.
+- The performance profile's comment now says what the effort setting does on each model: medium is
+  already the default on Opus 5.5, Sonnet 5.5 and Haiku 5.5; the setting only lowers Fable 5.1 and Opus 5.
+
+### Fixed
+
+- The adherence harness recorded a multi-turn case's tokens, turn count and durations from its last
+  turn only, beside a whole-session cost. They are now added up over every turn. Rows written before
+  2026-10-23 for cases 16 and 27 carry last-turn tokens; their cost column was always right.
+- `summarize.py` now reports the cost bar in three parts: the fixed overhead the rules add to every
+  cell (extra context written, in tokens and dollars), the marginal cost ratio over the cases both arms
+  always pass, and the cost of a pass. One total ratio hid that the overhead alone exceeds the 1.25x
+  bar on a 90-second task.
+- `CLAUDE.md`'s comment said Claude Code does not read `AGENTS.md`; it has since 2.1.277. The import
+  stays for older versions and never loads the file twice.
+
 ### Security
+
+- The command guard's Claude Code hook now carries `onFailure: "block"` and a 15-second timeout: a
+  guard that crashes, times out or cannot start (no Python) blocks the command instead of letting it
+  through (Claude Code 2.1.295 or later; earlier versions ignore the field). `install.sh --check` says
+  so when Python is missing. An existing install gains both fields on `--setup`; a value you set
+  yourself is kept, which is also how you opt out.
+- The guard's prompt hook now fails towards "nothing authorized": if reading the prompt crashes, or the
+  grant record cannot be written, the previous turn's commit or push grant is dropped rather than kept.
 
 - The command guard now asks before a release or force-push override is set from PowerShell
   (`$env:`, `Set-Item env:`), .NET (`SetEnvironmentVariable`) or `setx`. Before, it caught only a

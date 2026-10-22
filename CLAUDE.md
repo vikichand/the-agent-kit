@@ -1,5 +1,5 @@
-<!-- Claude Code reads CLAUDE.md, not AGENTS.md, so this file imports the rules rather than copying
-     them. One source of truth, nothing to keep in sync. Anthropic's documented pattern; a symlink
-     also works but needs Administrator or Developer Mode on Windows, so the import is the default.
-     Add Claude-Code-only instructions BELOW the import line. -->
+<!-- Claude Code 2.1.277 and later read AGENTS.md directly; this import keeps older versions and
+     the sessions that cannot (Bedrock, Vertex before 2.1.281) on the same file, and never loads it
+     twice. One source of truth, nothing to keep in sync. Add Claude-Code-only instructions BELOW
+     the import line. -->
 @AGENTS.md

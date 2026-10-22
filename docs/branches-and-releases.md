@@ -50,7 +50,10 @@ history other people may have pulled.
 
 1. **Gate.** On `develop`: `sh test/run-tests.sh` passes (free and offline), `sh install.sh --check`
    reports no FAIL, and every user-visible change since the last release has an entry under
-   `## [Unreleased]` in `CHANGELOG.md`. There is no CI in this repo; that suite is the gate.
+   `## [Unreleased]` in `CHANGELOG.md`. There is no CI in this repo; that suite is the gate. If the
+   rules changed, also run Claude Code's `/doctor prompt-audit` in this repo: it flags instructions
+   written for older models, references to files or commands that do not exist, and files that
+   contradict each other.
 2. **Version the changelog.** Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, add a fresh empty
    `## [Unreleased]` above it, update the compare links at the bottom, and commit on `develop` as
    `release: X.Y.Z`. There is no version file to bump: the tag is the version, and `install.sh` stamps
