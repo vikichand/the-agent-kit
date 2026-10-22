@@ -1,6 +1,6 @@
 ---
 name: writing-docs
-description: Use when writing or editing documentation, a README, a CHANGELOG, a commit message, a PR description, release notes, or any prose a human will read - carries the prose standards (no AI tells, symbols written out) and the README order (working path first, a runnable command in the first screenful, command surfaces as tables, shell differences named). Also use when asked to document something, write the README, write a commit message, open a pull request, or cut a release.
+description: Use when writing or editing documentation, a README, a CHANGELOG, a commit message, a pull request description, release notes or any prose a human will read, and when asked to document something, open a pull request or cut a release. Carries the prose standards and the README order.
 ---
 
 # Writing docs, READMEs, commits, pull requests and release notes
