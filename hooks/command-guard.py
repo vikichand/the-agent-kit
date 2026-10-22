@@ -202,7 +202,11 @@ def save_grants(session, grants):
         with open(_grant_path(session), "w") as f:
             json.dump({"authorized": sorted(grants)}, f)
     except Exception:
-        pass
+        # A write that fails must not leave the previous turn's grant live: no record means no grant.
+        try:
+            os.remove(_grant_path(session))
+        except Exception:
+            pass
 
 
 def _asked(text, v):
@@ -631,7 +635,11 @@ def emit(decision, reason):
 
 def capture_intent(data):
     """UserPromptSubmit: record which git-writes the user's OWN message authorizes, for this turn."""
-    save_grants(data.get("session_id") or "", detect_grants(data.get("prompt", "")))
+    try:
+        grants = detect_grants(data.get("prompt", ""))
+    except Exception:
+        grants = frozenset()   # a crash here must fail towards "nothing authorized", never keep the last turn's grant
+    save_grants(data.get("session_id") or "", grants)
     sys.exit(0)
 
 
