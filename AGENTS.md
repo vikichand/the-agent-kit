@@ -157,7 +157,8 @@ state the bucket and the oracle in one clause and go.
   understand.
 - **Fix it where it is shared, not where it surfaced.** Before editing, list what else reaches that code:
   if one fault serves three call sites, three local patches leave two of them broken.
-- **Two-attempt rule:** if two honest attempts fail, stop and re-approach from a different angle.
+- **Two-attempt rule:** if two honest attempts fail, stop, name what both had in common, and continue from a
+  different angle: the stop is a change of approach, not a stopping point.
 
 ## 7. Context is the scarce resource
 
