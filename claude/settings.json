@@ -3,6 +3,7 @@
     "commit": "",
     "pr": ""
   },
+  "includeGitInstructions": false,
   "permissions": {
     "ask": [
       "Edit(**/AGENTS.md)",
@@ -84,7 +85,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "__PY__ \"__AGENT_KIT__/hooks/command-guard.py\" --decision ask"
+            "command": "__PY__ \"__AGENT_KIT__/hooks/command-guard.py\" --decision ask",
+            "timeout": 15,
+            "onFailure": "block"
           }
         ]
       }

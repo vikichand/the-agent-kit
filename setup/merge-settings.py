@@ -65,6 +65,14 @@ def merge_hooks(mine, kit, changes, exact=False):
                     for h in list(b.get("hooks", [])):
                         if (h.get("command") == want) if exact else (canon(h.get("command")) == canon(want)):
                             found = True
+                            # A field the kit added later (onFailure, timeout) reaches an install that already
+                            # has the hook; a value the user set themselves is never overwritten. To opt out of
+                            # a field, set it to the value you want: a field left out comes back on the next run.
+                            missing = {k: v for k, v in kh.items() if k not in h}
+                            if missing:
+                                h.update(missing)
+                                changes.append("updated %s hook: %s (added %s)" % (event, script or want[:60],
+                                               ", ".join("%s=%s" % (k, missing[k]) for k in sorted(missing))))
                         elif script and kit_script(h.get("command")) == script and not found:
                             # The kit's own older entry (old flags, old interpreter).
                             if len(b.get("hooks", [])) == 1:   # its own block: update it in place

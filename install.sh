@@ -1130,7 +1130,8 @@ doctor() {
   py=$(detect_py)
   if [ -z "$py" ]; then
     dfail=1; say "  FAIL: no working python (python3/python/py). On Windows 'python3' is often a no-op Store stub."
-    say "        -> the tool-layer command-guard will NOT run. Install Python 3."
+    say "        -> the command-guard cannot start, and it fails closed (onFailure: block): Claude Code refuses"
+    say "           every Bash call until Python 3 is installed and this check passes."
   else
     say "  OK:   python = $py"
     d=$(printf '%s' '{"tool_input":{"command":"git push"}}'         | $py "$KIT/hooks/command-guard.py" --decision ask 2>/dev/null)

@@ -590,7 +590,15 @@ rather than silently rewritten.
 
 **Tool config** (`claude/settings.json`, `codex/config.toml`, `codex/hooks.json`) is added to your
 settings by `--setup`, or printed by `--global` for you to merge. On Claude Code it kills the native attribution trailer
-(`attribution.commit/pr:""`); asks before `git commit`, `git push`, and `gh pr create` *unless your own
+(`attribution.commit/pr:""`) and turns off Claude Code's own commit and pull-request instructions
+(`includeGitInstructions:false`), which competed with Section 7 and are where that trailer comes from (the
+setting is machine-wide: in a project without the kit's rules you lose that built-in guidance too, while the
+guard below still denies the dangerous git commands everywhere); the command guard carries
+`onFailure:"block"` and a 15-second timeout (Claude Code 2.1.295 or later; earlier versions ignore the
+field), so a guard that crashes, times out or cannot start blocks the command instead of letting it through
+(`--check` tells you when Python is missing; fix that from your own terminal, the agent cannot). To opt out
+of a field the kit sets on its hook, set it to the value you want: `--setup` never overwrites a value, only
+adds a missing one. It asks before `git commit`, `git push`, and `gh pr create` *unless your own
 message that turn asked for it* (a one-time, turn-scoped grant, below); asks on secret-file reads (a
 visible prompt naming the file - precaution without a hard stop); and denies `--no-verify`/force and
 writes to `.git/hooks`, `.git/config`, and `.claude/settings.json`. It also **asks** before an edit to
