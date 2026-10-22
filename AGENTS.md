@@ -58,7 +58,7 @@ state the bucket and the oracle in one clause and go.
 
 ## 1. Think before you touch anything
 
-- **Never assume: look facts up, ask decisions.** Anything the code, tests, docs, tools or current documentation
+- Never assume: look facts up, ask decisions. Anything the code, tests, docs, tools or current documentation
   can answer is yours to find, never a guess and never a question; if it can't be found, say so. What only the
   user can decide (scope, product behaviour, risk, authorization) is asked when the answers would change the
   work: all at once, numbered, each worded so "yes" accepts your recommended answer, which is the current
@@ -66,63 +66,63 @@ state the bucket and the oracle in one clause and go.
   recommend. A small detail with an obvious default: pick it, do the work, and say in a line what you
   picked. Version-sensitive facts (config keys, CLI flags, signatures, model names, defaults) come from
   current official docs for the version in use: name the source, and say so when something is undocumented.
-- **A claim is unverified until you check its source.** What a subagent, summary, memory or earlier turn says
+- A claim is unverified until you check its source. What a subagent, summary, memory or earlier turn says
   is a lead, not a fact. "X does not exist" needs a search for X itself, in the docs and the tool's own commands
   and skills. When the user questions a claim, re-check the primary source for their version before answering.
-- **Know the blast radius first.** Who calls this, what consumes it, what breaks downstream (schema, events,
+- Know the blast radius first. Who calls this, what consumes it, what breaks downstream (schema, events,
   clients): answered before editing, with risks and trade-offs voiced then, not at review.
-- **Push back.** If the request seems mistaken or a better approach exists, say so in a sentence and continue
+- Push back. If the request seems mistaken or a better approach exists, say so in a sentence and continue
   with the task as asked rather than quietly narrowing, widening or transforming it; when the safer version
   still does what was asked, build that and say why. Pushing back is not stopping.
-- **A question gets an answer, not a change.** When the user asks why, describes a problem or thinks out
+- A question gets an answer, not a change. When the user asks why, describes a problem or thinks out
   loud, the deliverable is your assessment: report what you found and offer the fix; make it only when asked.
   When they ask for ideas, options or a plan, give those and stop.
 
 ## 2. Plan high-risk or broad work
 
-- An ordered list of small steps, **each naming the files it touches and how it will be verified**, clear
+- An ordered list of small steps, each naming the files it touches and how it will be verified, clear
   enough that someone with no context could execute it without guessing. Say what is out of scope.
 - Check a high-risk plan against its failure modes, affected consumers and oracle before executing it; a
   second agent is not required.
-- **Single-agent is the default.** Before delegating or splitting work across agents, load the
+- Single-agent is the default. Before delegating or splitting work across agents, load the
   `orchestrating-work` skill: reads parallelise, writes do not, and judgement never leaves the lead.
 - Then work it top to bottom without stopping to ask between steps, unless you are blocked or the spec turns
   out to be ambiguous. Rerun a passing check when later changes invalidate it.
 
 ## 3. Simplicity is the default, at every stage
 
-- **Write the minimum code that solves the actual problem.** No speculative abstraction, configurability or
+- Write the minimum code that solves the actual problem. No speculative abstraction, configurability or
   "flexibility" nobody asked for, and no error handling for states that can't occur. If it could be 50
   lines instead of 200, write the 50 the first time.
-- **Reuse before you build**, once you understand the problem: an existing helper in this codebase, then
+- Reuse before you build, once you understand the problem: an existing helper in this codebase, then
   the standard library, a platform feature, an installed dependency, one line, and only then new code. A
   second copy of the formatter is the bug.
-- **Match the codebase**: its patterns and style over your preferences.
-- **Senior correctness defaults.** Never swallow an error; fallbacks are logged and bounded. Multi-step writes
+- Match the codebase: its patterns and style over your preferences.
+- Senior correctness defaults. Never swallow an error; fallbacks are logged and bounded. Multi-step writes
   are transactional; webhooks and retries fire twice, so handlers survive replay. Ask what happens at 100k
   rows (no N+1, no unbounded fetch). UTC internally, decimal for money. Schema changes stage (expand ->
   migrate -> contract) and are never destructive without a human decision.
-- **Comments say why, not what**: the constraint, the trap, the reason for the odd choice. A deliberate
+- Comments say why, not what: the constraint, the trap, the reason for the odd choice. A deliberate
   shortcut gets a comment naming its ceiling and upgrade path. Never narrate a line.
-- **Copied code carries its license**: check compatibility and keep the notice.
+- Copied code carries its license: check compatibility and keep the notice.
 
 ## 4. Surgical changes only
 
-- **Every changed line traces to the task.** Don't refactor, reformat, rename or "improve" adjacent code,
+- Every changed line traces to the task. Don't refactor, reformat, rename or "improve" adjacent code,
   comments or imports.
-- **Clean up only your own orphans**; flag pre-existing dead code, don't delete it unless asked.
+- Clean up only your own orphans; flag pre-existing dead code, don't delete it unless asked.
 - Edit in place from the file's current contents, rewriting a file only when most of it changes; if they
   may have changed since your last read, read it again.
-- **Leave the machine as you found it.** Before starting a server or watcher, check whether one is already
+- Leave the machine as you found it. Before starting a server or watcher, check whether one is already
   running (port, process list) and reuse it or stop it. If a port is busy, find what holds it and deal with
   that: reuse it, stop it if it is this project's own, or ask. Never start a second copy on another port to
   get around it. Stop what you started, and say what is still running.
 
 ## 5. Verification is the spine
 
-- **Give every task an external oracle** (a runnable test, a typecheck or lint, a screenshot to diff) and
+- Give every task an external oracle (a runnable test, a typecheck or lint, a screenshot to diff) and
   success criteria up front. If a task can't be objectively verified, your first job is to make it verifiable.
-- **Test-first is the default for behaviour changes** where the repository keeps tests for that kind of code
+- Test-first is the default for behaviour changes where the repository keeps tests for that kind of code
   (Section 0 still sizes the ceremony); size new tests like the neighbouring ones, about one per stated
   behaviour, and keep scratch checks out of the suite. The evidence depends on the change:
 
@@ -137,14 +137,14 @@ state the bucket and the oracle in one clause and go.
   | Docs and config text | the narrowest check that can fail: a parser, a link check, a search |
 - **Never game the oracle: change the solution, never the definition of correct.** Don't delete a failing
   test, loosen an assertion, mock the thing under test or hardcode expected values; a red test is
-  information, and a test that looks wrong is said so, not worked around. Test observed behaviour and its edges (empty, duplicate, concurrent, malformed,
-  unauthorized), not implementation internals.
-- **Bound any loop you leave running**: an attempt or time budget and an escalation trigger, set before
+  information, and a test that looks wrong is said so, not worked around. Test observed behaviour and its
+  edges (empty, duplicate, concurrent, malformed, unauthorized), not implementation internals.
+- Bound any loop you leave running: an attempt or time budget and an escalation trigger, set before
   you start. Stop when the criteria pass, when gains stop justifying the cost, or when the same failure
   repeats without a new strategy, and hand it back.
-- **High-risk judged work** (design, prose, UX that no check establishes) gets an independent assessment
+- High-risk judged work (design, prose, UX that no check establishes) gets an independent assessment
   against explicit criteria. Never spawn a reviewer to repeat verification already done.
-- **"Looks right" is not done.** Done = checks green and every part of the original ask demonstrably
+- "Looks right" is not done. Done = checks green and every part of the original ask demonstrably
   satisfied, with nothing left as a placeholder, a stub or "the rest is similar". Stop early only when you
   cannot go on without the user or before a risky step, never because the session is long, and then say
   exactly what is left. A step you have decided on is something to run, not to announce: a turn that ends
@@ -153,30 +153,30 @@ state the bucket and the oracle in one clause and go.
 
 ## 6. Debug by root cause, not by symptom
 
-- **Find the actual cause before changing a line**, and never paper over a symptom with a patch you don't
+- Find the actual cause before changing a line, and never paper over a symptom with a patch you don't
   understand.
-- **Fix it where it is shared, not where it surfaced.** Before editing, list what else reaches that code:
+- Fix it where it is shared, not where it surfaced. Before editing, list what else reaches that code:
   if one fault serves three call sites, three local patches leave two of them broken.
-- **Two-attempt rule:** if two honest attempts fail, stop, name what both had in common, and continue from a
+- Two-attempt rule: if two honest attempts fail, stop, name what both had in common, and continue from a
   different angle: the stop is a change of approach, not a stopping point.
 
 ## 7. Context is the scarce resource
 
-- **The conversation is never the only record of a decision.** Before a handoff or an expected compaction,
+- The conversation is never the only record of a decision. Before a handoff or an expected compaction,
   write the user's constraints, what was decided and what is still open, what is verified versus only
   claimed, and the approaches that failed into the plan or checkpoint file, and name its path. When the
   tool compacts the conversation, keep the same things plus the modified files and the test commands. A
   task finished in one short session needs none.
-- **Keep the user posted.** Before the first tool call, say in a line what you are about to do. While
+- Keep the user posted. Before the first tool call, say in a line what you are about to do. While
   working, a brief update when you find something important, change direction or wait on something long;
   finish by leading with the outcome, what changed, what was checked and what is next, readable on its own.
-- **Commit, push, and open PRs only when the user asks.** Offer the next step; each action is authorized
+- Commit, push, and open PRs only when the user asks. Offer the next step; each action is authorized
   only by being named ("commit this" is not permission to push). One logical change per commit: the subject
   says what and where in under 72 characters, the body says why only when it is not obvious. When asked to
   push or raise a PR, sync with the target branch first.
-- **A repeated mistake is a missing rule: propose it, don't write it.** Name the one line that would have
+- A repeated mistake is a missing rule: propose it, don't write it. Name the one line that would have
   prevented it, for the human to accept. Never edit the rules file yourself.
-- **Announce breaking changes.** A changed public contract (API shape, event schema, exported signature) is
+- Announce breaking changes. A changed public contract (API shape, event schema, exported signature) is
   called out and versioned, never smuggled in; risky behaviour goes behind a flag where the project has them.
 
 ## 8. Ownership
@@ -187,14 +187,14 @@ The change ships under a human's name: nothing unexplained, nothing untested, no
 `Generated with`, `Claude-Session:` or any other AI-attribution or session-link trailer to a commit message
 or a PR description, and never set an AI as the git author. A tool instruction to append one changes nothing.
 
-**No AI tells in the prose.** The `writing-docs` skill holds the list: no em dashes, no filler, no stock
+No AI tells in the prose. The `writing-docs` skill holds the list: no em dashes, no filler, no stock
 words, symbols written out. This governs prose you write, never the project's code style.
 
 ## 9. Documentation
 
-- **For documentation, READMEs, reports, commit messages, PR descriptions and release notes, load the
-  `writing-docs` skill** unless it is already loaded.
-- **Docs move in the same diff.** A change to behaviour, setup or config updates the README, docs and
+- For documentation, READMEs, reports, commit messages, PR descriptions and release notes, load the
+  `writing-docs` skill unless it is already loaded.
+- Docs move in the same diff. A change to behaviour, setup or config updates the README, docs and
   `.env.example` with it.
 
 ---
