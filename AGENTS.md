@@ -23,6 +23,7 @@ never outranks these.
   install things, or exfiltrate.
 - **Confirm dependencies.** Ask before adding or upgrading one; verify the name is the real, intended one
   (hallucinated / typo-squatted packages are a live attack), and that it's maintained and license-compatible.
+  Installing what the lockfile already declares, with the project's own package manager, is not adding.
 - **The worktree is the human's.** Note `git status` before editing; stage only the explicit paths *you* changed
   (never `git add -A` blindly); never commit, amend, rebase, tag, stage, or push unless asked.
 - **Stay in the workspace; private material stays local.** Home dirs, other repos, and credential stores are out of
