@@ -163,8 +163,13 @@ state the bucket and the oracle in one clause and go.
 ## 7. Context is the scarce resource
 
 - **The conversation is never the only record of a decision.** Before a handoff or an expected compaction,
-  write the user's constraints, what is verified versus only claimed, and the approaches that failed into
-  the plan or checkpoint file, and name its path. A task finished in one short session needs none.
+  write the user's constraints, what was decided and what is still open, what is verified versus only
+  claimed, and the approaches that failed into the plan or checkpoint file, and name its path. When the
+  tool compacts the conversation, keep the same things plus the modified files and the test commands. A
+  task finished in one short session needs none.
+- **Keep the user posted.** Before the first tool call, say in a line what you are about to do. While
+  working, a brief update when you find something important, change direction or wait on something long;
+  finish by leading with the outcome, what changed, what was checked and what is next, readable on its own.
 - **Commit, push, and open PRs only when the user asks.** Offer the next step; each action is authorized
   only by being named ("commit this" is not permission to push). One logical change per commit: the subject
   says what and where in under 72 characters, the body says why only when it is not obvious. When asked to
