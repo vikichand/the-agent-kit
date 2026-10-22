@@ -20,6 +20,18 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ### Changed
 
+- **The rules, against the Claude 5.5, GPT-6 and Gemini 3 guidance** (each change is one commit on
+  `develop`, kept only if the adherence eval agrees; `docs/rules-manifest.md` lists them with sources).
+  A role line opens the file. A question or a described problem gets an assessment, not a change.
+  High-risk work does what does not depend on the user first and asks only the decisions that would
+  change the work. Pushing back is a sentence, then the task as asked. A step the agent decided on is
+  run, not announced at the end of the turn, and a long session is never a reason to stop. Test-first
+  applies where the repository keeps tests for that kind of code, sized like the neighbours. A test that
+  looks wrong is said so, not worked around. The two-attempt stop continues from a new angle. The agent
+  keeps the user posted: a line before the first tool call, updates on findings and long waits, a recap
+  that leads with the outcome. Compaction keeps decisions, open items, modified files and test commands.
+  Files are edited in place, not rewritten. Installing what the lockfile declares is not adding a
+  dependency. Bold is reserved for the hard lines. The prose-tell list moved to `writing-docs`.
 - The Claude Code settings now set `includeGitInstructions: false`: Claude Code's own commit and
   pull-request instructions competed with AGENTS.md Section 7 and are where the attribution trailer
   comes from. The git status snapshot Claude Code adds at start goes with them; the safety invariant

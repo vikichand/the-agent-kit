@@ -37,12 +37,14 @@ means no case covers the rule yet.
 
 | Id | Rule | Class | Case | Notes |
 |---|---|---|---|---|
+| R0 | Role line: a senior engineer working for the user as their manager; recommendations and finished work, never a problem without a fix | contract | - | 0.6.0, Anthropic best practices ("even a single sentence makes a difference"); measured in W2 |
 | S0.1 | Size by risk: mechanical, bounded, high-risk | workflow | 32 (10/13), 33 (9/11) | the ceremony gate; Codex 33 is 0/13; 0.5.0: 32 3/3, 33 3/3 |
 | S0.2 | High-risk question round | contract | 39 (Sonnet 2/3 vs 0/3, astra 3/3 vs 2/3) | added 0.4.0; 0.5.0: 39 4/4 (v0.4.0 2/4), and the "if none are open, build" clause is what fixed 13 (2/2) |
 | S0.3 | Name what you skipped | contract | - | |
 | S1.1 | Never assume: look up facts, ask decisions; version-sensitive facts from current docs | contract | 38 (3/3), 39 (4/4), 40 (3/3) | 0.5.0 absorbed "verify API and config facts" from Section 5 |
 | S1.2 | Blast radius first | engineering | 03 (12/12) | 0.5.0: 3/3 |
 | S1.3 | Push back | contract | 06, 13 | 06 fails often with and without; wording barely moves it (0.5.0: 3/3). 0.5.0 added "build the safer version and say why"; 13 went 1/3 to 2/2 valid, v0.4.0 2/2 |
+| S1.4 | A question gets an answer, not a change; ideas, options or a plan: give those and stop | contract | 49 | 0.6.0, Fable 5.1 and Sonnet 5.5 guides |
 | S2.1 | Plan steps name files and checks; say what is out of scope | workflow | - | high-risk only |
 | S2.2 | Check a high-risk plan against its failure modes | workflow | - | |
 | S2.3 | Single-agent default; load `orchestrating-work` before delegating | workflow | - | 0.5.0: the detail moved to the skill; watch Codex, whose vendor says it delegates too little unless told |
@@ -65,6 +67,7 @@ means no case covers the rule yet.
 | S6.1 | Root cause; fix where shared | engineering | 03, 32, 35 (4/6) | 0.5.0: 03, 32, 35 all 3/3 |
 | S6.2 | Two-attempt rule | workflow | - | |
 | S7.1 | Session is disposable; checkpoint constraints and evidence; clear a degraded thread | workflow | - | no case (needs a multi-session harness) |
+| S7.1b | Keep the user posted: a line before the first tool call, updates on findings, direction changes and long waits, an outcome-first recap | contract | 51 | 0.6.0, all three Claude 5.5 guides; the orchestrating-work skill carries the cadence while workers run |
 | S7.2 | Commit, push, PR only when asked; sync before shipping | contract | 08 (3/3) | also the grant hook |
 | S7.3 | A repeated mistake is a missing rule: propose it | contract | - | |
 | S7.4 | Announce breaking changes | engineering | - | |
@@ -73,6 +76,27 @@ means no case covers the rule yet.
 | S8.3 | Prose style (no em dashes, filler) | style | 47 (0 tells in every arm, vanilla too, 2026-10-21) | full version in the `writing-docs` skill |
 | S9.1 | Load `writing-docs` for prose deliverables | workflow | - | |
 | S9.2 | Docs move in the same diff | engineering | - | |
+
+## Changed in 0.6.0 (2026-10-23, each its own commit on develop, measured in eval window 2)
+
+Sources: Anthropic's prompting guides for Opus 5.5, Opus 5, Sonnet 5.5 and Fable 5.1, Claude Code's memory
+and best-practices pages, OpenAI's GPT-6 Astra guide and "Rethinking skills and prompts", and the 2026
+studies in `docs/0.6.0-plan.md` (private). Every wording below is the vendor's measured one where it had one.
+
+| Id | Change | Why | Case |
+|---|---|---|---|
+| I4 | installing what the lockfile declares is not adding a dependency | Sonnet 5.5 verification paragraph; the invariant read as forbidding the install | - |
+| S0.2 | do what does not depend on the user first; ask only the decisions that would change the work | Opus 5.5: a list of non-blocking decisions is an unwanted stop; Fable 5.1: deliver the independent part first | 39 |
+| S1.3 | say so in a sentence and continue; never quietly narrow, widen or transform | Opus 5 and Fable 5.1 scope wording | 06 |
+| S2.4 | "without stopping to ask" replaces "without checking in" | the 5.5 guides: remove lines that suppress narration | 51 |
+| S4.3 | edit in place; rewrite only when most of a file changes | Fable 5.1, measured output-token saving | 34 |
+| S5.2 | test-first where the repository keeps tests for that kind of code; sized like neighbours; scratch checks stay out | Fable 5.1 measured: unrequested test files drop, task success unchanged; OpenAI the same for GPT-6 | 09, 16 |
+| S5.3 | a test that looks wrong is said so, not worked around | ImpossibleBench; Anthropic best practices | 01 |
+| S5.6 | never stop for session length; a decided step is run, not announced | Opus 5.5's four unwanted endings; Fable 5.1 measured; GPT-6 Astra stops on the same shape | 42, 50 |
+| S6.2 | the two-attempt stop is a change of approach, not a stopping point | OpenAI: a requirement to stop pulls GPT-6 to an earlier stop | - |
+| S7.1 | checkpoint also keeps decisions and open items; compaction keeps modified files and test commands | Fable 5.1 preserve list; Claude Code compaction instructions | - |
+| S8.3 | the list of prose tells moved to `writing-docs`; one pointer stays | 47 and 48: 0 tells in every arm, vanilla included | 47 |
+| all | bold only on the invariants, the oracle rule and authorship | Claude Code best practices: emphasis on many lines means none stands out | W2 full suite |
 
 ## Removed in 0.5.0
 
