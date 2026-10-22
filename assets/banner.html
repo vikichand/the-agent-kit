@@ -1,0 +1,68 @@
+<!doctype html>
+<!-- Source of assets/banner-dark.png and assets/banner-light.png. Tokens and pixel font are copied from
+     claude/skills/generating-reports/references/design.md (dark is the default, light is the report's
+     light mode). Re-render both: node assets/render-banner.js (needs puppeteer). Open this file with
+     #light on the end to see the light version. -->
+<html><head><meta charset="utf-8"><title>The Agent Kit banner</title>
+<style>
+:root{--bg:#0D1015;--text:#ECEAE6;--muted:#8B93A1;--hair:rgba(255,255,255,.10);
+  --glow-a:rgba(255,90,45,.32);--glow-b:rgba(61,120,220,.16);--glow-c:rgba(61,220,151,.10);
+  --gridline:rgba(255,255,255,.025);--px-ink:#ECEAE6;
+  --orange:#FF5A2D;--ng-o:0 0 12px rgba(255,90,45,.55);--ng-o-soft:0 0 8px rgba(255,90,45,.35);
+  --mono:"Cascadia Mono",Consolas,Menlo,monospace}
+:root[data-theme="light"]{--bg:#F2F1ED;--text:#141414;--muted:#6E6A63;--hair:rgba(20,20,20,.12);
+  --glow-a:rgba(255,90,45,.14);--glow-b:rgba(61,120,220,.08);--glow-c:rgba(61,220,151,.07);
+  --gridline:rgba(20,20,20,.03);--px-ink:#141414;
+  --ng-o:0 0 8px rgba(255,90,45,.30);--ng-o-soft:0 0 6px rgba(255,90,45,.20)}
+*{box-sizing:border-box;margin:0}
+html,body{background:transparent}
+.card{width:1280px;height:356px;border-radius:22px;overflow:hidden;position:relative;color:var(--text);
+  background:
+    radial-gradient(560px 380px at 88% -10%,var(--glow-a),transparent 65%),
+    radial-gradient(500px 420px at -8% 70%,var(--glow-b),transparent 65%),
+    radial-gradient(420px 320px at 62% 120%,var(--glow-c),transparent 60%),
+    var(--bg);
+  border:1px solid var(--hair);padding:30px 64px}
+.card::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(var(--gridline) 1px,transparent 1px),linear-gradient(90deg,var(--gridline) 1px,transparent 1px);
+  background-size:28px 28px}
+.chrome{display:flex;justify-content:space-between;font:13px var(--mono);letter-spacing:2px;text-transform:uppercase;
+  padding-bottom:12px;border-bottom:1.5px solid var(--text)}
+.mark{color:var(--orange);text-shadow:var(--ng-o)}
+.r{color:var(--muted)}
+.kicker{margin-top:44px;font:14px var(--mono);letter-spacing:2.5px;text-transform:uppercase;color:var(--orange);text-shadow:var(--ng-o-soft)}
+.brk{color:var(--muted);text-shadow:none}
+canvas{display:block;margin-top:22px}
+.sub{display:flex;gap:30px;margin-top:30px;font:14px var(--mono);color:var(--muted);letter-spacing:.5px}
+.sub .dot{color:var(--orange);text-shadow:var(--ng-o)}
+</style></head><body>
+<div class="card">
+  <div class="chrome"><span>RULES + GUARDRAILS <span class="mark">&#9787;</span> FOR CODING AGENTS</span>
+    <span class="r">CLAUDE CODE &nbsp;&#183;&nbsp; CODEX &nbsp;&#183;&nbsp; ANTIGRAVITY</span></div>
+  <div class="kicker"><span class="brk">[ SENIOR ENGINEER ]</span> -&gt; NOT EAGER INTERN</div>
+  <canvas id="t" data-text="THE AGENT KIT" data-px="12"></canvas>
+  <div class="sub">
+    <span><span class="dot">&#9679;</span> READ FIRST</span>
+    <span><span class="dot">&#9679;</span> TEST FIRST</span>
+    <span><span class="dot">&#9679;</span> ROOT CAUSE</span>
+    <span><span class="dot">&#9679;</span> MEASURED, NOT ASSERTED</span>
+  </div>
+</div>
+<script>
+(function(){
+  if(location.hash==="#light") document.documentElement.setAttribute("data-theme","light");
+  var G={A:["01110","10001","10001","11111","10001","10001","10001"],E:["11111","10000","10000","11110","10000","10000","11111"],G:["01110","10001","10000","10111","10001","10001","01110"],H:["10001","10001","10001","11111","10001","10001","10001"],I:["01110","00100","00100","00100","00100","00100","01110"],K:["10001","10010","10100","11000","10100","10010","10001"],N:["10001","11001","10101","10011","10001","10001","10001"],T:["11111","00100","00100","00100","00100","00100","00100"]," ":["00000","00000","00000","00000","00000","00000","00000"]};
+  var c=document.getElementById("t"), text=c.getAttribute("data-text"), px=+c.getAttribute("data-px");
+  var ink=getComputedStyle(document.documentElement).getPropertyValue("--px-ink").trim()||"#ECEAE6";
+  var gap=2, adv=6, dpr=window.devicePixelRatio||1, pad=14;
+  var w=(text.length*adv-1)*px+pad*2, h=7*px+pad*2;
+  c.width=w*dpr; c.height=h*dpr; c.style.width=w+"px"; c.style.height=h+"px"; c.style.marginLeft=-pad+"px";
+  var x=c.getContext("2d"); x.setTransform(dpr,0,0,dpr,0,0);
+  function rr(a,b,s,r){x.beginPath();x.moveTo(a+r,b);x.arcTo(a+s,b,a+s,b+s,r);x.arcTo(a+s,b+s,a,b+s,r);x.arcTo(a,b+s,a,b,r);x.arcTo(a,b,a+s,b,r);x.fill();}
+  var mid=Math.floor(text.length/2), idx=text[mid]===" "?mid+1:mid;
+  for(var i=0;i<text.length;i++){var g=G[text[i]];
+    if(i===idx){x.fillStyle="#FF5A2D";x.shadowColor="#FF5A2D";x.shadowBlur=14;}else{x.fillStyle=ink;x.shadowBlur=0;}
+    for(var r=0;r<7;r++)for(var col=0;col<5;col++) if(g[r][col]==="1") rr(pad+(i*adv+col)*px,pad+r*px,px-gap,3.2);}
+})();
+</script>
+</body></html>

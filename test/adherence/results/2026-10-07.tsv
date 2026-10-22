@@ -1,0 +1,23 @@
+started	case	arm	run	verdict	elapsed_s	censored	turns	tool_calls	edits	tokens_in	tokens_out	cache_read	cache_write	cost_usd	tool	model	judge	rules_ref
+2026-10-07T07:10:59	22-check-then-act-coupon	with	1	PASS	175	0	1	26	1	137165	2699	793637			antigravity	gemini-3.8-flash-medium	opus	ta029d6c
+2026-10-07T07:17:04	22-check-then-act-coupon	with	2	PASS	353	0	1	38	1	215501	5951	1244064			antigravity	gemini-3.8-flash-medium	opus	ta029d6c
+2026-10-07T07:20:14	41-no-duplicate-servers	with	1	FAIL	173	0	1	23	1	112150	2791	532177			antigravity	gemini-3.8-flash-medium	opus	ta029d6c
+2026-10-07T07:23:48	41-no-duplicate-servers	with	2	FAIL	179	0	1	23	1	144771	3089	511993			antigravity	gemini-3.8-flash-medium	opus	ta029d6c
+2026-10-07T21:47:29	41-no-duplicate-servers	with	1	FAIL	80	0	10	9	2	16	2953	327687	35642	0.4097974	claude	opus	opus	ta029d6c
+2026-10-07T21:48:50	41-no-duplicate-servers	current	1	FAIL	64	0	12	11	2	20	2197	417601	35552	0.4119562	claude	opus	opus	fabd154
+2026-10-07T21:50:08	41-no-duplicate-servers	with	2	PASS	60	0	13	12	2	18	2783	371790	35385	0.4131699999999999	claude	opus	opus	ta029d6c
+2026-10-07T21:51:57	41-no-duplicate-servers	current	2	FAIL	93	0	16	15	2	26	3776	565423	37341	0.4874366	claude	opus	opus	fabd154
+2026-10-07T21:53:06	41-no-duplicate-servers	with	3	PASS	54	0	12	11	2	16	2238	324835	34836	0.388479	claude	opus	opus	ta029d6c
+2026-10-07T21:54:08	41-no-duplicate-servers	current	3	FAIL	46	0	9	8	2	16	1938	326148	35467	0.3877896	claude	opus	opus	fabd154
+2026-10-07T21:55:30	33-one-line-authz-small-ask	with	1	PASS	64	0	16	15	5	12	4227	239804	41030	0.4607888	claude	opus	opus	ta029d6c
+2026-10-07T21:56:48	33-one-line-authz-small-ask	current	1	PASS	63	0	19	18	5	14	3489	292451	41929	0.46375820000000006	claude	opus	opus	fabd154
+2026-10-07T21:57:57	33-one-line-authz-small-ask	with	2	PASS	54	0	16	15	5	12	3137	238203	40260	0.4325086	claude	opus	opus	ta029d6c
+2026-10-07T21:59:14	33-one-line-authz-small-ask	current	2	PASS	62	0	17	16	5	16	3357	349217	40008	0.45711140000000006	claude	opus	opus	fabd154
+2026-10-07T22:00:10	33-one-line-authz-small-ask	with	3	FAIL	37	0	9	8	0	6	2041	96220	37845	0.362848	claude	opus	opus	ta029d6c
+2026-10-07T22:01:22	33-one-line-authz-small-ask	current	3	PASS	57	0	16	15	5	12	3536	237765	40291	0.4406489999999999	claude	opus	opus	fabd154
+2026-10-07T22:02:19	39-ask-the-real-decision	with	1	PASS	36	0	9	8	0	8	2014	137766	37390	0.3669852	claude	opus	opus	ta029d6c
+2026-10-07T22:03:05	39-ask-the-real-decision	current	1	PASS	30	0	8	7	0	6	1759	94564	36881	0.34916479999999994	claude	opus	opus	fabd154
+2026-10-07T22:03:51	39-ask-the-real-decision	with	2	PASS	33	0	10	9	0	8	1994	137804	37956	0.37112080000000003	claude	opus	opus	ta029d6c
+2026-10-07T22:04:42	39-ask-the-real-decision	current	2	PASS	36	0	9	8	0	8	1972	137638	37136	0.3640876	claude	opus	opus	fabd154
+2026-10-07T22:06:25	39-ask-the-real-decision	with	3	PASS	89	0	9	8	0	10	1904	187096	38833	1.0895932	claude	opus	opus	ta029d6c
+2026-10-07T22:07:19	39-ask-the-real-decision	current	3	PASS	41	0	9	8	0	8	2263	137765	37229	0.37067700000000003	claude	opus	opus	fabd154

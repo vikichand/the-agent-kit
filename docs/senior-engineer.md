@@ -7,9 +7,9 @@ idea twice.
 
 | Part | Ships in | Loaded |
 |---|---|---|
-| I - universal discipline | `AGENTS.md` safety invariants + Sections 0-10 | every turn, every repo |
+| I - universal discipline | `AGENTS.md` safety invariants + Sections 0-9 | every turn, every repo |
 | II - product quality bars | the project block, written by `docs/project-setup-prompt.md` | every turn, in user-facing repos |
-| III - web security | `claude/rules/web-security.md` + `ci-cd.md` (Codex: `.agents/skills/`) | on matching paths or tasks |
+| III - web security | `claude/rules/web-security.md` + `ci-cd.md` (Codex and Antigravity: `.agents/skills/`) | on matching paths or tasks |
 | IV - launch readiness | `docs/web-checklists.md` | on demand, before a public launch |
 
 ## The organizing idea
@@ -102,7 +102,7 @@ Two halves, two destinies:
 - **Verify facts against the version in use.** Training data lags; verify
   library and API behavior against current docs before asserting it.
 - **Run it before claiming it.** "Looks right" is not done; state how you verified.
-- **UI work gets end-to-end proof in a real browser.** Drive the flow with the Playwright MCP, inspect
+- **UI work gets end-to-end proof in a real browser.** Drive the flow with the Playwright CLI, inspect
   with the Chrome DevTools MCP. A passing unit suite does not prove a button works. The accessibility
   check (Lighthouse audit / a11y snapshot) rides in the same pass, not as a someday task.
 
@@ -393,7 +393,7 @@ ceremony around those, and the evidence for changing it.
 - **Reports**: a deliverable a human reads keeps Markdown plus the styled HTML render; a working
   plan or review stays Markdown. The render and its 25 KB design file were the largest avoidable load.
 - **Prose and README standards moved to the `writing-docs` skill** (loaded for documentation, README
-  and commit-message work); Section 9 keeps two lines. A file-size study (arXiv 2605.10039) found no
+  and commit-message work); Section 8 keeps two lines. A file-size study (arXiv 2605.10039) found no
   detectable adherence effect of file size or position, so the 200-line target is a context-cost
   budget, not a cliff; the floor is 192 effective lines.
 - **Delegation bounded**: at most two workers, one layer, model and effort named on every dispatch,

@@ -196,10 +196,9 @@ the CAPITALISED content:
   <span class="r"><span>REV NN &nbsp;/&nbsp; YYYY-MM-DD</span>
   <button id="themebtn" class="tbtn">[ LIGHT ]</button></span></div>
 ...report content...
-<div class="foot"><span>EDITS LAND IN SOURCE.MD &#8212; THIS PAGE IS A RENDER</span>
+<div class="foot"><span>EDITS LAND IN SOURCE.MD - THIS PAGE IS A RENDER</span>
   <span>REV NN &#183; YYYY-MM-DD</span></div>
-<div class="colophon"><span>GENERATED WITH THE-AGENT-KIT</span><span class="mark">&#9787;</span>
-  <span>BUILT BY VIKASH CHAND</span><span>&#183;</span>
+<div class="colophon"><span>GENERATED WITH THE AGENT KIT</span><span class="mark">&#9787;</span>
   <span class="repo">GITHUB.COM/VIKICHAND/THE-AGENT-KIT</span></div>
 </div>
 ```
@@ -207,7 +206,7 @@ the CAPITALISED content:
 The colophon sits BELOW the document footer, separated by its dashed rule - deliberately outside
 the document, like a plate mark on a print. Exact text, exact classes, always last, never louder.
 It is the only place the kit names itself: never a badge, never in the headline, never in content.
-(It credits the human and his tool; Section 9's ban on AI attribution governs git trailers and stands.)
+(It names the tool, not an author; Section 8's ban on AI attribution governs git trailers and stands.)
 
 Everything lives inside `.frame` (max-width 860px), so chrome, content, foot and colophon share
 exact edges.
@@ -218,7 +217,7 @@ Kicker -> pixel headline -> metadata dots, in this order:
 
 ```html
 <div class="hero">
-  <div class="kicker"><span class="brk">[ 1/1 ]</span> DOC TYPE &#8212;&gt; CURRENT STATE</div>
+  <div class="kicker"><span class="brk">[ 1/1 ]</span> DOC TYPE -&gt; CURRENT STATE</div>
   <canvas id="pxtitle" class="pxt" data-text="SHORT TITLE" data-accent="1" data-px="9" aria-label="SHORT TITLE"></canvas>
   <div class="sub">
     <span><span class="dot">&#9679;</span> ID <b>doc-id</b></span>

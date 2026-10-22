@@ -20,8 +20,10 @@ context for every session, whether it fires or not.
 | **Optional** | Superpowers, ponytail, headroom | They work alongside the kit, but each costs context or latency, so opt in knowingly |
 
 The kit's session-start check suggests the Core items and, in a project set up as a web or UI app,
-the Web and UI items, when they are missing. It reads `~/.the-agent-kit/recommended.json`: delete an
-entry there to stop it being suggested, or add your own. It never installs anything.
+the Web and UI items, when they are missing. It reads `~/.the-agent-kit/recommended.json`, which
+`install.sh --setup` keeps current: delete an entry (or list its id under `dismissed`) to stop it being
+suggested, or add your own with an id of your own. The Optional profile is never suggested at session
+start; `install.sh --check` lists what is missing. It never installs anything.
 
 ---
 
@@ -67,8 +69,13 @@ State plainly what is already present. Everything below is measured against this
 ### Step 2: MCP servers
 
 Install at **user** scope so they apply to every project; which of the three you need depends on the
-profile you picked above. For Codex, the same servers are added with `codex mcp add <name> -- <command>`
-(for example `codex mcp add context7 -- npx -y @upstash/context7-mcp@latest`).
+profile you picked above. **An MCP server is added once per tool, with that tool's own command; the tools
+cannot share one file.** Claude Code keeps its servers in `~/.claude.json`, Codex in `~/.codex/config.toml`
+(TOML) and Antigravity in `~/.gemini/config/mcp_config.json`, and each tool starts its own server process and
+holds its own key. For Codex the command is `codex mcp add <name> -- <command>` (for example
+`codex mcp add context7 -- npx -y @upstash/context7-mcp@latest`). For Antigravity it is `agy mcp add`, with its
+flags before the name (for example `agy mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest`; run
+`agy mcp add --help` for the rest).
 
 **a. Context7** (library and framework documentation; this is what stops the agent answering API
 questions from stale training data).
@@ -80,9 +87,6 @@ placeholder intact and **stop for me to run it**:
 claude mcp add --transport http context7 https://mcp.context7.com/mcp \
   --scope user --header "Authorization: Bearer <paste-your-key-here>"
 ```
-
-(The kit's old `CONTEXT7_API_KEY:` header still works but is no longer documented; the form above is
-the current one.)
 
 Do not proceed past this step until I confirm.
 
@@ -127,8 +131,21 @@ claude mcp add chrome-devtools --scope user -- npx -y chrome-devtools-mcp@latest
 
 ### Step 3: Web and UI skills (Web and UI profile)
 
-Skip this step unless the profile is Web and UI. Both are plain skill folders, installed for Claude
-Code (`~/.claude/skills/`) and, if Codex is used, for Codex (`~/.agents/skills/`).
+Skip this step unless the profile is Web and UI. Both are plain skill folders. Install a skill **once**,
+where Codex reads it, and link it into the other tools, the way `install.sh --setup` installs the kit's
+own skills:
+
+1. Put the real folder in `~/.agents/skills/<name>`. Codex reads it there.
+2. Claude Code has no setting for another skills folder, so link it. macOS and Linux:
+   `ln -s ~/.agents/skills/<name> ~/.claude/skills/<name>`. Windows, a junction that needs no admin rights:
+   `cmd /c mklink /J "%USERPROFILE%\.claude\skills\<name>" "%USERPROFILE%\.agents\skills\<name>"`.
+   Never replace a folder that is already there, and remove a link later with `rmdir` (Windows) or `rm`
+   (macOS, Linux), never `rm -rf`.
+3. Antigravity: add `<name>` to the `include_only` list of the `~/.agents/skills` entry in
+   `~/.gemini/config/skills.json`, or create that entry if there is none:
+   `{"entries": [{"path": "~/.agents/skills", "include_only": ["<name>"]}]}`.
+
+A skill that ships a different build per tool (Impeccable, below) cannot be shared: give each tool its own.
 
 - **Impeccable** ([pbakaus/impeccable](https://github.com/pbakaus/impeccable), Apache-2.0): a design
   workflow with commands and deterministic design checks. Follow its README, and install it as a
@@ -259,15 +276,13 @@ buried in the prose. A partial setup reported as done is worse than a failure re
 
 ## After it runs
 
-Two things worth doing by hand, since neither should be automated:
+One thing worth doing by hand, since it should not be automated:
 
 - **Store the Context7 key outside plain config if you can.** `claude mcp add` writes it to
   `~/.claude.json` in plaintext, which is readable by anything running as you.
-- **Decide Playwright vs Chrome DevTools** and write the answer into your global `CLAUDE.md`, so the
-  agent stops choosing per session.
 
 ## What this deliberately does not do
 
 No formatter, linter, language runtime, or editor config. That is machine bootstrap and belongs in a
-dedicated setup repo, not here. This file covers only what Claude Code itself loads: MCP servers,
-plugins, skills, agents, and rules.
+dedicated setup repo, not here. This file covers only what the coding agents themselves load: MCP
+servers, plugins, skills, agents, and rules.

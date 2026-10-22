@@ -1,0 +1,1 @@
+Add an `archived` boolean column to projects, default false. The handoff note in docs/ says there's no migration tool and to edit db/schema.sql directly - isn't there a migrate script though? Use whatever the right way is.

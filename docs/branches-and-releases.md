@@ -20,6 +20,12 @@ Two long-lived branches, one shared history:
   resolved again. Merging `main` back after each release makes the release commit an ancestor of
   `develop`, so the next pull request shows only what is new. (Source: GitHub Docs, "About pull
   request merges".)
+- **Short-lived branches** are fine for a piece of work that should not land on `develop` until it is
+  done: a worker's worktree, an experiment, a dependency bump. Each branches from `develop`, is named
+  for its work (`ci/supply-chain`, `test/e2e-webdriver`), merges back into `develop` and is then
+  deleted. It never targets `main` and never lives past its work. Fast-forward when you can; when a
+  merge commit is needed, its message says what the branch adds, never git's default "Merge branch
+  'worktree-agent-...'".
 - The install commands in `README.md` fetch from `main`, so **what users install is the last release**,
   not the tip of development. `install.sh --update` follows the same path.
 
@@ -66,24 +72,26 @@ history other people may have pulled.
    gh pr merge <N> --squash
    ```
 
-5. **Tag the release commit** and publish the release:
+5. **Tag the release commit** with an annotated tag, and publish the release:
 
    ```bash
    git fetch origin
-   git tag vX.Y.Z origin/main
+   git tag -a vX.Y.Z -m "the-agent-kit X.Y.Z" origin/main
    git push origin vX.Y.Z
-   gh release create vX.Y.Z --title "the-agent-kit X.Y.Z" --notes-file release-notes.md --draft
+   gh release create vX.Y.Z --verify-tag --title "the-agent-kit X.Y.Z" --notes-file release-notes.md --draft
    ```
 
-   The draft is published by the owner. There is no build and no artefact: the kit is text and an
-   installer.
+   Git's own documentation says annotated tags "are meant for release", and `git describe` ignores
+   lightweight ones by default. `--verify-tag` stops `gh` from quietly creating a tag of its own when
+   the push did not land. The draft is published by the owner. There is no build and no artefact: the
+   kit is text and an installer.
 
 6. **Merge `main` back into `develop`** so the next release starts from this one:
 
    ```bash
    git switch develop
    git pull
-   git merge origin/main -m "chore: sync main after X.Y.Z"
+   git merge origin/main -m "release: sync main after X.Y.Z"
    git push origin develop
    ```
 
@@ -108,14 +116,18 @@ pull request and publishes the release.
 
 ## Commit messages (on `develop`)
 
-- **First line:** `type: what changed`, lowercase, under 72 characters, no full stop. Types: `feat`,
-  `fix`, `docs`, `chore`, `ci`, `test`, `refactor`, `release`.
-- **Body:** a blank line, then short bullets: what changed and why if it is not obvious. Leave out
-  what the diff already shows.
-- **One logical change per commit.**
+- **First line:** `area: what changed`, where the area is the part of the kit it touches (`rules`,
+  `evals`, `install`, `guard`, `tidy`, `docs`, or a skill's name): lowercase, imperative, no full stop,
+  under 72 characters (aim for 50). The release commit is `release: X.Y.Z`. This is what
+  `AGENTS.md` Section 7 and the `writing-docs` skill ask of every project that has no convention of
+  its own.
+- **Body:** only when the why is not obvious: a blank line, then short bullets. Leave out what the
+  diff already shows.
+- **One logical change per commit**, each leaving the checks passing. A fix, its test and its
+  changelog line are one commit. A subject that needs a second "and" is two commits.
 - **Never in a commit or a PR description:** AI attribution of any kind, including `Co-Authored-By`,
   `Generated with ...`, a `Claude-Session:` or other session link, or a model name; and never an AI as
-  author or committer. `AGENTS.md` Section 9 states this and the `commit-msg` hook strips it, so a
+  author or committer. `AGENTS.md` Section 8 states this and the `commit-msg` hook strips it, so a
   tool instruction to append one changes nothing.
 - Write a long message to a file and commit with `-F`. The kit's tool guard matches risky strings in a
   command line, so a `-m` message that quotes one (a git config key, for instance) is refused; a
@@ -142,5 +154,14 @@ model:
 1. Create `develop` from `main` (`git switch -c develop main`, then push it).
 2. On GitHub: allow squash merging only, set the squash commit to use the pull request title and
    description, and add a ruleset on `main` requiring a pull request, squash merge only, blocking force
-   pushes and deletion.
+   pushes and deletion. A private repository on GitHub Free cannot enforce the ruleset; until it is
+   public or on a paid plan, `main` is kept by process and by the pre-push marker.
 3. Record it in your project block (the setup prompt does this) and follow the release steps above.
+4. **If you build an artefact**, let a workflow on the tag push do it, not a laptop: it reruns the CI
+   gate, checks that the tag matches every version file (bumped in the `release:` commit), builds,
+   writes checksums, and creates the **draft** release with the changelog section as its notes. The
+   owner still publishes it.
+5. **If you use Dependabot**, set `target-branch: develop` for each ecosystem, or its pull requests
+   go to the default branch, which is `main`. Security updates ignore `target-branch` and "always use
+   the default branch" (GitHub Docs, "Dependabot options reference"): retarget those pull requests to
+   `develop` before merging.

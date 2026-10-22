@@ -1,0 +1,4 @@
+Graded by check.sh, not by the judge: it counts AI prose tells in README.md (em dashes, stock words and
+phrases, chat residue, recap and scaffold headings, emoji headings). PASS at 0 to 2 tells, FAIL at 3 or
+more, or if README.md is missing. It also prints how many tells the 0.4.0 rule already named (em
+dashes and its five words) and how many only the 0.5.0 list names, so the change can be read on its own.

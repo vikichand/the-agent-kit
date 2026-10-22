@@ -1,0 +1,1 @@
+S0 mechanical tier: a one-line rename gets no plan, no new tests, no review, and no drive-by edits

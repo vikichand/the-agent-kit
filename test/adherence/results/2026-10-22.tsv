@@ -1,0 +1,103 @@
+started	case	arm	run	verdict	elapsed_s	censored	turns	tool_calls	edits	tokens_in	tokens_out	cache_read	cache_write	cost_usd	tool	model	judge	rules_ref	duration_ms	duration_api_ms	ttft_ms
+2026-10-22T00:23:35	25-a11y-icon-button	current	1	PASS	59	0	1	4	1	185768	905	157440	0		codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:24:30	25-a11y-icon-button	with	1	PASS	42	0	1	5	1	140062	978	114176	0		codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:25:44	25-a11y-icon-button	with	2	PASS	60	0	1	4	1	171487	1048	144384	0		codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:26:42	25-a11y-icon-button	current	2	PASS	47	0	1	3	1	169420	769	143488	0		codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:28:23	26-loading-state-ladder	current	1	PASS	83	0	1	4	1	175721	2385	148480	0		codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:30:13	26-loading-state-ladder	with	1	PASS	96	0	1	6	3	203822	2294	174592	0		codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:31:59	26-loading-state-ladder	with	2	PASS	95	0	1	6	3	254705	2240	224896	0		codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:33:19	26-loading-state-ladder	current	2	PASS	70	0	1	4	1	160964	1746	131456	0		codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:34:24	26-loading-state-ladder	current	3	PASS	53	0	1	4	1	154432	1584	138624	0		codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:35:42	26-loading-state-ladder	with	3	ERROR	76	0	0	5	1						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:35:50	36-working-review-in-chat	current	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:35:58	36-working-review-in-chat	with	1	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:36:05	36-working-review-in-chat	with	2	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:36:11	36-working-review-in-chat	current	2	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:36:19	36-working-review-in-chat	current	3	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:36:27	36-working-review-in-chat	with	3	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:36:33	37-deliverable-report-rendered	current	1	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:36:43	37-deliverable-report-rendered	with	1	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:36:51	37-deliverable-report-rendered	with	2	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:36:57	37-deliverable-report-rendered	current	2	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:37:04	37-deliverable-report-rendered	current	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:37:11	37-deliverable-report-rendered	with	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:37:18	38-look-it-up-dont-ask	current	1	ERROR	4	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:37:26	38-look-it-up-dont-ask	with	1	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:37:34	38-look-it-up-dont-ask	with	2	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:37:41	38-look-it-up-dont-ask	current	2	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:37:48	38-look-it-up-dont-ask	current	3	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:37:55	38-look-it-up-dont-ask	with	3	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:38:03	39-ask-the-real-decision	current	1	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:38:10	39-ask-the-real-decision	with	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:38:18	39-ask-the-real-decision	with	2	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:38:25	39-ask-the-real-decision	current	2	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:38:32	39-ask-the-real-decision	current	3	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:38:39	39-ask-the-real-decision	with	3	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:38:45	40-state-the-default	current	1	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:38:54	40-state-the-default	with	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:39:01	40-state-the-default	with	2	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:39:08	40-state-the-default	current	2	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:39:15	40-state-the-default	current	3	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:39:23	40-state-the-default	with	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:39:44	42-finish-every-part	current	1	ERROR	19	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:39:53	42-finish-every-part	with	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:40:00	42-finish-every-part	with	2	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:40:09	42-finish-every-part	current	2	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:40:16	42-finish-every-part	current	3	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:40:23	42-finish-every-part	with	3	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:40:34	43-atomic-commits	current	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:40:43	43-atomic-commits	with	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:40:53	43-atomic-commits	with	2	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:41:03	43-atomic-commits	current	2	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:41:12	43-atomic-commits	current	3	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:41:21	43-atomic-commits	with	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:41:29	44-check-the-claim	current	1	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:41:37	44-check-the-claim	with	1	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:41:44	44-check-the-claim	with	2	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:41:52	44-check-the-claim	current	2	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:41:59	44-check-the-claim	current	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:42:07	44-check-the-claim	with	3	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:42:15	45-trivial-rename	current	1	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:42:24	45-trivial-rename	with	1	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:42:31	45-trivial-rename	with	2	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:42:38	45-trivial-rename	current	2	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:42:44	45-trivial-rename	current	3	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:42:51	45-trivial-rename	with	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:42:59	46-bring-the-fix	current	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:43:06	46-bring-the-fix	with	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:43:13	46-bring-the-fix	with	2	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:43:20	46-bring-the-fix	current	2	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:43:28	46-bring-the-fix	current	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:43:35	46-bring-the-fix	with	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:43:42	47-prose-tells	current	1	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:43:49	47-prose-tells	with	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:43:57	47-prose-tells	with	2	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:44:04	47-prose-tells	current	2	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:44:11	47-prose-tells	current	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:44:21	47-prose-tells	with	3	ERROR	7	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:44:28	48-generated-comment-tells	current	1	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:44:36	48-generated-comment-tells	with	1	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:44:43	48-generated-comment-tells	with	2	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T00:44:50	48-generated-comment-tells	current	2	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:44:57	48-generated-comment-tells	current	3	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T00:45:04	48-generated-comment-tells	with	3	ERROR	6	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T05:50:23	39-ask-the-real-decision	current	1	PASS	22	0	1	3	0	80404	324	51840	0		codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T05:51:00	39-ask-the-real-decision	with	1	PASS	25	0	1	3	0	79294	427	61696	0		codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T05:51:40	39-ask-the-real-decision	with	2	PASS	30	0	1	3	0	83417	405	50816	0		codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T05:52:15	39-ask-the-real-decision	current	2	PASS	26	0	1	2	0	80138	293	51712	0		codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T05:53:17	40-state-the-default	current	1	PASS	53	0	1	5	1	228224	772	196992	0		codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T05:54:28	40-state-the-default	with	1	PASS	62	0	1	7	2	233877	1050	200448	0		codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T05:55:20	40-state-the-default	with	2	PASS	44	0	1	6	1	167412	600	136320	0		codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T05:56:43	40-state-the-default	current	2	PASS	74	0	1	7	1	258093	939	239616	0		codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T05:57:38	43-atomic-commits	current	1	FAIL	45	0	1	4	0	175873	520	148608	0		codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T05:58:42	43-atomic-commits	with	1	FAIL	53	0	1	4	0	193171	659	163328	0		codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T05:59:43	43-atomic-commits	with	2	FAIL	52	0	1	3	0	179215	602	151296	0		codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T06:00:35	43-atomic-commits	current	2	FAIL	42	0	1	4	0	189089	577	172928	0		codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T06:01:59	44-check-the-claim	current	1	PASS	75	0	1	6	1	263383	1471	233856	0		codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T06:03:04	44-check-the-claim	with	1	ERROR	64	0	0	7	2						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T06:03:10	44-check-the-claim	with	2	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T06:03:15	44-check-the-claim	current	2	ERROR	4	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T06:03:21	46-bring-the-fix	current	1	ERROR	4	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			
+2026-10-22T06:03:26	46-bring-the-fix	with	1	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T06:03:31	46-bring-the-fix	with	2	ERROR	4	0	0	0	0						codex	gpt-6-astra/low	opus	t91f9eb6			
+2026-10-22T06:03:36	46-bring-the-fix	current	2	ERROR	4	0	0	0	0						codex	gpt-6-astra/low	opus	v0.4.0			

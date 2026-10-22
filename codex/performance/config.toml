@@ -8,7 +8,7 @@
 # it, and it can differ from OpenAI's public model pages (a ChatGPT plan may not have the newest model yet).
 
 model = "gpt-6-astra"              # the lead: the most capable model your plan provides
-model_reasoning_effort = "medium"  # the setting under test; raise per task, not globally
+model_reasoning_effort = "medium"  # medium won Claude's 2026-10-21 effort sweep; Codex is measured in window 3. Raise per task, not globally
 
 [agents]
 enabled = true

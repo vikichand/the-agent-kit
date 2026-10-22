@@ -6,9 +6,7 @@
   "permissions": {
     "ask": [
       "Edit(**/AGENTS.md)",
-      "Write(**/AGENTS.md)",
       "Edit(**/CLAUDE.md)",
-      "Write(**/CLAUDE.md)",
       "Bash(npm install *)",
       "Bash(npm i *)",
       "Bash(npm add *)",

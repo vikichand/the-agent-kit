@@ -5,7 +5,7 @@ description: Use when writing or editing documentation, a README, a CHANGELOG, a
 
 # Writing docs, READMEs, commits, pull requests and release notes
 
-`AGENTS.md` Section 9 keeps the two-line version of this always on; this file is the full standard and
+`AGENTS.md` Section 8 keeps the two-line version of this always on; this file is the full standard and
 loads only when you are writing prose.
 
 ## The prose does not get stamped either
@@ -24,6 +24,8 @@ README, comment, commit body and PR description.
 - **Match length to what the reader needs.** Cover the substance; do not pad with filler sections,
   redundant summaries or boilerplate.
 - This governs prose you write, never the project's code style (that is Section 3).
+- **Before handing over** a README, a report, release notes or anything longer than a few paragraphs,
+  check it against [references/prose-tells.md](references/prose-tells.md), the full list.
 
 ## Commits, pull requests and release notes
 
@@ -35,16 +37,32 @@ thorough.
 
 - What changed and why, in the imperative. The body explains a non-obvious reason, never narrates the
   diff.
-- A good default shape, unless the project's own convention says otherwise: `type: what changed` on the
-  first line, lowercase, under 72 characters, no full stop (`feat`, `fix`, `docs`, `chore`, `ci`,
-  `test`, `refactor`, `release`), then a blank line and short bullets. One logical change per commit.
+- Follow the repository's own convention when `git log` shows one. Otherwise the first line is
+  `area: what changed`, where the area is the component or folder (`hooks:`, `docs:`): lowercase, no full
+  stop, under 72 characters (aim for 50). Then, only when needed, a blank line and short bullets.
+- One logical change per commit, each leaving the checks passing. A fix, its test and its doc line are one
+  commit, never one per file. A subject that needs a bracketed list or a second "and" is two commits.
+- For a squash merge, the pull request description becomes the commit message: write it as one.
+
+**Branches, tags and releases** (the project block's **Branches** line decides; this is the default)
+
+- A short-lived branch starts from the working branch, is named for its work (`ci/supply-chain`),
+  merges back there and is deleted. It never targets a release-only branch. Fast-forward when you can;
+  a merge commit's message says what the branch adds, never git's default "Merge branch ...".
+- A release is one `release: X.Y.Z` commit that versions the changelog section and bumps any version
+  files, then a pull request titled with the project and version whose description is that section.
+- Tag the release commit with an annotated tag, `git tag -a vX.Y.Z -m "<project> X.Y.Z"` (git: annotated
+  tags "are meant for release"), and create the release with `gh release create vX.Y.Z --verify-tag
+  --draft`, so `gh` never makes a tag of its own. The owner publishes it.
+- After a squash-merged release, merge the release branch back into the working branch, or the next
+  pull request carries the old commits again.
 
 **Pull request descriptions**
 
 - **Title:** what the change does, in the imperative, under 72 characters. A release pull request is
   titled with the project and version.
 - **Body**, in this order, each part only when it has something to say:
-  - **What:** two to five bullets of the change as a reviewer or user sees it.
+  - **What:** the change as a reviewer or user sees it, in short bullets.
   - **Why:** a sentence or two, when the title does not already make it obvious.
   - **Verified:** the checks you ran and their result (`npm test`: 212 passed). Not "tested locally".
   - **Risks, breaking changes, follow-ups:** only real ones.

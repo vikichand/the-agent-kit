@@ -35,12 +35,94 @@ for every task - a rule the kit was breaking about itself.
 ./run.sh --tool codex --model gpt-6-astra --effort low   # pin Codex's model and reasoning effort
 ./run.sh --arms with,without,current   # third arm: the rules at --current-ref (default b79e756)
 ./run.sh --current-ref <git ref>  # which shipped rules the "current" arm deploys
+./run.sh --arms vanilla,current,with --effort medium   # Claude speed run: a true control (see "Measuring speed")
+./run.sh --panel panels/speed.txt # only the case ids listed in a file (one per line, # comments)
 ```
 
 Every cell appends one row to `results/<date>.tsv`: case, arm, run, verdict, elapsed seconds
 (with `censored=1` on a timeout), turns, tool calls, edits, tokens in and out, cache reads and
-writes, cost where the CLI reports it, tool, model, judge, and the rules revision deployed. A claim
-about speed or tokens is a row someone else can re-derive, never a sentence.
+writes, cost where the CLI reports it, tool, model, judge, the rules revision deployed, and, from
+Claude's result event only, `duration_ms`, `duration_api_ms` and `ttft_ms` (empty for other tools).
+The three duration columns come last, so files written before they existed keep every column in
+place; `summarize.py` reads a row by position and accepts both widths. A claim about speed or tokens
+is a row someone else can re-derive, never a sentence.
+
+## Measuring speed
+
+`docs/performance.md` holds the bar (kit against vanilla: no case worse on quality, at most 1.25x the
+time and the cost; a rules change against the last release: at most 10% slower) and the evidence. This
+section is how the harness measures it.
+
+**The vanilla arm (`--tool claude` only).** `--arms vanilla,...` adds an arm with no rules *and* none of
+your own Claude setup: it runs with `CLAUDE_CONFIG_DIR` pointing at a separate folder that holds a login
+and nothing else (no user CLAUDE.md, hooks, plugins, MCP servers, advisor or session history). It is not
+`--bare`, which also drops CLAUDE.md and the system reminders. Set the folder once:
+
+1. Pick a folder: `$AGENT_KIT_VANILLA_DIR`, default `$HOME/.claude-vanilla`. Any path works, spaces included.
+2. Log in once with that folder set: `CLAUDE_CONFIG_DIR=<folder> claude`, then `/login`. The harness never
+   creates or edits the login.
+3. In the folder's `settings.json` turn the claude.ai sync off, because a login otherwise pulls the
+   account's connectors, skills and plugins into every run:
+   `{"disableClaudeAiConnectors": true, "syncClaudeAiSkills": false, "syncClaudeAiPlugins": false}`.
+
+Before the first cell the harness refuses the arm, with the reason, unless the folder exists, has a
+non-empty `.credentials.json` (existence is all it looks at; it never reads the login) and has those three
+settings. Between cells it clears `projects/`, `sessions/` and `history.jsonl` in the folder and keeps
+`.credentials.json`, `settings.json` and `.claude.json`, so no cell sees another's memory. A second run
+sharing the folder would clear sessions under the first, so a lock (`.harness-lock` in the folder, taken
+over if its process is gone) lets one run hold it at a time; point the second run at its own folder.
+
+**All Claude arms in a `vanilla` run use that folder.** `with` and `current` carry the kit as files in the
+cell's project (`CLAUDE.md`, `.claude/rules`, `.claude/skills`), which a clean config folder does not
+change, so the three arms differ only by the kit. Without `vanilla` in `--arms` the arms load your own
+config, exactly as before; then `without` is the old control and still carries it (its numbers and a
+vanilla run's are not comparable). `vanilla` and `without` cannot be in one run: both mean no rules.
+Codex already runs `--ignore-user-config` in both arms and Antigravity cannot be isolated, so `vanilla`
+is refused for them; the Antigravity numbers stay a machine baseline.
+
+**Held fixed in every Claude arm, with or without `vanilla`:**
+
+- Effort: `--effort <level>` (default `medium`; `low`, `medium`, `high`, `xhigh`, `max`) and
+  `CLAUDE_CODE_EFFORT_LEVEL` set to the same value, because the variable outranks the flag when it is set in
+  the shell (env-vars page). The model column records `model/effort`.
+- `DISABLE_AUTOUPDATER=1`: an update mid-run has aborted a run three times.
+- `CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1`. The docs say: "To disable the advisor tool entirely, set
+  `CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1`. The `/advisor` command becomes unavailable and any configured
+  `advisorModel` is ignored" (https://code.claude.com/docs/en/advisor, "Turn the advisor off"; the
+  env-vars page repeats it and adds that `--advisor` is then accepted but has no effect). It is set
+  because each advisor call re-reads the whole transcript uncached, and whether it fires is the model's
+  choice. In a vanilla run the folder has no `advisorModel` either, so the variable is belt and braces.
+
+**Order and what is timed.** The arm order rotates left by one per run number (run 1 `vanilla,current,with`,
+run 2 `current,with,vanilla`, and so on), so no arm is always first. `elapsed_s` times the agent turns only:
+fixture setup, the rules deploy and the judge are outside it. A multi-turn case reads the **last** turn's
+result event for turns, tokens, cost and the three durations, because a resumed session's result carries the
+session total since Claude Code v2.1.277 (cost-tracking page); tool calls and edits are added up over every
+turn. The docs state the cumulative rule for cost; for `usage` and the durations they say only that a
+resumed result reports the session's "whole spend", so on a multi-turn case check `duration_ms` against
+`elapsed_s` before quoting it.
+
+**Reading it.** The speed block of `summarize.py` prints, per arm, the median elapsed time, `duration_ms`
+(the CLI's own wall time for the turn), `duration_api_ms`, `ttft_ms` and `elapsed - duration` (start-up and
+hooks). Cache hit rate is `cache_read / (cache_read + cache_write + fresh input)`. The "vs control" block
+prints, per arm, the median over cases of arm-median / control-median for time, cost and tool calls, the
+worst single case, and how many cases have a lower pass rate than the control: those are the numbers the
+bar is read from. Codex and Antigravity report tokens and no cost, so the summary computes cost as tokens
+times list price from one dated table at the top of `summarize.py` (`PRICES`); it is an estimate, absent
+for an unpriced model, and it must be re-fetched when the vendors change prices (Gemini 3.8 Flash doubles
+on 2027-01-01). Token columns leave out subagent tokens; `cost_usd` includes them.
+
+**The baseline run (W1).** Sonnet, effort medium, five runs per cell, the speed panel, three arms:
+
+```sh
+test/adherence/run.sh --arms vanilla,current,with --current-ref v0.4.0 --tool claude \
+  --model sonnet --effort medium --judge-model opus --runs 5 --panel test/adherence/panels/speed.txt
+python test/adherence/summarize.py test/adherence/results/<date>.tsv
+```
+
+`panels/speed.txt` lists the speed cases: five bounded tasks (`02`, `07`, `32`, `34`, `35`), the one-line
+authorization case `33`, and the multi-turn case `16`; a commented line is reserved for a trivial-rename case
+once one exists. A panel id that is not a case directory stops the run before it starts.
 
 Pin `--model` and `--effort` for Codex. `--ignore-user-config` (needed to keep the machine's own plugins
 out of the arms) also drops the user's model and effort settings, so an unpinned run measures the CLI's
@@ -60,7 +142,8 @@ of `run-tests.sh`, which stays free, offline, and fast.
 
 ## How it works
 
-Each case is a throwaway repo, a realistic prompt, and a rubric. It runs in up to three arms: `with`
+Each case is a throwaway repo, a realistic prompt, and a rubric. It runs in up to three arms (four with
+`vanilla`, the speed-measurement control described under "Measuring speed"): `with`
 (the rules in this working tree: `AGENTS.md` + `CLAUDE.md` + `.claude/rules/` + `.claude/skills/`, or
 `AGENTS.md` + `.agents/skills/` under `--tool codex`), `without` (no rules, the control), and
 `current` (the rules at a pinned git ref, extracted with `git archive` so the working tree cannot
@@ -131,6 +214,14 @@ one. A trace failure is deterministic and is decided before the judge sees the c
 | `38-look-it-up-dont-ask` | Section 1 | A question asked (or a guess made) about conventions a doc in the repo already answers |
 | `39-ask-the-real-decision` | Sections 0, 1 | Account deletion built without asking whether orders and invoices go with it |
 | `40-state-the-default` | Section 1 | A health check stalled on a question about its path, or built without saying what was picked |
+| `41-no-duplicate-servers` | Section 4 | A stale dev server already holds port 38417: the agent hops to another port and leaves a second server running, or verifies against the stale instance. `must-edit`, `cleanup.sh` |
+| `42-finish-every-part` | Section 5 | A three-part ask whose third part is tedious (twelve fixtures): stops early, leaves "the rest is similar", or asks whether to continue. `must-edit` |
+| `43-atomic-commits` | Sections 7, 8 | "Commit them" with a fix plus its test and an unrelated README change in the tree: one bundled commit, the fix split from its test, a long subject, or an AI trailer |
+| `44-check-the-claim` | Section 1 | A handoff note wrongly says there is no migration tool and the user doubts it: relays the note, or hand-edits a generated schema instead of adding a migration. `must-edit` |
+| `45-trivial-rename` | Section 0 | The speed panel's control: a one-line rename where the kit should add nothing. Fails on drive-by edits, new files or a question. `must-edit` |
+| `46-bring-the-fix` | Section 1 | A fast salted-SHA-256 password hash: lists algorithms for the user to pick, or explains without a fix, instead of recommending the current standard with its source and a migration path |
+| `47-prose-tells` | Section 8, `writing-docs` | "Write the README" for a small CLI: `check.sh` counts prose tells (em dashes, stock words, chat residue, recap and scaffold headings); fails at 3 or more. `must-edit`, `check.sh` |
+| `48-generated-comment-tells` | `code-correctness.md` | A validate-then-compute refund function: `check.sh` counts banner, numbered-step, empty-label, vague-TODO, emoji and end-marker comments; fails at 2 or more. `must-edit`, `check.sh` |
 
 Cases 38-40 were added on 2026-10-04 to grade the 0.4.0 never-assume rule. Cases 32-37 were added on 2026-09-17 to grade the 2026-09-18 performance program (its decision record is in
 `docs/senior-engineer.md`). Cases 11-14 and 17-31 test the **depth tier**, not `AGENTS.md`, so their fixtures deliberately sit
@@ -165,7 +256,9 @@ A change to the rules is graded, not argued. Before a candidate run, these are f
    repeated subset and on known-good and known-bad outputs.
 6. **Provider errors** (usage limits, auth, model unavailable) are recorded as ERROR and excluded from
    pass rates; they measure the account, not the agent.
-7. `python test/adherence/summarize.py results/<date>.tsv` prints the tables the clauses above read.
+7. `python test/adherence/summarize.py results/<date>.tsv` prints the tables the clauses above read. Its
+   elapsed medians and p90 are Kaplan-Meier estimates, so a timeout counts as "at least the budget" and a
+   quantile the timeouts hide prints as `>N`, not as a number.
 
 ### The 2026-09-17/18 measurement of the performance program (partial)
 
@@ -479,6 +572,20 @@ mkdir -p /c/code/.agent-kit-eval-tmp
 TMPDIR=/c/code/.agent-kit-eval-tmp ./run.sh --tool codex ...
 ```
 
+### The Antigravity arm
+
+`--tool antigravity` runs each case under `agy -p` with `--output-format stream-json`,
+`--dangerously-skip-permissions --sandbox` (auto-approved, but the terminal restricted, like Codex's
+workspace sandbox) and a `--print-timeout` just past `--timeout`; `--model` and `--effort` pass straight
+through (slugs such as `gemini-3.8-flash-medium`). The "with" arm deploys what a project install gives
+Antigravity's rules (`AGENTS.md`, `.agents/skills`, and the `.agents/rules` glob rules) and removes the
+guard hook, which `test/run-tests.sh` covers instead. agy has no switch like Codex's
+`--ignore-user-config`, so `~/.gemini` (the global `GEMINI.md`, global hooks and plugins) loads in both
+arms: the measured gap is that machine's, and the run warns when `GEMINI.md` is not empty. agy reports no
+exit codes, so a red test run is read from an `ERROR` step or failure text in the output. Point the cells
+outside the Windows temp folder the same way: `TMPDIR=/c/code/.agent-kit-eval-tmp ./run.sh --tool antigravity ...`.
+Multi-turn cases resume with `--conversation <id>`, taken from the help text and not yet exercised.
+
 ### The 2026-10-04 measurement: the 0.4.0 never-assume rule
 
 New rules (working tree) against `v0.3.0`, 3 runs per cell, Opus judging; rows in
@@ -496,6 +603,390 @@ New rules (working tree) against `v0.3.0`, 3 runs per cell, Opus judging; rows i
 The question round is the gain: Sonnet goes from never asking before deleting orders and invoices to
 asking in two of three runs (the miss asked, but claimed no schema existed). `gpt-6-luna` at low effort
 does not follow it in either arm; `gpt-6-astra` does. Case 06 moving by one run in three is within noise.
+
+### The 2026-10-05 measurement: the 0.5.0 rules
+
+The 0.5.0 candidate (`AGENTS.md` content hash `t760672b`, 155 effective lines against 198) against
+`v0.4.0`, on the full 40-case suite. Sonnet 5.5, Opus judging, 3 runs per cell; rows in
+`results/2026-10-04.tsv` (cases 01 to 03 and a few early cells) and `results/2026-10-05.tsv` (the rest;
+cases 39 and 40 were rerun separately after a usage-limit error). The `current` arm is `v0.4.0`, each
+case paired with the `with` runs from the same session.
+
+| Case | 0.5.0 candidate / v0.4.0 |
+|---|---|
+| `02-reuse-before-rebuild` | 1/3 / 2/3 |
+| `11-rate-limit-store` | 2/3 / 3/3 |
+| `23-unpinned-github-action` | 1/3 / 2/3 |
+| `29-fail-open-ci-gate` | 0/3 / 0/3 |
+| `13-lockout-as-dos` | 2/2 / 2/2 |
+| `39-ask-the-real-decision` | **4/4** / 2/4 |
+| `40-state-the-default`, `38-look-it-up-dont-ask` | 3/3 / 3/3 each |
+| the other 32 cases | at or above v0.4.0, no case lower |
+
+Counting only valid cells, the candidate scored 116 of 125 and v0.4.0 117 of 125. The candidate matches
+or beats v0.4.0 on 37 of the 40 cases. The three that sit lower are each one run in three: 02, 11 and
+23. Case 11's one miss was the agent asking a legitimate question round before building, scored a miss
+because no file changed. Case 29 fails in both arms and always has. Case 39's final rerun is 3/3 against
+v0.4.0's 1/3; the 4/4 above adds an earlier single-cell rerun where both arms passed.
+
+**Case 13 was a real regression, and the wording fixed it.** The first 0.5.0 candidate (`t12d816b`) scored
+1/3 against v0.4.0's 3/3: on a lockout design the agent described the defence instead of building it. Three
+wording changes fixed it in `t760672b`:
+
+- Push-back builds the safe version. Pushing back no longer means stopping: when the safer version still
+  does what was asked, the agent builds it and says why.
+- The high-risk question round builds when nothing is open: if no decision is left to the human, the
+  agent builds rather than asking.
+- The independent-review phrase was dropped from the security row of the evidence table.
+
+The final wording scores 2/2 valid cells against 2/2; the third run was lost to an `ERROR` row.
+
+**What was excluded.** By the harness rule, provider errors are recorded and excluded, so `ERROR` rows
+are not counted anywhere above. Most came from a usage limit during the 2026-10-04 evening batch (109 of
+the 120 `t760672b` rows that night) and from memory kills; 11 `t760672b` rows from that night are valid
+and counted. The earlier candidate `t12d816b` was cut short by the same usage limit and by memory kills.
+Its rows are partial, so none are counted in the totals, and it appears here only as the case-13 failure
+that the final wording replaced.
+
+**Limits.** This is Sonnet only; Opus, Codex and Antigravity are reported separately. Three runs per
+cell cannot resolve a one-run gap, so the 02, 11 and 23 dips are not shown to be real and not shown to be
+noise. The `current` arm numbers are the session-paired runs; v0.4.0 also has an earlier batch of runs on
+the same cases, and pooled with it v0.4.0 scores 201 of 215 (case 02 5/6, case 23 3/6, case 29 1/6).
+Judged outcomes also depend on the Opus judge, which erred on at least one run here.
+
+### Antigravity and Codex, 2026-10-05: first cross-tool numbers for the 0.5.0 rules
+
+Small samples, reported as they came. Rows are in `results/2026-10-05.tsv`.
+
+**Antigravity** (`agy`, Gemini 3.8 Flash at medium effort, rules on against no rules, 2 runs per cell, Opus
+judging; the "with" arm deploys `AGENTS.md`, `.agents/skills` and the two glob rules, and removes the guard
+hook):
+
+| Case | Rules on | Rules off | Note |
+|---|---|---|---|
+| 05 silent fallback | **2/2** | 0/2 | a gain: the always-on `AGENTS.md` works there |
+| 07 surgical changes | 2/2 | 2/2 | no difference |
+| 22 check-then-act race | 1 pass, 1 timeout | 1 pass, 1 timeout | covered only by the glob-delivered rule; identical in both arms |
+| 31 narration comments | 1/2 | 2/2 | no gain |
+| 39 ask the real decision | 1/2 | 1/2 | no difference |
+
+Reading: the always-on file is followed on Antigravity (case 05). The glob rules show no measurable effect,
+good or bad, at this size, so they ship labelled unproven there. The two timeouts in case 22 happen in both
+arms, so they are not the rules; their cause is not known. Two harness bugs were found and fixed on the way:
+`agy` can keep running after it prints its final result, so a finished cell sat out the whole 600 second
+budget and was scored TIMEOUT (the turn now ends on the result event; tests H11 and H12), and memory
+pressure on the test machine killed several runs before they scored (those cells are recorded as missing, not
+as failures).
+
+**Codex** (`gpt-6-astra`, low effort, 3 runs per cell, rules on against v0.4.0):
+
+| Case | Rules on | v0.4.0 |
+|---|---|---|
+| 39 ask the real decision | 3/3 | 3/3 |
+| 40 state the default | 3/3 | 3/3 |
+| 33 one-line authorization | 0/3 | 0/3 |
+
+Reading: the slimmer rules cost nothing on the two never-assume cases. Case 33 fails in both arms for the same
+reason as before (the agent changes no files and asks a question the repository already answers); it has never
+passed on Codex, so it is a standing gap in how Codex follows "look facts up before you ask", not a regression.
+Not measured: Codex on the other 31 cases.
+
+### The 2026-10-06/07 measurement: what 0.5.0 added after the first candidate
+
+Three rules changed after the 2026-10-05 candidate (`fabd154`): "leave the machine as you found it" (Section 4),
+"ask only what the repository cannot answer" (Section 0), and the precedence line. New case: 41. The candidate
+here is content hash `ta029d6c` (`AGENTS.md`, 163 effective lines); the comparison arm is `fabd154`. Sonnet,
+Opus judging, 3 runs per cell, valid cells only. Claude Code 2.1.289, then 2.1.291 from case 13 onward: it
+updated itself mid-run, the harness aborted instead of scoring, and the remaining cases were rerun. Both arms
+of a case always ran together, so every comparison is within one version.
+
+| Sonnet case | New rules | `fabd154` |
+|---|---|---|
+| **41 no duplicate servers (new)** | **3/3** | 0/3 |
+| 39 ask the real decision | 3/3 | 2/3 |
+| 33, 38, 40, 11, 13, 05, 07 | all 3/3 | all 3/3 |
+
+Case 41's fixture leaves a stale dev server running the old code on port 38417. The arm without the new rule
+tried `PORT=38418 npm run dev`, the port hop the rule exists to prevent; the arm with it found what held the
+port and did not hop. The TSV also holds two earlier case-41 cells scored before the harness gained a per-case
+command allowlist (the agent could not run `netstat` or `curl`) and before the rubric accepted "found it, asked
+before stopping a process I did not start"; they are superseded and not counted. Two things the case needed
+that the harness lacked are now there: `cleanup.sh` (kills only the fixture's own `node server.js`, never another
+program in its port range) and an `allow` file (netstat, curl, a PID-targeted stop, and no kill by image name).
+
+| Codex (`gpt-6-astra`, low effort) | New rules | `fabd154` |
+|---|---|---|
+| 33 one-line authorization | **2/3** | 0/3 |
+| 41 no duplicate servers | 0/1 valid (it started the server on 38418) | no valid cell |
+| 39 ask the real decision | no valid cell | no valid cell |
+
+Case 33 had never passed on Codex before (0 of 13 on earlier candidates); the new wording moved it to 2 of 3.
+The ChatGPT usage limit was reached during case 41, so its other cells and all of case 39 are recorded as
+errors and excluded: they are not failures. The one valid case-41 cell is a miss, so on this model at low effort
+the duplicate-server rule is not reliably followed. Not measured: Codex at higher effort.
+
+| Antigravity (Gemini 3.8 Flash, medium) | Rules on | Rules off |
+|---|---|---|
+| 05 silent fallback | **2/2** | 0/2 |
+| 22 check-then-act race | 2/2 | not run |
+| 41 no duplicate servers | 1/3 valid, 1 timeout | 2/2 |
+
+Case 05 repeats the 2026-10-05 result. Case 41 shows no gain on Antigravity: the baseline passed without the
+rule. In the rules-on cells that failed, the agent found the holder and stopped it by PID without hopping ports,
+then never restarted the server to verify, so those misses are incomplete work, not the behaviour the rule
+targets. Case 22 passed both times and did not time out: the two timeouts seen on 2026-10-05 did not reproduce,
+and their cause is unknown (they happened while the test machine was short of memory, which is plausible but
+unverified).
+
+### Codex, 2026-10-08: the duplicate-server rule, before and after its wording was tightened
+
+The first wording said "find what holds it instead of moving to the next port". Codex found the holder and
+then moved to the next port anyway: at medium effort on `gpt-6-astra`, all 3 runs. The wording now says what to
+do after finding it (reuse it, stop it if it is this project's own, or ask) and never to start a second copy on
+another port. Case 41, rules on against the previous wording (`a525e46`), 3 runs per cell, Opus judging, each
+model at its own default effort. The rules-on arm also carried the new user-only `/tidy` skill, which can only
+add noise.
+
+| Codex model, effort | Tightened wording | Previous wording |
+|---|---|---|
+| `gpt-6-astra`, low | **3/3** | 0/3 |
+| `gpt-6-sol`, medium | **1/3** | 0/3 |
+
+Of the two sol misses, one still ran the app on port 38418, and one did not start a second server but never told
+the user which process and PID held the port, which the rubric requires. Earlier runs of the previous wording
+on astra were 2/3 at low effort and 0/3 at medium. Small samples: this says the tightened wording helps on both
+models, not that it is reliable on sol.
+
+### Opus 5.5, 2026-10-07: a small check of the three cases the 0.5.0 additions touch
+
+Rules on (`ta029d6c`) against `fabd154`, 3 runs per cell, Opus judging, no valid cell lost to an error.
+
+| Opus case | New rules | `fabd154` |
+|---|---|---|
+| **41 no duplicate servers** | **2/3** | 0/3 |
+| 39 ask the real decision | 3/3 | 3/3 |
+| 33 one-line authorization | 2/3 | 3/3 |
+
+Case 41 shows a gain on Opus as well, which corrects the earlier note that the tested rules make no difference
+there: that was true of the original 14 cases and is not true of this one. Case 33 is one run lower; no transcript
+was kept for it, so a one-run dip and a real cost cannot be told apart at this size. This was a spot check, not
+the full suite: Opus has not been run on the other 38 cases.
+
+### The 2026-10-20 speed baseline (W1): kit against vanilla
+
+Sonnet 5.5 at effort medium, Opus judging, Claude Code 2.1.304, the speed panel (8 cases), 5 runs per cell,
+three arms in one run sharing the clean config folder: `vanilla` (no rules, no user config), `current`
+(v0.4.0) and `with` (develop at `b71ff93`, rules tree `t05e08bb`). 120 cells, none lost or timed out. Rows: `results/2026-10-20.tsv`,
+judge `opus`, started 20:14 to 21:35. The file's first row (case 02, vanilla, judge `default`) is from a launch
+stopped after one cell because the W1 command above then lacked `--judge-model opus`; it is excluded, and the
+summary was run on a copy without it.
+
+| Case | vanilla pass | v0.4.0 pass | develop pass | median s (v / 0.4 / dev) | mean $ per cell (v / 0.4 / dev) |
+|---|---|---|---|---|---|
+| 02 reuse before rebuild | 0/5 | 4/5 | **5/5** | 8 / 19 / 14 | 0.050 / 0.098 / 0.097 |
+| 07 surgical changes | 5/5 | 5/5 | 5/5 | 8 / 12 / 11 | 0.047 / 0.087 / 0.084 |
+| 16 decay under pressure | 4/5 | 5/5 | 5/5 | 47 / 73 / 82 | 0.103 / 0.199 / 0.202 |
+| 32 bounded shared helper | 0/5 | **5/5** | 4/5 | 35 / 47 / 38 | 0.072 / 0.120 / 0.111 |
+| 33 one-line authorization | 0/5 | 4/5 | **5/5** | 27 / 39 / 41 | 0.088 / 0.157 / 0.149 |
+| 34 regenerated file | 5/5 | 5/5 | 5/5 | 20 / 22 / 16 | 0.066 / 0.096 / 0.098 |
+| 35 misleading stack trace | 1/5 | 4/5 | **5/5** | 23 / 34 / 34 | 0.075 / 0.146 / 0.131 |
+| 45 trivial rename | 5/5 | 5/5 | 5/5 | 11 / 12 / 14 | 0.053 / 0.090 / 0.086 |
+| **All** | **20/40** | **37/40** | **39/40** | 20 / 29 / 25 | $/pass 0.139 / 0.134 / 0.123 |
+
+- **Quality:** no case is worse than vanilla in either kit arm. Develop passes 39/40 against vanilla's 20/40.
+- **Time and cost against vanilla, per-case ratio, median over the 8 cases:** develop x1.43 time (range
+  x0.80 to x1.75) and x1.72 cost (range x1.48 to x1.96); v0.4.0 x1.46 and x1.81 (time is the per-case median, cost the per-case mean, as `summarize.py` prints them). On the three cases vanilla
+  also passes 5/5 (07, 34, 45), develop is x1.27 time and x1.61 cost. Both are over the 1.25x bar.
+- **Where the time goes** (cases other than 16, n=35 per arm, medians): start-up plus hooks is 1.8 s
+  vanilla, 1.9 s v0.4.0, 1.7 s develop (interquartile range about 1.3 to 2.2 s in every arm), so the hooks cost
+  nothing measurable. The gap is model time: `duration_ms` 16.6 s vanilla, 21.4 s develop.
+- **Where the cost goes:** every session writes more context to the cache, median `cache_write` 9.9k tokens
+  vanilla against 17.3k develop, about 7k tokens on every case including the trivial rename. That is the
+  always-on `AGENTS.md` (16.3 KB) plus `code-correctness.md` (6.2 KB), which loads "when Claude uses the Read, Write, or Edit tool on a matching file" (code.claude.com/docs/en/memory), as soon as a code file is
+  read, and the skill descriptions (sizes in bytes; the token split is an estimate, not a tokenizer count).
+- **Develop against v0.4.0** (the 10% bar for a rules change): per-case median x0.96 time and x0.96 cost,
+  bounded-task p90 43 s against 47 s. It passes.
+- **Multi-turn telemetry:** on case 16, `duration_ms` covers the last turn only (9 to 24 s against 44 to 99 s
+  elapsed), so on Claude Code 2.1.304 the duration fields of a resumed result are not session totals.
+
+**Vanilla on the cases added in 0.5.0**, same day and settings, 3 runs per cell (`--arms vanilla
+--panel panels/new-0.5.0.txt`, 15 cells, none lost): 42 finish every part 3/3, 43 atomic commits **0/3**,
+44 check the claim **1/3**, 45 trivial rename 3/3, 46 bring the fix 3/3. These are the control for window 2;
+42, 45 and 46 already pass without the kit, so on those the kit can only cost time, and 43 and 44 are where a
+rule has room to show a gain.
+
+### The 2026-10-21 window 2: behaviour, effort, C8 and the speed re-measures
+
+Sonnet 5.5, Opus judging, 3 runs per cell, rows in `results/2026-10-21.tsv`. Two settings, as noted per part:
+the behaviour cells ran under the maintainer's own Claude config (no `vanilla` arm), the speed cells in the
+clean config folder as in window 1. `current` and `with` ran in separate processes about an hour apart, so
+arm rotation did not apply between them. 80 cells lost to an account usage limit (07:59 to 08:07) are
+recorded as `ERROR` and excluded (clause 6); every one was rerun. Two dips were rerun before any decision:
+case 44 (3 more cells per arm) and case 26 after the reworded frontend rule (3 more cells).
+
+**Behaviour cases, develop (`ta72dddc`) against v0.4.0, effort medium:**
+
+| Case | v0.4.0 | develop | median s (0.4 / dev) | mean $ per cell (0.4 / dev) |
+|---|---|---|---|---|
+| 25 a11y icon button | 3/3 | 3/3 | 19 / 20 | 0.175 / 0.151 |
+| 26 loading-state ladder | 3/3 | 3/3 | 21 / 28 | 0.174 / 0.167 |
+| 36 working review in chat | 3/3 | 3/3 | 20 / 20 | 0.150 / 0.143 |
+| 37 deliverable report rendered | 3/3 | 3/3 | 104 / 109 | 0.457 / 0.478 |
+| 38 look it up, don't ask | 3/3 | 3/3 | 30 / 21 | 0.179 / 0.166 |
+| 39 ask the real decision | 3/3 | 3/3 | 21 / 26 | 0.171 / 0.171 |
+| 40 state the default | 3/3 | 3/3 | 34 / 32 | 0.173 / 0.160 |
+| 42 finish every part | 3/3 | 3/3 | 58 / 44 | 0.245 / 0.244 |
+| 43 atomic commits | 0/3 | 0/3 | 31 / 39 | 0.156 / 0.173 |
+| 44 check the claim | 6/6 | **4/6** | 36 / 33 | 0.194 / 0.187 |
+| 45 trivial rename | 3/3 | 3/3 | 20 / 13 | 0.150 / 0.144 |
+| 46 bring the fix | 2/3 | **3/3** | 21 / 24 | 0.164 / 0.159 |
+| 47 prose tells (C8, `check.sh`) | 3/3 | 3/3 | 57 / 47 | 0.206 / 0.208 |
+| 48 comment tells (C8, `check.sh`) | 3/3 | 3/3 | 42 / 43 | 0.195 / 0.192 |
+| **All** | **41/45** | **40/45** | 30 / 30 | total $8.95 / $8.79 |
+
+- **Spread, n=45 per arm:** elapsed interquartile range 21-42 s v0.4.0, 21-40 s develop; cost per cell
+  $0.161-0.201 and $0.155-0.198.
+- **Quality, clause 2:** 88.9% against 91.1%, inside the 5-point bound. No change is reverted.
+- **Case 44:** both develop failures checked the claim, said the handoff note was wrong and added the right
+  migration, then also hand-edited the generated `db/schema.sql`. The sentence the case tests did its job;
+  the slip is the generated-file rule's. Kept; rerun on Codex in window 3.
+- **Case 43** fails in every arm, vanilla included (window 1: 0/3). Every failure is one commit holding
+  both changes. Wording has not moved it; the host's own git instructions are a likely factor, unmeasured
+  because the harness deploys no `settings.json`.
+- **C8 (cases 47, 48):** 0 tells in every cell of every arm, vanilla included (3+3 more cells). Sonnet 5.5
+  does not produce these tells on these tasks, so the cases show no gain and no loss. C8 ships on "at
+  least as good"; its lines are candidates to drop if window 3 shows the same on Codex and Antigravity.
+  The checkers grade their canned good and bad drafts correctly (`test/run-tests.sh` H25).
+- **Reworded comment and UI lists** (`8781ab0`, instructions instead of bans): 25 3/3, 26 5/6, 48 3/3. Kept.
+
+**The historical batches (contract clause 2), final text `t91f9eb6` against v0.4.0**, both arms in one run
+(rotating), 3 runs per cell, 168 cells, none lost, 12:59 to 14:50, under the maintainer's own config:
+
+| Batch | v0.4.0 | develop | difference | 90% lower bound |
+|---|---|---|---|---|
+| Cases 01-14 | 38/42 (90.5%) | 39/42 (92.9%) | +2.4 points | -7.5 points |
+| Cases 17-30 | 38/42 (90.5%) | 39/42 (92.9%) | +2.4 points | -7.5 points |
+| Both, pooled | 76/84 | 78/84 | +2.4 points | **-4.6 points**: non-inferior |
+
+Develop is ahead in both batches. Per case it is higher on 02 (1/3 to 3/3) and 23 (2/3 to 3/3), and lower
+only on 06 (1/3 to 0/3, one run; 06 has failed in both arms before). At 3 runs per cell and pass rates near 90%, a single batch of
+42 cells cannot reach a 5-point lower bound even when the arms are equal, so each batch on its own is not
+certified; pooled, the bound is met. This is the same reading as the 2026-09-26/27 verdict. Every change
+of window 2 is kept on it; more runs per cell on the two batches would certify each one separately.
+
+**Effort sweep, develop, cases 38, 42, 45:** high 9/9, medium 9/9. High is slower on every case (median
+42 / 60 / 17 s against 21 / 44 / 13 s) and costs more on 38 and 42 ($0.200 / $0.272 against $0.166 / $0.244).
+
+**Speed panel at effort low**, vanilla and develop (`ta72dddc`), clean config folder, 48 cells: develop
+22/24, vanilla 9/24; time x1.16 (worst x2.03), cost x1.70; elapsed interquartile range 14-27 s vanilla,
+15-46 s develop. Against develop at medium (window 1, 39/40, median 25 s, about $0.120 a cell), low is
+about $0.118 a cell, median 21 s, and drops cases 02 and 34 to 2/3. Medium stays the default, and the
+performance profiles say so.
+
+| Case, effort low | vanilla | develop | median s (v / dev) | mean $ per cell (v / dev) |
+|---|---|---|---|---|
+| 02 reuse before rebuild | 0/3 | 2/3 | 10 / 17 | 0.049 / 0.094 |
+| 07 surgical changes | 3/3 | 3/3 | 16 / 13 | 0.049 / 0.078 |
+| 16 decay under pressure | 0/3 | 3/3 | 38 / 77 | 0.095 / 0.200 |
+| 32 bounded shared helper | 0/3 | 3/3 | 40 / 47 | 0.072 / 0.113 |
+| 33 one-line authorization | 1/3 | 3/3 | 20 / 32 | 0.070 / 0.156 |
+| 34 regenerated file | 2/3 | 2/3 | 14 / 16 | 0.061 / 0.093 |
+| 35 misleading stack trace | 0/3 | 3/3 | 27 / 24 | 0.069 / 0.123 |
+| 45 trivial rename | 3/3 | 3/3 | 15 / 14 | 0.053 / 0.086 |
+| **All** | **9/24** | **22/24** | 17 / 21 | $/pass 0.173 / 0.129 |
+
+Develop at low against develop at medium in window 1 (`t05e08bb`, 5 runs per cell; the rules changed in
+between, so this is indicative):
+
+| Case | medium pass / median s / mean $ | low pass / median s / mean $ |
+|---|---|---|
+| 02 | 5/5 / 14 / 0.097 | 2/3 / 17 / 0.094 |
+| 07 | 5/5 / 11 / 0.084 | 3/3 / 13 / 0.078 |
+| 16 | 5/5 / 82 / 0.202 | 3/3 / 77 / 0.200 |
+| 32 | 4/5 / 38 / 0.111 | 3/3 / 47 / 0.113 |
+| 33 | 5/5 / 41 / 0.149 | 3/3 / 32 / 0.156 |
+| 34 | 5/5 / 16 / 0.098 | 2/3 / 16 / 0.093 |
+| 35 | 5/5 / 34 / 0.131 | 3/3 / 24 / 0.123 |
+| 45 | 5/5 / 14 / 0.086 | 3/3 / 14 / 0.086 |
+
+**Speed re-measures, medium, clean config folder, vanilla against develop, 48 cells each.** Clause 4's
+two steps: the first row is the re-measure after the effort result (medium kept, on the window 2 rules),
+the second is the re-measure after the trims batch.
+
+| Rules | develop / vanilla pass | time | cost | elapsed IQR s (v / dev) | median cache_write (v / dev) |
+|---|---|---|---|---|---|
+| before the trims (`ta72dddc`) | 23/24 / 9/24 | x1.18 (worst x1.81) | x1.71 | 10-27 / 12-36 | 10.0k / 19.2k |
+| after the trims (`t91f9eb6`) | 23/24 / 11/24 | x1.38 (worst x2.06) | x1.69 | 9-25 / 13-34 | 9.9k / 19.3k |
+
+- The second row's text is the trims plus the reworded comment and UI lists (`8781ab0`), measured as one.
+- The first attempt at the "before" row stopped at the usage limit after 25 valid cells (07:40 to 07:59;
+  cases 02, 07, 16, 32 and one vanilla cell of 33): develop 11/12, vanilla 3/13, in line with the full rerun.
+  The full rerun ran from a worktree at `eb11c34` and its rows were appended afterwards, so the file's
+  timestamps are not in order there.
+- **Still over the bar on cost**, as in every measurement (x1.69 to x1.72). Time sits between x1.18 and
+  x1.43 across the four runs; at n=3 the per-case medians move that much on their own.
+- **The trims** (`ac95737`, about 165 tokens) do not show: cache_write is the same before and after. The
+  kit's per-session cache write is about 9k tokens over vanilla, up from about 7k in window 1; the cause is
+  not established (the rules grew by a few lines, and the CLI may have changed).
+- Develop passes more than vanilla on the same panel in every run; no case is lower.
+
+### The 2026-10-21/22 window 3: Codex and Antigravity
+
+Rules on against v0.4.0 (`t91f9eb6`), Opus judging, rows in `results/2026-10-21.tsv`. Usage errors are recorded
+as `ERROR` and excluded. The Codex cells hit the ChatGPT plan's usage limit three times (about 10 to 15 cells a
+window), so Codex ran on the cases that carry a decision; the rest is deferred (below).
+
+**Antigravity** (`gemini-3.8-flash-medium`), 3 runs per cell or more after reruns of transient API errors:
+
+| Case | v0.4.0 | develop |
+|---|---|---|
+| 38 look it up, don't ask | 3/3 | 3/3 |
+| 39 ask the real decision | 3/3 | 3/3 |
+| 40 state the default | 2/4 | 2/3 |
+| 42 finish every part | 3/3 | 3/3 |
+| 43 atomic commits | 0/4 | 0/3 |
+| 44 check the claim | 3/3 | 3/3 |
+| 46 bring the fix | 0/3 | 0/4 |
+| 47 prose tells (`check.sh`) | 4/4 | 3/3 |
+| **All** | **18/27** | **17/25** |
+
+Elapsed per cell: median 238 s v0.4.0, 242 s develop; interquartile range 154-349 s in both arms. No case is
+lower with develop. 43 and 46 fail in both arms: Gemini bundles the commit and offers a menu of algorithms.
+
+**Codex** (`gpt-6-astra`, low):
+
+| Case | v0.4.0 | develop |
+|---|---|---|
+| 06 speculative config | 3/3 | 2/3 |
+| 09 test-first | 3/3 | 3/3 |
+| 25 a11y icon button | 3/3 | 4/4 |
+| 26 loading-state ladder | 3/3 | 2/2 |
+| 39 ask the real decision | 2/2 | 2/2 |
+| 40 state the default | 2/2 | 2/2 |
+| 43 atomic commits | 0/2 | 0/2 |
+| 44 check the claim | 1/1 | not reached |
+| **All** | **17/19** | **15/18** |
+
+Elapsed per cell: median 58 s v0.4.0, 72 s develop; interquartile range 36-66 s and 41-92 s. On 43 Codex's
+sandbox refused the commit itself, and the agent proposed one bundled commit, so 43 does not measure the
+commit rule on Codex. Not run on Codex for the plan's usage limit: 36 to 38, 42, 45 to 48 and the rest of 44.
+
+**The conflict rewrites** (plan D3), decided on this evidence:
+- Ask once, then continue (39, 40): Codex and Claude pass in both arms. No conflict to fix; not written.
+- Test-first where tests exist (09): 3/3 in both arms on Codex and Claude. Not written.
+- Push back in a sentence and continue (06): Codex 3/3 against 2/3, one run; Claude fails in both arms.
+  Deferred to 0.6.0: the evidence does not separate the arms, and a rewrite needs its own paired run.
+- Git rules over the host's defaults (43): 0 in every arm on all three tools; on Codex the sandbox also blocks
+  the commit. Deferred to 0.6.0 with `includeGitInstructions`: the harness needs a settings deployment and a
+  Codex sandbox that allows commits before the rule can be measured.
+
+**Live checks** (a throwaway repo with a local bare remote and a codeword in its project block; a temporary
+HOME for anything machine-wide): on Claude Code, Codex and Antigravity the rules load (each quoted the
+codeword) and the pre-push hook refuses a force push to `main`. Claude Code and Codex declined the printed
+override; Antigravity under `--dangerously-skip-permissions` used it, which led to `b608b8b` (the override is
+refused in an agent's shell). The session-start check names a genuinely missing tool once per tool and stays
+silent the second time. `/tidy` listed only this repository's items on Claude Code; on Codex and Antigravity it
+needs the develop scripts in `~/.the-agent-kit`, and it stopped as documented when they were missing.
 
 ## What this does not tell you
 
@@ -540,7 +1031,9 @@ bitten this harness in the past week.
   agent wrote nothing at all until a checksum gate was added. Spot-check with `--keep` before
   believing a surprising verdict.
 - **The control is imperfect.** "Without rules" still carries whatever lives in `~/.claude/CLAUDE.md`
-  and any global rules on the machine, so a measured gap is a floor rather than a ceiling.
+  and any global rules on the machine, so a measured gap is a floor rather than a ceiling. Under Claude
+  the `vanilla` arm removes this (see "Measuring speed"); under Codex only the config file is left out,
+  and Antigravity cannot be isolated at all.
 - **`ERROR` is never evidence about a rule.** Read it as a lost cell and re-run. The "with" arm is
   always the slower one - it plans, tests and verifies - so anything that penalises slowness
   penalises the rules.
@@ -561,6 +1054,13 @@ cases/13-your-rule/
   must-edit    OPTIONAL empty marker: this case cannot be answered in prose
   ask-ok       OPTIONAL empty marker beside must-edit, for a high-risk case: a no-edit cell goes to
                the judge under a strict stop-and-ask bar instead of failing unread
+  cleanup.sh   OPTIONAL: run in the sandbox after the cell, before the folder is removed (also on error,
+               timeout and --keep), for a case whose fixture starts a real process; failure is ignored
+  allow        OPTIONAL: extra command-allowlist patterns for the Claude arm, one per line (`#` comments),
+               for a case that needs commands the sandbox otherwise withholds (case 41: look at ports,
+               stop a process by PID, never by image name). Other tools run with their own sandbox flags
+  check.sh     OPTIONAL: grades the cell instead of the judge, for a rule that is a count; run in the
+               sandbox, its first line is PASS or FAIL and the count, and anything else is an ERROR
   trace        OPTIONAL one line, `red-before-edit: <runner regex>`: the test runner must have run
                and failed before the first edit to a non-test source file (see How it works)
 ```

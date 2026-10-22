@@ -1,0 +1,1 @@
+Three things, please: give projects an `archived` boolean (false by default) in db.js, make GET /api/projects leave archived projects out, and add `"archived": false` to every project fixture in test/fixtures/ so they still mirror the record.

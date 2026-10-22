@@ -10,10 +10,8 @@ another session) needs a diffable, parseable file it can re-read, tick off, and 
 needs something they will actually *read* - and practitioners are blunt that nobody truly reads a
 100-line markdown plan in a terminal; they skim it, and skimmed review is no review.
 
-This is a named, current pattern ("markdown to agents, HTML to humans"), and it is the synthesis of
-a real 2026 debate: the HTML-only camp is right that rendered pages keep the human in the loop, and
-the markdown camp is right that HTML as *source* loses git-diffability, co-editing, and roughly
-two-thirds more tokens. So: both formats, one direction of authority.
+Rendered pages keep the human in the loop, but HTML as *source* loses git-diffability and co-editing
+and costs roughly two-thirds more tokens. So: both formats, one direction of authority.
 
 ## The rule
 
@@ -22,10 +20,10 @@ Two kinds of output, and the reader decides which:
 - **A deliverable** - a report, audit, plan or review that a human will read, or that was asked to be
   saved: write the markdown first as the source of truth, then render the self-contained HTML view
   beside it, dated (`plan.md` -> `2026-08-24-plan.html`), styled and structured per
-  [design.md](design.md) in this folder. Authority flows one way: the HTML is generated *from* the
+  [references/design.md](references/design.md). Authority flows one way: the HTML is generated *from* the
   markdown and is disposable; decisions, edits and review feedback land in the `.md`.
 - **A working artifact** - a plan or review that you yourself consume during the task, or that lives
-  only in the conversation: markdown only, no render, and do not load design.md. Section 0 sizing
+  only in the conversation: markdown only, no render, and do not load the design reference. Section 0 sizing
   applies; a three-line answer needs no file at all.
 
 When in doubt, ask in one clause whether the reader is a human. Match detail to the reader's decision;
@@ -51,12 +49,12 @@ review found") always run from the markdown.
 - **One self-contained file.** Inline all CSS and any JS; no CDN, no external fonts, no remote
   images or fetches of any kind - images as `data:` URIs if needed. It must open from a
   `file://` double-click and render identically offline.
-- Follow **[design.md](design.md)** for the visual system - tokens, components, and the hard
+- Follow **[references/design.md](references/design.md)** for the visual system - tokens, components, and the hard
   prohibitions. A verdict banner up top; badges for severities; tables for anything enumerable.
 - Wide content (tables, code) scrolls inside its own container; the page never scrolls sideways.
 - Keep it legible in dark and light (design.md carries both palettes).
 - These constraints match Claude Code's Artifacts contract, so a report can also be published as an
-  artifact unchanged when the human wants a shareable link.
+  artifact when the human wants a shareable link, after inverting the theme cascade as design.md says.
 
 ## Writing technical prose (applies to both formats, and to docs generally)
 
@@ -66,9 +64,7 @@ review found") always run from the markdown.
 - **Follow the project's declared style guide** from `PROJECT-CONFIG`; absent one, Google's
   developer documentation style guide is the default for developer-facing prose. Declaring a
   standard matters more than which one.
-- **Commit messages follow the kit's own discipline** (Section 7: why over what, no attribution trailers).
-  Conventional Commits is *not* imposed: adopt it only where the project already uses it and
-  enforces it with tooling - agents default to it out of habit, and unenforced type prefixes decay
-  into noise.
+- **Commit messages follow the `writing-docs` skill** (`AGENTS.md` Section 7: one logical change per
+  commit; Section 8: no attribution trailers).
 - the `writing-docs` skill still governs: no AI prose tells, working path first, tables for what people
   scan for.
