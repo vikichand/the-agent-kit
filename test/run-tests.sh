@@ -1054,6 +1054,39 @@ EOF
     && pass "M13 --setup removes the kit's two Write rules, keeps the user's, backs up first" || bad "M13 retired rules not handled: $o"
   su 1
   has 'already' "$o" && pass "M13 a second run is already current" || bad "M13 retiring is not idempotent: $o"
+  # M16: the template turns off Claude Code's own commit and pull-request instructions (AGENTS.md Section 7
+  # carries the kit's; the built-in ones competed with it and add the attribution trailer) and makes the
+  # guard fail closed. An install that already has the guard gains the new field in place; a value the
+  # user set themselves is kept.
+  printf '{}' > "$g/.claude/settings.json"
+  su 1
+  guard_field() { jq_ "$g/.claude/settings.json" "[h for b in d['hooks']['PreToolUse'] for h in b['hooks'] if 'command-guard.py' in h['command']][0].get('$1')"; }
+  [ "$(jq_ "$g/.claude/settings.json" "d['includeGitInstructions']")" = False ] && [ "$(guard_field onFailure)" = block ] \
+    && pass "M16 fresh install: includeGitInstructions off, the guard fails closed" || bad "M16 template keys missing: $o"
+  $PY - "$(wq "$g/.claude/settings.json")" <<'EOF'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p, encoding='utf-8'))
+d['includeGitInstructions'] = True
+for b in d['hooks']['PreToolUse']:
+    for h in b['hooks']:
+        if 'command-guard.py' in h['command']: h.pop('onFailure', None); h['timeout'] = 7
+json.dump(d, open(p, 'w', encoding='utf-8'))
+EOF
+  su 1
+  [ "$(jq_ "$g/.claude/settings.json" "d['includeGitInstructions']")" = True ] && [ "$(guard_field onFailure)" = block ] && [ "$(guard_field timeout)" = 7 ] \
+    && pass "M16 an existing guard hook gains onFailure in place; the user's own values are kept" || bad "M16 field merge wrong: $(cat "$g/.claude/settings.json")"
+  su 1; has 'already' "$o" && pass "M16 a second run is already current" || bad "M16 field merge not idempotent: $o"
+  $PY - "$(wq "$g/.claude/settings.json")" <<'EOF'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p, encoding='utf-8'))
+for b in d['hooks']['PreToolUse']:
+    for h in b['hooks']:
+        if 'command-guard.py' in h['command']: h['onFailure'] = 'continue'
+json.dump(d, open(p, 'w', encoding='utf-8'))
+EOF
+  su 1
+  [ "$(guard_field onFailure)" = continue ] && has 'already' "$o" \
+    && pass "M16 a value the user set for a field the kit also sets is the opt-out: kept, nothing rewritten" || bad "M16 user's onFailure overwritten: $(guard_field onFailure) $o"
   HOME="$g" git config --global core.hooksPath .husky
   su 1
   [ "$(gh_)" = .husky ] && has 'is .husky' "$o" \
@@ -1528,8 +1561,10 @@ fi
   [ "$u" = "1,0,0,2,4,18182,6982,0.0316084,2883,2779,2858" ] \
     && pass "H16 claude usage: the usual eight columns, then duration_ms, duration_api_ms, ttft_ms" || bad "H16 claude usage read as '$u'"
   u=$(claude_field "$hf/claude-vanilla-probe.jsonl" usage "$hf/claude-resumed-turn2.jsonl" "$hf/no-such-turn.jsonl" | tr '\t' ',')
-  [ "$u" = "3,1,1,6,210,52000,7300,0.0612,9120,8004,1900" ] \
-    && pass "H17 a resumed case reads the LAST turn's result; tool calls and edits add up over every turn" || bad "H17 multi-turn usage read as '$u'"
+  # Turn 1 (1 turn, 2 in, 4 out, 18182 read, 6982 written, 2883 ms) plus turn 2 (3 turns, 6, 210, 52000, 7300,
+  # 9120 ms): tokens, turns and durations add up, cost is the last result's session total, ttft the first's.
+  [ "$u" = "4,1,1,8,214,70182,14282,0.0612,12003,10783,2858" ] \
+    && pass "H17 a resumed case adds up every turn's tokens, turns and durations; cost from the last result, ttft from the first" || bad "H17 multi-turn usage read as '$u'"
   rb=$(mktemp -d); TSV="$rb/r.tsv"; TOOL=claude; MODEL=sonnet; EFFORT=medium; JUDGE=opus
   record_row 02-x vanilla 1 PASS 40 0 "$(printf '1\t2\t3\t4\t5\t6\t7\t8\t2883\t2779\t2858')" none
   TOOL=codex; record_row 02-x with 1 PASS 40 0 "$(printf '1\t2\t3\t4\t5\t6\t7\t8')" t1

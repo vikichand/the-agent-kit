@@ -95,9 +95,10 @@ is refused for them; the Antigravity numbers stay a machine baseline.
 
 **Order and what is timed.** The arm order rotates left by one per run number (run 1 `vanilla,current,with`,
 run 2 `current,with,vanilla`, and so on), so no arm is always first. `elapsed_s` times the agent turns only:
-fixture setup, the rules deploy and the judge are outside it. A multi-turn case reads the **last** turn's
-result event for turns, tokens, cost and the three durations, because a resumed session's result carries the
-session total since Claude Code v2.1.277 (cost-tracking page); tool calls and edits are added up over every
+fixture setup, the rules deploy and the judge are outside it. A multi-turn case adds turns, tokens and
+the durations up over every turn's result event and reads cost from the last one: a resumed session's result
+carries the whole session's cost but only its own turn's tokens and turn count (verified 2026-10-23 with a
+two-turn probe; rows written before that date carry last-turn tokens for cases 16 and 27); tool calls and edits are added up over every
 turn. The docs state the cumulative rule for cost; for `usage` and the durations they say only that a
 resumed result reports the session's "whole spend", so on a multi-turn case check `duration_ms` against
 `elapsed_s` before quoting it.
@@ -222,6 +223,12 @@ one. A trace failure is deterministic and is decided before the judge sees the c
 | `46-bring-the-fix` | Section 1 | A fast salted-SHA-256 password hash: lists algorithms for the user to pick, or explains without a fix, instead of recommending the current standard with its source and a migration path |
 | `47-prose-tells` | Section 8, `writing-docs` | "Write the README" for a small CLI: `check.sh` counts prose tells (em dashes, stock words, chat residue, recap and scaffold headings); fails at 3 or more. `must-edit`, `check.sh` |
 | `48-generated-comment-tells` | `code-correctness.md` | A validate-then-compute refund function: `check.sh` counts banner, numbered-step, empty-label, vague-TODO, emoji and end-marker comments; fails at 2 or more. `must-edit`, `check.sh` |
+| `49-assessment-not-change` | Section 1 | "Why is GET /api/orders slow?" with an N+1 one edit away: the agent patches the handler instead of answering, or answers with no diagnosis tied to the code. |
+| `50-announce-versus-run` | Section 5 | A three-step ask whose third step is "run the tests and fix what they turn up": the turn ends with "Next, run the tests" or "Shall I?", or reports done with no run. `must-edit` |
+| `51-progress-updates` | Section 7 | A four-part change done in silence: no line before the work saying what is about to happen, or a closing message that narrates steps instead of leading with the outcome. `must-edit` |
+
+Cases 49-51 were added on 2026-10-23 for the 0.6.0 rules (assessment-versus-change, announce-versus-run,
+progress updates), each from a behaviour Anthropic's Claude 5.5 prompting guides name and measure.
 
 Cases 38-40 were added on 2026-10-04 to grade the 0.4.0 never-assume rule. Cases 32-37 were added on 2026-09-17 to grade the 2026-09-18 performance program (its decision record is in
 `docs/senior-engineer.md`). Cases 11-14 and 17-31 test the **depth tier**, not `AGENTS.md`, so their fixtures deliberately sit
