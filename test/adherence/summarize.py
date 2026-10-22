@@ -17,7 +17,7 @@ measure the account, not the agent.
 Files written before 2026-10-09 have 19 columns; newer ones add three at the end. Rows are read by
 position against COLS, so a short row, a long row and a mismatched header all load.
 """
-import csv, statistics, sys, collections
+import csv, os, statistics, sys, collections
 from fractions import Fraction
 
 COLS = ["started", "case", "arm", "run", "verdict", "elapsed_s", "censored", "turns", "tool_calls", "edits",
@@ -36,6 +36,10 @@ PRICES = {
     "gpt-6-sol": (2.00, 0.20, 10.00),
     "gemini-3.8-flash": (0.75, 0.075, 3.75),
 }
+# Claude cache-WRITE price, USD per 1M tokens, by the model column's family (the eval records "sonnet/medium").
+# Used only to price the kit's fixed overhead; a 2026-10-23 probe (8,944 tokens written, $0.0375) agrees with
+# 3.75 for Sonnet 5.5. Add the family before quoting an overhead figure for another model.
+CLAUDE_CACHE_WRITE = {"sonnet": 3.75}
 # Codex reports cached tokens inside input_tokens; Antigravity reports them beside it (its cache_read
 # column is larger than its input column in the record). Claude reports its own cost, so it is not here.
 CACHE_INSIDE_INPUT = {"codex": True, "antigravity": False}
@@ -43,6 +47,11 @@ CACHE_INSIDE_INPUT = {"codex": True, "antigravity": False}
 BOUNDED = {"02-reuse-before-rebuild", "07-surgical-changes", "32-bounded-shared-helper",
            "34-regenerated-file-before-edit", "35-misleading-stack-trace", "36-working-review-in-chat"}
 SAFETY = {"33-one-line-authz-small-ask", "08-unasked-commit", "01-never-game-the-oracle"}
+
+
+def multi_prompt(case):
+    """A case with a prompt-2.txt resumes the session, so its cache writes are not one session start."""
+    return os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), "cases", case, "prompt-2.txt"))
 
 
 def fnum(x):
@@ -205,6 +214,41 @@ def main(paths):
                 cell = lambda key: (f"x{med(rat[key]):.2f}" + (f" (worst x{max(rat[key]):.2f})" if key == "elapsed" else "")) if rat[key] else "-"
                 print(f"{arm:8} cases {n_ok:<3} elapsed {cell('elapsed')}  cost {cell('cost')}  tool calls {cell('tools')}  "
                       f"cases with a lower pass rate than control: {worse}")
+            # The cost bar, split (decided 2026-10-23): what the rules cost before the model does anything
+            # (the extra context written per single-turn cell, priced at the cache-write rate), what they cost
+            # in behaviour (the ratio once that overhead is taken off, over the cases both arms always pass,
+            # so a failed attempt's cheapness does not flatter the control), and the price of a pass.
+            print(f"\n-- cost split vs {ctl}: fixed overhead (extra context written per cell, estimated on single-prompt cases "
+                  "where both arms made about the same number of tool calls), marginal ratio on both-pass cases, $/pass --")
+            for arm in sorted(a):
+                if arm == ctl: continue
+                diffs = []
+                for case, d in cases.items():
+                    if arm not in d or ctl not in d or multi_prompt(case): continue
+                    ta, tc = mean([fnum(r["tool_calls"]) for r in d[arm]]), mean([fnum(r["tool_calls"]) for r in d[ctl]])
+                    ca, cc = med([fnum(r["cache_write"]) for r in d[arm]]), med([fnum(r["cache_write"]) for r in d[ctl]])
+                    if None in (ta, tc, ca, cc) or abs(ta - tc) > 1: continue
+                    diffs.append(ca - cc)
+                if not diffs: print(f"{arm:8} no single-prompt case with matched tool calls: overhead not estimable from this file"); continue
+                ovh_tok = med(diffs)
+                model = (a[arm][0].get("model") or "").split("/")[0]
+                price = CLAUDE_CACHE_WRITE.get(model)
+                ovh_usd = ovh_tok * price / 1e6 if price else None
+                both = [case for case, d in cases.items() if arm in d and ctl in d
+                        and all(r["verdict"] == "PASS" for r in d[arm]) and all(r["verdict"] == "PASS" for r in d[ctl])]
+                marg = None
+                if both and ovh_usd is not None:
+                    xs = [mean([fnum(r["cost_usd"]) for r in cases[c][arm]]) for c in both]
+                    ys = [mean([fnum(r["cost_usd"]) for r in cases[c][ctl]]) for c in both]
+                    pairs = [(x - ovh_usd, y) for x, y in zip(xs, ys) if x is not None and y and x > ovh_usd]
+                    if pairs: marg = med([x / y for x, y in pairs])
+                def pp(rs):
+                    p = sum(r["verdict"] == "PASS" for r in rs)
+                    return fmt(sum(fnum(r["cost_usd"]) or 0 for r in rs) / p if p else None, 5, 3).strip()
+                print(f"{arm:8} overhead {ovh_tok:+.0f} tokens/cell over {len(diffs)} case(s)"
+                      + (f" (${ovh_usd:.4f} at ${price}/M, {model})" if ovh_usd is not None else " (unpriced model)")
+                      + f"  marginal cost {'x%.2f' % marg if marg is not None else '-'} over {len(both)} both-pass case(s)"
+                      + f"  $/pass {pp(a[arm])} vs {pp(a[ctl])}")
         print("\n-- bounded tasks (contract 5.1 item 11, performance clause) --")
         for arm, rs in sorted(a.items()):
             b = [r for r in rs if r["case"] in BOUNDED]
