@@ -11,6 +11,13 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-22
+
+### Fixed
+
+- After `--update`, the session-start check no longer says a newer release is on `main` when you have
+  just installed it. It kept the day's earlier answer, from before the update, until the next day.
+
 ## [0.5.0] - 2026-10-22
 
 ### Added
@@ -246,7 +253,8 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.5.0...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.5.1...develop
+[0.5.1]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.5.1
 [0.5.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.5.0
 [0.4.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.4.0
 [0.3.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.3.0

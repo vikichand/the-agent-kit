@@ -654,13 +654,17 @@ if [ -z "$head" ]; then
 else
   # AGENT_KIT_APPLY=1 on --update must NOT apply settings that just arrived from the network: the update
   # lists them, and applying is a second, separate step taken after seeing that list.
-  mkdir -p "$w/.claude"
+  mkdir -p "$w/.claude" "$w/.the-agent-kit"
+  printf '{"checked": 9999999999, "latest": "0000000"}\n' > "$w/.the-agent-kit/.update-check"
   d=$(HOME="$w" AGENT_KIT_APPLY=1 AGENT_KIT_REPO="$w/src" sh "$KIT/install.sh" --update 2>&1) || bad "U5 --update exited non-zero"
   [ ! -e "$w/.claude/settings.json" ] && has 'settings.json' "$d" \
     && pass "U5 --update lists the settings changes but never applies them itself" || bad "U5 --update applied network-sourced settings"
   [ -f "$w/.the-agent-kit/AGENTS.md" ] && pass "U5 --update populated a fresh ~/.the-agent-kit" || bad "U5 kit not installed"
   [ "$(cat "$w/.the-agent-kit/.kit-version" 2>/dev/null)" = "$head" ] \
     && pass "U5 version stamped from the source commit" || bad "U5 .kit-version wrong or missing"
+  # A same-day cached answer from before the update would name an older main as "newer" until tomorrow.
+  [ ! -e "$w/.the-agent-kit/.update-check" ] && pass "U5 --update drops the cached release answer" \
+    || bad "U5 stale .update-check survived --update"
   # Second run must detect it is current and do nothing.
   d=$(HOME="$w" AGENT_KIT_REPO="$w/src" sh "$KIT/install.sh" --update 2>&1)
   has 'already at' "$d" && pass "U6 second --update is a no-op" || bad "U6 no-op NOT detected"
