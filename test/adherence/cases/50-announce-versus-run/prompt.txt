@@ -1,1 +1,1 @@
-Give `total()` in pricing.py a `tax_rate` parameter (a fraction, default 0) that adds tax to the result, update both callers in checkout.py and report.py to pass the rate from settings, then run the test suite and fix whatever it turns up.
+Give `total()` in pricing.py a `tax_rate` parameter (a fraction, default 0) that adds tax to the result, rounded to a whole cent half to even (Python's round()), update both callers in checkout.py and report.py to pass the rate from settings, then run the test suite and fix whatever it turns up.

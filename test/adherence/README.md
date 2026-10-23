@@ -233,6 +233,12 @@ Only the announce-versus-run rule was kept: 49 passes on v0.5.1 and vanilla, and
 existing lines carry it; vanilla fails it), so their draft rules
 came out on 2026-10-24 and the two cases stay as regression guards (`docs/rules-manifest.md`).
 
+Case 50's prompt gained "rounded to a whole cent half to even (Python's round())" on 2026-10-24, after
+GPT-6 Astra stopped once to ask how to round tax. Money is high-risk under Section 0, so that question
+was a fair one, and the rubric already ignores rounding: the prompt now answers it. Both arms were
+1/3 on Codex before the change. Case 50 rows started before 2026-10-24T08:30 (the TSVs' local time)
+used the old prompt and are not pooled with later ones.
+
 Cases 38-40 were added on 2026-10-04 to grade the 0.4.0 never-assume rule. Cases 32-37 were added on 2026-09-17 to grade the 2026-09-18 performance program (its decision record is in
 `docs/senior-engineer.md`). Cases 11-14 and 17-31 test the **depth tier**, not `AGENTS.md`, so their fixtures deliberately sit
 on paths the relevant `claude/rules/*.md` file declares (`api/`, `middleware/`, `models/`,
