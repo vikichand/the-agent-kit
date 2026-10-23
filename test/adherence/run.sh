@@ -31,6 +31,9 @@
 #                                     and settings.json turns the claude.ai connector/skill/plugin sync off.
 #                                     Without "vanilla" the Claude arms load your own config, as before.
 #                                     Arm order rotates with the run number. See README.md.
+#   ./run.sh --clean-config           Claude only: the same clean config folder for every arm without running
+#                                     a vanilla arm, so --arms current,with compares two rule sets and nothing
+#                                     of yours (global CLAUDE.md, plugins, hooks) rides along in either.
 #
 # Every cell appends a row to results/<date>.tsv: case, arm, run, verdict, elapsed seconds (censored=1
 # on timeout), turns, tool calls, tokens in/out/cache, cost where the CLI reports it, model, judge,
@@ -47,7 +50,7 @@ set -u
 
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 KIT=$(CDPATH= cd -- "$HERE/../.." && pwd)
-RUNS=1; ONLY=""; MODEL=""; EFFORT=""; JUDGE=""; KEEP=0; TOOL="claude"; PANEL=""
+RUNS=1; ONLY=""; MODEL=""; EFFORT=""; JUDGE=""; KEEP=0; TOOL="claude"; PANEL=""; CLEAN=0
 # ARMS. `without` = no rules (control); `with` = the rules in this working tree (the candidate);
 # `current` = the rules at a pinned git ref, so a rule edit can be compared against what shipped
 # before it, with the control alongside. Three arms are what let a smaller with/without gap be read
@@ -74,7 +77,8 @@ while [ $# -gt 0 ]; do
     --arms)        ARMS="$2"; shift 2 ;;
     --current-ref) CURRENT_REF="$2"; shift 2 ;;
     --panel)       PANEL="$2"; shift 2 ;;
-    -h|--help)     sed -n '2,37p' "$0"; exit 0 ;;
+    --clean-config) CLEAN=1; shift ;;
+    -h|--help)     sed -n '2,40p' "$0"; exit 0 ;;
     *) echo "unknown option: $1"; exit 2 ;;
   esac
 done
@@ -106,6 +110,9 @@ esac
 for a in $(printf '%s' "$ARMS" | tr ',' ' '); do
   case "$a" in with|without|current|vanilla) ;; *) echo "FAIL: --arms accepts with, without, current, vanilla (got '$a')."; exit 2 ;; esac
 done
+if [ "$CLEAN" -eq 1 ] && [ "$TOOL" != claude ]; then
+  echo "FAIL: --clean-config is for --tool claude. Codex already runs --ignore-user-config in every arm."; rm -rf "$STAGE"; exit 2
+fi
 case ",$ARMS," in *,vanilla,*)
   [ "$TOOL" = claude ] || { echo "FAIL: the vanilla arm is for --tool claude. Codex already runs --ignore-user-config in both arms; Antigravity has no switch to isolate ~/.gemini, so its numbers stay a machine baseline."; rm -rf "$STAGE"; exit 2; }
   case ",$ARMS," in *,without,*) echo "FAIL: --arms cannot hold both vanilla and without. Both mean no rules; vanilla also drops your user config, so use it."; rm -rf "$STAGE"; exit 2 ;; esac ;;
@@ -128,8 +135,9 @@ export AGENT_KIT_NO_UPDATE_CHECK=1
 # ~/.codex/AGENTS.md) loads in BOTH arms, so if it already carries engineering conventions, the
 # "without" run is not ruleless and the measured gap is a FLOOR, not the kit's absolute value.
 gms="$HOME/.claude/CLAUDE.md $HOME/.codex/AGENTS.md"
-# A vanilla run points every Claude arm at its own config folder, so ~/.claude/CLAUDE.md is not read.
-case ",$ARMS," in *,vanilla,*) gms="$HOME/.codex/AGENTS.md" ;; esac
+# A vanilla or --clean-config run points every Claude arm at its own config folder, so ~/.claude/CLAUDE.md
+# is not read.
+case ",$ARMS,:$CLEAN" in *,vanilla,*|*:1) gms="$HOME/.codex/AGENTS.md" ;; esac
 # Under Codex the user's hooks load too (the kit's deny-mode guard among them), so the control arm
 # is not hookless either. Named, not silenced. config.toml - and with it the plugins and their
 # skills - is NOT in this list because the Codex arm runs with --ignore-user-config (see run_cell).
@@ -889,12 +897,15 @@ panel_ids() {  # $1 = panel file  $2 = cases dir
   printf '%s\n' "$ids"
 }
 
-# The vanilla arm's config folder. Checked and locked here, after the functions exist and before any cell
-# runs. CFGDIR set means every Claude cell of this run is started with CLAUDE_CONFIG_DIR pointing at it.
+# The vanilla arm's config folder, also used by --clean-config. Checked and locked here, after the functions
+# exist and before any cell runs. CFGDIR set means every Claude cell of this run is started with
+# CLAUDE_CONFIG_DIR pointing at it.
 CFGDIR=""
-case ",$ARMS," in *,vanilla,*)
+case ",$ARMS,:$CLEAN" in *,vanilla,*|*:1)
   VDIR=${AGENT_KIT_VANILLA_DIR:-$HOME/.claude-vanilla}
   msg=$(vanilla_check "$VDIR") || { echo "FAIL: $msg"; rm -rf "$STAGE"; exit 2; }
+  # Absolute, because each cell runs from its sandbox: a relative folder would resolve there instead.
+  VDIR=$(cd -- "$VDIR" && pwd)
   msg=$(vanilla_lock "$VDIR") || { echo "FAIL: $msg"; rm -rf "$STAGE"; exit 2; }
   trap 'rm -rf "$VDIR/.harness-lock"' EXIT; trap 'exit 130' INT TERM
   # claude.exe is a native Windows program: hand it a Windows path, not an MSYS one.
@@ -912,7 +923,7 @@ printf '%s\n' "------------------------------------------------------------"
 echo "adherence eval - $RUNS run(s) per cell"
 echo "tool: $TOOL   model under test: ${MODEL:-<cli default>}${EFFORT:+ (effort $EFFORT)}   judge: claude ${JUDGE:-<cli default>}"
 echo "arms: $ARMS   with=$CAND_REF   current=$CURRENT_REF   results: $TSV"
-[ -n "$CFGDIR" ] && echo "claude config folder for every arm: $VDIR (vanilla; your own ~/.claude is not loaded)"
+[ -n "$CFGDIR" ] && echo "claude config folder for every arm: $VDIR (clean; your own ~/.claude is not loaded)"
 [ -n "$PANEL" ] && echo "panel: $PANEL ($(printf '%s\n' "$PANEL_IDS" | grep -c .) cases)"
 printf '%s\n' "------------------------------------------------------------"
 

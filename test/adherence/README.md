@@ -74,8 +74,10 @@ over if its process is gone) lets one run hold it at a time; point the second ru
 
 **All Claude arms in a `vanilla` run use that folder.** `with` and `current` carry the kit as files in the
 cell's project (`CLAUDE.md`, `.claude/rules`, `.claude/skills`), which a clean config folder does not
-change, so the three arms differ only by the kit. Without `vanilla` in `--arms` the arms load your own
-config, exactly as before; then `without` is the old control and still carries it (its numbers and a
+change, so the three arms differ only by the kit. `--clean-config` gives a run without a `vanilla` arm the
+same folder, checks and lock, for comparing two rule sets (`--arms current,with`) at two arms' cost instead
+of three. Its rows carry the same arm names as a run on your own config, so keep the two kinds of run
+in separate result files or apart by time; `summarize.py` would pool them. Without either, the arms load your own config, exactly as before; then `without` is the old control and still carries it (its numbers and a
 vanilla run's are not comparable). `vanilla` and `without` cannot be in one run: both mean no rules.
 Codex already runs `--ignore-user-config` in both arms and Antigravity cannot be isolated, so `vanilla`
 is refused for them; the Antigravity numbers stay a machine baseline.

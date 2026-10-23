@@ -17,6 +17,8 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   patched), `50-announce-versus-run` (a step the agent decided on is run, not announced at the end of
   the turn) and `51-progress-updates` (a line before the work starts, a recap that leads with the
   outcome). Rules for 49 and 51 were drafted and left out: the 0.5.1 rules already pass both.
+- `test/adherence/run.sh --clean-config`: every Claude arm runs on the clean config folder the vanilla
+  arm uses, so two rule sets can be compared without a third arm and without your own setup in either.
 
 ### Changed
 
