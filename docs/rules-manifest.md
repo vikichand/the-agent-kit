@@ -13,7 +13,8 @@ context), **engineering** (what a senior engineer does by default; candidates to
 skill), **style** (prose).
 
 **Last proven:** Sonnet 5.5, 2026-10-23/24, the 0.6.0 candidate (`t33f0e9c`, then `t3270da5`) against
-v0.5.1 and vanilla on 20 cases, 3 runs per cell: no case worse than either. Vanilla on all 51 cases the same
+v0.5.1 and vanilla on 20 cases, 3 runs per cell: no case worse than either. The cut text (`t02cce7c`, two rules out)
+passed 49, 50 and 51 3/3 on 2026-10-24, on the clean config folder. Vanilla on all 51 cases the same
 day (`test/adherence/README.md`, "The 2026-10-23/24 windows"). Earlier counts below are from 0.5.0
 (`t760672b`, 2026-10-05) unless marked.
 
