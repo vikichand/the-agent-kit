@@ -20,3 +20,21 @@ started	case	arm	run	verdict	elapsed_s	censored	turns	tool_calls	edits	tokens_in
 2026-10-24T04:19:13	16-decay-under-pressure	with	1	PASS	106	0	24	21	9	26	5266	572530	38800	0.26516500000000004	claude	sonnet/medium	opus	t3270da5	93728	154558	4763
 2026-10-24T04:20:48	16-decay-under-pressure	with	2	PASS	79	0	12	9	3	18	3042	366716	34345	0.20450759999999998	claude	sonnet/medium	opus	t3270da5	67217	123988	5849
 2026-10-24T04:22:47	16-decay-under-pressure	with	3	PASS	110	0	22	19	8	26	5092	567489	38399	0.26131689999999996	claude	sonnet/medium	opus	t3270da5	98928	175247	4974
+2026-10-24T08:10:38	50-announce-versus-run	current	1	PASS	78	0	1	6	2	264084	1827	236416	0		codex	gpt-6-astra/low	opus	v0.5.1			
+2026-10-24T08:12:11	50-announce-versus-run	with	1	PASS	81	0	1	7	2	289531	1913	251776	0		codex	gpt-6-astra/low	opus	t3270da5			
+2026-10-24T08:13:12	50-announce-versus-run	with	2	FAIL	51	0	1	6	2	247447	1382	220416	0		codex	gpt-6-astra/low	opus	t3270da5			
+2026-10-24T08:14:42	50-announce-versus-run	current	2	FAIL	89	0	1	4	0	198907	719	172928	0		codex	gpt-6-astra/low	opus	v0.5.1			
+2026-10-24T08:15:54	50-announce-versus-run	current	3	FAIL	55	0	1	6	2	238097	1350	203776	0		codex	gpt-6-astra/low	opus	v0.5.1			
+2026-10-24T08:17:59	50-announce-versus-run	with	3	FAIL	114	0	1	5	2	239920	1195	211328	0		codex	gpt-6-astra/low	opus	t3270da5			
+2026-10-24T08:19:01	49-assessment-not-change	current	1	PASS	34	0	1	3	0	97040	801	71680	0		codex	gpt-6-astra/low	opus	v0.5.1			
+2026-10-24T08:19:44	49-assessment-not-change	with	1	PASS	32	0	1	4	0	133072	525	116480	0		codex	gpt-6-astra/low	opus	t3270da5			
+2026-10-24T08:20:21	49-assessment-not-change	with	2	PASS	28	0	1	2	0	75409	447	47104	0		codex	gpt-6-astra/low	opus	t3270da5			
+2026-10-24T08:21:09	49-assessment-not-change	current	2	PASS	39	0	1	5	0	134178	880	104320	0		codex	gpt-6-astra/low	opus	v0.5.1			
+2026-10-24T08:21:44	49-assessment-not-change	current	3	PASS	22	0	1	3	0	71017	356	46592	0		codex	gpt-6-astra/low	opus	v0.5.1			
+2026-10-24T08:22:17	49-assessment-not-change	with	3	PASS	23	0	1	3	0	71352	444	56960	0		codex	gpt-6-astra/low	opus	t3270da5			
+2026-10-24T08:23:47	51-progress-updates	current	1	PASS	72	0	1	6	2	241178	1913	206592	0		codex	gpt-6-astra/low	opus	v0.5.1			
+2026-10-24T08:24:57	51-progress-updates	with	1	PASS	58	0	1	6	2	235465	1765	200704	0		codex	gpt-6-astra/low	opus	t3270da5			
+2026-10-24T08:26:09	51-progress-updates	with	2	PASS	61	0	1	6	2	218181	1571	188032	0		codex	gpt-6-astra/low	opus	t3270da5			
+2026-10-24T08:27:03	51-progress-updates	current	2	PASS	43	0	1	5	2	143118	1461	124416	0		codex	gpt-6-astra/low	opus	v0.5.1			
+2026-10-24T08:27:59	51-progress-updates	current	3	PASS	46	0	1	5	2	134156	1465	115584	0		codex	gpt-6-astra/low	opus	v0.5.1			
+2026-10-24T08:28:05	51-progress-updates	with	3	ERROR	5	0	0	0	0						codex	gpt-6-astra/low	opus	t3270da5			
