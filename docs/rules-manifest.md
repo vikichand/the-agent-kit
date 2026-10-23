@@ -44,7 +44,6 @@ means no case covers the rule yet.
 | S1.1 | Never assume: look up facts, ask decisions; version-sensitive facts from current docs | contract | 38 (3/3), 39 (4/4), 40 (3/3) | 0.5.0 absorbed "verify API and config facts" from Section 5 |
 | S1.2 | Blast radius first | engineering | 03 (12/12) | 0.5.0: 3/3 |
 | S1.3 | Push back | contract | 06, 13 | 06 fails often with and without; wording barely moves it (0.5.0: 3/3). 0.5.0 added "build the safer version and say why"; 13 went 1/3 to 2/2 valid, v0.4.0 2/2 |
-| S1.4 | A question gets an answer, not a change; ideas, options or a plan: give those and stop | contract | 49 | 0.6.0, Fable 5.1 and Sonnet 5.5 guides |
 | S2.1 | Plan steps name files and checks; say what is out of scope | workflow | - | high-risk only |
 | S2.2 | Check a high-risk plan against its failure modes | workflow | - | |
 | S2.3 | Single-agent default; load `orchestrating-work` before delegating | workflow | - | 0.5.0: the detail moved to the skill; watch Codex, whose vendor says it delegates too little unless told |
@@ -67,7 +66,6 @@ means no case covers the rule yet.
 | S6.1 | Root cause; fix where shared | engineering | 03, 32, 35 (4/6) | 0.5.0: 03, 32, 35 all 3/3 |
 | S6.2 | Two-attempt rule | workflow | - | |
 | S7.1 | Session is disposable; checkpoint constraints and evidence; clear a degraded thread | workflow | - | no case (needs a multi-session harness) |
-| S7.1b | Keep the user posted: a line before the first tool call, updates on findings, direction changes and long waits, an outcome-first recap | contract | 51 | 0.6.0, all three Claude 5.5 guides; the orchestrating-work skill carries the cadence while workers run |
 | S7.2 | Commit, push, PR only when asked; sync before shipping | contract | 08 (3/3) | also the grant hook |
 | S7.3 | A repeated mistake is a missing rule: propose it | contract | - | |
 | S7.4 | Announce breaking changes | engineering | - | |
@@ -97,6 +95,19 @@ studies in `docs/0.6.0-plan.md` (private). Every wording below is the vendor's m
 | S7.1 | checkpoint also keeps decisions and open items; compaction keeps modified files and test commands | Fable 5.1 preserve list; Claude Code compaction instructions | - |
 | S8.3 | the list of prose tells moved to `writing-docs`; one pointer stays | 47 and 48: 0 tells in every arm, vanilla included | 47 |
 | all | bold only on the invariants, the oracle rule and authorship | Claude Code best practices: emphasis on many lines means none stands out | W2 full suite |
+
+## Tried in 0.6.0 and not kept
+
+Both were written from the Claude 5.5 guides and dropped because no model we run did worse without them:
+v0.5.1 and vanilla Sonnet 5.5 pass case 49, v0.5.1 passes case 51 on Sonnet 5.5 and GPT-6 Astra, and
+GPT-6 Astra passes 49 with or without the line (windows 1 to 3, `test/adherence/README.md`). Their cases
+stay in the suite as regression guards. Fable 5.1, the model Anthropic says writes fewer updates, is not
+measured; if it is added to the eval and fails case 51, S7.1b comes back.
+
+| Was | Rule | Why not kept |
+|---|---|---|
+| S1.4 | A question gets an answer, not a change; ideas, options or a plan: give those and stop | case 49 passes without it on every arm and model measured |
+| S7.1b | Keep the user posted: a line before the first tool call, updates, an outcome-first recap | case 51 passes on v0.5.1; the `orchestrating-work` skill keeps the cadence for long-running work |
 
 ## Removed in 0.5.0
 

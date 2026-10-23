@@ -155,7 +155,8 @@ speed panel (8 cases), 5 runs per cell, arms vanilla, v0.4.0 and develop (`t05e0
 **2026-10-23/24, the 0.6.0 windows.** Sonnet 5.5, effort medium, Opus judging, 3 runs per cell; vanilla on
 all 51 cases (155 cells, 68%), then develop against v0.5.1 and vanilla on the 20 touched cases (develop 89%,
 v0.5.1 86%, vanilla 61%, no case worse). Read in three parts: session-start overhead 5,334 tokens
-(AGENTS.md about 4,910 against a 4,800 budget, about 2% over); marginal cost on both-pass cases x1.21
+(AGENTS.md about 4,910 against a 4,800 budget, about 2% over; 5,157 and about 4,736, under budget,
+once the two rules no case needed came out on 2026-10-24); marginal cost on both-pass cases x1.21
 (passes 1.25x); cost per pass $0.162 for develop and v0.5.1, $0.108 vanilla. Time x1.36 against vanilla,
 over the bar as v0.5.1 was (x1.34); start-up plus hooks is equal, and a repeat count on three kept cells
 found no check run twice without an edit between, so the extra time is the reads and red-then-green test

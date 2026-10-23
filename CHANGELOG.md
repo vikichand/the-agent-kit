@@ -16,20 +16,17 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 - Three adherence cases: `49-assessment-not-change` (a "why is this slow?" question answered, not
   patched), `50-announce-versus-run` (a step the agent decided on is run, not announced at the end of
   the turn) and `51-progress-updates` (a line before the work starts, a recap that leads with the
-  outcome).
+  outcome). Rules for 49 and 51 were drafted and left out: the 0.5.1 rules already pass both.
 
 ### Changed
 
 - **The rules, against the Claude 5.5, GPT-6 and Gemini 3 guidance** (each change is one commit on
   `develop`, kept only if the adherence eval agrees; `docs/rules-manifest.md` lists them with sources).
-  A role line opens the file. A question or a described problem gets an assessment, not a change.
-  High-risk work does what does not depend on the user first and asks only the decisions that would
+  A role line opens the file. High-risk work does what does not depend on the user first and asks only the decisions that would
   change the work. Pushing back is a sentence, then the task as asked. A step the agent decided on is
   run, not announced at the end of the turn, and a long session is never a reason to stop. Test-first
   applies where the repository keeps tests for that kind of code, sized like the neighbours. A test that
-  looks wrong is said so, not worked around. The two-attempt stop continues from a new angle. The agent
-  keeps the user posted: a line before the first tool call, updates on findings and long waits, a recap
-  that leads with the outcome. Compaction keeps decisions, open items, modified files and test commands.
+  looks wrong is said so, not worked around. The two-attempt stop continues from a new angle. Compaction keeps decisions, open items, modified files and test commands.
   Files are edited in place, not rewritten. Installing what the lockfile declares is not adding a
   dependency. Bold is reserved for the hard lines. The prose-tell list moved to `writing-docs`, and the evidence table
   in Section 5 is one sentence. Measured on Sonnet 5.5 against 0.5.1 and a vanilla baseline on 20 cases:

@@ -229,6 +229,9 @@ one. A trace failure is deterministic and is decided before the judge sees the c
 
 Cases 49-51 were added on 2026-10-23 for the 0.6.0 rules (assessment-versus-change, announce-versus-run,
 progress updates), each from a behaviour Anthropic's Claude 5.5 prompting guides name and measure.
+Only the announce-versus-run rule was kept: 49 passes on v0.5.1 and vanilla, and 51 on v0.5.1 (its
+existing lines carry it; vanilla fails it), so their draft rules
+came out on 2026-10-24 and the two cases stay as regression guards (`docs/rules-manifest.md`).
 
 Cases 38-40 were added on 2026-10-04 to grade the 0.4.0 never-assume rule. Cases 32-37 were added on 2026-09-17 to grade the 2026-09-18 performance program (its decision record is in
 `docs/senior-engineer.md`). Cases 11-14 and 17-31 test the **depth tier**, not `AGENTS.md`, so their fixtures deliberately sit
@@ -1060,6 +1063,8 @@ the 0.6.0 changes touch (`panels/w2-0.6.0.txt`):
 - **Against vanilla:** the marginal cost passes 1.25x. The fixed overhead is about 2% over its 4,800-token
   budget for `AGENTS.md`. Time is over 1.25x, as it was for v0.5.1; start-up plus hooks is equal (1.9 s), so
   the gap is model time spent on the reads and test runs the repeat count found.
+- **After the 2026-10-24 cut** (the assessment and progress rules, which cases 49 and 51 showed no model
+  needed): the same probe reads 5,157 tokens, `AGENTS.md` about 4,736, under its budget. 168 effective lines.
 - Vanilla's lower cost per pass is real on this panel because half the panel is cases vanilla passes too;
   on the cases only the kit passes, vanilla has no pass to price.
 

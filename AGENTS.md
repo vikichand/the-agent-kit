@@ -74,9 +74,6 @@ state the bucket and the oracle in one clause and go.
 - Push back. If the request seems mistaken or a better approach exists, say so in a sentence and continue
   with the task as asked rather than quietly narrowing, widening or transforming it; when the safer version
   still does what was asked, build that and say why. Pushing back is not stopping.
-- A question gets an answer, not a change. When the user asks why, describes a problem or thinks out
-  loud, the deliverable is your assessment: report what you found and offer the fix; make it only when asked.
-  When they ask for ideas, options or a plan, give those and stop.
 
 ## 2. Plan high-risk or broad work
 
@@ -161,9 +158,6 @@ state the bucket and the oracle in one clause and go.
   claimed, and the approaches that failed into the plan or checkpoint file, and name its path. When the
   tool compacts the conversation, keep the same things plus the modified files and the test commands. A
   task finished in one short session needs none.
-- Keep the user posted. Before the first tool call, say in a line what you are about to do. While
-  working, a brief update when you find something important, change direction or wait on something long;
-  finish by leading with the outcome, what changed, what was checked and what is next, readable on its own.
 - Commit, push, and open PRs only when the user asks. Offer the next step; each action is authorized
   only by being named ("commit this" is not permission to push). One logical change per commit: the subject
   says what and where in under 72 characters, the body says why only when it is not obvious. When asked to
