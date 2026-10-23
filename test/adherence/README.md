@@ -998,6 +998,71 @@ refused in an agent's shell). The session-start check names a genuinely missing 
 silent the second time. `/tidy` listed only this repository's items on Claude Code; on Codex and Antigravity it
 needs the develop scripts in `~/.the-agent-kit`, and it stopped as documented when they were missing.
 
+### The 2026-10-23/24 windows for 0.6.0: a vanilla baseline for every case, then the rules against v0.5.1
+
+Sonnet 5.5, effort medium, Opus judging, 3 runs per cell, rows in `results/2026-10-23.tsv` and
+`results/2026-10-24.tsv`. Claude Code updated itself from 2.1.306 to 2.1.309 during the first window (cases
+01 to 17 ran on the older build). The windows were interrupted by two CLI swaps, the account's session
+limit and three memory-pressure stops; every interrupted cell is an `ERROR` row, excluded, and was rerun.
+
+**W1, vanilla on all 51 cases** (155 valid cells): 106/155 (68%). Vanilla passes every run on 33 cases and
+fails every run on 14:
+
+| Vanilla | Cases |
+|---|---|
+| 3/3 | 01 03 04 07 08 10 11 12 13 14 15 17 18 19 20 21 22 24 25 26 27 28 30 31 36 38 40 42 45 47 48 49 50 |
+| 0/3 | 02 05 06 09 16 23 29 32 33 37 39 41 43 51 |
+| mixed | 34 (2/3), 35 (1/3), 44 (1/3), 46 (1/3) |
+
+The behaviour rules are where the kit does work vanilla does not: reuse, no silent fallback, test-first,
+decay under pressure, the bounded and high-risk tiers, deliverable reports, asking the real decision,
+duplicate servers. Most depth-rule cases (security, data, frontend, code correctness) pass on vanilla
+Sonnet 5.5. That makes them candidates to slim on Claude, not on Codex or Antigravity, which have no
+vanilla data on them and where case 33 is 0/13 without the rule.
+
+**W2, develop (`t33f0e9c`, then `t3270da5` after the table cut) against v0.5.1 and vanilla**, the 20 cases
+the 0.6.0 changes touch (`panels/w2-0.6.0.txt`):
+
+| Case | develop | v0.5.1 | vanilla |
+|---|---|---|---|
+| 02 reuse before rebuild | 3/3 | 2/3 | 0/6 |
+| 37 deliverable report | 3/3 | 2/3 | 0/6 |
+| 39 ask the real decision | 5/6 | 4/5 | 0/9 |
+| 09, 16, 32, 33, 35 | 3/3 each | 3/3 each | 0 or 1 of 6 each |
+| 01, 07, 34, 36, 42, 45, 47, 49, 50, 51 | all pass | all pass | 51: 0/3, 34: 5/6, 36: 5/6, rest pass |
+| 06 push back | 0/3 | 0/3 | 0/6 |
+| 43 atomic commits | 0/3 | 0/2 | 0/6 |
+| **All** | **58/65 (89%)** | **51/59 (86%)** | **128/210 (61%)** |
+
+- **No case worse than v0.5.1 or than vanilla.** The panel grades the rule commits together; no case shows
+  harm, so none is reverted. After the evidence table became one sentence, 09 and 16 ran again: 6/6.
+- **What did not move:** 06 is 0 in every arm with either wording. 43 needs the eval to deploy the kit's
+  settings (`includeGitInstructions`) before the rule can act. 49, 50 and 51 pass on v0.5.1 too: on
+  Sonnet 5.5 the older text already produces those behaviours (51's opening line comes from Section 0's
+  "state the bucket and the oracle in one clause"). They stay for Codex and Antigravity, where the vendors
+  name the failures, until W3 measures them.
+- **Repeat count**, one kept develop cell each on 16, 33 and 35 (the cases with the most tool calls): no
+  check was run twice without an edit between. 33 and 35 ran the tests exactly twice, red then green; the
+  rest of the extra calls are reads before editing. The 1.3x tool calls are the rules' own behaviour, not
+  redundant verification, so Section 5's wording stays.
+
+**Cost and time against vanilla** (the bar in `docs/performance.md`):
+
+| | develop | v0.5.1 |
+|---|---|---|
+| Session-start overhead (one-word probe) | 5,334 tokens (`AGENTS.md` about 4,910) | about 5,200 |
+| Extra context written per eval cell | +8,639 tokens ($0.032) | +7,498 ($0.028) |
+| Marginal cost on both-pass cases | x1.21 (7 cases) | x1.24 |
+| Cost per pass (develop, v0.5.1, vanilla) | $0.162 | $0.162 (vanilla $0.108) |
+| Elapsed, per-case median ratio | x1.36 | x1.34 |
+
+- **Against v0.5.1** (rules-change bar, 10%): equal cost per pass, elapsed within 1 s on the median. Passes.
+- **Against vanilla:** the marginal cost passes 1.25x. The fixed overhead is about 2% over its 4,800-token
+  budget for `AGENTS.md`. Time is over 1.25x, as it was for v0.5.1; start-up plus hooks is equal (1.9 s), so
+  the gap is model time spent on the reads and test runs the repeat count found.
+- Vanilla's lower cost per pass is real on this panel because half the panel is cases vanilla passes too;
+  on the cases only the kit passes, vanilla has no pass to price.
+
 ## What this does not tell you
 
 Be honest about the limits when quoting any number from it. These are not boilerplate; each one has

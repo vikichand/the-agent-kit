@@ -31,7 +31,9 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   keeps the user posted: a line before the first tool call, updates on findings and long waits, a recap
   that leads with the outcome. Compaction keeps decisions, open items, modified files and test commands.
   Files are edited in place, not rewritten. Installing what the lockfile declares is not adding a
-  dependency. Bold is reserved for the hard lines. The prose-tell list moved to `writing-docs`.
+  dependency. Bold is reserved for the hard lines. The prose-tell list moved to `writing-docs`, and the evidence table
+  in Section 5 is one sentence. Measured on Sonnet 5.5 against 0.5.1 and a vanilla baseline on 20 cases:
+  no case worse, 89% against 86%, equal cost per pass.
 - The Claude Code settings now set `includeGitInstructions: false`: Claude Code's own commit and
   pull-request instructions competed with AGENTS.md Section 7 and are where the attribution trailer
   comes from. The git status snapshot Claude Code adds at start goes with them; the safety invariant
