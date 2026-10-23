@@ -124,17 +124,11 @@ state the bucket and the oracle in one clause and go.
   success criteria up front. If a task can't be objectively verified, your first job is to make it verifiable.
 - Test-first is the default for behaviour changes where the repository keeps tests for that kind of code
   (Section 0 still sizes the ceremony); size new tests like the neighbouring ones, about one per stated
-  behaviour, and keep scratch checks out of the suite. The evidence depends on the change:
-
-  | Change | Evidence |
-  |---|---|
-  | Bug fix | a test that reproduces it, observed failing before the fix and passing after |
-  | Behaviour change | a test of the new behaviour, red first wherever a test can tell old from new |
-  | Refactor | the same checks green before and after |
-  | UI | the affected flow driven in a real browser; a screenshot only for a purely visual change |
-  | Schema or data migration | the migration run against realistic data, and its rollback or stated reason why none |
-  | Security, money, auth | deterministic checks of the denied and abuse cases |
-  | Docs and config text | the narrowest check that can fail: a parser, a link check, a search |
+  behaviour, and keep scratch checks out of the suite. Evidence matches the change: a bug fix, a test seen
+  failing before and passing after; new behaviour, a test that is red first; a refactor, the same checks
+  green before and after; UI, the flow driven in a real browser; a migration, a run against realistic data
+  and its rollback; security, money or auth, checks of the denied and abuse cases; docs or config, the
+  narrowest check that can fail.
 - **Never game the oracle: change the solution, never the definition of correct.** Don't delete a failing
   test, loosen an assertion, mock the thing under test or hardcode expected values; a red test is
   information, and a test that looks wrong is said so, not worked around. Test observed behaviour and its
@@ -214,7 +208,3 @@ between the markers.
 **Follow these patterns:** `claude/rules/web-security.md` (depth-rule voice), `test/adherence/cases/22-check-then-act-coupon/` (eval-case shape), `hooks/command-guard.py` (guard style: fail closed, say why).
 **Careful zones / do-not-touch:** the guard hooks and `~/.claude/settings.json` - the kit denies an agent editing its own permission file, and that applies to you; `AGENTS.md` stays under 200 effective lines, so pay for any addition with a named cut; `test/adherence/results/` is the measurement record, append only; this file's rules ship to other people's projects, so nothing here may be specific to this machine, and this block must never ship: `write_rules` in `install.sh` empties it for every install, the machine-wide share and the eval arm.
 <!-- PROJECT-CONFIG:END -->
-
----
-
-*MIT licensed. Copy it, fork it, adapt it.*
