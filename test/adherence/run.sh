@@ -171,7 +171,9 @@ fi
 jflag=""; [ -n "$JUDGE" ] && jflag="--model $JUDGE"
 
 # What the agent may run inside the throwaway sandbox. Deliberately narrow: the test runners the
-# fixtures need, the reading tools any diagnosis needs, and git. Unquoted on use, so no spaces.
+# fixtures need, the reading tools any diagnosis needs, and git. Unquoted on use, so no spaces. Not
+# covered: `cd "/c/Users/..." && ...` on Windows, which Claude Code reads as a cd outside the sandbox
+# (`Bash(cd:*)` did not help, tried 2026-10-24). It is denied, and the agent re-runs it without the cd.
 ALLOW="Bash(python:*) Bash(python3:*) Bash(pytest:*) Bash(uv:*) Bash(node:*) Bash(npm:*) Bash(npx:*) Bash(git:*) Bash(ls:*) Bash(cat:*) Bash(grep:*) Bash(find:*) Bash(sed:*) Bash(head:*) Bash(tail:*)"
 
 # A case may add patterns to the allowlist with an `allow` file in its folder (one per line, `#` comments),
@@ -671,8 +673,13 @@ run_cell() {
       #  - DISABLE_AUTOUPDATER: an update mid-run has aborted a run three times;
       #  - CLAUDE_CODE_DISABLE_ADVISOR_TOOL: the advisor re-reads the whole transcript on every call, and
       #    whether it fires is the model's choice. Documented at https://code.claude.com/docs/en/advisor.
+      #  - CLAUDE_CODE_USE_POWERSHELL_TOOL=0: on Windows with a claude.ai login the PowerShell tool is on by
+      #    default and ALLOW holds only Bash rules, so every test run the agent sent through PowerShell was
+      #    denied in -p mode and scored as the agent's failure (found 2026-10-24 on Opus, case 50). One
+      #    shell tool, the one ALLOW was written for, on every platform.
       # In a vanilla run CLAUDE_CONFIG_DIR is the clean folder (quoted: the real path has a space).
-      ( cd "$w" && export DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1 CLAUDE_CODE_EFFORT_LEVEL="$EFFORT" \
+      ( cd "$w" && export DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1 CLAUDE_CODE_USE_POWERSHELL_TOOL=0 \
+          CLAUDE_CODE_EFFORT_LEVEL="$EFFORT" \
           && { [ -z "$CFGDIR" ] || export CLAUDE_CONFIG_DIR="$CFGDIR"; } \
           && timeout "$TIMEOUT" claude -p "$(cat "$pf")" --output-format stream-json --verbose \
           --permission-mode acceptEdits --allowedTools $ALLOW ${cx:+"$cx"} $sflag $mflag $eflag >"$ev" 2>>"$err" ); rc=$?
