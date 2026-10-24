@@ -25,7 +25,7 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 - **The rules, against the Claude 5.5, GPT-6 and Gemini 3 guidance** (each change is one commit on
   `develop`, kept only if the adherence eval agrees; `docs/rules-manifest.md` lists them with sources).
   A role line opens the file. High-risk work does what does not depend on the user first and asks only the decisions that would
-  change the work. Pushing back is a sentence, then the task as asked. A step the agent decided on is
+  change the work. A step the agent decided on is
   run, not announced at the end of the turn, and a long session is never a reason to stop. Test-first
   applies where the repository keeps tests for that kind of code, sized like the neighbours. A test that
   looks wrong is said so, not worked around. The two-attempt stop continues from a new angle. Compaction keeps decisions, open items, modified files and test commands.

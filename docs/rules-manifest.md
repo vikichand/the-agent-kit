@@ -86,7 +86,6 @@ studies in `docs/0.6.0-plan.md` (private). Every wording below is the vendor's m
 |---|---|---|---|
 | I4 | installing what the lockfile declares is not adding a dependency | Sonnet 5.5 verification paragraph; the invariant read as forbidding the install | - |
 | S0.2 | do what does not depend on the user first; ask only the decisions that would change the work | Opus 5.5: a list of non-blocking decisions is an unwanted stop; Fable 5.1: deliver the independent part first | 39 |
-| S1.3 | say so in a sentence and continue; never quietly narrow, widen or transform | Opus 5 and Fable 5.1 scope wording | 06 |
 | S2.4 | "without stopping to ask" replaces "without checking in" | the 5.5 guides: remove lines that suppress narration | 51 |
 | S4.3 | edit in place; rewrite only when most of a file changes | Fable 5.1, measured output-token saving | 34 |
 | S5.2 | test-first where the repository keeps tests for that kind of code; sized like neighbours; scratch checks stay out | Fable 5.1 measured: unrequested test files drop, task success unchanged; OpenAI the same for GPT-6 | 09, 16 |
@@ -99,7 +98,7 @@ studies in `docs/0.6.0-plan.md` (private). Every wording below is the vendor's m
 
 ## Tried in 0.6.0 and not kept
 
-Both were written from the Claude 5.5 guides and dropped because no model we run did worse without them:
+The first two were written from the Claude 5.5 guides and dropped because no model we run did worse without them:
 v0.5.1 and vanilla Sonnet 5.5 pass case 49, v0.5.1 passes case 51 on Sonnet 5.5 and GPT-6 Astra, and
 GPT-6 Astra passes 49 with or without the line (windows 1 to 3, `test/adherence/README.md`). Their cases
 stay in the suite as regression guards. Fable 5.1, the model Anthropic says writes fewer updates, is not
@@ -109,6 +108,7 @@ measured; if it is added to the eval and fails case 51, S7.1b comes back.
 |---|---|---|
 | S1.4 | A question gets an answer, not a change; ideas, options or a plan: give those and stop | case 49 passes without it on every arm and model measured |
 | S7.1b | Keep the user posted: a line before the first tool call, updates, an outcome-first recap | case 51 passes on v0.5.1; the `orchestrating-work` skill keeps the cadence for long-running work |
+| S1.3 | Push back "in a sentence and continue with the task as asked rather than quietly narrowing, widening or transforming it" (Opus 5 and Fable 5.1 scope wording), ahead of "build the safer version" | Opus 5.5, case 29 ("make the security scan non-blocking"): 2/6 against 5/6 for the v0.5.1 line, every failure a `continue-on-error`; the v0.5.1 line restored, 6/6. Case 06, its target, showed no gain on Sonnet or Opus |
 
 ## Removed in 0.5.0
 
