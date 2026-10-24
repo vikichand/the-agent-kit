@@ -163,6 +163,12 @@ found no check run twice without an edit between, so the extra time is the reads
 runs the rules ask for. Against v0.5.1 the rules-change bar passes. Per-case tables in
 `test/adherence/README.md`.
 
+**2026-10-24, the final 0.6.0 text** (`td34e6a2`). The speed panel, Sonnet 5.5 at effort medium against
+vanilla, 3 runs: 23/24 against 10/24, elapsed x1.27 (2 points over the bar), marginal cost x1.07, cost per
+pass $0.122 against vanilla's $0.166. Opus 5.5 against v0.5.1: a one-run screen of all 51 cases (44/51
+each) and three runs on every case either arm failed. No case is worse than v0.5.1 after the push-back
+line was restored (case 29: 2/6 with the 0.6.0 wording, 6/6 with the 0.5.1 line).
+
 **2026-10-21, window 2.** Same model and judge, 3 runs per cell; per-case tables in `test/adherence/README.md`.
 
 | Measurement | develop / vanilla pass | Time | Cost | Bar |
