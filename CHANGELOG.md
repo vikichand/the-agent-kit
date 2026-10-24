@@ -24,15 +24,18 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 - **The rules, against the Claude 5.5, GPT-6 and Gemini 3 guidance** (each change is one commit on
   `develop`, kept only if the adherence eval agrees; `docs/rules-manifest.md` lists them with sources).
-  A role line opens the file. High-risk work does what does not depend on the user first and asks only the decisions that would
-  change the work. A step the agent decided on is
-  run, not announced at the end of the turn, and a long session is never a reason to stop. Test-first
-  applies where the repository keeps tests for that kind of code, sized like the neighbours. A test that
-  looks wrong is said so, not worked around. The two-attempt stop continues from a new angle. Compaction keeps decisions, open items, modified files and test commands.
-  Files are edited in place, not rewritten. Installing what the lockfile declares is not adding a
-  dependency. Bold is reserved for the hard lines. The prose-tell list moved to `writing-docs`, and the evidence table
-  in Section 5 is one sentence. Measured on Sonnet 5.5 against 0.5.1 and a vanilla baseline on 20 cases:
-  no case worse, 89% against 86%, equal cost per pass.
+  A role line opens the file. High-risk work does what does not depend on the user first and asks only
+  the decisions that would change the work. A step the agent decided on is run, not announced at the end
+  of the turn, and a long session is never a reason to stop. Test-first applies where the repository
+  keeps tests for that kind of code, sized like the neighbours. A test that looks wrong is said so, not
+  worked around. The two-attempt stop continues from a new angle. Compaction keeps decisions, open items,
+  modified files and test commands. Files are edited in place, not rewritten. Installing what the
+  lockfile declares is not adding a dependency. Bold is reserved for the hard lines. The prose-tell list
+  moved to `writing-docs`, and the evidence table in Section 5 is one sentence. Measured on Sonnet 5.5
+  against 0.5.1 and a vanilla baseline on 20 cases: no case worse, 89% against 86%, equal cost per pass.
+  The final text, after two unneeded lines came out and the 0.5.1 push-back line went back in, was
+  measured on Opus 5.5 against 0.5.1 across all 51 cases (no case worse) and on the speed panel against
+  vanilla (23/24 against 10/24, cost per pass below vanilla's).
 - The Claude Code settings now set `includeGitInstructions: false`: Claude Code's own commit and
   pull-request instructions competed with AGENTS.md Section 7 and are where the attribution trailer
   comes from. The git status snapshot Claude Code adds at start goes with them; the safety invariant
@@ -50,6 +53,9 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ### Fixed
 
+- The adherence eval on Windows: a claude.ai login turns the PowerShell tool on by default and the
+  harness allowlist holds only Bash rules, so a test run sent through PowerShell was denied and scored as
+  the agent's failure. Agent cells now run with the PowerShell tool off.
 - The adherence harness recorded a multi-turn case's tokens, turn count and durations from its last
   turn only, beside a whole-session cost. They are now added up over every turn. Rows written before
   2026-10-23 for cases 16 and 27 carry last-turn tokens; their cost column was always right.
