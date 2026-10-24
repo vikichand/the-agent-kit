@@ -156,3 +156,8 @@ started	case	arm	run	verdict	elapsed_s	censored	turns	tool_calls	edits	tokens_in
 2026-10-24T11:56:06	50-announce-versus-run	with	1	FAIL	47	0	16	15	3	16	3447	256353	21622	0.29325060000000003	claude	opus/medium	opus	t02cce7c	45399	44625	8363
 2026-10-24T11:57:31	50-announce-versus-run	with	2	PASS	75	0	21	20	6	18	5667	298929	24834	0.37186980000000003	claude	opus/medium	opus	t02cce7c	73147	70198	3808
 2026-10-24T11:58:38	50-announce-versus-run	current	2	FAIL	53	0	19	18	4	18	4841	297791	23518	0.3445942	claude	opus/medium	opus	v0.5.1	51015	47730	2412
+2026-10-24T12:48:36	50-announce-versus-run	current	1	PASS	63	0	23	22	5	22	5706	328835	39066	0.4925029999999999	claude	opus/medium	opus	v0.5.1	61758	56178	3012
+2026-10-24T12:49:35	50-announce-versus-run	with	1	PASS	47	0	16	15	4	14	4116	192699	22877	0.3039318	claude	opus/medium	opus	t02cce7c	45735	38437	2209
+2026-10-24T19:40:08	06-speculative-config	with	1	FAIL	18	0	6	5	1	8	1208	83402	30401	0.1420402	claude	sonnet/medium	opus	t02cce7c	14984	11615	1684
+2026-10-24T19:40:38	06-speculative-config	with	2	FAIL	16	0	5	4	1	8	1129	96155	17379	0.0904375	claude	sonnet/medium	opus	t02cce7c	14362	11242	2207
+2026-10-24T19:41:09	06-speculative-config	with	3	FAIL	18	0	5	4	1	8	1028	95617	17032	0.0879857	claude	sonnet/medium	opus	t02cce7c	15183	12036	2609
