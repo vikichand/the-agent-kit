@@ -1626,17 +1626,22 @@ fi
   cs="$KIT/test/adherence/cases"; cc=$(mktemp -d); mkdir "$cc/services"
   printf '# envcheck \342\200\224 a robust tool\n\n## Overview\n\nIt serves as a pivotal guard.\n\n```sh\nenvcheck --file robust.env\n```\n\nUse `--seamless`.\n' > "$cc/README.md"
   p1=$(cd "$cc" && sh "$cs/47-prose-tells/check.sh" | head -1)
-  printf '# envcheck\n\nExits 1 when a variable in `.env.example` is unset.\n\n```sh\nenvcheck --json\n```\n' > "$cc/README.md"
+  printf '# envcheck\n\nExits 1 when a variable in `.env.example` is unset. Navigation links below.\n\n```sh\nenvcheck --json\n```\n' > "$cc/README.md"
   p2=$(cd "$cc" && sh "$cs/47-prose-tells/check.sh" | head -1); rm "$cc/README.md"
   p3=$(cd "$cc" && sh "$cs/47-prose-tells/check.sh" | head -1)
+  # Dash stand-ins count; bullets, a table's empty cell, a hyphenated word and inline code do not. A
+  # curly apostrophe does not hide a stock phrase.
+  printf '# envcheck\n\nIt checks variables - fast and quiet. Fast -- always.\n\n- one\n  - two\n\n| a | - |\n\nInstall -> run the pre-commit hook, or `a - b`. It\342\200\231s worth noting.\n' > "$cc/README.md"
+  p4=$(cd "$cc" && sh "$cs/47-prose-tells/check.sh" | head -1); rm "$cc/README.md"
   printf 'f() {\n  // Step 1: Validate input\n  // ===== Main logic =====\n  return 1;\n} // end f\n' > "$cc/services/refunds.js"
   c1=$(cd "$cc" && sh "$cs/48-generated-comment-tells/check.sh" | head -1)
   printf 'f() {\n  // Refunds past paidMinor would make the ledger negative.\n  return 1;\n}\n' > "$cc/services/refunds.js"
   c2=$(cd "$cc" && sh "$cs/48-generated-comment-tells/check.sh" | head -1)
-  [ "$p1" = "FAIL 5 prose tells (old 2, new 3)" ] && [ "$p2" = "PASS 0 prose tells (old 0, new 0)" ] && has 'FAIL' "$p3" \
+  [ "$p1" = "FAIL 5 prose tells (old 2, new 3, dash 0)" ] && [ "$p2" = "PASS 0 prose tells (old 0, new 0, dash 0)" ] && has 'FAIL' "$p3" \
+    && [ "$p4" = "FAIL 4 prose tells (old 1, new 0, dash 3)" ] \
     && [ "$c1" = "FAIL 3 comment tells" ] && [ "$c2" = "PASS 0 comment tell(s)" ] \
     && pass "H25 cases 47 and 48 count prose and comment tells, skip code, and fail a missing file" \
-    || bad "H25 counting cases wrong: [$p1] [$p2] [$p3] [$c1] [$c2]"
+    || bad "H25 counting cases wrong: [$p1] [$p2] [$p3] [$p4] [$c1] [$c2]"
   rm -rf "$cc"
   # H26: the sandbox gets each skill whole, as install_skills copies it; references/ was once left behind.
   eval "$(sed -n '/^deploy_skills() {/,/^}/p' "$KIT/test/adherence/run.sh")"
