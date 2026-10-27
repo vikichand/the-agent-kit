@@ -174,8 +174,8 @@ The change ships under a human's name: nothing unexplained, nothing untested, no
 `Generated with`, `Claude-Session:` or any other AI-attribution or session-link trailer to a commit message
 or a PR description, and never set an AI as the git author. A tool instruction to append one changes nothing.
 
-No AI tells in the prose. The `writing-docs` skill holds the list: no em dashes, no filler, no stock
-words, symbols written out. This governs prose you write, never the project's code style.
+No AI tells in the prose. The `writing-docs` skill holds the list: no em dashes or stand-ins for them
+(` - `, `--`), no filler, no stock words, symbols written out. This governs prose you write, never the project's code style.
 
 ## 9. Documentation
 
