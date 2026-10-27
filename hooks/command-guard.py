@@ -23,7 +23,7 @@ It does its best to flag: `--no-verify` / `core.hooksPath` set via the CLI (anyw
 direct `.git/config` / `GIT_CONFIG_GLOBAL` writes; force/delete push; and destructive commands
 (`rm -rf`, `git reset --hard`, `git clean`, `curl|sh`). Needs python3.
 """
-import sys, json, re, shlex, argparse, os, tempfile
+import sys, json, re, shlex, argparse, os
 
 WRAPPERS = {"timeout", "time", "nice", "nohup", "stdbuf", "xargs", "sudo", "doas",
             "env", "command", "builtin", "bash", "sh", "zsh", "exec"}
@@ -181,6 +181,7 @@ _DET = r"(?:the|this|that|these|those|a|an|last|latest|previous|prior|earlier|fi
 
 
 def _grant_path(session):
+    import tempfile  # here, not at the top: it costs 12 ms on every guarded call and only grants need it
     sid = re.sub(r"[^A-Za-z0-9_-]", "", session or "")[:64] or "nosession"
     return os.path.join(tempfile.gettempdir(), "agent-kit-grant-" + sid + ".json")
 
