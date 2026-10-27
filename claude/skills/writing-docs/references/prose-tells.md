@@ -10,7 +10,8 @@ have learned to read as machine-written. The fix is almost always the plainer se
   State the fact and let the reader judge whether it matters.
 - **Fake-strong verbs.** "serves as", "stands as", "boasts", "features" where "is" or "has" is meant.
 - **Stock vocabulary.** *underscore, showcase, foster, navigate, pivotal, testament, tapestry, deep dive,
-  game-changer*; "when it comes to", "at the end of the day", "the reality is"; *Moreover, Furthermore,
+  game-changer, crucial, enhance, highlighting, align with, intricate, meticulous*; and the newer set,
+  *matters, quietly, practical, dependable, steady, multifaceted, prioritize, universally*; "when it comes to", "at the end of the day", "the reality is"; *Moreover, Furthermore,
   Additionally* opening a sentence.
 - **Empty adverbs and intensifiers.** *just, simply, truly, fundamentally, crucially*; "a real
   improvement", "genuinely useful". Keep one only when it carries contrast or doubt.
@@ -30,6 +31,8 @@ have learned to read as machine-written. The fix is almost always the plainer se
 - **Telling the reader what to think.** "This is the key point", "That part matters more than it
   sounds", "Interestingly". Show why, or delete the aside.
 - **Weasel attribution.** "Experts agree", "studies show", "widely regarded". Name the source or cut it.
+- **Kicker contrasts.** "X, not Y" and "this is not X, it is Y" closing a line for effect: "the stop
+  is a change of approach, not a stopping point". Say what it is and stop.
 - **Staged reveals.** A colon before a dramatic payoff ("The best part: it learns"), "Not X. Not Y. Just
   Z.", a rhetorical question answered in the next sentence. Make the point directly.
 - **Forced triads.** Three adjectives or three parallel clauses because three sounds finished. Use the
@@ -63,10 +66,15 @@ have learned to read as machine-written. The fix is almost always the plainer se
 - **Bold labels that repeat the line.** "**Performance:** Performance improved by 20%."
 - **Title Case Headings.** Use sentence case unless the project's style says otherwise.
 - **Bold scattered mid-sentence**, emoji in headings, a horizontal rule between every section.
+- **Dashes and their stand-ins.** The em dash, the en dash, and a spaced hyphen or double hyphen used as
+  one. A comma, a colon, parentheses or a full stop says the same thing without the tell.
+- **Decorative arrows.** `->` or the arrow glyph in a heading, a list item or a sentence ("Plan -> build
+  -> ship"). Write the words: "plan, then build, then ship".
 
 ## Checking a draft
 
-1. Search the draft for the stock words above and for em dashes; each hit is rewritten or justified.
+1. Search the draft for the stock words above, for dashes and their stand-ins (U+2014, U+2013, ` - `,
+   ` -- `) and for arrows; each hit is rewritten or justified.
 2. Read the first and last sentence of every section: the opener is not a preamble and the closer is
    not a recap or a kicker.
 3. For each paragraph, ask what fact it adds. A paragraph with none is cut.
