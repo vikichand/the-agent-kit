@@ -27,9 +27,22 @@ import sys, json, re, shlex, argparse, os
 
 WRAPPERS = {"timeout", "time", "nice", "nohup", "stdbuf", "xargs", "sudo", "doas",
             "env", "command", "builtin", "bash", "sh", "zsh", "exec"}
+# Options of a wrapper that consume the NEXT token. Without them `timeout -s KILL 60 git push --force`
+# read KILL as the command and the push went unseen.
+WRAPPER_VALUE = {
+    "timeout": {"-s", "--signal", "-k", "--kill-after"},
+    "nice": {"-n", "--adjustment"},
+    "env": {"-u", "--unset", "-C", "--chdir"},
+    "stdbuf": {"-i", "-o", "-e", "--input", "--output", "--error"},
+    "sudo": {"-u", "-g", "-C", "-D", "-h", "-p", "-r", "-t", "-U", "-R", "--user", "--group", "--chdir"},
+    "doas": {"-u", "-C"},
+    "xargs": {"-I", "-n", "-L", "-P", "-s", "-d", "-E", "-a", "--max-args", "--max-procs", "--delimiter"},
+    "time": {"-f", "-o", "--format", "--output"},
+    "exec": {"-a"},
+}
 PUSH_REASON = {
     "ask":  "git push needs your approval each time (per-run, not persistent). Approve only if you asked for this push.",
-    "deny": "git push is guarded on this tool - run it yourself. The agent may commit freely; pushing is left to you.",
+    "deny": "git push is guarded on this tool: run it yourself. Pushing is left to you.",
 }
 # One-time, turn-scoped grants (Claude ask-mode only). See capture_intent() / load_grants().
 COMMIT_ASK = "git commit: approve here, or just ask me in chat to commit. It runs without a prompt only in the same turn you request a commit."
@@ -37,6 +50,7 @@ COMMIT_OK  = "git commit: authorized by your request this turn."
 PUSH_OK    = "git push: authorized by your request this turn."
 PR_ASK     = "gh pr create: approve here, or ask me in chat to open the PR."
 PR_OK      = "gh pr create: authorized by your request this turn."
+PR_DENY    = "opening or merging a pull request is guarded on this tool: run it yourself, like a push."
 MERGE_ASK  = "gh pr merge always needs your approval - a merge is never authorized by a chat request."
 HOOKSPATH_DENY = "core.hooksPath is being set - that points git's hooks elsewhere and disables the guards. Blocked."
 NOVERIFY_DENY  = "`--no-verify` skips the git guard hooks (secret scan, attribution, push guard). Blocked."
@@ -68,10 +82,21 @@ def verb_tokens(tokens):
     i = 0
     while i < len(tokens):
         raw = tokens[i]
-        if base(raw).lower() in WRAPPERS:
+        w = base(raw).lower()
+        if w in WRAPPERS:
             i += 1
-            while i < len(tokens) and (re.match(r"^-?\d+[a-z]?$", tokens[i]) or tokens[i] == "-u"):
-                i += 2 if tokens[i] == "-u" else 1
+            while i < len(tokens) and (tokens[i].startswith("-") or re.match(r"^\d+[a-z]?$", tokens[i])):
+                t = tokens[i]
+                split = (tokens[i + 1] if t in ("-S", "--split-string") and i + 1 < len(tokens) else
+                         t[2:] if t.startswith("-S") and len(t) > 2 else
+                         t.split("=", 1)[1] if t.startswith("--split-string=") else None)
+                if w == "env" and split is not None:
+                    rest = tokens[i + (1 if t in ("-S", "--split-string") else 0) + 1:]
+                    try:                                   # env -S 'git push --force': the value IS the command
+                        return verb_tokens(shlex.split(split) + rest)
+                    except ValueError:
+                        return split.split() + rest
+                i += 2 if tokens[i] in WRAPPER_VALUE.get(w, ()) else 1
             continue
         if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", raw):
             i += 1
@@ -140,6 +165,34 @@ def regenerable_path(p):
     return segs[-1] in REGENERABLE
 
 
+# PowerShell's delete commands and aliases. `rm` is not here: as a POSIX command it keeps the -rf rule above.
+PS_REMOVE = {"remove-item", "ri", "del", "erase", "rd", "rmdir"}
+PS_REMOVE_VALUE = ("-path", "-literalpath", "-filter", "-include", "-exclude")
+# Commands that print a file's contents. A secret file read with one of them lands in the transcript.
+READERS = {"cat", "type", "less", "more", "head", "tail", "grep", "egrep", "fgrep", "rg", "bat", "nl", "xxd",
+           "od", "strings", "base64", "awk", "sed", "cut", "sort", "get-content", "gc", "select-string", "sls",
+           "findstr", "format-hex"}
+_TEMPLATE = (".example", ".sample", ".template", ".dist", ".defaults", ".schema")
+
+
+def secret_path(p):
+    """The same files the Claude settings ask before reading: .env and its variants (templates excepted),
+    keys and certificates, cloud and package-manager credentials, and anything under a secrets folder."""
+    q = p.replace("\\", "/").strip("'\"").rstrip("/")
+    segs = [x for x in q.lower().split("/") if x]
+    if not segs:
+        return False
+    b = segs[-1]
+    if b.endswith(".pub"):
+        return False
+    if b == ".env" or (b.startswith(".env.") and not b.endswith(_TEMPLATE)):
+        return True
+    if b.endswith((".pem", ".p12", ".pfx")) or b in ("id_rsa", "id_ed25519", "id_ecdsa", "id_dsa",
+                                                    ".npmrc", ".netrc", ".pgpass", "credentials"):
+        return b != "credentials" or ".aws" in segs
+    return "secrets" in segs[:-1] or ".gnupg" in segs[:-1]
+
+
 def is_no_verify(flags):                       # git-CONTEXT use (we already know it's a git commit/push)
     return any(a.lower().startswith("--no-v") for a in flags)
 
@@ -151,7 +204,7 @@ def sets_hookspath(tok):                        # a token that SETS core.hooksPa
 
 def is_force_push(args):
     flags = flags_only(args, PUSH_VALUE_FLAGS)
-    if any(a.lower().startswith("--for") or a.lower().startswith("--de") or a == "-d" for a in flags):
+    if any(a.lower().startswith(("--for", "--de", "--mir", "--pru")) or a == "-d" for a in flags):
         return True
     if short_has(flags, "f") or short_has(flags, "d"):
         return True
@@ -264,6 +317,7 @@ def detect_grants(prompt):
     return g
 
 
+GRANT_ASK = "this names the kit's turn-grant file, which only the prompt hook should write. Approve only if you meant it."
 TIDY_ASK = ("this deletes branches, worktrees or files, or kills processes, and none of it can be undone. "
             "Approve only if you chose these items in /tidy.")
 
@@ -299,6 +353,36 @@ def shell_payload(prog, toks):
             out.append([s for s in (x.strip("(){}") for x in shlex.split(part)) if s])
         except ValueError:
             out.append(part.split())
+    return out
+
+
+SHELLS = {"bash", "sh", "zsh", "dash", "ksh", "fish"}
+
+
+def inner_commands(cmd):
+    """The command strings that a shell, eval or Windows shell in `cmd` runs. `bash -c 'git push -f'` holds
+    its command in one quoted word, which every check would otherwise read as a single name. Matched
+    anywhere in a segment, so `echo bash -c '...'` is read too: the cost is a prompt, never a miss."""
+    out = []
+    for part in split_ops(cmd):
+        try:
+            toks = shlex.split(part)
+        except ValueError:
+            continue
+        for i, t in enumerate(toks):
+            prog = base(t).lower()
+            if prog == "eval":
+                out.append(" ".join(toks[i + 1:]))
+            elif prog in ("cmd", "pwsh", "powershell"):
+                out += [shlex.join(s) for s in shell_payload(prog, toks[i:]) or ()]
+            elif prog in SHELLS:
+                j = i + 1
+                while j < len(toks) and toks[j][:1] in "-+":
+                    if re.match(r"^-[A-Za-z]*c[A-Za-z]*$", toks[j]):      # -c, -lc, -xc
+                        if j + 1 < len(toks):
+                            out.append(toks[j + 1])
+                        break
+                    j += 2 if toks[j] in ("-o", "+o", "-O", "+O") else 1   # set -o pipefail takes a value
     return out
 
 
@@ -414,6 +498,11 @@ def _classify(tokens, decision, grants):
         # Scan for the pr subcommand rather than assuming position: a value-taking global flag
         # (`--repo o/r`) leaves its value sitting among the operands.
         ops = [a for a in rest if not a.startswith("-")]
+        if decision == "deny":                           # Codex: no grants and no ask, so like a push
+            for k in range(len(ops) - 1):
+                if ops[k].lower() == "pr" and ops[k + 1].lower() in ("create", "merge"):
+                    return "deny", PR_DENY
+            return None
         if decision == "ask":
             for k in range(len(ops) - 1):
                 if ops[k].lower() == "pr":
@@ -436,6 +525,19 @@ def _classify(tokens, decision, grants):
             if targets and all(regenerable_path(t) for t in targets):
                 return None
             return decision, "`rm -rf` irreversibly deletes files."
+    if verb in PS_REMOVE or (POWERSHELL and verb == "rm"):   # in PowerShell, rm is Remove-Item
+        fl = [a.lower().split(":")[0] for a in rest if a.startswith("-")]      # -Recurse:$true
+        cmd_s = verb in ("rd", "rmdir", "del", "erase") and any(a.lower() == "/s" for a in rest)
+        if cmd_s or any(len(a) > 1 and "-recurse".startswith(a) for a in fl):
+            targets = [a for a in drop_values(rest, PS_REMOVE_VALUE)
+                       if not a.startswith("-") and not re.match(r"^/[A-Za-z]$", a)]
+            if targets and all(regenerable_path(t) for t in targets):
+                return None
+            return decision, "`%s -Recurse` irreversibly deletes a folder and everything in it." % toks[0]
+    if verb in READERS:
+        hit = next((a for a in rest if not a.startswith("-") and secret_path(a)), None)
+        if hit:
+            return decision, "this reads `%s`, a file that holds secrets. Approve only if you meant to show it." % hit
     if verb in ("dd", "mkfs") or verb.startswith("mkfs"):
         return decision, "`%s` can irreversibly destroy data." % verb
     if verb == "chmod" and any(a == "777" or a.endswith("777") or "+s" in a for a in rest):
@@ -461,6 +563,9 @@ _MSG_HEREDOC = re.compile(
 def strip_message_heredocs(cmd):
     def strip(m):
         if not m.group(3) and ("$(" in m.group(5) or "`" in m.group(5)):
+            return m.group(0)
+        line = m.string[m.string.rfind("\n", 0, m.start()) + 1:m.end(1)]
+        if line.count("<<") > 1:                         # `bash <<B; git commit -F - <<A`: B's body runs first
             return m.group(0)
         return m.group(1) + m.group(6)
     return _MSG_HEREDOC.sub(strip, cmd)
@@ -622,6 +727,7 @@ def _env_tamper(rest, depth):
 
 
 ANTIGRAVITY = False   # set by --tool antigravity: its PreToolUse contract differs from Claude's and Codex's
+POWERSHELL = False    # set for Claude Code's PowerShell tool, where rm is Remove-Item
 
 
 def emit(decision, reason):
@@ -667,10 +773,29 @@ def main():
         call = call if isinstance(call, dict) and call.get("name") == "run_command" else {}
         cmd = (call.get("args") or {}).get("CommandLine", "")
     else:
-        cmd = data.get("tool_input", {}).get("command", "")
+        ti = data.get("tool_input")
+        cmd = ti.get("command", "") if isinstance(ti, dict) else ""
     if not isinstance(cmd, str) or not cmd:
         sys.exit(0)
+    if data.get("tool_name") == "PowerShell":
+        global POWERSHELL
+        POWERSHELL = True
+        # PowerShell's escape is the backtick (`--force is --force, a trailing ` continues the line) and its
+        # backslash is a path separator, which the POSIX parsing below would eat: .\.env must stay .env.
+        cmd = re.sub(r"`(.)", r"\1", re.sub(r"`\r?\n", "", cmd)).replace("\\", "/")
     cmd = strip_message_heredocs(cmd)   # a commit message is data, not commands (see _MSG_HEREDOC)
+    cmd = re.sub(r"\\\r?\n", "", cmd)    # the shell joins a backslash-newline: `push \<newline>--force` is one word list
+    # What `bash -c`, eval, `cmd /c` and `pwsh -Command` run is checked as its own lines, three levels deep.
+    todo = [cmd]
+    for _ in range(3):
+        todo = [c for s in todo for c in inner_commands(s)]
+        if not todo:
+            break
+        cmd += "\n" + "\n".join(todo)
+    # The grant file is written by the prompt hook. A command that names it could forge a grant. This
+    # raises the bar for an accident only: the agent's shell can write any file this hook can.
+    if re.search(r"agent-kit-grant", cmd, re.I):
+        emit(args.decision, GRANT_ASK)
     # Grants only exist in Claude ask-mode; Codex (deny) never consults them.
     grants = load_grants(data.get("session_id") or "") if args.decision == "ask" else frozenset()
 
@@ -686,7 +811,8 @@ def main():
     if tamper == "marker":
         emit(args.decision, MARKER_ASK)
 
-    if re.search(r"\|\s*(sudo\s+)?(ba|z)?sh\b", cmd, re.IGNORECASE):   # curl ... | sh / SH / bash / BASH
+    # curl ... | sh / SH / bash / BASH, and PowerShell's iwr ... | iex
+    if re.search(r"\|\s*(?:(sudo\s+)?(ba|z)?sh|iex|invoke-expression)\b", cmd, re.IGNORECASE):
         emit(args.decision, "piping a download straight into a shell (curl | sh) runs unreviewed code.")
 
     # bar-raise (NOT a boundary): direct git-config writes can point hooks elsewhere; the sandbox is the real fix
@@ -712,7 +838,8 @@ def main():
     best = None
     for part in split_ops(cmd):
         try:
-            toks = [s for s in (x.strip("(){}") for x in shlex.split(part)) if s]
+            # An option keeps its braces: stripping `xargs -I{}` to `-I` made it take `git` as its value.
+            toks = [s for s in (x.strip("()" if x.startswith("-") else "(){}") for x in shlex.split(part)) if s]
         except ValueError:
             continue
         res = classify(toks, args.decision, grants)
@@ -726,4 +853,10 @@ def main():
     sys.exit(0)
 
 
-main()
+try:
+    main()
+except SystemExit:
+    raise
+except Exception:
+    # Fail closed on a host without onFailure: an unexpected crash asks (Codex, which cannot ask, denies).
+    emit("deny" if "deny" in sys.argv else "ask", "the command guard could not read this command, so it stops it for you to check.")
