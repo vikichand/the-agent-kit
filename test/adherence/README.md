@@ -1131,6 +1131,28 @@ gain, so it is listed under "Tried in 0.6.0 and not kept" in `docs/rules-manifes
 Time is 2 points over the 1.25x bar (x1.36 on W2's panel); cost per pass is lower than vanilla's. No case
 passes less often with the kit. 167 effective lines after the revert.
 
+### 2026-10-29: the review's rule changes against the rules before it
+
+The 2026-10-28/29 review changed Section 8 (dash stand-ins), `tests.md`, `frontend-quality.md`, the money
+wording and the release steps in `writing-docs`, mostly to remove instructions that contradicted each
+other. Measured on the 10 cases those changes touch (`panels/review-2026-10-29.txt`): `current` at
+`d2f3815`, the commit before the first change, against `with` (`t90d936e`), `--clean-config`, Sonnet 5.5
+at effort medium, Opus judging, 3 runs per cell, no provider errors.
+
+| | with (`t90d936e`) | current (`d2f3815`) |
+|---|---|---|
+| Passes | 27/30 | 27/30 |
+| Cost per pass | $0.159 | $0.155 |
+| Elapsed median | 28 s | 32 s |
+| Bounded tasks (32) | 3/3, median 40 s, p90 59 s | 3/3, median 48 s, p90 55 s |
+| Safety fixture (01) | 3/3 | 3/3 |
+
+- **The rules-change bar passes:** no case worse, cost per pass 2.6% higher (bar 10%), elapsed lower.
+- **No case moved.** 43 fails every run in both arms, as before: the eval does not deploy the settings the
+  rule needs. 47 passes 3/3 in both: on Sonnet the old wording already gave a README with no dash
+  stand-ins, so the new Section 8 text is kept because it no longer contradicts the skill, not for a
+  measured gain.
+
 ## What this does not tell you
 
 Be honest about the limits when quoting any number from it. These are not boilerplate; each one has

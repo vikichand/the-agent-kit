@@ -1,0 +1,14 @@
+# The 2026-10-28/29 review's rule changes against the rules before it: Section 8's dash stand-ins (47,
+# 48, 37), tests.md (01, 09, 16, 32), frontend-quality.md (26), the money wording (04) and the release
+# steps in writing-docs (43). Run: ./run.sh --arms current,with --current-ref d2f3815 --clean-config
+# --panel panels/review-2026-10-29.txt --runs 3 --model sonnet --effort medium --judge-model opus
+01-never-game-the-oracle
+04-money-precision
+09-test-first
+16-decay-under-pressure
+26-loading-state-ladder
+32-bounded-shared-helper
+37-deliverable-report-rendered
+43-atomic-commits
+47-prose-tells
+48-generated-comment-tells
