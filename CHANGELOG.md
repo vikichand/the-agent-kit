@@ -22,12 +22,22 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ### Changed
 
-- **Fewer permission prompts on everyday commands.** The kit no longer adds ask rules for `npx`, `uvx`,
-  `bunx`, `pnpm dlx`, `npm ci` or `yarn install`. Claude Code honours an ask rule even in auto mode and
-  bypass permissions mode, with no time limit, so these stalled unattended runs. Adding a dependency
-  still asks, and so does a bare `npm install`. `install.sh --setup` (and `--update`) removes the old rules from
-  your settings. The README now says how to run unattended: auto mode, plus
-  `CLAUDE_CODE_DISABLE_DANGEROUS_RM_TIMEOUT=1` for commands Claude Code cannot parse.
+- **An overnight run no longer stops on routine commands.** Replayed against the 1,140 permission
+  prompts one user answered in a week, about half no longer appear, and of the rest, all but 275 now
+  time out on their own instead of waiting for you. Those 275 are pushes, deletes outside the project,
+  added dependencies, rules-file edits and the like.
+  - A local `git commit` never asks: it is undoable and never leaves your machine. Pushes, pull
+    requests and merges still ask.
+  - `rm -rf` (and `Remove-Item -Recurse`) asks only when a target could be outside the project or the
+    temp folder. A folder the same command made with `mktemp` counts as temp.
+  - Adding a dependency still asks, now from the guard, which tells `pnpm add x` from
+    `pnpm install --frozen-lockfile`: installing what the lockfile declares, `npx`, `uvx`, `bunx` and
+    `pnpm dlx` no longer ask. Claude Code honours an ask rule even in auto mode and bypass permissions
+    mode, with no time limit, so the old rules stalled unattended runs.
+  - The `curl | sh` check fires only when a download feeds the shell, not on `grep "a|sh.exe"`.
+  - `install.sh --setup` (and `--update`) removes the old ask rules from your settings. The README
+    says what still stops an unattended run in each permission mode, and how to quiet Claude Code's
+    own prompt on commands it cannot parse.
 - **The rules, against the Claude 5.5, GPT-6 and Gemini 3 guidance** (each change is one commit on
   `develop`, kept only if the adherence eval agrees; `docs/rules-manifest.md` lists them with sources).
   A role line opens the file. High-risk work does what does not depend on the user first and asks only

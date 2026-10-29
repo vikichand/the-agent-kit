@@ -29,13 +29,18 @@ KIT_HOOK = re.compile(r'^\s*(?:\S+\s+(?:-3\s+)?)?(?:"[^"]*|\S*)\.the-agent-kit[\
 
 # Ask rules older kits added and this one dropped. Claude Code ignores Write(...) rules, with a warning on
 # every start, because Edit rules cover all file-editing tools (code.claude.com/docs/en/permissions). The
-# tool runners and lockfile installs prompted on everyday commands (npx vitest, npm ci) in every mode,
-# bypassPermissions and auto included, with no time limit, so unattended runs stalled on them; adding a
-# dependency still asks. A bare `npm install` still asks too: `Bash(npm install *)` matches it.
+# tool runners and package installs prompted on everyday commands (npx vitest, npm ci, pnpm install
+# --frozen-lockfile) in every mode, bypassPermissions and auto included, with no time limit, so
+# unattended runs stalled on them: a rule cannot tell adding a package from installing the lockfile.
+# The command guard asks on adding a dependency instead.
 RETIRED = ("Write(**/AGENTS.md)", "Write(**/CLAUDE.md)",
            "Bash(npx *)", "Bash(bunx *)", "Bash(pnpm dlx *)", "Bash(uvx *)",
            "Bash(npm install)", "Bash(npm ci)", "Bash(npm ci *)", "Bash(yarn install)", "Bash(bun install)",
-           "Bash(pnpm install)")
+           "Bash(pnpm install)", "Bash(npm install *)", "Bash(npm i *)", "Bash(npm add *)", "Bash(pnpm add *)",
+           "Bash(pnpm install *)", "Bash(yarn add *)", "Bash(bun add *)", "Bash(bun install *)",
+           "Bash(pip install *)", "Bash(pip3 install *)", "Bash(python -m pip install *)",
+           "Bash(python3 -m pip install *)", "Bash(uv add *)", "Bash(uv pip install *)", "Bash(cargo install *)",
+           "Bash(cargo add *)", "Bash(go install *)", "Bash(gem install *)")
 # Hook matchers older kits shipped, keyed by the current one. The guard first matched only Bash, which left
 # Claude Code's PowerShell tool unguarded.
 OLD_MATCHERS = {"Bash|PowerShell": ("Bash",)}

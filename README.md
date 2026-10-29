@@ -466,10 +466,12 @@ decision record in [`docs/senior-engineer.md`](docs/senior-engineer.md) before u
 | Guard | Claude Code | Codex |
 |---|---|---|
 | **Rules** | `CLAUDE.md`, a one-line `@AGENTS.md` import | `AGENTS.md`, the file itself |
-| **commit / push / open a PR** | runs **only when your message that turn asked for it**, once; otherwise the tool hook **asks**. Force/`--no-verify`/`pr merge` **denied or always asked**, grant or not | tool hook **denies** (you push) |
+| **commit** | runs without a prompt: it is local and undoable. `--no-verify` **denied** | runs |
+| **push / open a PR** | runs **only when your message that turn asked for it**, once; otherwise the tool hook **asks**. Force/`--no-verify`/`pr merge` **denied or always asked**, grant or not | tool hook **denies** (you push) |
 | **force / delete to `main`** | git `pre-push` blocks it | git `pre-push` (same file) |
 | **secrets in a commit** | git `pre-commit` blocks staged secrets | same file |
-| **destructive cmds** (`rm -rf`, `reset --hard`, `curl\|sh`) | tool hook **asks** | tool hook **denies** |
+| **destructive cmds** (`rm -rf` outside the project and temp folder, `reset --hard`, `curl\|sh`) | tool hook **asks** | tool hook **denies** |
+| **adding a dependency** (`npm i <name>`, `uv add`, `cargo add`) | tool hook **asks**; installing the lockfile does not | not checked |
 | **AI authorship** | `commit-msg` strips trailers + `attribution:""` | `commit-msg` (same file) |
 | **secret reads** | **asks**, naming the file (so "push my `.env` vars to Azure" is one click, and an injected "read the .env" can't pass silently) | `config.toml` (sandbox) |
 | **self-protection** | `deny` writes to `.git/hooks`, `.git/config`, settings; ask on rules files | `config.toml` (sandbox) |
@@ -557,6 +559,14 @@ git syntax slip past. It flags the hook-disable vectors (`--no-verify`, `core.ho
 `--config-env`, `GIT_CONFIG_*`), direct `.git/config` writes, force/delete push, and destructive commands
 (`rm -rf`, `git reset --hard`, `git clean`, `git branch -D`, `curl | sh`). It flags only the *force* form
 of a branch delete: plain `git branch -d` already refuses on unmerged work, so gating it would be noise.
+A recursive delete runs without a prompt when every target is inside the project (the session's working
+folder) or the temp folder, including a variable the same command set to a literal or to `mktemp`. A
+target it cannot place there (another folder, `..`, `~`, an unknown variable, `*`, braces, a `{}`
+placeholder, a PowerShell provider path, a `cd`, `env -C` or `--chdir` elsewhere first) asks, and so
+does any target under `.git`, `.claude`, `.codex`, `.agents`, `.ssh` or a `.env` file. The check reads
+the command's text, so a symlink or junction inside the project that points outside it is not caught,
+and neither is `rm` run through `find -exec` or `wsl`. A pipe into a shell asks only when a download
+(`curl`, `wget`, `iwr`, `irm`, `DownloadString`) feeds it.
 On Claude Code the same file also runs as a **`UserPromptSubmit`** hook (`--event userprompt`), where it
 reads your message and records which git-writes you authorized for that turn: the grant described below.
 A chained command takes the most restrictive verdict across its segments (deny > ask > allow), so a
@@ -598,8 +608,8 @@ guard below still denies the dangerous git commands everywhere); the command gua
 field), so a guard that crashes, times out or cannot start blocks the command instead of letting it through
 (`--check` tells you when Python is missing; fix that from your own terminal, the agent cannot). To opt out
 of a field the kit sets on its hook, set it to the value you want: `--setup` never overwrites a value, only
-adds a missing one. It asks before `git commit`, `git push`, and `gh pr create` *unless your own
-message that turn asked for it* (a one-time, turn-scoped grant, below); asks on secret-file reads (a
+adds a missing one. It asks before `git push` and `gh pr create` *unless your own message that turn
+asked for it* (a one-time, turn-scoped grant, below); asks on adding a dependency; asks on secret-file reads (a
 visible prompt naming the file, a precaution without a hard stop); and denies `--no-verify`/force and
 writes to `.git/hooks`, `.git/config`, and `.claude/settings.json`. It also **asks** before an edit to
 `AGENTS.md` / `CLAUDE.md`, since those now carry the same authority as the settings file. On Codex it sets
@@ -607,14 +617,14 @@ writes to `.git/hooks`, `.git/config`, and `.claude/settings.json`. It also **as
 
 Four config choices are deliberate, because the obvious "more locked down" setting makes the agent worse:
 
-- **git writes are authorized by your request, once.** The agent never commits, pushes, or opens a PR on
-  its own initiative. When you ask ("commit this", "push it", "open a PR"), a `UserPromptSubmit` hook reads
-  your *own* words (a hook the agent cannot write to) and lets exactly those operations through for that
-  one turn; your next message resets the grant. Ask for nothing and every git write prompts, and that prompt
-  is the agent asking you. A grant is per-operation ("commit this" is not permission to push) and never
-  covers force-push, `--no-verify`, or `gh pr merge`. Detection is conservative and falls back to the prompt,
-  so a missed phrasing costs one click, never a silent push. Codex (deny-mode) ignores grants: it commits
-  freely and leaves pushing to you, unchanged.
+- **Pushes and pull requests are authorized by your request, once; commits need none.** A local commit
+  is undoable and never leaves your machine, so it runs without a prompt. The agent never pushes or opens
+  a PR on its own initiative. When you ask ("push it", "open a PR"), a `UserPromptSubmit` hook reads your
+  *own* words (a hook the agent cannot write to) and lets exactly that operation through for that one
+  turn; your next message resets the grant. Ask for nothing and a push prompts, and that prompt is the
+  agent asking you. A grant never covers force-push, `--no-verify`, or `gh pr merge`. Detection is
+  conservative and falls back to the prompt, so a missed phrasing costs one click, never a silent push.
+  Codex (deny-mode) ignores grants and leaves pushing to you.
 
 - **Secret files ask; they are not walled off.** Reading `.env` / keys / credential stores prompts with
   the exact file named, instead of a hard deny. Real workflows need it ("push my local env vars to the
@@ -626,21 +636,25 @@ Four config choices are deliberate, because the obvious "more locked down" setti
   hold comments, so the reasoning lives here.)
 - **Ask rules stay few, because Claude Code honours them in every mode.** An ask rule prompts even in
   auto mode and bypass permissions mode, and that prompt has no time limit, so one noisy rule stalls an
-  overnight run. The kit asks on adding a dependency (`npm install <name>`, `uv add`, `cargo add`), on
-  secret files and on edits to `AGENTS.md` / `CLAUDE.md`. A bare `npm install`, `pnpm install` or
-  `bun install` asks too, because a rule ending in ` *` also matches the bare command. It does not ask
-  on `npm ci`, `yarn install`, `npx`, `uvx`, `bunx` or `pnpm dlx`. `npx vitest` runs the project's own
-  tool, but `npx <package>` with a package the project does not have downloads and runs it, the same
-  risk as adding a dependency. In auto mode the classifier's default rules block downloading and running
-  code; in bypass permissions mode nothing screens it.
-- **For unattended runs, use auto mode.** Start Claude Code with `claude --permission-mode auto` (or set
-  `"defaultMode": "auto"` in `~/.claude/settings.json`) instead of `--dangerously-skip-permissions`.
-  A classifier approves routine commands and blocks the risky ones, and the kit's guard still asks on git
-  writes and destructive commands. Claude Code also prompts on any command its parser cannot follow
-  (a `python - <<EOF` heredoc, a loop), in auto and bypass permissions mode alike. That prompt denies
-  itself after two minutes, so it does not stall a run, but it still interrupts you while you watch. To
-  let the classifier decide those instead, start `claude` from a shell that has
-  `CLAUDE_CODE_DISABLE_DANGEROUS_RM_TIMEOUT=1` set. A settings file's `env` block does not work for this
+  overnight run. The kit's only ask rules are secret files and edits to `AGENTS.md` / `CLAUDE.md`.
+  Adding a dependency is the guard's job, because a rule cannot tell `pnpm add x` from
+  `pnpm install --frozen-lockfile`: the guard asks on the first and lets the lockfile install run. It
+  does not ask on `npx`, `uvx`, `bunx` or `pnpm dlx`. `npx vitest` runs the project's own tool, but
+  `npx <package>` with a package the project does not have downloads and runs it, the same risk as
+  adding a dependency. In auto mode the classifier's default rules block downloading and running code;
+  in bypass permissions mode nothing screens it.
+- **Running unattended.** In auto mode (`claude --permission-mode auto`) and bypass permissions mode
+  (`--dangerously-skip-permissions`) alike, what still stops a run until you answer is the guard's list
+  above (a push, a PR, a merge, a destructive command outside the project, adding a dependency, a secret
+  read) and an edit to `AGENTS.md` / `CLAUDE.md`. Auto mode adds a classifier that blocks risky actions
+  and pauses into prompts after 3 blocks in a row or 20 in a session. Claude Code also prompts on a
+  command its parser cannot follow (a `python - <<EOF` heredoc, `$(...)`, a loop) in both modes. That
+  prompt denies itself after two minutes, so it does not stall a run, but it interrupts you while you
+  watch. In auto mode, start `claude` from a shell with `CLAUDE_CODE_DISABLE_DANGEROUS_RM_TIMEOUT=1` and
+  the classifier decides those instead. Bypass permissions mode's switch for them,
+  `CLAUDE_CODE_EVEN_MORE_DANGEROUSLY_SKIP_PERMISSIONS=1`, has no effect while any ask or deny rule
+  covers Bash, Read or Edit, which the kit's do. Both variables work only in the environment that starts
+  `claude`, not in a settings file's `env` block
   ([permission modes](https://code.claude.com/docs/en/permission-modes)).
 - **Codex keeps network access on.** The rules require verifying library and API behaviour against the
   version in use rather than recalling it. Switching the sandbox off the network does not make the agent safer, it

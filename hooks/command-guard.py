@@ -23,7 +23,7 @@ It does its best to flag: `--no-verify` / `core.hooksPath` set via the CLI (anyw
 direct `.git/config` / `GIT_CONFIG_GLOBAL` writes; force/delete push; and destructive commands
 (`rm -rf`, `git reset --hard`, `git clean`, `curl|sh`). Needs python3.
 """
-import sys, json, re, shlex, argparse, os
+import sys, json, re, shlex, argparse, os, posixpath
 
 WRAPPERS = {"timeout", "time", "nice", "nohup", "stdbuf", "xargs", "sudo", "doas",
             "env", "command", "builtin", "bash", "sh", "zsh", "exec"}
@@ -45,8 +45,6 @@ PUSH_REASON = {
     "deny": "git push is guarded on this tool: run it yourself. Pushing is left to you.",
 }
 # One-time, turn-scoped grants (Claude ask-mode only). See capture_intent() / load_grants().
-COMMIT_ASK = "git commit: approve here, or just ask me in chat to commit. It runs without a prompt only in the same turn you request a commit."
-COMMIT_OK  = "git commit: authorized by your request this turn."
 PUSH_OK    = "git push: authorized by your request this turn."
 PR_ASK     = "gh pr create: approve here, or ask me in chat to open the PR."
 PR_OK      = "gh pr create: authorized by your request this turn."
@@ -165,6 +163,98 @@ def regenerable_path(p):
     return segs[-1] in REGENERABLE
 
 
+# A recursive delete runs without a prompt when every target is inside the project (the session's
+# working directory) or the temp folder. main() sets CWD, and turns RELATIVE_OK off when the command
+# also changes directory to anywhere it cannot place inside them.
+CWD = ""
+CMD = ""
+_KEEP = {".git", ".claude", ".codex", ".agents", ".gemini", ".ssh", ".gnupg", ".aws"}
+SHELL_KEYWORDS = ("if", "then", "else", "elif", "do", "while", "until", "!", "time")
+VARS = None
+RELATIVE_OK = True
+_ROOTS = []
+
+
+def _norm(p):
+    """An absolute path in one comparable form: forward slashes, Git Bash's /c/ as c:/, `..` resolved."""
+    q = p.replace("\\", "/")
+    if os.name == "nt":
+        q = re.sub(r"^/([A-Za-z])(?=/|$)", r"\1:", q).lower()
+    return posixpath.normpath(q)
+
+
+def safe_roots():
+    if not _ROOTS:
+        import tempfile  # here, not at the top: it costs 12 ms and only a recursive delete needs it
+        home = _norm(os.path.expanduser("~"))
+        # No cwd from the host: only the temp folder. The hook's own working folder could be anywhere.
+        for r in map(_norm, ([CWD] if CWD else []) + [tempfile.gettempdir(), "/tmp"]):
+            # A session opened in home, a drive root or above home would make everything "the project".
+            if r != home and not home.startswith(r + "/") and posixpath.dirname(r) != r \
+                    and not re.fullmatch(r"[a-z]:/?", r, re.I):
+                _ROOTS.append(r)
+    return _ROOTS
+
+
+def shell_vars():
+    """Variables the command sets to one literal or to a plain `mktemp`, and the temp folder's own names.
+    A name set twice to different values, or to anything else, stays unknown."""
+    if VARS is None:
+        import tempfile
+        tmp = tempfile.gettempdir().replace("\\", "/")
+        found = {"TEMP": tmp, "TMP": tmp, "TMPDIR": tmp}
+        for m in re.finditer(r"(?:^|[\s;&|(])(?:export\s+)?([A-Za-z_]\w*)=(?:\"?\$\(\s*mktemp\b([^)]*)\)\"?"
+                             r"|\"([^\"$`]*)\"|'([^']*)'|([^\s;&|$`'\"()]*))(?=$|[\s;&|)])", CMD):
+            if m.group(2) is not None:   # mktemp -p DIR / --tmpdir=DIR can create anywhere
+                val = None if re.search(r"(^|\s)(-p|--tmpdir)", m.group(2)) else tmp + "/mktemp"
+            else:
+                val = next(g for g in m.group(3, 4, 5) if g is not None)
+                # Globs and braces expand, and a value with a space splits wherever $x is used unquoted.
+                if re.search(r"[*?\[{},\\]", val) or (re.search(r"\s", val) and any(
+                        CMD[:u.start()].count('"') % 2 == 0 for u in re.finditer(r"\$\{?%s\b" % m.group(1), CMD))):
+                    val = None
+            found[m.group(1)] = val if found.get(m.group(1), val) == val else None
+        for name in found:   # set again some other way: `read x`, `for x in`, `unset x`, `x+=`, ...
+            if re.search(r"\b(?:read|unset|declare|typeset|local|let|readonly|for|select|getopts|mapfile)\b"
+                         r"[^;&|\n]*\b%s\b|\b%s\+=" % (name, name), CMD):
+                found[name] = None
+        globals()["VARS"] = found
+    return VARS
+
+
+def contained(p):
+    """True when deleting p cannot reach outside the project or the temp folder, and p is neither."""
+    if "{}" in CMD:     # find -exec / xargs -I fill in `{}`: the real target is unknown
+        return False
+    if "$" in p:
+        v = shell_vars()
+        p = re.sub(r"\$\{(\w+)\}|\$(\w+)", lambda m: v.get(m.group(1) or m.group(2)) or "\0", p)
+    q = p.replace("\\", "/")
+    # An unknown variable, ~, brace expansion or a PowerShell list (`x,D:\y`) can name anything.
+    if not q or any(ch in q for ch in "\0$`~{},"):
+        return False
+    # A colon past a drive letter is a provider or another drive (HKCU:\, FileSystem::D:\, Cert:\).
+    if ":" in (q[2:] if re.match(r"^[A-Za-z]:", q) else q):
+        return False
+    segs = q.split("/")
+    # `...` or `.. ` can read as `..` on Windows; the kit's own folders and secrets always ask.
+    if any(re.fullmatch(r"[. ]+", s) and s not in (".", "..") or s.lower() in _KEEP or s.lower().startswith(".env")
+           for s in segs):
+        return False
+    if any(ch in q for ch in "*?["):
+        # A glob only in the last segment, after a literal first character: `e2e-*` is a family of
+        # entries, while `*` is everything and `.*` can reach `..`.
+        head, _, last = q.rpartition("/")
+        if not re.fullmatch(r"[\w-][^/]*", last) or any(ch in head for ch in "*?["):
+            return False
+        q = head + "/x" if head else "x"
+    if q.startswith("/") or re.match(r"^[A-Za-z]:", q):
+        n = _norm(q)
+        return any(n.startswith(r + "/") for r in safe_roots())
+    segs = [s for s in q.split("/") if s and s != "."]
+    return RELATIVE_OK and bool(segs) and ".." not in segs and bool(CWD) and _norm(CWD) in safe_roots()
+
+
 # PowerShell's delete commands and aliases. `rm` is not here: as a POSIX command it keeps the -rf rule above.
 PS_REMOVE = {"remove-item", "ri", "del", "erase", "rd", "rmdir"}
 PS_REMOVE_VALUE = ("-path", "-literalpath", "-filter", "-include", "-exclude")
@@ -219,8 +309,9 @@ def is_force_push(args):
 # cannot write to) reads each message and records which of commit / push / pr the user asked for,
 # keyed to the session id. The PreToolUse guard then lets exactly those operations through with no
 # prompt, for that turn only. Every new user message OVERWRITES the record, so a grant never
-# survives into a later turn: the agent can never commit, push or open a PR on its own initiative,
-# only in the same turn you asked, or by approving the normal prompt (which is it asking you).
+# survives into a later turn: the agent can never push or open a PR on its own initiative, only in
+# the same turn you asked, or by approving the normal prompt (which is it asking you). A local commit
+# needs no grant: it is undoable and never leaves the machine, so it runs without a prompt.
 #
 # Detection is deliberately CONSERVATIVE and fails toward the prompt: it grants only on a clear
 # request and vetoes on any nearby negation or noun usage ("the commit", "the push logs"). A missed
@@ -434,7 +525,53 @@ def classify(tokens, decision, grants=frozenset()):
     # break /tidy there, so this is Claude and Antigravity only.
     if toks and decision == "ask" and kit_destructive(toks):
         return "ask", TIDY_ASK
+    if toks and decision == "ask":
+        pkg = added_dependency(toks)
+        if pkg:
+            return "ask", DEP_ASK % pkg
     return None
+
+
+# Package managers and the subcommands that add a package when they name one. A bare or flags-only
+# install (`npm install`, `pnpm install --frozen-lockfile`) installs what the lockfile declares.
+_ADDERS = {"npm": ("install", "i", "add", "in"), "pnpm": ("install", "i", "add"), "yarn": ("add",),
+           "bun": ("install", "i", "add", "a"), "pip": ("install",), "pip3": ("install",), "uv": ("add",),
+           "cargo": ("add", "install"), "go": ("install", "get"), "gem": ("install",), "poetry": ("add",),
+           "pipx": ("install", "run"), "bundle": ("add",), "deno": ("add", "install"), "dotnet": ("package",)}
+# Not -w: npm's takes a workspace name but pnpm's is a switch, so it stays a token and npm's
+# `-w ws` reads `ws` as the package. That over-asks; it never lets a package through unasked.
+_DEP_VALUE = ("-r", "--requirement", "-c", "--constraint", "--workspace", "--filter", "-C", "--dir", "--cwd",
+              "--prefix", "--path", "--registry", "--target", "-t")
+DEP_ASK = ("this adds a dependency (%s). Approve after checking it is the real, maintained package you want: "
+           "typo-squatted names are a live attack.")
+
+
+def added_dependency(toks):
+    """The package a command adds, or None. `uv pip install` and `python -m pip install` count as pip."""
+    verb = base(toks[0]).lower()
+    rest = toks[1:]
+    if _LAUNCHER.match(verb) and rest[:2] == ["-m", "pip"]:
+        verb, rest = "pip", rest[2:]
+    if re.fullmatch(r"pip\d*(?:\.\d+)?", verb):
+        verb = "pip"
+    if verb == "uv" and rest[:1] in (["pip"], ["tool"]):        # uv pip install / uv tool install
+        verb, rest = ("pip" if rest[0] == "pip" else "pipx"), rest[1:]
+    if verb == "dotnet" and rest[:1] == ["add"]:                 # dotnet add [project] package x
+        rest = rest[1:]
+        rest = rest[rest.index("package"):] if "package" in rest else []
+    ops, skip = [], False
+    for a in drop_values(rest, _DEP_VALUE):
+        redirect = re.match(r"^\d*(?:>>?|<)(.*)$", a)   # `2>&1`, `> log.txt`, `>/dev/null`
+        if skip or redirect:
+            skip = bool(redirect) and not redirect.group(1)
+            continue
+        if not a.startswith("-"):
+            ops.append(a)
+    if verb not in _ADDERS or not ops or ops[0] not in _ADDERS[verb]:
+        return None
+    # A local path (`./packages/ui`, `file:./CMS`) is the project's own code, not a registry package.
+    pkgs = [a for a in ops[1:] if not re.match(r"^(?:file:|link:|portal:)?(?:\.{1,2}(?:/|$)|/)", a)]
+    return pkgs[0] if pkgs else None
 
 
 def _classify(tokens, decision, grants):
@@ -469,9 +606,7 @@ def _classify(tokens, decision, grants):
         if sub == "commit":
             if is_no_verify(flags_only(args, COMMIT_VALUE_FLAGS)) or short_has(flags_only(args, COMMIT_VALUE_FLAGS), "n"):
                 return "deny", NOVERIFY_DENY
-            if decision == "ask":                       # Claude: silent only if you asked this turn
-                return ("allow", COMMIT_OK) if "commit" in grants else ("ask", COMMIT_ASK)
-            return None                                  # Codex (deny): commit freely, as before
+            return None                                  # local and undoable: no prompt on any tool
         if sub == "reset" and any(a.lower().startswith("--h") for a in args):
             return decision, "`git reset --hard` irreversibly discards changes."
         if sub == "clean" and (short_has(args, "f") or any(a.lower().startswith("--f") for a in args)):
@@ -519,10 +654,10 @@ def _classify(tokens, decision, grants):
         recursive = "r" in letters or any(a.lower().startswith("--r") for a in ftoks)
         force = "f" in letters or any(a.lower().startswith("--f") for a in ftoks)
         if recursive and force:
-            # Silent ONLY when every operand is regenerable build output. One stray target - an
-            # absolute path, a glob, a source dir - and the whole command asks, as before.
+            # Silent only when every operand is build output or sits inside the project or the temp
+            # folder. One target that could reach outside them and the whole command asks.
             targets = [a for a in rest if not a.startswith("-")]
-            if targets and all(regenerable_path(t) for t in targets):
+            if targets and all(regenerable_path(t) or contained(t) for t in targets):
                 return None
             return decision, "`rm -rf` irreversibly deletes files."
     if verb in PS_REMOVE or (POWERSHELL and verb == "rm"):   # in PowerShell, rm is Remove-Item
@@ -531,7 +666,7 @@ def _classify(tokens, decision, grants):
         if cmd_s or any(len(a) > 1 and "-recurse".startswith(a) for a in fl):
             targets = [a for a in drop_values(rest, PS_REMOVE_VALUE)
                        if not a.startswith("-") and not re.match(r"^/[A-Za-z]$", a)]
-            if targets and all(regenerable_path(t) for t in targets):
+            if targets and all(regenerable_path(t) or contained(t) for t in targets):
                 return None
             return decision, "`%s -Recurse` irreversibly deletes a folder and everything in it." % toks[0]
     if verb in READERS:
@@ -811,8 +946,10 @@ def main():
     if tamper == "marker":
         emit(args.decision, MARKER_ASK)
 
-    # curl ... | sh / SH / bash / BASH, and PowerShell's iwr ... | iex
-    if re.search(r"\|\s*(?:(sudo\s+)?(ba|z)?sh|iex|invoke-expression)\b", cmd, re.IGNORECASE):
+    # curl ... | sh / SH / bash / BASH, and PowerShell's iwr ... | iex. Only a download feeding the shell:
+    # `grep "a|sh.exe"` and `printf y | sh install.sh` run nothing fetched.
+    if re.search(r"\b(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod|downloadstring|net\.webclient)\b[^\n;]*"
+                 r"\|\s*(?:(sudo\s+)?(ba|z)?sh|iex|invoke-expression)\b", cmd, re.IGNORECASE):
         emit(args.decision, "piping a download straight into a shell (curl | sh) runs unreviewed code.")
 
     # bar-raise (NOT a boundary): direct git-config writes can point hooks elsewhere; the sandbox is the real fix
@@ -834,14 +971,35 @@ def main():
     # One Bash call gets ONE decision, so the MOST RESTRICTIVE segment must win: deny > ask > allow.
     # Without this ranking a chained command silently downgrades - `git push && git commit` with only
     # commit granted would end on `allow` and run the ungranted push promptless.
+    global CWD, CMD, RELATIVE_OK
+    CWD = data.get("cwd") if isinstance(data.get("cwd"), str) else ""
+    CMD = cmd
+    for part in split_ops(cmd):                      # `cd / && rm -rf usr` is not a delete inside the project
+        try:
+            raw = [s for s in (x.strip("(){}") for x in shlex.split(part)) if s]
+        except ValueError:
+            RELATIVE_OK = False                      # unreadable: it may change directory
+            continue
+        while raw and raw[0] in SHELL_KEYWORDS:
+            raw = raw[1:]                            # `if true; then cd /; rm -rf x; fi`
+        if any(a in ("-C", "--chdir", "--cd") or a.startswith(("--chdir=", "--cd=")) for a in raw):
+            RELATIVE_OK = False                      # `env -C / rm -rf x`, `wsl --cd /`
+        t = verb_tokens(raw)
+        if t and base(t[0]).lower() in ("cd", "pushd", "popd", "chdir", "set-location", "sl", "push-location"):
+            dest = [a for a in t[1:] if not a.startswith("-")]
+            if not dest or not contained(dest[0].rstrip("/\\") + "/x"):   # the folder itself, or inside
+                RELATIVE_OK = False
     rank = {"allow": 0, "ask": 1, "deny": 2}
     best = None
     for part in split_ops(cmd):
         try:
-            # An option keeps its braces: stripping `xargs -I{}` to `-I` made it take `git` as its value.
-            toks = [s for s in (x.strip("()" if x.startswith("-") else "(){}") for x in shlex.split(part)) if s]
+            words = shlex.split(part)
         except ValueError:
-            continue
+            words = part.split()     # unbalanced quotes: read the words anyway, never skip the segment
+        # An option keeps its braces: stripping `xargs -I{}` to `-I` made it take `git` as its value.
+        toks = [s for s in (x.strip("()" if x.startswith("-") else "(){}") for x in words) if s]
+        while toks and toks[0] in SHELL_KEYWORDS:       # `for i in 1; do rm -rf /; done`
+            toks = toks[1:]
         res = classify(toks, args.decision, grants)
         if res:
             if res[0] == "deny":
