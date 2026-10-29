@@ -96,7 +96,7 @@ state the bucket and the oracle in one clause and go.
 - Match the codebase: its patterns and style over your preferences.
 - Senior correctness defaults. Never swallow an error; fallbacks are logged and bounded. Multi-step writes
   are transactional; webhooks and retries fire twice, so handlers survive replay. Ask what happens at 100k
-  rows (no N+1, no unbounded fetch). UTC internally, decimal for money. Schema changes stage (expand ->
+  rows (no N+1, no unbounded fetch). UTC internally; money as decimal or minor units. Schema changes stage (expand ->
   migrate -> contract) and are never destructive without a human decision.
 - Comments say why, not what: the constraint, the trap, the reason for the odd choice. A deliberate
   shortcut gets a comment naming its ceiling and upgrade path. Never narrate a line.

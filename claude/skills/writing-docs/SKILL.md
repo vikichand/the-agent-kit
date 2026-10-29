@@ -52,7 +52,9 @@ thorough.
   commit, never one per file. A subject that needs a bracketed list or a second "and" is two commits.
 - For a squash merge, the pull request description becomes the commit message: write it as one.
 
-**Branches, tags and releases** (the project block's **Branches** line decides; this is the default)
+**Branches, tags and releases** (the project block's **Branches** line decides; this is the default).
+This says how; each step (merge, branch delete, tag, push, release) still runs only when the user names
+it (`AGENTS.md` Section 7).
 
 - A short-lived branch starts from the working branch, is named for its work (`ci/supply-chain`),
   merges back there and is deleted. It never targets a release-only branch. Fast-forward when you can;

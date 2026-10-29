@@ -63,7 +63,8 @@ review found") always run from the markdown.
   most common docs failure is a reference that keeps lapsing into tutorial.
 - **Follow the project's declared style guide** from `PROJECT-CONFIG`; absent one, Google's
   developer documentation style guide is the default for developer-facing prose. Declaring a
-  standard matters more than which one.
+  standard matters more than which one. Where a guide and `writing-docs` differ (dashes, arrows),
+  `writing-docs` wins.
 - **Commit messages follow the `writing-docs` skill** (`AGENTS.md` Section 7: one logical change per
   commit; Section 8: no attribution trailers).
 - the `writing-docs` skill still governs: no AI prose tells, working path first, tables for what people

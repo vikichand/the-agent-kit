@@ -29,7 +29,7 @@ Under pressure to make a build pass, the tempting moves are all cheating:
 changed. Fix the implementation, or change the test *deliberately and visibly* - never in the same
 quiet diff as the feature, and never without saying you did it.
 
-If a test is genuinely wrong, say so out loud, explain why, and change it as its own change.
+If a test is genuinely wrong, say so out loud, explain why, and name the change in the commit message.
 
 **Repairing a failing test** (by hand, or by an automated healer such as Playwright's) may fix selectors,
 waits, setup and stale fixtures. Changing what the test *expects* (behaviour, permissions, a contract, an
@@ -61,4 +61,5 @@ only where the changed behaviour has no coverage, so you can prove the fix works
 stays dead.
 
 `AGENTS.md` Section 0 sets the ceremony - a mechanical change needs none of this; a behaviour change
-keeps test-first, and one reproducing test is enough.
+keeps test-first: one reproducing test for a bug fix, and about one per stated behaviour otherwise,
+with the denied and abuse cases where security, money or auth are involved (Section 5).

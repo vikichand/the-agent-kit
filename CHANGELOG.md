@@ -53,6 +53,10 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ### Fixed
 
+- Rules that told the agent two incompatible things now agree: how many tests a behaviour change needs,
+  how a corrected test is committed, skeleton or spinner for a short wait, what to do in a project with
+  no i18n layer, money as decimal or integer minor units, which style guide wins on dashes, and that
+  each release step still needs your request.
 - The pre-commit hook blocked every commit once gitleaks was installed: it read a clean gitleaks
   result as a finding. It now runs `gitleaks git --staged` on 8.19 and later and `protect --staged`
   before that, and blocks only on a finding.
