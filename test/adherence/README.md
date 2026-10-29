@@ -1043,7 +1043,10 @@ the 0.6.0 changes touch (`panels/w2-0.6.0.txt`):
 | 01, 07, 34, 36, 42, 45, 47, 49, 50, 51 | all pass | all pass | 51: 0/3, 34: 5/6, 36: 5/6, rest pass |
 | 06 push back | 0/3 | 0/3 | 0/6 |
 | 43 atomic commits | 0/3 | 0/2 | 0/6 |
-| **All** | **58/65 (89%)** | **51/59 (86%)** | **128/210 (61%)** |
+| **All** | **58/65 (89%)** | **51/59 (86%)** | **49/115 (43%)** |
+
+The vanilla total first read 128/210 (61%): it counted every vanilla cell of 2026-10-23, the 31 cases
+outside this panel included. Corrected 2026-10-29 from `results/2026-10-23.tsv`.
 
 - **No case worse than v0.5.1 or than vanilla.** The panel grades the rule commits together; no case shows
   harm, so none is reverted. After the evidence table became one sentence, 09 and 16 ran again: 6/6.
@@ -1064,7 +1067,7 @@ the 0.6.0 changes touch (`panels/w2-0.6.0.txt`):
 | Session-start overhead (one-word probe) | 5,334 tokens (`AGENTS.md` about 4,910) | about 5,200 |
 | Extra context written per eval cell | +8,639 tokens ($0.032) | +7,498 ($0.028) |
 | Marginal cost on both-pass cases | x1.21 (7 cases) | x1.24 |
-| Cost per pass (develop, v0.5.1, vanilla) | $0.162 | $0.162 (vanilla $0.108) |
+| Cost per pass (develop, v0.5.1, vanilla) | $0.162 | $0.162 (vanilla $0.161 on these 20 cases) |
 | Elapsed, per-case median ratio | x1.36 | x1.34 |
 
 - **Against v0.5.1** (rules-change bar, 10%): equal cost per pass, elapsed within 1 s on the median. Passes.
