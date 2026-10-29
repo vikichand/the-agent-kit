@@ -84,6 +84,22 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   clears the environment for a push. The pre-push
   hook reads that marker to refuse a force-push override from an agent, so removing it would make
   the agent's push look like yours.
+- The command guard now covers Claude Code's PowerShell tool. Before, it ran only on Bash, so on Windows
+  every command sent through PowerShell skipped it. It reads PowerShell's own escapes: ``git push
+  `--force`` is a force push and `gc .\.env` reads a secret. `iwr ... | iex` is asked like `curl | sh`.
+  An existing install's guard gains the PowerShell tool on `--setup`; a matcher you set yourself is kept.
+- Closed guard bypasses: the command inside `bash -c '...'`, `sh -lc`, `eval`, `cmd /c` and
+  `pwsh -Command` is now checked like any other, so `bash -c 'git push -f'` is refused. A wrapper's own
+  options (`timeout -s KILL 60 git push --force`, `nice -n`, `sudo -u`, `exec -a`, `xargs -I{}`,
+  `env -S` in every spelling) no longer hide the command they run. In PowerShell, `rm -Recurse`,
+  `-Recurse:$true` and `rd /s` are asked like `rm -rf`; `git push --mirror` and `--prune` are refused like a
+  force push and a push grant never covers them; a line continuation no longer splits `--force` from its
+  push; a second heredoc can no longer hide a command behind a commit grant. On Codex, `gh pr merge` and
+  `gh pr create` are refused. PowerShell's `Remove-Item -Recurse` is asked like `rm -rf`. Reading a
+  secret file through the shell (`cat .env`, `Get-Content`, `~/.ssh` keys) is asked on Claude Code and
+  Antigravity and refused on Codex. A
+  command that names the turn-grant file is asked, and a payload the guard does not expect no longer
+  crashes it.
 
 ## [0.5.1] - 2026-10-22
 

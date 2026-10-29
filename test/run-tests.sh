@@ -1087,6 +1087,19 @@ EOF
   su 1
   [ "$(guard_field onFailure)" = continue ] && has 'already' "$o" \
     && pass "M16 a value the user set for a field the kit also sets is the opt-out: kept, nothing rewritten" || bad "M16 user's onFailure overwritten: $(guard_field onFailure) $o"
+  # M17: the guard also covers Claude Code's PowerShell tool. An install whose guard block still has the
+  # kit's old "Bash" matcher gains it; a matcher the user chose is kept.
+  guard_matcher() { jq_ "$g/.claude/settings.json" "[b.get('matcher') for b in d['hooks']['PreToolUse'] if any('command-guard.py' in h['command'] for h in b['hooks'])][0]"; }
+  set_matcher() { $PY -c "import json,sys;p=sys.argv[1];d=json.load(open(p,encoding='utf-8'))
+for b in d['hooks']['PreToolUse']:
+    if any('command-guard.py' in h['command'] for h in b['hooks']): b['matcher']=sys.argv[2]
+json.dump(d,open(p,'w',encoding='utf-8'))" "$(wq "$g/.claude/settings.json")" "$1"; }
+  set_matcher Bash; su 1
+  [ "$(guard_matcher)" = 'Bash|PowerShell' ] && has 'matcher' "$o" \
+    && pass "M17 the guard's old Bash matcher widens to Bash|PowerShell" || bad "M17 matcher not widened: $(guard_matcher) $o"
+  set_matcher 'Bash|Shell'; su 1
+  [ "$(guard_matcher)" = 'Bash|Shell' ] && pass "M17 a matcher the user chose is kept" || bad "M17 user's matcher overwritten: $(guard_matcher)"
+  set_matcher 'Bash|PowerShell'
   HOME="$g" git config --global core.hooksPath .husky
   su 1
   [ "$(gh_)" = .husky ] && has 'is .husky' "$o" \

@@ -30,6 +30,9 @@ KIT_HOOK = re.compile(r'^\s*(?:\S+\s+(?:-3\s+)?)?(?:"[^"]*|\S*)\.the-agent-kit[\
 # Permission rules older kits added that Claude Code now ignores, with a warning on every start: it reads
 # no Write(...) rules, because Edit rules cover all file-editing tools (code.claude.com/docs/en/permissions).
 RETIRED = ("Write(**/AGENTS.md)", "Write(**/CLAUDE.md)")
+# Hook matchers older kits shipped, keyed by the current one. The guard first matched only Bash, which left
+# Claude Code's PowerShell tool unguarded.
+OLD_MATCHERS = {"Bash|PowerShell": ("Bash",)}
 
 
 def load_template(path, share_cmd, py):
@@ -65,6 +68,14 @@ def merge_hooks(mine, kit, changes, exact=False):
                     for h in list(b.get("hooks", [])):
                         if (h.get("command") == want) if exact else (canon(h.get("command")) == canon(want)):
                             found = True
+                            # A matcher the kit shipped before widens to the current one; any other matcher
+                            # is the user's choice and is kept. Only in the kit's own block: a shared block's
+                            # matcher would change which tools the user's hooks run on.
+                            if (b.get("matcher") in OLD_MATCHERS.get(kb.get("matcher"), ())
+                                    and len(b.get("hooks", [])) == 1):
+                                changes.append("updated %s hook: %s (matcher %s to %s)" % (
+                                    event, script or want[:60], b["matcher"], kb["matcher"]))
+                                b["matcher"] = kb["matcher"]
                             # A field the kit added later (onFailure, timeout) reaches an install that already
                             # has the hook; a value the user set themselves is never overwritten. To opt out of
                             # a field, set it to the value you want: a field left out comes back on the next run.
