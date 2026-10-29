@@ -624,6 +624,24 @@ Four config choices are deliberate, because the obvious "more locked down" setti
   `.env.*`, so `.env.example` / `.env.sample` stay silently readable. They carry no secrets and are
   exactly how an agent learns what configuration a project expects. (`settings.json` is JSON and cannot
   hold comments, so the reasoning lives here.)
+- **Ask rules stay few, because Claude Code honours them in every mode.** An ask rule prompts even in
+  auto mode and bypass permissions mode, and that prompt has no time limit, so one noisy rule stalls an
+  overnight run. The kit asks on adding a dependency (`npm install <name>`, `uv add`, `cargo add`), on
+  secret files and on edits to `AGENTS.md` / `CLAUDE.md`. A bare `npm install`, `pnpm install` or
+  `bun install` asks too, because a rule ending in ` *` also matches the bare command. It does not ask
+  on `npm ci`, `yarn install`, `npx`, `uvx`, `bunx` or `pnpm dlx`. `npx vitest` runs the project's own
+  tool, but `npx <package>` with a package the project does not have downloads and runs it, the same
+  risk as adding a dependency. In auto mode the classifier's default rules block downloading and running
+  code; in bypass permissions mode nothing screens it.
+- **For unattended runs, use auto mode.** Start Claude Code with `claude --permission-mode auto` (or set
+  `"defaultMode": "auto"` in `~/.claude/settings.json`) instead of `--dangerously-skip-permissions`.
+  A classifier approves routine commands and blocks the risky ones, and the kit's guard still asks on git
+  writes and destructive commands. Claude Code also prompts on any command its parser cannot follow
+  (a `python - <<EOF` heredoc, a loop), in auto and bypass permissions mode alike. That prompt denies
+  itself after two minutes, so it does not stall a run, but it still interrupts you while you watch. To
+  let the classifier decide those instead, start `claude` from a shell that has
+  `CLAUDE_CODE_DISABLE_DANGEROUS_RM_TIMEOUT=1` set. A settings file's `env` block does not work for this
+  ([permission modes](https://code.claude.com/docs/en/permission-modes)).
 - **Codex keeps network access on.** The rules require verifying library and API behaviour against the
   version in use rather than recalling it. Switching the sandbox off the network does not make the agent safer, it
   makes it fall back on training data. Anthropic's own guidance notes that when two instructions conflict,

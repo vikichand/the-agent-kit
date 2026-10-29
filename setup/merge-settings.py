@@ -27,9 +27,15 @@ import argparse, json, os, re, shutil, sys, time
 KIT_HOOK = re.compile(r'^\s*(?:\S+\s+(?:-3\s+)?)?(?:"[^"]*|\S*)\.the-agent-kit[\\/]+hooks[\\/]+([\w.-]+\.py)"?'
                       r'(?:\s+--?[\w-]+(?:\s+[\w-]+)?)*\s*$')
 
-# Permission rules older kits added that Claude Code now ignores, with a warning on every start: it reads
-# no Write(...) rules, because Edit rules cover all file-editing tools (code.claude.com/docs/en/permissions).
-RETIRED = ("Write(**/AGENTS.md)", "Write(**/CLAUDE.md)")
+# Ask rules older kits added and this one dropped. Claude Code ignores Write(...) rules, with a warning on
+# every start, because Edit rules cover all file-editing tools (code.claude.com/docs/en/permissions). The
+# tool runners and lockfile installs prompted on everyday commands (npx vitest, npm ci) in every mode,
+# bypassPermissions and auto included, with no time limit, so unattended runs stalled on them; adding a
+# dependency still asks. A bare `npm install` still asks too: `Bash(npm install *)` matches it.
+RETIRED = ("Write(**/AGENTS.md)", "Write(**/CLAUDE.md)",
+           "Bash(npx *)", "Bash(bunx *)", "Bash(pnpm dlx *)", "Bash(uvx *)",
+           "Bash(npm install)", "Bash(npm ci)", "Bash(npm ci *)", "Bash(yarn install)", "Bash(bun install)",
+           "Bash(pnpm install)")
 # Hook matchers older kits shipped, keyed by the current one. The guard first matched only Bash, which left
 # Claude Code's PowerShell tool unguarded.
 OLD_MATCHERS = {"Bash|PowerShell": ("Bash",)}
@@ -120,7 +126,7 @@ def merge_json(path, template, is_claude):
             retired = [r for r in lst if r in RETIRED] if kind == "ask" else []   # shipped in ask only
             if retired:
                 lst[:] = [r for r in lst if r not in RETIRED]
-                changes.append("removed %d %s rule(s) Claude Code ignores: %s" % (len(retired), kind, ", ".join(retired)))
+                changes.append("removed %d %s rule(s) the kit retired: %s" % (len(retired), kind, ", ".join(retired)))
             added = [r for r in template.get("permissions", {}).get(kind, []) if r not in lst]
             lst.extend(added)
             if added:

@@ -1054,7 +1054,7 @@ EOF
   $PY - "$(wq "$g/.claude/settings.json")" <<'EOF'
 import json, sys
 p = sys.argv[1]; d = json.load(open(p, encoding='utf-8')); ask = d['permissions']['ask']
-ask += [r for r in ("Write(**/AGENTS.md)", "Write(**/CLAUDE.md)", "Write(**/mine.md)") if r not in ask]
+ask += [r for r in ("Write(**/AGENTS.md)", "Write(**/CLAUDE.md)", "Write(**/mine.md)", "Bash(npx *)", "Bash(npm ci)") if r not in ask]
 d['permissions']['deny'].append("Write(**/CLAUDE.md)")   # the kit only shipped them in ask: a deny is the user's
 json.dump(d, open(p, 'w', encoding='utf-8'))
 EOF
@@ -1067,6 +1067,10 @@ EOF
     && [ "$(jq_ "$g/.claude/settings.json" "'Write(**/CLAUDE.md)' in d['permissions']['deny']")" = True ] \
     && ls "$g/.claude/"settings.json.bak-agent-kit-* >/dev/null 2>&1 \
     && pass "M13 --setup removes the kit's two Write rules, keeps the user's, backs up first" || bad "M13 retired rules not handled: $o"
+  # The tool-runner and lockfile-install ask rules prompted on everyday commands (npx vitest, npm ci) with
+  # no time limit in every mode, which stalled unattended runs. Adding a dependency still asks.
+  [ "$(jq_ "$g/.claude/settings.json" "[r for r in ('Bash(npx *)', 'Bash(npm ci)', 'Bash(npm install *)') if r in d['permissions']['ask']]")" = "['Bash(npm install *)']" ] \
+    && pass "M13 --setup removes the retired npx and lockfile-install asks; adding a dependency still asks" || bad "M13 noisy ask rules kept: $(jq_ "$g/.claude/settings.json" "d['permissions']['ask']")"
   su 1
   has 'already' "$o" && pass "M13 a second run is already current" || bad "M13 retiring is not idempotent: $o"
   # M16: the template turns off Claude Code's own commit and pull-request instructions (AGENTS.md Section 7

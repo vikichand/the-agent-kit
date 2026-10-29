@@ -22,6 +22,12 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ### Changed
 
+- **Fewer permission prompts on everyday commands.** The kit no longer adds ask rules for `npx`, `uvx`,
+  `bunx`, `pnpm dlx`, `npm ci` or `yarn install`. Claude Code honours an ask rule even in auto mode and
+  bypass permissions mode, with no time limit, so these stalled unattended runs. Adding a dependency
+  still asks, and so does a bare `npm install`. `install.sh --setup` (and `--update`) removes the old rules from
+  your settings. The README now says how to run unattended: auto mode, plus
+  `CLAUDE_CODE_DISABLE_DANGEROUS_RM_TIMEOUT=1` for commands Claude Code cannot parse.
 - **The rules, against the Claude 5.5, GPT-6 and Gemini 3 guidance** (each change is one commit on
   `develop`, kept only if the adherence eval agrees; `docs/rules-manifest.md` lists them with sources).
   A role line opens the file. High-risk work does what does not depend on the user first and asks only
