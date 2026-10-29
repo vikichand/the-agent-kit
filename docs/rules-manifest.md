@@ -67,7 +67,7 @@ means no case covers the rule yet.
 | S5.6 | Looks right is not done; a check that never ran is not a check | workflow | - | Sonnet 5.5 at low effort can skip the check |
 | S6.1 | Root cause; fix where shared | engineering | 03, 32, 35 (4/6) | 0.5.0: 03, 32, 35 all 3/3 |
 | S6.2 | Two-attempt rule | workflow | - | |
-| S7.1 | Session is disposable; checkpoint constraints and evidence; clear a degraded thread | workflow | - | no case (needs a multi-session harness) |
+| S7.1 | The conversation is never the only record; checkpoint constraints, decisions and evidence before a handoff or compaction | workflow | - | no case (needs a multi-session harness) |
 | S7.2 | Commit, push, PR only when asked; sync before shipping | contract | 08 (3/3) | also the grant hook |
 | S7.3 | A repeated mistake is a missing rule: propose it | contract | - | |
 | S7.4 | Announce breaking changes | engineering | - | |
