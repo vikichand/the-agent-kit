@@ -53,6 +53,9 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ### Fixed
 
+- The pre-commit hook blocked every commit once gitleaks was installed: it read a clean gitleaks
+  result as a finding. It now runs `gitleaks git --staged` on 8.19 and later and `protect --staged`
+  before that, and blocks only on a finding.
 - The adherence eval on Windows: a claude.ai login turns the PowerShell tool on by default and the
   harness allowlist holds only Bash rules, so a test run sent through PowerShell was denied and scored as
   the agent's failure. Agent cells now run with the PowerShell tool off.

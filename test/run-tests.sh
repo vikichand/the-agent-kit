@@ -107,6 +107,21 @@ sec() { printf '%s\n' "$2" > "$1"; git add "$1"
 sec s1 "AKIA""IOSFODNN7EXAMPLE"             'AWS key'
 sec s2 "sk-""abcdefghijklmnopqrstuvwx12345" 'sk- key'
 sec s3 "-----BEGIN RSA PRIVATE"" KEY-----"  'private key'
+# PC-G: with gitleaks installed, a clean commit still passes and its finding still blocks, on the
+# current CLI (`gitleaks git`, 8.19+) and on an older one that has only `protect`. A fake on PATH
+# lists FAKE_SUB in its help and exits FAKE_RC when that subcommand runs.
+fg=$(mktemp -d) || exit 2
+printf '#!/bin/sh\ncase "$1" in\n--help|help) printf "Available Commands:\\n  %%s  scan\\n" "$FAKE_SUB" ;;\n"$FAKE_SUB") exit "${FAKE_RC:-0}" ;;\n*) echo "unknown command" >&2; exit 1 ;;\nesac\n' > "$fg/gitleaks"
+chmod +x "$fg/gitleaks"
+for sub in git protect; do
+  printf 'ok %s\n' "$sub" > g.txt; git add g.txt
+  if PATH="$fg:$PATH" FAKE_SUB=$sub FAKE_RC=0 git commit -q -m g 2>/dev/null; then pass "PC-G clean commit passes with gitleaks ($sub)"
+  else bad "PC-G clean commit BLOCKED with gitleaks ($sub)"; git reset -q >/dev/null 2>&1; fi
+  printf 'leak %s\n' "$sub" > g.txt; git add g.txt
+  if PATH="$fg:$PATH" FAKE_SUB=$sub FAKE_RC=1 git commit -q -m g 2>/dev/null; then bad "PC-G gitleaks ($sub) finding committed"
+  else pass "PC-G gitleaks ($sub) finding blocks"; git reset -q >/dev/null 2>&1; fi
+done
+rm -rf "$fg"; git rm -q --cached g.txt >/dev/null 2>&1; rm -f g.txt
 # PC-A: GitHub Actions pinned to a floating ref are blocked; SHA, local, digest and exempt pass; and an
 # UNCHANGED floating line never blocks a commit that only touches another line.
 mkdir -p .github/workflows
