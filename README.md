@@ -171,7 +171,7 @@ mkdir -p ~/.gemini && cat ~/.the-agent-kit/AGENTS.md >> ~/.gemini/AGENTS.md  # A
 cd /path/to/project && ~/.the-agent-kit/install.sh --extension
 ```
 
-**One thing this costs you, tested:** `~/.claude/rules/` is *not* read - path-scoped rules only load
+**One thing this costs you, tested:** `~/.claude/rules/` is *not* read: path-scoped rules only load
 from a project's own `.claude/rules/`. So global rules give you the universal floor everywhere but
 none of the depth tier. `--extension` still installs the depth tier into the project, which is why
 it is in the command above. Global rules also stay on your machine, so cloud agents, CI and
@@ -204,10 +204,10 @@ in `~/.agents/skills`, the `skills.json` names and the Antigravity check hook, a
 | Shell | What changes |
 |---|---|
 | Git Bash · WSL · macOS · Linux | Nothing. The commands work as written. |
-| PowerShell | `curl.exe`, not `curl` - PowerShell aliases `curl` to `Invoke-WebRequest`, which rejects these flags. `sh`, `cp` and `~` all work. |
+| PowerShell | `curl.exe`, not `curl`: PowerShell aliases `curl` to `Invoke-WebRequest`, which rejects these flags. `sh`, `cp` and `~` all work. |
 | CMD | `%USERPROFILE%` in place of `~`. |
 
-**No `curl`?** You never need it - this does the same job with git, which the kit requires anyway:
+**No `curl`?** You never need it. This does the same job with git, which the kit requires anyway:
 
 ```bash
 git clone https://github.com/vikichand/the-agent-kit.git && cd the-agent-kit && ./install.sh --setup
@@ -262,7 +262,7 @@ hooks in that file are kept. To switch it off, set `AGENT_KIT_NO_UPDATE_CHECK=1`
 [**the-ultimate-gitignore-ai**](https://github.com/vikichand/the-ultimate-gitignore-ai) as the
 project's `.gitignore`. The two agree by design: `AGENTS.md` / `CLAUDE.md` stay committed (team
 intent), the files agent sessions generate (`.claude/settings.local.json`, `CLAUDE.local.md`) stay
-ignored, and `.env` is ignored while `.env.example` stays readable - the same carve-out the kit's
+ignored, and `.env` is ignored while `.env.example` stays readable, the same carve-out the kit's
 permission rules make.
 
 Needs `git`, POSIX `sh` / `awk` / `grep` (bundled with git), and Python 3 for the tool-layer guard.
@@ -274,7 +274,7 @@ MCP servers, plugins, and skills are a separate job, deliberately not automated:
 [`docs/environment-setup-prompt.md`](docs/environment-setup-prompt.md). For browser work,
 [`docs/browser-tools.md`](docs/browser-tools.md) settles Playwright vs Chrome DevTools. To keep the
 kit current as practice moves, run [`docs/staying-current-prompt.md`](docs/staying-current-prompt.md)
-quarterly - it researches what shifted and proposes at most a handful of changes, with NO CHANGE as
+quarterly. It researches what shifted and proposes at most a handful of changes, with NO CHANGE as
 the expected verdict.
 
 ## Table of Contents
@@ -298,18 +298,18 @@ the expected verdict.
 Two halves, one install: rules the agent follows, and guards that do not depend on it remembering
 them. The rules arrive in three tiers, each paid for only when it applies.
 
-**The rules** - a tight `AGENTS.md` that gets an agent working like a senior engineer instead of an
+**The rules:** a tight `AGENTS.md` that gets an agent working like a senior engineer instead of an
 eager intern: reuse what the codebase already has rather than rebuilding it, know the blast radius
 before editing, test first and never fake a green test, fix the root cause instead of the reported
 symptom, and ship no "improvement" nobody asked for. Per-project setup adds your real build and test
-commands, and for user-facing apps the quality bars an agent otherwise skips - accessibility, i18n,
+commands, and for user-facing apps the quality bars an agent otherwise skips: accessibility, i18n,
 observability, audit logs.
 
-**The depth tier** - longer, situational rules that load only when the agent opens a file they apply
+**The depth tier:** longer, situational rules that load only when the agent opens a file they apply
 to, so security rules arrive on API code and accessibility rules on components, at no cost the rest of
 the time.
 
-**The task tier** - four skills that load on what you are *doing* rather than which file you opened:
+**The task tier:** four skills that load on what you are *doing* rather than which file you opened:
 splitting work across subagents, writing a plan or report a human will act on, documentation and
 commit-message prose, and a user-invoked `/tidy` cleanup.
 
@@ -327,7 +327,7 @@ and the installer is the adapter between them:
 | Session-start update check | yes | yes | yes, on the first call of each conversation (a global `PreInvocation` hook; Antigravity has no `SessionStart` event) |
 | Measured | 48 cases, Sonnet | 15 cases, see [Limits](#limits) | 13 cases, small sample, see [Limits](#limits) |
 
-**The guards** - hooks at the **git layer** (reorder-proof, covering Claude Code, Codex, Antigravity, plain `git`,
+**The guards:** hooks at the **git layer** (reorder-proof, covering Claude Code, Codex, Antigravity, plain `git`,
 and any MCP tool that shells out to `git`) plus the **tool layer**, a fast prompt-time veto. Full map
 in [`FEATURES.md`](FEATURES.md); the senior-engineer trait ledger with sources is
 [`docs/senior-engineer.md`](docs/senior-engineer.md).
@@ -341,8 +341,8 @@ you want server-side branch protection and a
 credential you hand it. Nothing here guarantees an agent never pushes or never leaks; it makes the
 careless paths fail **closed and loud**.
 
-Built because the same four failure modes kept recurring - silent assumptions, bloat, drive-by edits,
-confident-but-unverified "done" - along with agents pushing when only a commit was wanted, or signing
+Built because the same four failure modes kept recurring (silent assumptions, bloat, drive-by edits,
+confident-but-unverified "done"), along with agents pushing when only a commit was wanted, or signing
 themselves into the history.
 
 ## Features
@@ -378,14 +378,14 @@ straight from the people in [Inspired by](#inspired-by), noted there by section.
 
 **Section 8 keeps a two-line prose rule; the full standard is the `writing-docs` skill (Section 9).** A
 `Co-Authored-By` trailer isn't the only thing that marks work as machine-made; the writing does it too. Section 8
-always bans **em dashes** and the AI-vocabulary words (*delve / leverage / seamless / robust / comprehensive*);
-the skill adds the rest - "it's not just X, it's Y", filler openers, hedges, emoji headings, bolding every third
-phrase - and loads only when you're writing prose. It governs what the agent *writes*, never your project's code
+always bans **em dashes** and the spaced hyphens and double hyphens that stand in for them, filler and stock
+words. The skill holds the full list (contrast reframes, filler openers, hedges, arrows in prose, emoji headings,
+bolding every third phrase) and loads only when you're writing prose. It governs what the agent *writes*, never your project's code
 style.
 
 ### The depth tier: rules that cost nothing until they apply
 
-`AGENTS.md` is read on every turn, so every line in it is paid for on every task - which caps how much
+`AGENTS.md` is read on every turn, so every line in it is paid for on every task, which caps how much
 can live there. The deep, situational material instead ships as **path-scoped rules** in
 `.claude/rules/`, each carrying `paths:` frontmatter. They load only when the agent opens a file that
 matches, and nothing at all otherwise.
@@ -395,12 +395,12 @@ matches, and nothing at all otherwise.
 | `code-correctness.md` | source files | no silent fallbacks · idempotent, transactional writes · "what happens at 100k rows" · **performance is measured, not asserted** · UTC and decimal money · named-ceiling shortcuts · **comments say why, not what** |
 | `web-security.md` | `auth/**`, `api/**`, `**/webhook*`, `**/payment*`, routes, middleware, edge config (`nginx.conf`, `Caddyfile`, `vercel.json`, `wrangler.toml`, `fly.toml`, `.htaccess`) | sessions, object-level authz (the row-42 bug) · injection family · rate limits that survive a second instance · uploads · HSTS/CSRF/CORS · server-side prices · limits on AI endpoints |
 | `frontend-quality.md` | components, pages, `*.tsx`, `*.jsx` | accessibility (and its legal exposure) · i18n · skeleton loaders · UI restraint |
-| `data-layer.md` | migrations, models, schema, `*.sql` | expand -> migrate -> contract · N+1 and indexes · money and time column types · privacy |
+| `data-layer.md` | migrations, models, schema, `*.sql` | expand, migrate, contract · N+1 and indexes · money and time column types · privacy |
 | `ci-cd.md` | `.github/workflows/**`, `Dockerfile`, `.gitlab-ci.yml`, `Jenkinsfile`, `azure-pipelines.yml` | pin actions to a digest · least-privilege token · `pull_request_target` + untrusted checkout · secrets never echoed · gates fail closed |
 | `tests.md` | test files | never game the oracle · behaviour over internals · the edges · test-first |
 
 **Measured, not assumed.** A 53 KiB rule present but not matching cost 65,347 tokens of context,
-against 65,510 with no rule file at all - free, within noise. The same file cost +12.7k the moment a
+against 65,510 with no rule file at all: free, within noise. The same file cost +12.7k the moment a
 path matched. That is why the deep material could grow without anything being deleted to make room.
 
 `paths:` is read by Claude Code, VS Code Copilot and Cline. Every other tool ignores the folder and
@@ -428,18 +428,18 @@ A third trigger, for guidance keyed to *what you are doing* rather than which fi
 skill's one-line description sits in context; the body loads when a task matches. Four ship:
 
 **`orchestrating-work`** fires when a task looks decomposable, or when you ask to parallelise or use
-subagents. Its spine is the rule every credible source agrees on - **reads parallelise, writes do
-not** - plus freezing shared contracts before fan-out, one owner per file, worktree isolation,
+subagents. Its spine is the rule every credible source agrees on: **reads parallelise, writes do
+not**. Around it sit freezing shared contracts before fan-out, one owner per file, worktree isolation,
 sequential integration, and an orchestrator-worker split where the lead keeps decomposition, the
 contract and the final review while workers execute already-complete specs. Delegate only when the
 expected parallel progress is worth the startup and integration cost, name the model and effort on
-every dispatch, and keep at most two workers active and one delegation layer - workers do not spawn
+every dispatch, and keep at most two workers active and one delegation layer, so workers do not spawn
 workers. It starts by picking the shape (do it, delegate a read or a slice, fan out, hand off), gives
 every worker an outcome contract with its escalation triggers, and classifies a failure before retrying it.
 
-**`generating-reports`** fires on a deliverable - a report, audit, plan or review a human will read,
-or one asked to be saved. It carries the dual-format rule for that case only - markdown as the source
-of truth, plus a self-contained styled HTML render for human review - and the structure that keeps a
+**`generating-reports`** fires on a deliverable: a report, audit, plan or review a human will read,
+or one asked to be saved. It carries the dual-format rule for that case only (markdown as the source
+of truth, plus a self-contained styled HTML render for human review) and the structure that keeps a
 plan machine-executable. A working plan or review the agent itself consumes, or one that lives only in
 the conversation, stays markdown-only.
 
@@ -456,7 +456,7 @@ asks group by group, and removes only what you approve, with a dry run first and
 
 `claude/performance/` and `codex/performance/` hold an experimental routing profile: effort level
 medium, subagent caps (`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS=2`,
-`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`), and three agent roles - `bounded-reader` (a small model for
+`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`), and three agent roles: `bounded-reader` (a small model for
 scoped lookups), `implementer` (a fully specified slice), `reviewer` (independent judgment on
 high-risk work). It is never installed by default and its effect is unmeasured; see the
 decision record in [`docs/senior-engineer.md`](docs/senior-engineer.md) before using it.
@@ -490,7 +490,7 @@ Quick Start covers the usual path. The installer's modes:
 | `--undo` | machine | Remove the machine-wide skill links, copies, `skills.json` names and Antigravity check hook that `--setup` made. Only what the kit made; your settings come back from their `.bak-agent-kit-*` files. |
 | `--update` | machine | Fetch the latest kit, check it is the kit, then run `--setup` from it. Needs no kit beside it, so one downloaded `install.sh` bootstraps everything. |
 | `--global` | machine | By hand: copy the kit and **print** the settings snippets and the git-hooks command for you to apply. |
-| *(none)* | project | Full rules - `AGENTS.md` plus a `CLAUDE.md` that imports it - the depth tier and skills for all three tools (`.claude/` for Claude Code, `.agents/` for Codex and Antigravity), and this repo's git hooks. |
+| *(none)* | project | Full rules (`AGENTS.md` plus a `CLAUDE.md` that imports it), the depth tier and skills for all three tools (`.claude/` for Claude Code, `.agents/` for Codex and Antigravity), and this repo's git hooks. |
 | `--extension` | project | Project block only, for when the universal rules already live in your global files, so nothing is duplicated into context. |
 | `--update-rules` | project | Replace the universal rules, keep `PROJECT-CONFIG` byte-for-byte. |
 | `--check` | project | Doctor: interpreter, guard firing, per-hook identity, settings wiring, the recommended and optional tools missing for each tool installed here, rules-file size, and one line on orphaned MCP processes. |
@@ -538,9 +538,9 @@ Put the kit's hook first, so a staged secret blocks the commit before you spend 
 ## Customise per project
 
 The universal rules are the floor; the per-project block is the multiplier. Run the
-**[project setup prompt](docs/project-setup-prompt.md)** from inside the project. It classifies the repo -
+**[project setup prompt](docs/project-setup-prompt.md)** from inside the project. It classifies the repo,
 including its platform (web / mobile / desktop / TV / CLI / library / service) and intent (production /
-prototype) - reads it, and writes a tailored block between the `PROJECT-CONFIG` markers without touching the
+prototype), reads it, and writes a tailored block between the `PROJECT-CONFIG` markers without touching the
 rules above. User-facing platforms get senior quality bars (a11y, i18n, observability, audit logs) scaled to
 intent, web repos additionally get **path-scoped rules** in `.claude/rules/` that load themselves when the
 agent opens auth, API, payment or migration code, and **[docs/web-checklists.md](docs/web-checklists.md)**
@@ -558,7 +558,7 @@ git syntax slip past. It flags the hook-disable vectors (`--no-verify`, `core.ho
 (`rm -rf`, `git reset --hard`, `git clean`, `git branch -D`, `curl | sh`). It flags only the *force* form
 of a branch delete: plain `git branch -d` already refuses on unmerged work, so gating it would be noise.
 On Claude Code the same file also runs as a **`UserPromptSubmit`** hook (`--event userprompt`), where it
-reads your message and records which git-writes you authorized for that turn - the grant described below.
+reads your message and records which git-writes you authorized for that turn: the grant described below.
 A chained command takes the most restrictive verdict across its segments (deny > ask > allow), so a
 granted operation can never carry an ungranted one through with it.
 
@@ -600,7 +600,7 @@ field), so a guard that crashes, times out or cannot start blocks the command in
 of a field the kit sets on its hook, set it to the value you want: `--setup` never overwrites a value, only
 adds a missing one. It asks before `git commit`, `git push`, and `gh pr create` *unless your own
 message that turn asked for it* (a one-time, turn-scoped grant, below); asks on secret-file reads (a
-visible prompt naming the file - precaution without a hard stop); and denies `--no-verify`/force and
+visible prompt naming the file, a precaution without a hard stop); and denies `--no-verify`/force and
 writes to `.git/hooks`, `.git/config`, and `.claude/settings.json`. It also **asks** before an edit to
 `AGENTS.md` / `CLAUDE.md`, since those now carry the same authority as the settings file. On Codex it sets
 `approval_policy=on-request` and `sandbox_mode=workspace-write`; `codex/hooks.json` wires the deny-mode hook.
@@ -609,7 +609,7 @@ Four config choices are deliberate, because the obvious "more locked down" setti
 
 - **git writes are authorized by your request, once.** The agent never commits, pushes, or opens a PR on
   its own initiative. When you ask ("commit this", "push it", "open a PR"), a `UserPromptSubmit` hook reads
-  your *own* words - a hook the agent cannot write to - and lets exactly those operations through for that
+  your *own* words (a hook the agent cannot write to) and lets exactly those operations through for that
   one turn; your next message resets the grant. Ask for nothing and every git write prompts, and that prompt
   is the agent asking you. A grant is per-operation ("commit this" is not permission to push) and never
   covers force-push, `--no-verify`, or `gh pr merge`. Detection is conservative and falls back to the prompt,
@@ -621,7 +621,7 @@ Four config choices are deliberate, because the obvious "more locked down" setti
   platform"), and the prompt is the precaution: an injected "read the .env" surfaces visibly and dies on
   your click, and ask outranks a mis-clicked "don't ask again" permanently. The ask list still names the
   real secret files (`.env`, `.env.local`, `.env.*.local`, `.env.production`) instead of the broad
-  `.env.*`, so `.env.example` / `.env.sample` stay silently readable - they carry no secrets and are
+  `.env.*`, so `.env.example` / `.env.sample` stay silently readable. They carry no secrets and are
   exactly how an agent learns what configuration a project expects. (`settings.json` is JSON and cannot
   hold comments, so the reasoning lives here.)
 - **Codex keeps network access on.** The rules require verifying library and API behaviour against the
@@ -662,8 +662,8 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
 - **The MCP orphan fix is verified on Windows and Linux (WSL2), not macOS.** Servers a plugin launches cannot be wrapped (the reaper covers them), and a server you run on purpose as a systemd service that matches an MCP pattern would be listed by the reaper.
 - **Not a sandbox.** These stop a *well-intentioned* agent and the careless common paths, not a determined
   adversary; for real isolation, run agents in a container / OS sandbox.
-- **The tool hook is Bash-scoped.** It sees `Bash` commands only, so an MCP server that pushes or writes
-  files is not seen by it. The git-layer hooks are the backstop; there is no local guard on MCP writes.
+- **The tool hook sees shell commands only.** It runs on Claude Code's Bash and PowerShell tools, Codex's
+  shell and Antigravity's `run_command`, so an MCP server that pushes or writes files is not seen by it. The git-layer hooks are the backstop; there is no local guard on MCP writes.
 - **The deny-lists are prefix-matched** (Claude's permission engine), so a reordered flag can slip a deny.
   The reorder-proof catch is the git layer.
 - **`--no-verify` skips git hooks.** It's denied at the tool/permission layer on all three tools, the only place
@@ -680,13 +680,13 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
 - **The rules are guidance, and guidance is probabilistic.** The guards above hold regardless of context
   because nothing has to remember them. The behavioural rules are different, and the honest number is
   measured rather than claimed: on Sonnet, **88.9% compliance on the rules in the original 14-case suite
-  (24/27), against 71.4% with no kit loaded (20/28)** - a +17.5 point effect, with no case scoring worse
+  (24/27), against 71.4% with no kit loaded (20/28)**, a +17.5 point effect, with no case scoring worse
   with the rules than without. On Opus the original tested rules showed no gap; it already did those things
   unprompted. The newer duplicate-server rule does show one (see the 2026-10-07 section of the adherence README). A second batch of 14 cases closed most of the depth tier's remaining blind spots (21 of 30
   distinct rule-file sections now have a dedicated case, up from 8): 3 showed a clean gap, 8 showed Sonnet
   already doing the right thing unprompted, 2 turned out to be about task completion rather than code
-  safety, and one - pinning a CI action to a commit SHA - failed with the rules present in both arms and
-  needs an enforced check, not better wording, which is now a named open item. The remaining rule-file
+  safety, and one, pinning a CI action to a commit SHA, failed with the rules present in both arms. It
+  needed an enforced check, not better wording, and the pre-commit hook now refuses an unpinned action. The remaining rule-file
   sections without a case, and the `AGENTS.md` bullets a one-shot diff-graded case structurally cannot
   reach at all (a high-risk plan checked against its failure modes, decay across a long session, proof in a real browser), are
   listed by name rather than folded into one fraction. Method, the full per-case tables, and that list
@@ -749,7 +749,7 @@ but the primary link could not be verified, it is attributed by talk and date in
 - **[Kent Beck](https://simonwillison.net/2025/Dec/16/kent-beck/)** (created TDD): **Section 5.** *Augmented*
   coding: move faster with AI while keeping quality. The test-first cycle in Section 5 is his.
 - **[ponytail](https://github.com/DietrichGebert/ponytail)** (MIT): **Sections 3, 6.** Its "lazy senior dev" framing
-  sharpened two rules here - stopping at the first rung of a reuse ladder, and marking a deliberate shortcut
+  sharpened two rules here: stopping at the first rung of a reuse ladder, and marking a deliberate shortcut
   with the ceiling it carries. The wording in this kit is its own; the thinking was better for having read theirs.
 - **[Fabien Sanglard](https://fabiensanglard.net/agent.md/index.html)**: **Section 3.** His `agent.md` keeps
   comments small, on the why, and off any code the agent didn't touch. The comment rule here is that, plus one
