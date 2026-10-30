@@ -102,7 +102,9 @@ see ([Limits](#limits)).
 ### What `--setup` does
 
 1. **Copies the kit** to `~/.the-agent-kit`: rules, hooks, installer and docs. The download is then
-   disposable. Two steps rather than `curl ... | sh` on purpose: piping unread code into a shell is
+   disposable. Each run replaces that copy whole, so a file the kit stopped shipping does not linger,
+   and a skill it stopped shipping is removed from your skill folders; your recommended-tools list and
+   your own skills are kept. Two steps rather than `curl ... | sh` on purpose: piping unread code into a shell is
    what the kit's own rules tell an agent never to do.
 2. **Turns on the git hooks** for every repo: the secret scan, the protected-branch check and the
    AI-attribution stripper. If another tool (Husky, lefthook) already owns git's hooks folder, it

@@ -909,6 +909,17 @@ else
   [ ! -d "$g/.the-agent-kit/skills/skills" ] && [ "$got" = "$want" ] && [ -f "$g/.the-agent-kit/claude/performance/settings.json" ] \
     && pass "U16 --global twice keeps one flat skills tree ($got skills) and ships the performance profile" \
     || bad "U16 --global left a nested or stale skills tree ($got of $want, nested=$([ -d "$g/.the-agent-kit/skills/skills" ] && echo yes || echo no))"
+  # U16b: every run is a clean reinstall. A file the kit no longer ships goes, at any depth; the
+  # user's own state (recommended.json, its backups, the dot-files) stays, and no staging folder is left.
+  s="$g/.the-agent-kit"
+  mkdir -p "$s/retired-dir"; : > "$s/retired-dir/x"; : > "$s/rules/retired-rule.md"; : > "$s/hooks/retired-hook.py"; : > "$s/retired.md"
+  printf '{"items":[],"dismissed":["mine"]}' > "$s/recommended.json"; : > "$s/recommended.json.bak-agent-kit-1"; : > "$s/.tools-check"
+  HOME="$g" sh "$KIT/install.sh" --global >/dev/null 2>&1
+  [ ! -e "$s/retired-dir" ] && [ ! -e "$s/rules/retired-rule.md" ] && [ ! -e "$s/hooks/retired-hook.py" ] && [ ! -e "$s/retired.md" ] \
+    && grep -q '"mine"' "$s/recommended.json" && [ -e "$s/recommended.json.bak-agent-kit-1" ] && [ -e "$s/.tools-check" ] \
+    && [ ! -e "$s/.incoming" ] && ! ls -d "$s"/.old-* >/dev/null 2>&1 && [ -f "$s/hooks/command-guard.py" ] && [ -f "$s/git-hooks/pre-commit" ] && [ -f "$s/install.sh" ] \
+    && pass "U16b a reinstall removes what the kit no longer ships and keeps the user's state" \
+    || bad "U16b stale kit files kept or user state lost: $(ls -a "$s" | tr '\n' ' ')"
   rm -rf "$g"
   # U9: the structural guard U8 cannot be. update_kit must END by exec-ing the downloaded installer -
   # exec replaces the process, so not one more byte is read from the file --global is overwriting.
@@ -1284,6 +1295,30 @@ EOF
   printf 'drifted\n' > "$g/.agents/skills/tidy/SKILL.md"; su 1
   cmp -s "$g/.agents/skills/tidy/SKILL.md" "$KIT/claude/skills/tidy/SKILL.md" && [ "$(lnk "$g/.claude/skills/tidy")" = "link ok" ] \
     && pass "W5 a drifted kit copy is refreshed and its link still resolves" || bad "W5 drifted copy not refreshed: $o"
+  # W5b: a skill the kit made and a later kit no longer ships goes on --setup: its copy, its
+  # ~/.claude/skills link and its skills.json name. A skill of the user's (no kit mark) stays, and so does
+  # a copy the user renamed: its mark names the original, so it is never taken for the kit's.
+  cp -r "$g/.agents/skills/tidy" "$g/.agents/skills/old-kit-skill"; cp -r "$g/.agents/skills/tidy" "$g/.agents/skills/my-renamed"
+  printf "This folder is a copy made by the-agent-kit's install.sh; --setup refreshes it and --undo removes it.\nskill: old-kit-skill\n" > "$g/.agents/skills/old-kit-skill/.the-agent-kit"
+  mkdir -p "$g/.agents/skills/mine-unmarked"; printf 'x\n' > "$g/.agents/skills/mine-unmarked/SKILL.md"
+  $PY - "$(wq "$g")" <<'EOF'
+import json, os, subprocess, sys
+g = sys.argv[1]; dst = os.path.join(g, ".agents", "skills", "old-kit-skill"); link = os.path.join(g, ".claude", "skills", "old-kit-skill")
+if os.name == "nt":
+    subprocess.run(["cmd", "/c", "mklink", "/J", os.path.normpath(link), os.path.normpath(dst)], capture_output=True, check=True)
+else:
+    os.symlink(dst, link, target_is_directory=True)
+p = os.path.join(g, ".gemini", "config", "skills.json"); d = json.load(open(p, encoding="utf-8"))
+d["entries"][0]["include_only"].append("old-kit-skill"); json.dump(d, open(p, "w", encoding="utf-8"))
+EOF
+  su 1
+  [ ! -e "$g/.agents/skills/old-kit-skill" ] && ! [ -e "$g/.claude/skills/old-kit-skill" ] && ! [ -L "$g/.claude/skills/old-kit-skill" ] \
+    && [ -f "$g/.agents/skills/mine-unmarked/SKILL.md" ] && [ -f "$g/.agents/skills/my-renamed/SKILL.md" ] \
+    && [ -f "$g/.agents/skills/tidy/SKILL.md" ] && [ "$(lnk "$g/.claude/skills/tidy")" = "link ok" ] \
+    && [ "$(sj_ "$g/.gemini/config/skills.json" "'old-kit-skill' in d['entries'][0]['include_only']")" = False ] \
+    && pass "W5b a kit skill the kit no longer ships is removed with its link and skills.json name; the user's own and a renamed copy stay" \
+    || bad "W5b retired kit skill kept or user skill touched: $o"
+  rm -rf "$g/.agents/skills/mine-unmarked" "$g/.agents/skills/my-renamed"
   # W6: undo removes what the installer made and nothing else.
   mkdir -p "$g/.agents/skills/mine" "$g/.claude/skills/theirs"; printf 'x\n' > "$g/.agents/skills/mine/SKILL.md"; printf 'y\n' > "$g/.claude/skills/theirs/SKILL.md"
   $PY - "$(wq "$g/.gemini/config/skills.json")" <<'EOF'

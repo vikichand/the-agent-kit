@@ -25,6 +25,11 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ### Changed
 
+- `--setup` and `--update` reinstall `~/.the-agent-kit` cleanly: the new copy is built in full, then
+  swapped in, so a rule, hook or doc the kit no longer ships is removed instead of left behind. Your
+  recommended-tools list, its backups and the reminder state are kept. A skill the kit installed and no
+  longer ships goes too: its copy in `~/.agents/skills`, its `~/.claude/skills` link and its Antigravity
+  `skills.json` name. Skills of your own are never touched.
 - **An overnight run no longer stops on routine commands.** Replayed against the 1,140 permission
   prompts one user answered in a week, about half no longer appear, and of the rest, all but 275 now
   time out on their own instead of waiting for you. Those 275 are pushes, deletes outside the project,

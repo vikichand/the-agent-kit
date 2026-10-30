@@ -414,51 +414,78 @@ RECO
 
 copy_share() {  # copy this kit into ~/.the-agent-kit, so the download it came from can be deleted
   share="$HOME/.the-agent-kit"
-  mkdir -p "$share/hooks" "$share/git-hooks" "$share/docs" "$share/claude" "$share/codex" "$share/setup"
+  # Every run is a clean reinstall: the kit is built whole in a staging folder, then swapped in for the
+  # old copy, so a file the kit stopped shipping never lingers. Building first means a copy that fails
+  # halfway leaves the old kit working, never a share with no guard or git hooks. The user's own state
+  # stays: recommended.json (and its backups), and dot-files are never touched (version stamp, reminder
+  # markers); the swap's own .incoming and .old-* folders are cleared on the next run if one is left.
+  st="$share/.incoming"
+  rm -rf "$st"; mkdir -p "$st/hooks" "$st/git-hooks" "$st/docs" "$st/claude" "$st/codex" "$st/setup"
   # Copy the WHOLE kit, not just the hooks, so the clone you ran this from becomes disposable.
   # git-hooks/ is the core.hooksPath target (those three only); hooks/ is the full set, which is
   # what the relocated install.sh compares against in --check and copies from per project.
   for h in command-guard.py kit-check.py agent-kit-check.py mcp-orphans.py mcp-wrap.py tidy-procs.py tidy-scan.py commit-msg pre-commit pre-push; do
     case "$h" in mcp-*|tidy-*|agent-kit-*) [ -f "$KIT/hooks/$h" ] || continue ;; esac
-    cp "$KIT/hooks/$h" "$share/hooks/$h"
+    cp "$KIT/hooks/$h" "$st/hooks/$h"
   done
-  for h in commit-msg pre-commit pre-push; do cp "$KIT/hooks/$h" "$share/git-hooks/$h"; done
+  for h in commit-msg pre-commit pre-push; do cp "$KIT/hooks/$h" "$st/git-hooks/$h"; done
   # The recommended-tools list is the user's once seeded. hooks/recommended.json beside it is the kit's
   # pristine copy, which --setup merges in by id (merge_recommended): a declined item stays declined.
-  cp "$KIT/hooks/recommended.json" "$share/hooks/recommended.json" 2>/dev/null || true
+  cp "$KIT/hooks/recommended.json" "$st/hooks/recommended.json" 2>/dev/null || true
   [ -f "$share/recommended.json" ] || merge_recommended "$KIT/hooks/recommended.json" "$share/recommended.json" \
     || cp "$KIT/hooks/recommended.json" "$share/recommended.json" 2>/dev/null || true
   # AGENTS.md goes through write_rules, never cp: this repo's file carries its OWN project block, and
   # the share is what --update-rules and the "prefer the rules global" append both read. A cp here put
   # this repo's branch rules into every user's global rules (Q3, found 2026-09-26 before it shipped).
-  write_rules "$share/AGENTS.md"
-  cp "$KIT/CLAUDE.md" "$KIT/install.sh" "$share/"
+  write_rules "$st/AGENTS.md"
+  cp "$KIT/CLAUDE.md" "$KIT/install.sh" "$st/"
   # The installer prints these as merge snippets, so the relocated copy must carry them too.
-  cp "$KIT/claude/settings.json" "$share/claude/" 2>/dev/null || true
-  cp "$KIT/codex/config.toml" "$KIT/codex/hooks.json" "$share/codex/" 2>/dev/null || true
-  cp "$KIT/setup/merge-settings.py" "$share/setup/" 2>/dev/null || true
+  cp "$KIT/claude/settings.json" "$st/claude/" 2>/dev/null || true
+  cp "$KIT/codex/config.toml" "$KIT/codex/hooks.json" "$st/codex/" 2>/dev/null || true
+  cp "$KIT/setup/merge-settings.py" "$st/setup/" 2>/dev/null || true
   # Only docs git would publish: anything git ignores is the owner's private working notes (plans,
   # research, todo lists), never the kit's. A copy with no .git (a zip) has no ignored files to leak.
   for f in "$KIT/docs/"*.md; do
     [ -f "$f" ] || continue
     git -C "$KIT" check-ignore -q "$f" 2>/dev/null && continue
-    cp "$f" "$share/docs/"
+    cp "$f" "$st/docs/"
   done
-  rm -f "$share/docs/lessons.md" "$share/docs/my-skills-and-plugins.md" "$share/docs/enhancements.md" "$share/docs/todo.md"   # left by earlier installs
-  mkdir -p "$share/rules"
-  cp "$KIT/claude/rules/"*.md "$share/rules/" 2>/dev/null || cp "$KIT/rules/"*.md "$share/rules/" 2>/dev/null || true
+  mkdir -p "$st/rules"
+  cp "$KIT/claude/rules/"*.md "$st/rules/" 2>/dev/null || cp "$KIT/rules/"*.md "$st/rules/" 2>/dev/null || true
   # Replace the share's skills wholesale. `cp -r src dest` with dest already present copies INTO it,
   # which on the second --update left a nested skills/skills/ and a stale top level: projects updated
   # from that copy silently missed every skill added after the first install (observed 2026-09-18).
-  rm -rf "$share/skills"; mkdir -p "$share/skills"
-  if [ -d "$KIT/claude/skills" ]; then cp -r "$KIT/claude/skills/." "$share/skills/" 2>/dev/null || true
-  elif [ -d "$KIT/skills" ]; then cp -r "$KIT/skills/." "$share/skills/" 2>/dev/null || true; fi
+  mkdir -p "$st/skills"
+  if [ -d "$KIT/claude/skills" ]; then cp -r "$KIT/claude/skills/." "$st/skills/" 2>/dev/null || true
+  elif [ -d "$KIT/skills" ]; then cp -r "$KIT/skills/." "$st/skills/" 2>/dev/null || true; fi
   # The optional performance profile ships in the share too, so the README's paths exist after --update.
   for pd in claude/performance codex/performance; do
-    rm -rf "$share/$pd"
-    [ -d "$KIT/$pd" ] && mkdir -p "$share/$pd" && cp -r "$KIT/$pd/." "$share/$pd/" 2>/dev/null
+    [ -d "$KIT/$pd" ] && mkdir -p "$st/$pd" && cp -r "$KIT/$pd/." "$st/$pd/" 2>/dev/null
   done
-  chmod +x "$share/hooks/"* "$share/git-hooks/"* "$share/install.sh"
+  chmod +x "$st/hooks/"* "$st/git-hooks/"* "$st/install.sh"
+  for p in "$share"/*; do   # the swap: whatever is not the user's own and not in the new kit goes
+    n=${p##*/}
+    case "$n" in recommended.json|recommended.json.bak-agent-kit-*) continue ;; esac
+    [ -e "$st/$n" ] || rm -rf "$p" || say "  ! could not remove $p (a file in use?); re-run to retry"
+  done
+  # Then each item is replaced by renames, never by deleting first: the old copy is moved aside, the new
+  # one moved in, and the old one deleted last. A rename either happens whole or not at all, so a locked
+  # file on Windows or an interrupted run leaves the old copy or the new one in place, never a hooks/
+  # half deleted (the guard runs with onFailure=block, and core.hooksPath points at git-hooks/).
+  for p in "$st"/*; do
+    n=${p##*/}
+    case "$n" in recommended.json|recommended.json.bak-agent-kit-*) continue ;; esac   # never the user's own
+    rm -rf "$share/.old-$n" 2>/dev/null || true
+    if [ -e "$share/$n" ] || [ -L "$share/$n" ]; then
+      mv "$share/$n" "$share/.old-$n" 2>/dev/null || { say "  ! could not replace $share/$n (a file in use?) - kept the old copy; re-run to retry"; continue; }
+    fi
+    if mv "$p" "$share/$n"; then rm -rf "$share/.old-$n" 2>/dev/null || true   # a leftover goes on the next run
+    else
+      [ -e "$share/.old-$n" ] && mv "$share/.old-$n" "$share/$n"
+      say "  ! could not install the new $n - kept the old copy; re-run to retry"
+    fi
+  done
+  rm -rf "$st" 2>/dev/null || true
   # Stamp the source commit so --update can tell "already current" from "a month behind", and show
   # you what actually changed. Absent (or "unknown") when installed from a non-git copy - not fatal.
   ver=$( (cd "$KIT" && git rev-parse --short HEAD 2>/dev/null) || true )
@@ -584,8 +611,28 @@ SJ_PATH = "~/.agents/skills"
 src_root = os.path.join(share, "skills")
 names = sorted(n for n in (os.listdir(src_root) if os.path.isdir(src_root) else [])
                if os.path.isfile(os.path.join(src_root, n, "SKILL.md")))
+MARK_TEXT = "This folder is a copy made by the-agent-kit's install.sh; --setup refreshes it and --undo removes it.\n"
+
+def mark_for(n):                     # the mark names its own folder, so a copy renamed by the user is never ours
+    return MARK_TEXT + "skill: %s\n" % n
+
+def marked_as(p, n):
+    try:
+        with open(os.path.join(p, MARK), encoding="utf-8") as f:
+            return f.read() == mark_for(n)
+    except (OSError, ValueError):
+        return False
+
+def kit_copies():                    # every folder in ~/.agents/skills the kit made, by a mark naming it
+    return [n for n in (os.listdir(canon_root) if os.path.isdir(canon_root) else [])
+            if not n.endswith(".agent-kit-new") and not os.path.islink(os.path.join(canon_root, n))
+            and marked_as(os.path.join(canon_root, n), n)]
+# A skill the kit made but no longer ships: --setup removes its copy, its link and its skills.json name.
+# No skills in the share means a broken share, not a kit that ships none: then nothing is retired.
+# Names compare without case, as Windows does, so a "Foo" never counts as retired while "foo" ships.
+retired = sorted(n for n in kit_copies() if n.casefold() not in {x.casefold() for x in names}) if names else []
 if mode == "undo":
-    names = sorted(set(names) | set(KIT_SKILLS))
+    names = sorted(set(names) | set(KIT_SKILLS) | set(retired))
 # Antigravity's session-start check: a named PreInvocation hook in the global hooks.json, run through a
 # launcher beside it (the hook command is split on whitespace and quotes are ignored, so no quoted path).
 HOOK_KEY = "the-agent-kit-check"     # not "the-agent-kit": the project hook in .agents/hooks.json already has that name
@@ -655,7 +702,7 @@ def copy_skill(n):
         raise OSError("%s already exists; left as it is" % tmp)
     shutil.copytree(src, tmp, symlinks=True)   # a link inside a kit skill is copied as a link, never followed
     with open(os.path.join(tmp, MARK), "w", encoding="utf-8") as f:
-        f.write("This folder is a copy made by the-agent-kit's install.sh; --setup refreshes it and --undo removes it.\n")
+        f.write(mark_for(n))
     if os.path.lexists(dst):
         if not owned_copy(dst):      # re-checked here: it may have changed since the plan was made
             shutil.rmtree(tmp, ignore_errors=True)
@@ -712,7 +759,7 @@ if mode in ("plan", "apply"):
         else:
             ok.append(n)
             try:
-                differs = tree(dst) != tree(os.path.join(src_root, n))
+                differs = tree(dst) != tree(os.path.join(src_root, n)) or not marked_as(dst, n)   # an older mark is rewritten once
             except OSError:
                 differs = True
             if differs:
@@ -729,6 +776,20 @@ if mode in ("plan", "apply"):
     if todo_refresh:
         lines.append("  + refresh in ~/.agents/skills (the kit's copy; edits made to it are replaced): " + ", ".join(todo_refresh))
     actions += [("copy " + n, (lambda n=n: copy_skill(n))) for n in todo_copy + todo_refresh]
+    retired = [n for n in retired if owned_copy(os.path.join(canon_root, n))]   # is_link also catches a junction
+    removed = []                     # what drop_retired actually removed: the only names skills.json loses
+    if retired:
+        lines.append("  - remove the kit's skills it no longer ships (its own copies and links only): " + ", ".join(retired))
+        def drop_retired(todo=tuple(retired)):
+            for n in todo:
+                link, dst = os.path.join(claude_skills, n), os.path.join(canon_root, n)
+                if is_link(dst) or not owned_copy(dst) or not marked_as(dst, n):   # re-checked: it may have changed since the plan
+                    warn("~/.agents/skills/%s changed since the plan; left as it is" % n); continue
+                if os.path.lexists(link) and is_link(link) and points_to(link, dst):
+                    drop_link(link)
+                shutil.rmtree(dst)
+                removed.append(n)
+        actions.append(("remove retired skills", drop_retired))
     if os.path.isdir(os.path.join(home, ".claude")):
         for n in ok:
             link, dst = os.path.join(claude_skills, n), os.path.join(canon_root, n)
@@ -769,10 +830,20 @@ if mode in ("plan", "apply"):
                 actions.append(("skills.json", lambda d=data: write_json(sj_path, d)))
             elif isinstance(mine.get("include_only"), list):
                 missing = [n for n in ok if n not in mine["include_only"]]
-                if missing:
-                    mine["include_only"] += missing
-                    lines.append("  + add the kit's skills to your ~/.agents/skills entry in ~/.gemini/config/skills.json: " + ", ".join(missing))
-                    actions.append(("skills.json", lambda d=data: write_json(sj_path, d)))
+                stale = [n for n in mine["include_only"] if isinstance(n, str) and n.casefold() in {r.casefold() for r in retired}]
+                if missing or stale:
+                    if missing:
+                        lines.append("  + add the kit's skills to your ~/.agents/skills entry in ~/.gemini/config/skills.json: " + ", ".join(missing))
+                    if stale:
+                        lines.append("  - drop the kit's retired skills from ~/.gemini/config/skills.json: " + ", ".join(stale))
+                    def write_sj(d=data, m=mine, add=tuple(missing)):
+                        # Pruned at apply time by what was really removed; never left empty, which may mean "everything".
+                        gone = {r.casefold() for r in removed}
+                        new = [n for n in m["include_only"] if not (isinstance(n, str) and n.casefold() in gone)] + list(add)
+                        if new and new != m["include_only"]:
+                            m["include_only"] = new
+                            write_json(sj_path, d)
+                    actions.append(("skills.json", write_sj))
     if os.path.isdir(cfg) and os.path.isfile(launch_src) and os.path.isfile(os.path.join(share, "hooks", "kit-check.py")):
         data, state = {}, "add"      # `data` is rebound above for skills.json: the writers bind their own copy (d=data)
         if os.path.islink(hooks_path):
