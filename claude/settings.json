@@ -37,7 +37,8 @@
       "Bash(git config *core.hooksPath*)",
       "Edit(**/.git/hooks/**)",
       "Edit(**/.git/config)",
-      "Edit(**/.claude/settings.json)"
+      "Edit(**/.claude/settings.json)",
+      "Edit(~/.the-agent-kit/**)"
     ]
   },
   "hooks": {

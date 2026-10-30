@@ -119,9 +119,16 @@ see ([Limits](#limits)).
    | Codex | `~/.codex/config.toml` | approval, sandbox and network settings |
    | Antigravity | `~/.gemini/config/hooks.json` | the session-start check, as a `PreInvocation` hook run through a launcher beside it (your other hooks there are kept) |
 
-   It only adds. A setting you already chose is kept, the kit's own older entries are updated in place,
-   a file it cannot read safely is left untouched, and a tool you do not have is skipped. Each changed
-   file is backed up beside itself as `<file>.bak-agent-kit-<time>`.
+   Every run takes out what the old kit put in, then puts in the new kit. An install record
+   (`~/.the-agent-kit/.install-record.json`) lists each entry the kit wrote and its value, so an entry a
+   later kit no longer ships is removed instead of left behind, and an entry the kit changed is updated.
+   Anything of yours is kept: your own entries, and a kit entry whose value you changed, which is named
+   in the run's output. A file it cannot read safely is left untouched, a tool you do not have is
+   skipped, and each changed file is backed up beside itself as `<file>.bak-agent-kit-<time>`. The run
+   ends by reading everything back and fails if anything is not in place. The record is never trusted
+   on its own: an entry that names anything outside the kit's own places is ignored, and a deny rule
+   (`Edit(~/.the-agent-kit/**)`) stops an agent's file tools from changing the kit, its guard or the
+   record. A deny rule does not cover shell commands; the command guard is the layer for those.
 4. **Installs the kit's four skills once for all three tools**, so `/tidy` and the others work in every
    project, not only where `install.sh` ran:
 
@@ -133,7 +140,8 @@ see ([Limits](#limits)).
 
    It creates and removes only what it made. A folder or link of yours with the same name is left as it
    is, with a warning; a tool you do not have gets nothing. `install.sh --undo` removes the kit's links,
-   copies and `skills.json` names (a junction goes with `rmdir`, never `rm -rf`).
+   copies and `skills.json` names (a junction goes with `rmdir`, never `rm -rf`), along with everything
+   else the install record lists.
 
 Nothing is written until you answer yes. Run it again at any time: when everything is in place it says
 so and changes nothing. Prefer to merge by hand? `install.sh --global` copies the kit and prints the
@@ -195,11 +203,12 @@ carrying the kit. A `WARN` about `PROJECT-CONFIG` is expected until you run the 
 
 ### Undo
 
-Every settings file `--setup` changed has a backup beside it (`*.bak-agent-kit-<time>`): copy it back.
-To turn the git hooks off: `git config --global --unset core.hooksPath`, run in a normal terminal. The
-kit itself is the `~/.the-agent-kit` folder, and a project's rules are its `AGENTS.md`, `CLAUDE.md`,
-`.claude/` and `.agents/skills/`. `install.sh --undo` removes the machine-wide skill links, the copies
-in `~/.agents/skills`, the `skills.json` names and the Antigravity check hook, and only those the kit made.
+`install.sh --undo` takes out everything the install record lists: the kit's rules, hooks and keys in
+your Claude Code and Codex settings, git's `core.hooksPath`, the skill copies and links, the
+`skills.json` names and the Antigravity check hook. It asks first, keeps anything you changed (and names
+it), and ends by checking nothing of the kit's is left. Every file it changes is backed up beside itself
+(`*.bak-agent-kit-<time>`). The kit itself is the `~/.the-agent-kit` folder, and a project's rules are
+its `AGENTS.md`, `CLAUDE.md`, `.claude/` and `.agents/skills/`.
 
 ### Your shell
 
@@ -490,8 +499,8 @@ Quick Start covers the usual path. The installer's modes:
 
 | Mode | Scope | What it does |
 |---|---|---|
-| `--setup` | machine | Copy the kit to `~/.the-agent-kit`, turn on its git hooks, and add it to your Claude Code and Codex settings, and install its four skills once for all three tools, plus Antigravity's session-start check: listed, asked, backed up. Safe to re-run. Antigravity's command guard is still wired per project. |
-| `--undo` | machine | Remove the machine-wide skill links, copies, `skills.json` names and Antigravity check hook that `--setup` made. Only what the kit made; your settings come back from their `.bak-agent-kit-*` files. |
+| `--setup` | machine | Copy the kit to `~/.the-agent-kit`, take out what the old kit installed and the new one no longer ships, then turn on its git hooks, add it to your Claude Code and Codex settings, and install its four skills once for all three tools, plus Antigravity's session-start check: listed, asked, backed up, then verified. Safe to re-run. Antigravity's command guard is still wired per project. |
+| `--undo` | machine | Take out everything the install record lists (settings entries, git hooks, skills, Antigravity's check), asked first and verified after. A kit entry you changed is kept and named. |
 | `--update` | machine | Fetch the latest kit, check it is the kit, then run `--setup` from it. Needs no kit beside it, so one downloaded `install.sh` bootstraps everything. |
 | `--global` | machine | By hand: copy the kit and **print** the settings snippets and the git-hooks command for you to apply. |
 | *(none)* | project | Full rules (`AGENTS.md` plus a `CLAUDE.md` that imports it), the depth tier and skills for all three tools (`.claude/` for Claude Code, `.agents/` for Codex and Antigravity), and this repo's git hooks. |

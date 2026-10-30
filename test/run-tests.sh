@@ -27,6 +27,8 @@ echo "== command-guard (tool layer) =="
 PY=""; for p in python3 python "py -3"; do [ "$(printf 'print(1)' | $p - 2>/dev/null)" = "1" ] && { PY="$p"; break; }; done
 if [ -n "$PY" ]; then
   $PY "$KIT/test/command_guard_cases.py" "$KIT/hooks/command-guard.py" || bad "command-guard corpus"
+  $PY "$KIT/test/machine_cases.py" || bad "machine install-record cases"
+  $PY "$KIT/test/shipped_history.py" || bad "an entry the kit once shipped is unknown to machine.py"
   $PY "$KIT/test/mcp_wrap_cases.py" || bad "mcp-wrap cases"
   $PY "$KIT/test/mcp_orphans_cases.py" || bad "mcp-orphans corpus"
   $PY "$KIT/test/tidy_procs_cases.py" || bad "tidy-procs corpus"
@@ -1045,11 +1047,11 @@ EOF
   su 1
   t=$($PY -c "import tomllib,sys; print(tomllib.load(open(sys.argv[1],'rb'))['approval_policy'])" "$(wq "$g/.codex/config.toml")" 2>&1)
   [ "$t" = never ] && pass "M7 a setting the user already chose is kept, not overwritten" || bad "M7 user's approval_policy overwritten: [$t]"
-  # The merge helper itself refuses to write without consent, so running it directly is no way around it.
+  # The machine helper itself refuses to write without consent, so running it directly is no way around it.
   printf '{}' > "$g/.claude/settings.json"
-  mrc=0; m=$(AGENT_KIT_APPLY= $PY "$KIT/setup/merge-settings.py" --home "$G" --share "$(wq "$g/.the-agent-kit")" --share-cmd x --py python --apply 2>&1) || mrc=$?
+  mrc=0; m=$(AGENT_KIT_APPLY= $PY "$KIT/setup/machine.py" install --home "$G" --share "$(wq "$g/.the-agent-kit")" --share-cmd x --py python --apply 2>&1) || mrc=$?
   [ "$(cat "$g/.claude/settings.json")" = '{}' ] && [ "$mrc" != 0 ] \
-    && pass "M11 merge-settings.py --apply without AGENT_KIT_APPLY=1 refuses and writes nothing" || bad "M11 helper wrote without consent (rc=$mrc): $m"
+    && pass "M11 machine.py --apply without AGENT_KIT_APPLY=1 refuses and writes nothing" || bad "M11 helper wrote without consent (rc=$mrc): $m"
   # Ownership is strict: a user's own command that merely mentions a kit script is theirs, and a block
   # the kit shares with a user hook keeps the user's matcher.
   cat > "$g/.claude/settings.json" <<'EOF'
@@ -1140,9 +1142,9 @@ json.dump(d,open(p,'w',encoding='utf-8'))" "$(wq "$g/.claude/settings.json")" "$
   su 1
   [ "$(gh_)" = .husky ] && has 'is .husky' "$o" \
     && pass "M8 git hooks owned by another tool are left alone, and it says so" || bad "M8 foreign core.hooksPath changed: [$(gh_)]"
-  HOME="$g" git config --global --unset core.hooksPath
+  # check covers everything the kit installs, git's core.hooksPath included, so it stays set here.
   d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
-  has 'settings.*kit entries' "$d" && ! has 'install.sh --setup' "$d" && pass "M9 --check confirms the settings carry the kit" || bad "M9 --check misreports current settings: $(printf '%s' "$d" | grep -i setting)"
+  has "machine-wide entries: installed and current" "$d" && ! has 'install.sh --setup' "$d" && pass "M9 --check confirms the kit's entries are installed" || bad "M9 --check misreports current settings: $(printf '%s' "$d" | grep -i -E "entries|setting")"
   printf '{}' > "$g/.claude/settings.json"
   d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
   has 'install.sh --setup' "$d" && pass "M9 --check warns when the settings are missing the kit" || bad "M9 --check silent about missing settings"
@@ -1263,7 +1265,8 @@ if [ -n "$PY" ]; then
   home_() { g=$(mktemp -d) || exit 2; G=$(wq "$g"); mkdir -p "$g/.claude" "$g/.gemini/config"; }
   su() {  # $1 = AGENT_KIT_APPLY ("" = no consent), $2 = link kind override ("" = platform default)
     src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY="$1" AGENT_KIT_LINK_KIND="${2:-}" sh "$KIT/install.sh" --setup </dev/null 2>&1) || src=$?; }
-  undo_() { src=0; o=$(env HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --undo </dev/null 2>&1) || src=$?; }
+  # Uninstall changes the user's settings too now, so it takes the same consent as install.
+  undo_() { src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY=1 sh "$KIT/install.sh" --undo </dev/null 2>&1) || src=$?; }
   lnk() {  # $1 = path -> "link ok" when it is a symlink or junction resolving to the same-named folder in ~/.agents/skills
     $PY - "$(wq "$1")" <<'EOF'
 import os, sys
@@ -1295,9 +1298,10 @@ EOF
   printf 'drifted\n' > "$g/.agents/skills/tidy/SKILL.md"; su 1
   cmp -s "$g/.agents/skills/tidy/SKILL.md" "$KIT/claude/skills/tidy/SKILL.md" && [ "$(lnk "$g/.claude/skills/tidy")" = "link ok" ] \
     && pass "W5 a drifted kit copy is refreshed and its link still resolves" || bad "W5 drifted copy not refreshed: $o"
-  # W5b: a skill the kit made and a later kit no longer ships goes on --setup: its copy, its
-  # ~/.claude/skills link and its skills.json name. A skill of the user's (no kit mark) stays, and so does
-  # a copy the user renamed: its mark names the original, so it is never taken for the kit's.
+  # W5b: a skill the kit installed (it is in the install record) and a later kit no longer ships goes on
+  # --setup: its copy, its ~/.claude/skills link and its skills.json name. A skill of the user's (no kit
+  # mark) stays, and so does a copy the user made of a kit skill: it carries the mark but is not in the
+  # record, and the record, not the mark, says what the kit installed.
   cp -r "$g/.agents/skills/tidy" "$g/.agents/skills/old-kit-skill"; cp -r "$g/.agents/skills/tidy" "$g/.agents/skills/my-renamed"
   printf "This folder is a copy made by the-agent-kit's install.sh; --setup refreshes it and --undo removes it.\nskill: old-kit-skill\n" > "$g/.agents/skills/old-kit-skill/.the-agent-kit"
   mkdir -p "$g/.agents/skills/mine-unmarked"; printf 'x\n' > "$g/.agents/skills/mine-unmarked/SKILL.md"
@@ -1310,6 +1314,11 @@ else:
     os.symlink(dst, link, target_is_directory=True)
 p = os.path.join(g, ".gemini", "config", "skills.json"); d = json.load(open(p, encoding="utf-8"))
 d["entries"][0]["include_only"].append("old-kit-skill"); json.dump(d, open(p, "w", encoding="utf-8"))
+r = os.path.join(g, ".the-agent-kit", ".install-record.json"); rec = json.load(open(r, encoding="utf-8"))
+rec["entries"] += [{"kind": "dir", "path": dst, "name": "old-kit-skill", "value": "x"},
+                   {"kind": "link", "path": link, "value": dst},
+                   {"kind": "listitem", "file": p, "value": "old-kit-skill"}]
+json.dump(rec, open(r, "w", encoding="utf-8"))
 EOF
   su 1
   [ ! -e "$g/.agents/skills/old-kit-skill" ] && ! [ -e "$g/.claude/skills/old-kit-skill" ] && ! [ -L "$g/.claude/skills/old-kit-skill" ] \
@@ -1421,13 +1430,14 @@ EOF
     case "$o" in *WARN*|*'!'*) pass "W12 (this platform may not create symlinks; the failure was reported, not hidden)" ;; *) bad "W12 symlink creation failed silently: $o" ;; esac
   fi
   rm -rf "$g"
-  # W13: the doctor says when the machine-wide skills are not in place, and stops once they are.
+  # W13: the doctor says when the kit is not installed on this machine (here: a share from before the
+  # install record), and is quiet once setup has run.
   home_
   mkdir -p "$g/.the-agent-kit"; cp -r "$KIT/claude/skills" "$g/.the-agent-kit/skills"
   d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
-  has 'machine-wide skills.*install.sh --setup' "$d" && pass "W13 --check notes the kit's skills are not installed machine-wide" || bad "W13 --check silent about missing machine-wide skills"
+  has 'predates the install record.*install.sh --update' "$d" && pass "W13 --check notes the machine-wide install is missing or old" || bad "W13 --check silent about a missing machine-wide install: $(printf '%s' "$d" | grep -i -E 'entries|record')"
   su 1; d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
-  has 'machine-wide skills' "$d" && bad "W13 --check still notes it after setup" || pass "W13 --check is quiet once they are in place"
+  has "machine-wide entries: installed and current" "$d" && pass "W13 --check is quiet once they are in place" || bad "W13 --check still notes it after setup: $(printf '%s' "$d" | grep -i -E 'entries|record')"
   rm -rf "$g"
 else
   bad "no python - machine-wide skills NOT tested"
@@ -1487,14 +1497,26 @@ EOF
   rm -rf "$ah"
   # G5: a stale launcher and a stale kit entry are refreshed; a different entry under the same name is not ours.
   printf '# The Agent Kit: launcher for the session-start check (old)\nstale\n' > "$g/.gemini/config/agent-kit-check.py"
+  # Stale = an older spelling of the kit's own command (another interpreter): the whole entry is the kit's.
+  $PY - "$(wq "$(HJ)")" <<'EOF'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); h = d["the-agent-kit-check"]["PreInvocation"][0]
+h["command"] = ("python3 " if h["command"].startswith("py -3 ") else "py -3 ") + "agent-kit-check.py --tool antigravity"
+h["timeout"] = 99
+json.dump(d, open(p, "w", encoding="utf-8"))
+EOF
+  su 1
+  ! grep -q '^stale$' "$g/.gemini/config/agent-kit-check.py" && [ "$(hk "$(HJ)" "d['the-agent-kit-check']['PreInvocation'][0]['timeout']")" = 10 ] && [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status', 'the-agent-kit-check']" ] \
+    && pass "G5 a stale launcher and a stale kit entry are brought current" || bad "G5 stale files not refreshed: $o"
+  # G5b: the kit's current command with a value the user set (a longer timeout): the user's, kept.
   $PY - "$(wq "$(HJ)")" <<'EOF'
 import json, sys
 p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); d["the-agent-kit-check"]["PreInvocation"][0]["timeout"] = 99
 json.dump(d, open(p, "w", encoding="utf-8"))
 EOF
   su 1
-  ! grep -q '^stale$' "$g/.gemini/config/agent-kit-check.py" && [ "$(hk "$(HJ)" "d['the-agent-kit-check']['PreInvocation'][0]['timeout']")" = 10 ] && [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status', 'the-agent-kit-check']" ] \
-    && pass "G5 a stale launcher and a stale kit entry are brought current" || bad "G5 stale files not refreshed: $o"
+  [ "$(hk "$(HJ)" "d['the-agent-kit-check']['PreInvocation'][0]['timeout']")" = 99 ] \
+    && pass "G5b a value the user set on the kit's own entry is kept" || bad "G5b user's timeout overwritten: $o"
   $PY - "$(wq "$(HJ)")" <<'EOF'
 import json, sys
 p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); d["the-agent-kit-check"] = {"PreInvocation": [{"command": "echo mine"}]}
@@ -1505,7 +1527,7 @@ EOF
     && pass "G6 an entry named the-agent-kit that is not the kit's is left alone, with a warning" || bad "G6 foreign entry replaced or not reported: $o"
   # G7: undo takes the kit's hook and launcher and nothing else.
   printf '%s\n' "$orca" > "$(HJ)"; su 1
-  src=0; o=$(env HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --undo </dev/null 2>&1) || src=$?
+  src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY=1 sh "$KIT/install.sh" --undo </dev/null 2>&1) || src=$?
   [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status']" ] && [ ! -e "$g/.gemini/config/agent-kit-check.py" ] \
     && pass "G7 --undo removes the kit's hook and launcher and keeps the other tool's hooks" || bad "G7 undo wrong: $(cat "$(HJ)")"
   rm -rf "$g"
@@ -1518,7 +1540,7 @@ EOF
   rm -rf "$g"; home_; printf 'mine\n' > "$g/.gemini/config/agent-kit-check.py"; su 1
   [ "$(cat "$g/.gemini/config/agent-kit-check.py")" = mine ] && [ ! -e "$(HJ)" ] && has 'launcher' "$(printf '%s' "$o" | grep '!')" \
     && pass "G8a a foreign agent-kit-check.py is left alone and the hook is not wired to it" || bad "G8a foreign launcher overwritten or wired: $o"
-  src=0; o=$(env HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --undo </dev/null 2>&1) || src=$?
+  src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY=1 sh "$KIT/install.sh" --undo </dev/null 2>&1) || src=$?
   [ "$(cat "$g/.gemini/config/agent-kit-check.py")" = mine ] && pass "G8a --undo does not remove a launcher that is not the kit's" || bad "G8a undo removed a foreign file"
   rm -rf "$g"; home_; vic=$(mktemp -d); printf '{"keep":"me"}\n' > "$vic/victim.json"
   if MSYS=winsymlinks:nativestrict ln -s "$vic/victim.json" "$(HJ)" 2>/dev/null && [ -L "$(HJ)" ]; then
@@ -1535,7 +1557,7 @@ EOF
   has 'machine-wide.*install.sh --setup' "$d" && bad "G10 --check complains although everything is in place" || pass "G10 --check is quiet when the Antigravity check is wired"
   printf '{}\n' > "$(HJ)"
   d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
-  has 'machine-wide.*Antigravity.*install.sh --setup' "$d" && pass "G10b --check notes the Antigravity check is not wired and what to run" || bad "G10b --check silent about an unwired Antigravity check"
+  has 'machine-wide entries.*gemini.*install.sh --setup' "$d" && pass "G10b --check notes the Antigravity check is not wired and what to run" || bad "G10b --check silent about an unwired Antigravity check"
   rm -rf "$g"
   # G11: --global prints the hook for a hand merge and writes nothing under ~/.gemini.
   g=$(mktemp -d) || exit 2; G=$(wq "$g"); mkdir -p "$g/.gemini/config"
