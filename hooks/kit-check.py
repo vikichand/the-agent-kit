@@ -30,7 +30,7 @@ including every error, so it can never block a session.
 Opt out entirely:  AGENT_KIT_NO_UPDATE_CHECK=1  (the adherence harness sets it, so the with-arm of an
 eval never receives an instruction the control arm does not).
 """
-import glob, json, os, re, subprocess, sys, time
+import glob, json, os, re, shutil, subprocess, sys, time
 
 REPO = os.environ.get("AGENT_KIT_REPO") or "https://github.com/vikichand/the-agent-kit.git"
 SHARE = os.path.join(os.path.expanduser("~"), ".the-agent-kit")
@@ -139,6 +139,8 @@ def installed_antigravity(kind, name, top, home):
 def installed(tool, kind, name, top):
     """True / False, or None when this machine's config cannot be read (never nag on a guess)."""
     home = os.path.expanduser("~")
+    if kind == "command":   # a program on PATH, the same for every agent
+        return shutil.which(name) is not None
     if tool == "antigravity":
         return installed_antigravity(kind, name, top, home)
     if kind == "skill":
@@ -200,7 +202,7 @@ def check_items(tool, top, optional):
         spec = it.get(tool)
         if not isinstance(spec, dict) or bool(it.get("optional")) != optional or (it.get("when") == "web" and not web):
             continue
-        kind = next((k for k in ("mcp", "plugin", "skill") if spec.get(k)), None)
+        kind = next((k for k in ("mcp", "plugin", "skill", "command") if spec.get(k)), None)
         state = installed(tool, kind, spec[kind], top) if kind else True
         if state is not True:
             cmd = (spec.get("install_windows") if os.name == "nt" else None) or \

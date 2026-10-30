@@ -15,7 +15,7 @@ context for every session, whether it fires or not.
 
 | Profile | What | Why |
 |---|---|---|
-| **Core** (everyone) | Context7 MCP | The kit's `context7.md` rule sends library and API questions to it instead of stale training data |
+| **Core** (everyone) | Context7 MCP, gitleaks | The kit's `context7.md` rule sends library and API questions to Context7 instead of stale training data; the kit's pre-commit hook adds a gitleaks scan to its own secret patterns when gitleaks is on PATH (`winget install --id Gitleaks.Gitleaks --exact` on Windows, `brew install gitleaks` elsewhere) |
 | **Web and UI** | Playwright CLI and its skill, Chrome DevTools MCP, Impeccable, `frontend-design` | Real-browser proof of UI work (Section 5) and design quality |
 | **Optional** | Superpowers, ponytail, headroom | They work alongside the kit, but each costs context or latency, so opt in knowingly |
 

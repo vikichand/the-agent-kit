@@ -1,5 +1,5 @@
 {
-  "_about": "What the-agent-kit's session-start check suggests when a tool is missing. install.sh --setup (and --update, which runs it) merges this list into ~/.the-agent-kit/recommended.json by 'id': new items are added and changed ones replaced. To stop a reminder, add the id to \"dismissed\" in your copy (deleting the entry works too). Entries without an id are yours and are never touched. 'when': 'always', or 'web' for projects whose AGENTS.md block marks a web or user-facing platform. 'optional': true items are listed by install.sh --check only, never in the session reminder. Per tool, 'mcp', 'plugin' or 'skill' names what must be present; 'install_windows' replaces 'install' on Windows. 'since' and 'replaces' are for the merge only. Details: ~/.the-agent-kit/docs/environment-setup-prompt.md",
+  "_about": "What the-agent-kit's session-start check suggests when a tool is missing. install.sh --setup (and --update, which runs it) merges this list into ~/.the-agent-kit/recommended.json by 'id': new items are added and changed ones replaced. To stop a reminder, add the id to \"dismissed\" in your copy (deleting the entry works too). Entries without an id are yours and are never touched. 'when': 'always', or 'web' for projects whose AGENTS.md block marks a web or user-facing platform. 'optional': true items are listed by install.sh --check only, never in the session reminder. Per tool, 'mcp', 'plugin', 'skill' or 'command' (a program on PATH) names what must be present; 'install_windows' replaces 'install' on Windows. 'since' and 'replaces' are for the merge only. Details: ~/.the-agent-kit/docs/environment-setup-prompt.md",
   "items": [
     {
       "id": "context7",
@@ -86,6 +86,27 @@
       "antigravity": {
         "skill": "frontend-design",
         "install": "copy skills/frontend-design from github.com/anthropics/skills into ~/.agents/skills/, then add frontend-design to the ~/.agents/skills entry's include_only list in ~/.gemini/config/skills.json"
+      }
+    },
+    {
+      "id": "gitleaks",
+      "name": "gitleaks (secret scan in the kit's pre-commit hook)",
+      "since": 2,
+      "when": "always",
+      "claude": {
+        "command": "gitleaks",
+        "install": "brew install gitleaks (or a release binary from github.com/gitleaks/gitleaks/releases)",
+        "install_windows": "winget install --id Gitleaks.Gitleaks --exact"
+      },
+      "codex": {
+        "command": "gitleaks",
+        "install": "brew install gitleaks (or a release binary from github.com/gitleaks/gitleaks/releases)",
+        "install_windows": "winget install --id Gitleaks.Gitleaks --exact"
+      },
+      "antigravity": {
+        "command": "gitleaks",
+        "install": "brew install gitleaks (or a release binary from github.com/gitleaks/gitleaks/releases)",
+        "install_windows": "winget install --id Gitleaks.Gitleaks --exact"
       }
     },
     {

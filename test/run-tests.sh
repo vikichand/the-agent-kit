@@ -269,9 +269,11 @@ if [ -n "$PY" ]; then
   # tool that started the session; web items only in a web project; at most once a day; silent when
   # it cannot tell (an unreadable config is not "missing").
   cp "$KIT/hooks/recommended.json" "$k/home/.the-agent-kit/recommended.json"
+  # A stand-in gitleaks on PATH, so whether this machine has the real one never changes a result.
+  mkdir -p "$k/bin"; : > "$k/bin/gitleaks"; : > "$k/bin/gitleaks.exe"; chmod +x "$k/bin/gitleaks"
   kt() {  # $1 = tool, $2 = cwd -> stdout; the once-a-day marker is cleared unless $3 = keep
     [ "${3:-}" = keep ] || rm -f "$k/home/.the-agent-kit/.tools-check"
-    printf '{"cwd":"%s","source":"startup"}' "$(wp "$2")" | HOME="$KH" USERPROFILE="$KH" AGENT_KIT_REPO="$KS" $PY "$KIT/hooks/kit-check.py" --tool "$1" 2>/dev/null
+    printf '{"cwd":"%s","source":"startup"}' "$(wp "$2")" | PATH="$k/bin:$PATH" HOME="$KH" USERPROFILE="$KH" AGENT_KIT_REPO="$KS" $PY "$KIT/hooks/kit-check.py" --tool "$1" 2>/dev/null
   }
   rm -f "$k/proj/AGENTS.md"
   o=$(kt claude "$k/proj"); has 'Context7' "$o" && ! has 'Playwright' "$o" \
@@ -294,6 +296,10 @@ if [ -n "$PY" ]; then
   printf '{"items":[]}' > "$k/home/.the-agent-kit/recommended.json"; printf '{}' > "$k/home/.claude.json"
   o=$(kt claude "$k/proj"); o2=$(kc "$k/proj")
   [ -z "$o" ] && [ -z "$o2" ] && pass "K17 declined (removed) items and sessions without --tool stay silent" || bad "K17 not silent: [$o] [$o2]"
+  # K17b: a 'command' item is a program on PATH, for every agent.
+  printf '{"items":[{"id":"x","name":"nocmd","when":"always","claude":{"command":"agent-kit-no-such-cmd","install":"get-nocmd"}},{"id":"y","name":"hascmd","when":"always","codex":{"command":"gitleaks","install":"get-hascmd"}}]}' > "$k/home/.the-agent-kit/recommended.json"
+  o=$(kt claude "$k/proj"); o2=$(kt codex "$k/proj")
+  has 'get-nocmd' "$o" && [ -z "$o2" ] && pass "K17b a command missing from PATH is named; one on PATH is silent" || bad "K17b command detection wrong: [$o] [$o2]"
   # K18: optional items (superpowers, ponytail, headroom) are for install.sh --check, never the reminder.
   cp "$KIT/hooks/recommended.json" "$k/home/.the-agent-kit/recommended.json"
   printf '# rules v2\n<!-- PROJECT-CONFIG:START -->\n**Platform / intent:** web - production\n<!-- PROJECT-CONFIG:END -->\n' > "$k/proj/AGENTS.md"
@@ -312,7 +318,7 @@ if [ -n "$PY" ]; then
   # nothing otherwise, and be cheap on the calls it skips.
   ka() {  # $1 = conversation id (empty = none), $2 = workspace -> stdout
     printf '{"conversationId":"%s","invocationNum":1,"workspacePaths":["%s"]}' "$1" "$(wp "$2")" \
-      | HOME="$KH" USERPROFILE="$KH" AGENT_KIT_REPO="$KS" $PY "$KIT/hooks/kit-check.py" --tool antigravity 2>/dev/null
+      | PATH="$k/bin:$PATH" HOME="$KH" USERPROFILE="$KH" AGENT_KIT_REPO="$KS" $PY "$KIT/hooks/kit-check.py" --tool antigravity 2>/dev/null
   }
   msg() { printf '%s' "$1" | $PY -c "import json,sys; d=json.loads(sys.stdin.read()); print(d['injectSteps'][0]['ephemeralMessage'] if d else '')" 2>/dev/null; }
   rm -f "$k/home/.the-agent-kit/.ag-conversations" "$k/home/.the-agent-kit/.update-check"; printf 'abc1234\n' > "$k/home/.the-agent-kit/.kit-version"
@@ -1209,7 +1215,7 @@ EOF
     && pass "R4 an unreadable list is left untouched and named" || bad "R4 unreadable list handled wrongly: $o"
   # R5: no list yet -> seeded from the kit, with the record the next merge needs.
   rm -f "$RL"; su
-  [ "$(rj "len(d['items'])")" = 8 ] && [ "$(rj "sorted(d['seeded']) == sorted(i['id'] for i in d['items'])")" = True ] \
+  [ "$(rj "len(d['items'])")" = 9 ] && [ "$(rj "sorted(d['seeded']) == sorted(i['id'] for i in d['items'])")" = True ] \
     && [ "$(rj "d['dismissed']")" = "[]" ] \
     && pass "R5 a fresh machine is seeded with every item and the record of them" || bad "R5 fresh seed wrong: $(cat "$RL" 2>/dev/null | head -c 200)"
   # R5b: the kit's list may have just come off the network (--update), and its text lands in the agent's

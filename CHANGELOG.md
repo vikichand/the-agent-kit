@@ -19,6 +19,9 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   outcome). Rules for 49 and 51 were drafted and left out: the 0.5.1 rules already pass both.
 - `test/adherence/run.sh --clean-config`: every Claude arm runs on the clean config folder the vanilla
   arm uses, so two rule sets can be compared without a third arm and without your own setup in either.
+- gitleaks joins the recommended tools for every agent. Without it the pre-commit hook still scans
+  for the common key formats, but skips the gitleaks pass with no warning, so the session-start check
+  now names it when it is missing. A recommended item can be a program on PATH (`"command"`).
 
 ### Changed
 
