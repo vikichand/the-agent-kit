@@ -8,8 +8,8 @@
 #                             hooks, add the kit to your Claude Code and Codex settings, and install its
 #                             skills once for all three tools and wire Antigravity's session-start check
 #                             (asks first)
-#   ./install.sh --undo       remove the machine-wide skill links, copies, skills.json names and the
-#                             Antigravity check hook it made
+#   ./install.sh --undo       take out everything the install record lists (settings entries, git
+#                             hooks, skills, Antigravity's check), asked first and verified after
 #   ./install.sh --global     machine-wide, by hand: copy the kit and PRINT the snippets to merge yourself
 #   ./install.sh --update     pull the latest kit from GitHub into ~/.the-agent-kit, then run --setup
 #   ./install.sh --update-rules  refresh THIS repo's AGENTS.md to the kit's current rules; the

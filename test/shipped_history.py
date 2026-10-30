@@ -6,7 +6,13 @@ listed would stay on every machine after an update. This makes forgetting a fail
 
   python3 test/shipped_history.py      (in a git checkout; skipped, with exit 0, without one)
 """
-import importlib.util, json, os, subprocess, sys, tomllib
+import importlib.util, json, os, subprocess, sys
+
+try:
+    import tomllib
+except ImportError:                  # Python 3.10 or older: machine.py itself skips config.toml there too
+    print("shipped history: needs Python 3.11+ (tomllib); skipped")
+    sys.exit(0)
 
 KIT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 spec = importlib.util.spec_from_file_location("machine", os.path.join(KIT, "setup", "machine.py"))
