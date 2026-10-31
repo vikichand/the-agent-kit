@@ -60,6 +60,13 @@ for h, text in versions("codex/config.toml"):
     for t, v in d.items():
         pairs = [(t, k) for k in v] if isinstance(v, dict) else [("", t)]
         missing += ["%s: config.toml %s" % (h, ".".join(x for x in p if x)) for p in pairs if p not in tkeys]
+# Rule and skill files: one the kit shipped and dropped must be in setup/project.py's RETIRED_FILES, or a
+# project install would leave it behind (or, from a tampered record, refuse to know it).
+pspec = importlib.util.spec_from_file_location("project", os.path.join(KIT, "setup", "project.py"))
+project = importlib.util.module_from_spec(pspec); pspec.loader.exec_module(project)
+ever = set(git("log", "--all", "--format=", "--name-only", "--", "claude/rules", "claude/skills").stdout.split())
+now_files = set(git("ls-files", "claude/rules", "claude/skills").stdout.split())
+missing += ["file %s" % f for f in ever - now_files - set(project.RETIRED_FILES)]
 for m in sorted(set(missing)):
     print("FAIL shipped once, unknown to machine.py now (add it to RETIRED, KIT_KEYS or KIT_TOML): " + m)
 print("shipped history: %s" % ("%d unknown" % len(set(missing)) if missing else "every entry ever shipped is known"))

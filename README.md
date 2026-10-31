@@ -159,9 +159,23 @@ snippets, and the skill steps, instead.
 - for Antigravity, `.agents/rules/` (the two depth rules Codex can't take, loaded on matching files) and
   the command guard as a workspace hook in `.agents/hooks.json`, with a small launcher beside it.
 
-It never overwrites an existing `AGENTS.md` or `CLAUDE.md`. `--update-rules` later replaces the
-universal rules and keeps the project's block byte for byte; anything hand-edited outside the block is
-replaced, so check `git diff AGENTS.md` afterwards.
+Every run, the first one or a later one, brings the project to the kit you are installing from. It
+takes out what the old kit wrote and the new one no longer ships, then writes the new kit's files.
+`.agents/the-agent-kit.json`, committed with the project, records each file the kit wrote and a
+fingerprint of it:
+- **The kit's own files** (the rules, skills, launcher) are replaced, even if edited, and nothing you
+  wrote is lost. If git holds your edit (the file is committed and clean), `git diff` shows it. If it
+  does not (an uncommitted change, or a folder git ignores), your copy is saved beside the file as
+  `<file>.bak-agent-kit-<time>` first, and the run names it.
+- **A retired file** is removed if unchanged. If you edited it, it is left in place and named.
+- **`AGENTS.md`** gets the kit's current rules around your `PROJECT-CONFIG` block, which is kept byte
+  for byte. A file without the markers is never guessed at: it is left as it is, with a warning.
+- **`CLAUDE.md`** is written once, for you to own.
+- **A newer kit's work is safe.** A project recorded by a newer kit than yours is left alone until you
+  update the kit, so a teammate a release behind cannot undo your update. `AGENT_KIT_FORCE=1` in front
+  of the command installs your kit anyway.
+- **Links stay out.** Nothing is written or removed through a symlink or junction anywhere on the path,
+  so a cloned repo cannot point the kit at files outside it.
 
 ### The setup prompt
 
@@ -278,8 +292,8 @@ permission rules make.
 
 Needs `git`, POSIX `sh` / `awk` / `grep` (bundled with git), and Python 3 for the tool-layer guard.
 On Windows a bare `python3` can be a no-op Store stub, so `--check` verifies the interpreter actually
-runs Python 3 and picks the fastest working one. Nothing is ever overwritten: an existing
-`CLAUDE.md`, `AGENTS.md`, or git hook is left untouched.
+runs Python 3 and picks the fastest working one. An existing `CLAUDE.md` or git hook is left
+untouched, and an `AGENTS.md` keeps your `PROJECT-CONFIG` block.
 
 MCP servers, plugins, and skills are a separate job, deliberately not automated:
 [`docs/environment-setup-prompt.md`](docs/environment-setup-prompt.md). For browser work,
@@ -503,9 +517,9 @@ Quick Start covers the usual path. The installer's modes:
 | `--undo` | machine | Take out everything the install record lists (settings entries, git hooks, skills, Antigravity's check), asked first and verified after. A kit entry you changed is kept and named. |
 | `--update` | machine | Fetch the latest kit, check it is the kit, then run `--setup` from it. Needs no kit beside it, so one downloaded `install.sh` bootstraps everything. |
 | `--global` | machine | By hand: copy the kit and **print** the settings snippets and the git-hooks command for you to apply. |
-| *(none)* | project | Full rules (`AGENTS.md` plus a `CLAUDE.md` that imports it), the depth tier and skills for all three tools (`.claude/` for Claude Code, `.agents/` for Codex and Antigravity), and this repo's git hooks. |
+| *(none)* | project | Full rules (`AGENTS.md` plus a `CLAUDE.md` that imports it), the depth tier and skills for all three tools (`.claude/` for Claude Code, `.agents/` for Codex and Antigravity), and this repo's git hooks. Run again, it brings the project to this kit: what the old kit wrote and this one no longer ships comes out (`.agents/the-agent-kit.json`). |
 | `--extension` | project | Project block only, for when the universal rules already live in your global files, so nothing is duplicated into context. |
-| `--update-rules` | project | Replace the universal rules, keep `PROJECT-CONFIG` byte-for-byte. |
+| `--update-rules` | project | The same as a plain install, for a project that already has the kit: the current rules around `PROJECT-CONFIG` (kept byte-for-byte), and every kit file brought current. Stops on a project without `AGENTS.md` or its markers. |
 | `--check` | project | Doctor: interpreter, guard firing, per-hook identity, settings wiring, the recommended and optional tools missing for each tool installed here, rules-file size, and one line on orphaned MCP processes. |
 | `--tidy` | machine | List orphaned MCP server processes left by a crashed agent. Dry run; add `--kill` to end exactly the listed trees. See [`docs/mcp-orphans.md`](docs/mcp-orphans.md). This is only the quick check for leftover MCP servers; the `/tidy` skill covers branches, worktrees, files and dev servers too. |
 

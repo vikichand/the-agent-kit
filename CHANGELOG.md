@@ -41,6 +41,15 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   Antigravity's check, and left your settings for you to restore from backups. It now takes out
   everything the install record lists, settings entries and `core.hooksPath` included, after your yes
   (or `AGENT_KIT_APPLY=1`), and checks nothing of the kit's is left.
+- **A project install brings the project to the kit, every time.** Running `install.sh` in a project
+  that already has the kit used to leave every existing file alone; only `--update-rules` refreshed
+  them. Now any run replaces the kit's own files and the rules around your `PROJECT-CONFIG` block,
+  even where they were edited. Nothing is lost: an edit git holds shows in `git diff`, and one it
+  does not hold (uncommitted, or in an ignored folder) is saved beside the file as
+  `<file>.bak-agent-kit-<time>` first. It also removes a file the kit no longer ships unless you
+  edited it. Nothing is written or removed through a symlink or junction. `.agents/the-agent-kit.json`, committed with the project,
+  records what the kit wrote. A project recorded by a newer kit is left alone until you update yours.
+  `setup/project.py` replaces the shell functions that did this one case at a time.
 - **An overnight run no longer stops on routine commands.** Replayed against the 1,140 permission
   prompts one user answered in a week, about half no longer appear, and of the rest, all but 275 now
   time out on their own instead of waiting for you. Those 275 are pushes, deletes outside the project,

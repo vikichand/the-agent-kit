@@ -28,6 +28,7 @@ PY=""; for p in python3 python "py -3"; do [ "$(printf 'print(1)' | $p - 2>/dev/
 if [ -n "$PY" ]; then
   $PY "$KIT/test/command_guard_cases.py" "$KIT/hooks/command-guard.py" || bad "command-guard corpus"
   $PY "$KIT/test/machine_cases.py" || bad "machine install-record cases"
+  $PY "$KIT/test/project_cases.py" || bad "project install-record cases"
   $PY "$KIT/test/shipped_history.py" || bad "an entry the kit once shipped is unknown to machine.py"
   $PY "$KIT/test/mcp_wrap_cases.py" || bad "mcp-wrap cases"
   $PY "$KIT/test/mcp_orphans_cases.py" || bad "mcp-orphans corpus"

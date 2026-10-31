@@ -2,7 +2,8 @@
 # the-agent-kit installer.
 #
 #   ./install.sh              per-project (self-contained): full rules (AGENTS.md + a CLAUDE.md that
-#                             imports it, so nothing is duplicated) + git hooks in THIS repo
+#                             imports it, so nothing is duplicated) + git hooks in THIS repo. Run again,
+#                             it brings the project to this kit (setup/project.py, .agents/the-agent-kit.json)
 #   ./install.sh --extension  per-project (extends global): project-config stub + git hooks
 #   ./install.sh --setup      machine-wide, all of it: copy the kit to ~/.the-agent-kit, turn on the git
 #                             hooks, add the kit to your Claude Code and Codex settings, and install its
@@ -17,7 +18,8 @@
 #   ./install.sh --check      doctor: verify the interpreter resolves and the guard actually fires
 #   ./install.sh --tidy       list orphaned MCP trees; add --kill to terminate them
 #
-# Safe by design: never overwrites an existing CLAUDE.md / AGENTS.md / git hook. In your tool settings it
+# Safe by design: never overwrites an existing CLAUDE.md or git hook, or an AGENTS.md's PROJECT-CONFIG
+# block (the rules around it are the kit's). In your tool settings it
 # changes only the kit's own entries, listed in an install record (setup/machine.py): what the old kit put
 # in and the new one no longer ships comes out, what you changed stays. After you say yes, with a backup
 # first, and verified after; --global prints them for a hand merge
@@ -75,17 +77,6 @@ install_git_hooks() {  # $1 = repo root
   done
 }
 
-write_stub() {  # $1 = target file
-  cat > "$1" <<'STUB'
-<!-- The universal rules live in your global ~/.claude/CLAUDE.md (and ~/.codex/AGENTS.md); both tools
-     read global + project files together, so this file EXTENDS them. Keep only project-specific config
-     here - do NOT copy the universal rules in (that would double them in context). -->
-
-<!-- PROJECT-CONFIG:START -->
-<!-- Run the setup prompt (~/.the-agent-kit/docs/project-setup-prompt.md) to fill this in (~15-30 lines, one screen). -->
-<!-- PROJECT-CONFIG:END -->
-STUB
-}
 
 write_rules() {  # $1 = target AGENTS.md - the kit's rules with an EMPTY project block
   # Never `cp` AGENTS.md: this repo fills its OWN PROJECT-CONFIG block (branches, gates, careful
@@ -103,59 +94,12 @@ write_rules() {  # $1 = target AGENTS.md - the kit's rules with an EMPTY project
   ' "$KIT/AGENTS.md" > "$1"
 }
 
-write_claude_importer() {  # $1 = target CLAUDE.md - imports AGENTS.md instead of duplicating it
-  cat > "$1" <<'IMP'
-<!-- Claude Code reads CLAUDE.md, not AGENTS.md, so this file imports the rules instead of copying them.
-     One source of truth, nothing to keep in sync. Put Claude-Code-only notes BELOW the import line. -->
-@AGENTS.md
-IMP
-}
 
-install_path_rules() {  # $1 = repo root. Path-scoped rules: the deep tier, free until a path matches.
-  # These load ONLY when the agent opens a file matching their `paths:` globs. Measured on a 53 KiB
-  # rule: 65,347 tokens of context with it present and not matching, versus 65,510 with no rule file
-  # at all - i.e. free. The same file costs its full size the moment a path matches, which is the
-  # point. `paths:` is read by Claude Code, VS Code Copilot and Cline; other tools ignore the folder
-  # and still get the full universal floor from AGENTS.md.
-  # Two possible homes: claude/rules in the repo, rules/ in the relocated ~/.the-agent-kit copy.
-  src=""
-  [ -d "$KIT/claude/rules" ] && src="$KIT/claude/rules"
-  [ -z "$src" ] && [ -d "$KIT/rules" ] && src="$KIT/rules"
-  [ -n "$src" ] || return 0
-  mkdir -p "$1/.claude/rules"
-  for r in "$src/"*.md; do
-    [ -e "$r" ] || continue
-    b=$(basename "$r")
-    if [ -e "$1/.claude/rules/$b" ]; then
-      say "  = .claude/rules/$b already exists - left untouched."
-    else
-      cp "$r" "$1/.claude/rules/$b"; say "  + wrote .claude/rules/$b (loads only on matching paths)"
-    fi
-  done
-}
 
-install_skills() {  # $1 = repo root. Task-shaped guidance: only the description sits in context.
-  # Skills are matched against the TASK, not against file paths, which is why orchestration lives here
-  # rather than in .claude/rules (path-triggered) or AGENTS.md (always-on and budget-capped).
-  src=""
-  [ -d "$KIT/claude/skills" ] && src="$KIT/claude/skills"
-  [ -z "$src" ] && [ -d "$KIT/skills" ] && src="$KIT/skills"
-  [ -n "$src" ] || return 0
-  for sd in "$src"/*/; do
-    [ -d "$sd" ] || continue
-    b=$(basename "$sd")
-    if [ -e "$1/.claude/skills/$b/SKILL.md" ]; then
-      say "  = .claude/skills/$b already exists - left untouched."
-    else
-      mkdir -p "$1/.claude/skills/$b"
-      # The whole folder, not just SKILL.md - skills route to reference files (references/design.md)
-      # that the body points at, and a skill deployed without them is silently broken.
-      cp -r "$sd." "$1/.claude/skills/$b/"
-      say "  + wrote .claude/skills/$b (loads when a task matches it)"
-    fi
-  done
-}
 
+# The adherence harness (test/adherence/run.sh) sources this file and builds the Codex and Antigravity
+# arms of an eval with the next five functions, against the kit version under test, which may predate
+# setup/project.py. A real install uses project.py; test/project_cases.py checks the two stay byte-identical.
 codex_skill_desc() {  # $1 = rule basename without .md -> the Codex skill description, or "" if not ported.
   # Codex has no path-scoped rules. It loads a skill when the TASK matches its description, keeping
   # only name + description in context until then, which is the closest thing it has to a rule that
@@ -299,23 +243,32 @@ install_antigravity() {  # $1 = repo root. Antigravity reads AGENTS.md and the .
   merge_ag_hooks "$1/.agents/hooks.json"
 }
 
+kit_time() {  # the commit time of the kit being installed: a project recorded by a newer kit is left alone
+  # Only when $KIT is the top of its own repo: ~/.the-agent-kit inside a dotfiles repo is not the kit's history.
+  t=""; [ -z "$(git -C "$KIT" rev-parse --show-prefix 2>/dev/null || printf x)" ] && t=$(git -C "$KIT" log -1 --format=%ct 2>/dev/null)
+  [ -n "$t" ] || t=$(cat "$KIT/.kit-time" 2>/dev/null) || t=""
+  printf '%s' "${t:-0}"
+}
+
+project() {  # $1 = install | uninstall | check, $2 = repo root, then flags -> setup/project.py
+  pr_act=$1; pr_root=$2; shift 2
+  py=$(detect_py)
+  [ -n "$py" ] || { say "  ! no working Python 3 found - the kit's project install and its guard both need it."; exit 2; }
+  $py "$(nat "$KIT/setup/project.py")" "$pr_act" --root "$(nat "$pr_root")" --kit "$(nat "$KIT")" \
+    --kit-time "$(kit_time)" --py "$py" "$@"
+}
+
 install_project() {   # self-contained: full rules + git hooks
   root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
   say "Installing FULL rules + git hooks into: $root"
   # AGENTS.md holds the rules (the cross-tool standard: Codex, Cursor, Aider, Copilot...). Claude Code
   # reads CLAUDE.md only, so CLAUDE.md IMPORTS AGENTS.md rather than duplicating it - one source of
-  # truth, no drift. (Anthropic's documented pattern; a symlink also works but needs admin on Windows.)
-  if [ -e "$root/AGENTS.md" ]; then say "  = AGENTS.md already exists - left untouched."
-  else write_rules "$root/AGENTS.md"; say "  + wrote AGENTS.md (full rules + empty project block)"; fi
-  if [ -e "$root/CLAUDE.md" ]; then say "  = CLAUDE.md already exists - left untouched."
-  else write_claude_importer "$root/CLAUDE.md"; say "  + wrote CLAUDE.md (imports AGENTS.md - single source of truth)"; fi
-  install_path_rules "$root"
-  install_skills "$root"
-  install_codex_skills "$root"
-  install_antigravity "$root"
+  # truth, no drift. Everything the kit writes here is in .agents/the-agent-kit.json (setup/project.py).
+  prc=0; project install "$root" --apply || prc=$?
   install_git_hooks "$root"
   hr
   say "Tool-layer guard is machine-wide - run once:  ./install.sh --setup   then:  ./install.sh --check"
+  [ "$prc" = 0 ] || exit 1
 }
 
 install_extension() { # lean: project-config stub + git hooks
@@ -325,15 +278,9 @@ install_extension() { # lean: project-config stub + git hooks
     say "  ! WARNING: no global rules found (~/.claude/CLAUDE.md or ~/.codex/AGENTS.md). This stub carries NO"
     say "    universal rules - add the global rules first, or use plain './install.sh' for a self-contained file."
   fi
-  if [ -e "$root/AGENTS.md" ]; then say "  = AGENTS.md already exists - left untouched."
-  else write_stub "$root/AGENTS.md"; say "  + wrote AGENTS.md (project-config stub; extends your global rules)"; fi
-  if [ -e "$root/CLAUDE.md" ]; then say "  = CLAUDE.md already exists - left untouched."
-  else write_claude_importer "$root/CLAUDE.md"; say "  + wrote CLAUDE.md (imports AGENTS.md)"; fi
-  install_path_rules "$root"
-  install_skills "$root"
-  install_codex_skills "$root"
-  install_antigravity "$root"
+  prc=0; project install "$root" --lean --apply || prc=$?
   install_git_hooks "$root"
+  [ "$prc" = 0 ] || exit 1
 }
 
 merge_recommended() {  # $1 = the kit's list  $2 = the user's list (~/.the-agent-kit/recommended.json)  $3 = plan | apply (default)
@@ -443,7 +390,7 @@ copy_share() {  # copy this kit into ~/.the-agent-kit, so the download it came f
   # The installer prints these as merge snippets, so the relocated copy must carry them too.
   cp "$KIT/claude/settings.json" "$st/claude/" 2>/dev/null || true
   cp "$KIT/codex/config.toml" "$KIT/codex/hooks.json" "$st/codex/" 2>/dev/null || true
-  cp "$KIT/setup/machine.py" "$st/setup/"   # no fallback: without it the kit cannot install or uninstall
+  cp "$KIT/setup/machine.py" "$KIT/setup/project.py" "$st/setup/"   # no fallback: without them the kit cannot install or uninstall
   # Only docs git would publish: anything git ignores is the owner's private working notes (plans,
   # research, todo lists), never the kit's. A copy with no .git (a zip) has no ignored files to leak.
   for f in "$KIT/docs/"*.md; do
@@ -491,6 +438,7 @@ copy_share() {  # copy this kit into ~/.the-agent-kit, so the download it came f
   # you what actually changed. Absent (or "unknown") when installed from a non-git copy - not fatal.
   ver=$( (cd "$KIT" && git rev-parse --short HEAD 2>/dev/null) || true )
   printf '%s\n' "${ver:-unknown}" > "$share/.kit-version"
+  kit_time > "$share/.kit-time"   # read by a project install, to leave alone a project a newer kit recorded
   say "Copied the kit to $share (rules + hooks + installer + docs)"
   say "  -> $share is now self-contained: the clone you ran this from can be deleted."
 }
@@ -714,76 +662,6 @@ update_kit() {  # refresh ~/.the-agent-kit from GitHub, so the clone stays dispo
   ' _ "$tmp/kit" "$tmp" "$share"
 }
 
-refresh_kit_owned() {  # $1 = repo root. Kit-NAMED rules and skills are kit-owned: a fix to
-  # web-security.md must reach installed projects, or every update silently under-delivers.
-  # Files under other names are the user's and are never touched.
-  src=""
-  [ -d "$KIT/claude/rules" ] && src="$KIT/claude/rules"
-  [ -z "$src" ] && [ -d "$KIT/rules" ] && src="$KIT/rules"
-  if [ -n "$src" ]; then
-    for r in "$src"/*.md; do
-      [ -e "$r" ] || continue
-      b=$(basename "$r"); tgt="$1/.claude/rules/$b"
-      if [ -e "$tgt" ] && ! cmp -s "$r" "$tgt"; then
-        cp -f "$r" "$tgt"; say "  ~ refreshed .claude/rules/$b (kit-owned; local edits to kit-named files are replaced)"
-      fi
-    done
-  fi
-  ssrc=""
-  [ -d "$KIT/claude/skills" ] && ssrc="$KIT/claude/skills"
-  [ -z "$ssrc" ] && [ -d "$KIT/skills" ] && ssrc="$KIT/skills"
-  if [ -n "$ssrc" ]; then
-    for sd in "$ssrc"/*/; do
-      [ -d "$sd" ] || continue
-      b=$(basename "$sd")
-      # 0.5.0 moved generating-reports/design.md into references/; drop the old kit-owned copy.
-      [ "$b" = generating-reports ] && [ -f "$sd/references/design.md" ] && for t in .claude/skills .agents/skills; do
-        [ -f "$1/$t/$b/design.md" ] && rm -f "$1/$t/$b/design.md" && say "  - removed $t/$b/design.md (moved to references/)"
-      done
-      # Every file in the skill, nested ones (references/) included; $fn is the path inside it.
-      for fn in $(cd "$sd" && find . -type f | sed 's|^\./||'); do
-        sf="$sd$fn"
-        # The Codex copy of the same skill is kit-owned on the same terms.
-        for t in .claude/skills .agents/skills; do
-          tgt="$1/$t/$b/$fn"
-          [ -L "$tgt" ] && continue   # a symlink here is not the kit's file; never write through it
-          if [ -e "$tgt" ] && ! cmp -s "$sf" "$tgt"; then
-            cp -f "$sf" "$tgt"; say "  ~ refreshed $t/$b/$fn (kit-owned)"
-          elif [ ! -e "$tgt" ] && [ -d "$1/$t/$b" ]; then
-            mkdir -p "$(dirname "$tgt")"; cp "$sf" "$tgt"; say "  + added $t/$b/$fn (new kit file)"
-          fi
-        done
-      done
-    done
-  fi
-  # Generated Codex skills: regenerate from the current rule text and replace on any difference, so a
-  # fix to web-security.md reaches Codex projects too, not only Claude ones.
-  if [ -n "$src" ]; then
-    for r in "$src"/*.md; do
-      [ -e "$r" ] || continue
-      n=$(basename "$r" .md); d=$(codex_skill_desc "$n"); [ -n "$d" ] || continue
-      tgt="$1/.agents/skills/$n/SKILL.md"; [ -e "$tgt" ] && [ ! -L "$tgt" ] || continue
-      tmp=$(mktemp "$tgt.XXXXXX") || continue; rule_to_skill "$r" "$n" "$d" > "$tmp"
-      if cmp -s "$tmp" "$tgt"; then rm -f "$tmp"
-      else mv -f "$tmp" "$tgt"; say "  ~ refreshed .agents/skills/$n/SKILL.md (kit-owned; regenerated from $n.md)"; fi
-    done
-  fi
-  # Antigravity's glob rules and guard launcher are kit-owned on the same terms.
-  if [ -n "$src" ]; then
-    for n in code-correctness tests; do
-      tgt="$1/.agents/rules/$n.md"; [ -e "$tgt" ] && [ ! -L "$tgt" ] && [ -e "$src/$n.md" ] || continue
-      tmp=$(mktemp "$tgt.XXXXXX") || continue; rule_to_glob "$src/$n.md" > "$tmp"
-      if cmp -s "$tmp" "$tgt"; then rm -f "$tmp"
-      else mv -f "$tmp" "$tgt"; say "  ~ refreshed .agents/rules/$n.md (kit-owned; regenerated from $n.md)"; fi
-    done
-  fi
-  tgt="$1/.agents/agent-kit-guard.py"
-  if [ -e "$tgt" ] && [ ! -L "$tgt" ] && tmp=$(mktemp "$tgt.XXXXXX"); then
-    write_ag_launcher "$tmp"
-    if cmp -s "$tmp" "$tgt"; then rm -f "$tmp"
-    else mv -f "$tmp" "$tgt"; say "  ~ refreshed .agents/agent-kit-guard.py (kit-owned)"; fi
-  fi
-}
 
 update_rules() {  # refresh the universal rules in this repo's AGENTS.md, preserving its PROJECT-CONFIG block
   root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
@@ -804,34 +682,11 @@ update_rules() {  # refresh the universal rules in this repo's AGENTS.md, preser
     say "    Add the markers (see the kit's AGENTS.md) or update the file by hand."
     exit 2
   fi
-  tmp="$tgt.update-rules.tmp"
-  # Pass 1 saves the project's block (markers inclusive); pass 2 prints the kit's current rules with
-  # the kit's placeholder block swapped for the saved one.
-  awk '
-    NR==FNR { if (/PROJECT-CONFIG:START/) c=1
-              if (c) blk = blk $0 ORS
-              if (/PROJECT-CONFIG:END/)  c=0
-              next }
-    /PROJECT-CONFIG:START/ { skip=1; printf "%s", blk }
-    !skip { print }
-    /PROJECT-CONFIG:END/   { skip=0 }
-  ' "$tgt" "$KIT/AGENTS.md" > "$tmp"
-  if [ ! -s "$tmp" ]; then rm -f "$tmp"; say "  ! update produced an empty file - aborted, nothing changed."; exit 2; fi
-  if cmp -s "$tmp" "$tgt"; then
-    rm -f "$tmp"; say "  = AGENTS.md already carries the current rules - nothing to do."
-  else
-    mv "$tmp" "$tgt"
-    say "  + updated the universal rules in $tgt - your PROJECT-CONFIG block is untouched."
-    say "    Anything else hand-edited OUTSIDE the markers was replaced; review:  git diff AGENTS.md"
-  fi
-  # Bringing a project up to date has to mean the WHOLE kit, not just this one file. A project set up
-  # before the depth tier existed has no .claude/rules, and updating only AGENTS.md would leave it
-  # silently missing every path-scoped rule while reporting success.
-  refresh_kit_owned "$root"
-  install_path_rules "$root"
-  install_skills "$root"
-  install_codex_skills "$root"
-  install_antigravity "$root"
+  # project.py brings the WHOLE kit current, not just this file: a project set up before the depth tier
+  # existed has no .claude/rules, and updating only AGENTS.md would leave it silently missing every
+  # path-scoped rule while reporting success.
+  prc=0; project install "$root" --apply || prc=$?
+  [ "$prc" = 0 ] || exit 1
 }
 
 doctor() {
