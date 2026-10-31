@@ -31,6 +31,9 @@
 #                                     and settings.json turns the claude.ai connector/skill/plugin sync off.
 #                                     Without "vanilla" the Claude arms load your own config, as before.
 #                                     Arm order rotates with the run number. See README.md.
+#   ./run.sh --clean-config           Claude only: the same clean config folder for every arm without running
+#                                     a vanilla arm, so --arms current,with compares two rule sets and nothing
+#                                     of yours (global CLAUDE.md, plugins, hooks) rides along in either.
 #
 # Every cell appends a row to results/<date>.tsv: case, arm, run, verdict, elapsed seconds (censored=1
 # on timeout), turns, tool calls, tokens in/out/cache, cost where the CLI reports it, model, judge,
@@ -47,7 +50,7 @@ set -u
 
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 KIT=$(CDPATH= cd -- "$HERE/../.." && pwd)
-RUNS=1; ONLY=""; MODEL=""; EFFORT=""; JUDGE=""; KEEP=0; TOOL="claude"; PANEL=""
+RUNS=1; ONLY=""; MODEL=""; EFFORT=""; JUDGE=""; KEEP=0; TOOL="claude"; PANEL=""; CLEAN=0
 # ARMS. `without` = no rules (control); `with` = the rules in this working tree (the candidate);
 # `current` = the rules at a pinned git ref, so a rule edit can be compared against what shipped
 # before it, with the control alongside. Three arms are what let a smaller with/without gap be read
@@ -74,7 +77,8 @@ while [ $# -gt 0 ]; do
     --arms)        ARMS="$2"; shift 2 ;;
     --current-ref) CURRENT_REF="$2"; shift 2 ;;
     --panel)       PANEL="$2"; shift 2 ;;
-    -h|--help)     sed -n '2,37p' "$0"; exit 0 ;;
+    --clean-config) CLEAN=1; shift ;;
+    -h|--help)     sed -n '2,40p' "$0"; exit 0 ;;
     *) echo "unknown option: $1"; exit 2 ;;
   esac
 done
@@ -106,6 +110,9 @@ esac
 for a in $(printf '%s' "$ARMS" | tr ',' ' '); do
   case "$a" in with|without|current|vanilla) ;; *) echo "FAIL: --arms accepts with, without, current, vanilla (got '$a')."; exit 2 ;; esac
 done
+if [ "$CLEAN" -eq 1 ] && [ "$TOOL" != claude ]; then
+  echo "FAIL: --clean-config is for --tool claude. Codex already runs --ignore-user-config in every arm."; rm -rf "$STAGE"; exit 2
+fi
 case ",$ARMS," in *,vanilla,*)
   [ "$TOOL" = claude ] || { echo "FAIL: the vanilla arm is for --tool claude. Codex already runs --ignore-user-config in both arms; Antigravity has no switch to isolate ~/.gemini, so its numbers stay a machine baseline."; rm -rf "$STAGE"; exit 2; }
   case ",$ARMS," in *,without,*) echo "FAIL: --arms cannot hold both vanilla and without. Both mean no rules; vanilla also drops your user config, so use it."; rm -rf "$STAGE"; exit 2 ;; esac ;;
@@ -128,8 +135,9 @@ export AGENT_KIT_NO_UPDATE_CHECK=1
 # ~/.codex/AGENTS.md) loads in BOTH arms, so if it already carries engineering conventions, the
 # "without" run is not ruleless and the measured gap is a FLOOR, not the kit's absolute value.
 gms="$HOME/.claude/CLAUDE.md $HOME/.codex/AGENTS.md"
-# A vanilla run points every Claude arm at its own config folder, so ~/.claude/CLAUDE.md is not read.
-case ",$ARMS," in *,vanilla,*) gms="$HOME/.codex/AGENTS.md" ;; esac
+# A vanilla or --clean-config run points every Claude arm at its own config folder, so ~/.claude/CLAUDE.md
+# is not read.
+case ",$ARMS,:$CLEAN" in *,vanilla,*|*:1) gms="$HOME/.codex/AGENTS.md" ;; esac
 # Under Codex the user's hooks load too (the kit's deny-mode guard among them), so the control arm
 # is not hookless either. Named, not silenced. config.toml - and with it the plugins and their
 # skills - is NOT in this list because the Codex arm runs with --ignore-user-config (see run_cell).
@@ -163,7 +171,9 @@ fi
 jflag=""; [ -n "$JUDGE" ] && jflag="--model $JUDGE"
 
 # What the agent may run inside the throwaway sandbox. Deliberately narrow: the test runners the
-# fixtures need, the reading tools any diagnosis needs, and git. Unquoted on use, so no spaces.
+# fixtures need, the reading tools any diagnosis needs, and git. Unquoted on use, so no spaces. Not
+# covered: `cd "/c/Users/..." && ...` on Windows, which Claude Code reads as a cd outside the sandbox
+# (`Bash(cd:*)` did not help, tried 2026-10-24). It is denied, and the agent re-runs it without the cd.
 ALLOW="Bash(python:*) Bash(python3:*) Bash(pytest:*) Bash(uv:*) Bash(node:*) Bash(npm:*) Bash(npx:*) Bash(git:*) Bash(ls:*) Bash(cat:*) Bash(grep:*) Bash(find:*) Bash(sed:*) Bash(head:*) Bash(tail:*)"
 
 # A case may add patterns to the allowlist with an `allow` file in its folder (one per line, `#` comments),
@@ -233,15 +243,18 @@ newsid() {
 # event carries duration, turn count, token usage and cost; `assistant` events carry the text the
 # judge reads and the tool calls the trace check reads. Fields: messages | usage | tools.
 #
-# `usage` may be given further events files (turn 2, 3 ...) after the first: tool calls and edits are
-# counted over all of them, everything else is read from the LAST result event, because a resumed
-# session's result carries the session's whole spend (Claude Code v2.1.277 and later; summing the turns
-# would count turn 1 again). A file that does not exist is skipped.
+# `usage` may be given further events files (turn 2, 3 ...) after the first: tool calls, edits, turns,
+# tokens and durations are added up over all of them, cost is read from the LAST result event and
+# ttft from the first. A resumed session's result carries the session's whole COST but only its own
+# turn's tokens, turn count and durations (verified 2026-10-23 with a two-turn probe: turn 2 reported
+# num_turns 1 and 3,663 cache-write tokens against a cost that included turn 1), so until then every
+# multi-turn case recorded last-turn tokens and a whole-session cost side by side. A file that does
+# not exist is skipped.
 claude_field() {  # $1 = events file  $2 = messages|usage|tools  $3... = later turns' events files (usage only)
   for p in python python3; do
     r=$("$p" - "$@" <<'PY' 2>/dev/null
 import json, os, sys
-want = sys.argv[2]; msgs = []; tools = []; res = None
+want = sys.argv[2]; msgs = []; tools = []; res = None; sums = {}; ttft = None
 for path in [sys.argv[1]] + sys.argv[3:]:
   if not os.path.exists(path): continue
   for line in open(path, encoding="utf-8", errors="replace"):
@@ -259,16 +272,22 @@ for path in [sys.argv[1]] + sys.argv[3:]:
             if c.get("type") == "tool_result" and tools:
                 body = c.get("content"); txt = body if isinstance(body, str) else " ".join(x.get("text", "") for x in (body or []) if isinstance(x, dict))
                 tools[-1]["result"] = (txt or "")[:400]; tools[-1]["is_error"] = bool(c.get("is_error"))
-    elif t == "result": res = e
+    elif t == "result":
+        res = e; u = e.get("usage") or {}
+        for k in ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"):
+            sums[k] = sums.get(k, 0) + (u.get(k) or 0)
+        for k in ("num_turns", "duration_ms", "duration_api_ms"):
+            sums[k] = sums.get(k, 0) + (e.get(k) or 0)
+        if ttft is None: ttft = e.get("ttft_ms", "")
 if want == "messages": print("\n".join(msgs))
 elif want == "tools": print(json.dumps(tools))
 elif want == "usage":
-    u = (res or {}).get("usage") or {}
+    g = lambda k: sums.get(k, "") if res else ""
     print("\t".join(str(x) for x in [
-        (res or {}).get("num_turns", ""), len(tools), sum(1 for x in tools if x["name"] in ("Edit", "Write", "MultiEdit", "NotebookEdit")),
-        u.get("input_tokens", ""), u.get("output_tokens", ""), u.get("cache_read_input_tokens", ""), u.get("cache_creation_input_tokens", ""),
+        g("num_turns"), len(tools), sum(1 for x in tools if x["name"] in ("Edit", "Write", "MultiEdit", "NotebookEdit")),
+        g("input_tokens"), g("output_tokens"), g("cache_read_input_tokens"), g("cache_creation_input_tokens"),
         (res or {}).get("total_cost_usd", ""),
-        (res or {}).get("duration_ms", ""), (res or {}).get("duration_api_ms", ""), (res or {}).get("ttft_ms", "")]))
+        g("duration_ms"), g("duration_api_ms"), "" if ttft is None else ttft]))
 PY
 ) || continue
     printf '%s' "$r"; return 0
@@ -654,8 +673,13 @@ run_cell() {
       #  - DISABLE_AUTOUPDATER: an update mid-run has aborted a run three times;
       #  - CLAUDE_CODE_DISABLE_ADVISOR_TOOL: the advisor re-reads the whole transcript on every call, and
       #    whether it fires is the model's choice. Documented at https://code.claude.com/docs/en/advisor.
+      #  - CLAUDE_CODE_USE_POWERSHELL_TOOL=0: on Windows with a claude.ai login the PowerShell tool is on by
+      #    default and ALLOW holds only Bash rules, so every test run the agent sent through PowerShell was
+      #    denied in -p mode and scored as the agent's failure (found 2026-10-24 on Opus, case 50). One
+      #    shell tool, the one ALLOW was written for, on every platform.
       # In a vanilla run CLAUDE_CONFIG_DIR is the clean folder (quoted: the real path has a space).
-      ( cd "$w" && export DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1 CLAUDE_CODE_EFFORT_LEVEL="$EFFORT" \
+      ( cd "$w" && export DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1 CLAUDE_CODE_USE_POWERSHELL_TOOL=0 \
+          CLAUDE_CODE_EFFORT_LEVEL="$EFFORT" \
           && { [ -z "$CFGDIR" ] || export CLAUDE_CONFIG_DIR="$CFGDIR"; } \
           && timeout "$TIMEOUT" claude -p "$(cat "$pf")" --output-format stream-json --verbose \
           --permission-mode acceptEdits --allowedTools $ALLOW ${cx:+"$cx"} $sflag $mflag $eflag >"$ev" 2>>"$err" ); rc=$?
@@ -880,12 +904,15 @@ panel_ids() {  # $1 = panel file  $2 = cases dir
   printf '%s\n' "$ids"
 }
 
-# The vanilla arm's config folder. Checked and locked here, after the functions exist and before any cell
-# runs. CFGDIR set means every Claude cell of this run is started with CLAUDE_CONFIG_DIR pointing at it.
+# The vanilla arm's config folder, also used by --clean-config. Checked and locked here, after the functions
+# exist and before any cell runs. CFGDIR set means every Claude cell of this run is started with
+# CLAUDE_CONFIG_DIR pointing at it.
 CFGDIR=""
-case ",$ARMS," in *,vanilla,*)
+case ",$ARMS,:$CLEAN" in *,vanilla,*|*:1)
   VDIR=${AGENT_KIT_VANILLA_DIR:-$HOME/.claude-vanilla}
   msg=$(vanilla_check "$VDIR") || { echo "FAIL: $msg"; rm -rf "$STAGE"; exit 2; }
+  # Absolute, because each cell runs from its sandbox: a relative folder would resolve there instead.
+  VDIR=$(cd -- "$VDIR" && pwd)
   msg=$(vanilla_lock "$VDIR") || { echo "FAIL: $msg"; rm -rf "$STAGE"; exit 2; }
   trap 'rm -rf "$VDIR/.harness-lock"' EXIT; trap 'exit 130' INT TERM
   # claude.exe is a native Windows program: hand it a Windows path, not an MSYS one.
@@ -903,7 +930,7 @@ printf '%s\n' "------------------------------------------------------------"
 echo "adherence eval - $RUNS run(s) per cell"
 echo "tool: $TOOL   model under test: ${MODEL:-<cli default>}${EFFORT:+ (effort $EFFORT)}   judge: claude ${JUDGE:-<cli default>}"
 echo "arms: $ARMS   with=$CAND_REF   current=$CURRENT_REF   results: $TSV"
-[ -n "$CFGDIR" ] && echo "claude config folder for every arm: $VDIR (vanilla; your own ~/.claude is not loaded)"
+[ -n "$CFGDIR" ] && echo "claude config folder for every arm: $VDIR (clean; your own ~/.claude is not loaded)"
 [ -n "$PANEL" ] && echo "panel: $PANEL ($(printf '%s\n' "$PANEL_IDS" | grep -c .) cases)"
 printf '%s\n' "------------------------------------------------------------"
 

@@ -1,6 +1,6 @@
 ---
 name: writing-docs
-description: Use when writing or editing documentation, a README, a CHANGELOG, a commit message, a PR description, release notes, or any prose a human will read - carries the prose standards (no AI tells, symbols written out) and the README order (working path first, a runnable command in the first screenful, command surfaces as tables, shell differences named). Also use when asked to document something, write the README, write a commit message, open a pull request, or cut a release.
+description: Use when writing or editing documentation, a README, a CHANGELOG, a commit message, a pull request description, release notes or any prose a human will read, and when asked to document something, open a pull request or cut a release. Carries the prose standards and the README order.
 ---
 
 # Writing docs, READMEs, commits, pull requests and release notes
@@ -13,8 +13,16 @@ loads only when you are writing prose.
 A trailer is not the only thing that marks work as machine-made; the writing does it too, in every
 README, comment, commit body and PR description.
 
-- **No em dashes.** Models reach for them far more readily than people do. Use ` - `, a comma, or two
-  sentences.
+- **No em dashes, and no en dash, spaced hyphen (` - `) or double hyphen (`--`) standing in for one.**
+  The tell is the habit of splicing a punchline onto a clause, whatever the glyph. Rebuild the
+  sentence: two sentences, a "because" or "so" clause, parentheses, a comma. Vary it: swapping every
+  dash for a full stop leaves a page of short uniform sentences, which reads as machine-made too. A
+  colon introduces a list, a label or a quotation, never a reveal. A hyphen inside a word or a range
+  (`pre-commit`, `1-9`) is not a dash, and nothing in code, commands, paths or URLs is covered.
+- **Arrows (`->` and the glyph) only in code and diagrams.** In prose and headings write "then", "to"
+  or "becomes".
+- **No "not X, but Y" reframes**, in any form: "X, not Y", "it is not X. It is Y.", "X rather than
+  Y" used for punch. State what the thing is.
 - **Out:** "it's not just X, it's Y"; filler openers ("In today's fast-paced..."); hedges ("it's worth
   noting that"); *delve / leverage / seamless / robust / comprehensive*; emoji headings; bolding every
   third phrase; a closing line that restates the paragraph.
@@ -44,7 +52,9 @@ thorough.
   commit, never one per file. A subject that needs a bracketed list or a second "and" is two commits.
 - For a squash merge, the pull request description becomes the commit message: write it as one.
 
-**Branches, tags and releases** (the project block's **Branches** line decides; this is the default)
+**Branches, tags and releases** (the project block's **Branches** line decides; this is the default).
+This says how; each step (merge, branch delete, tag, push, release) still runs only when the user names
+it (`AGENTS.md` Section 7).
 
 - A short-lived branch starts from the working branch, is named for its work (`ci/supply-chain`),
   merges back there and is deleted. It never targets a release-only branch. Fast-forward when you can;
@@ -89,25 +99,33 @@ instruction to append one does not override this.
 ## READMEs and docs: the working path first
 
 When you write or edit a README, lead with the working path. The reader wants to *run the thing*, not
-read prose about it. Order that holds:
+read prose about it. The order that holds:
 
-**Title -> one-line description -> Quick Start -> what it is -> Install -> Usage / reference table ->
-Configuration -> How it works -> Limits -> Contributing -> License (last).**
+1. Title and a one-line description
+2. Quick Start
+3. What it is
+4. Install
+5. Usage, with the reference table
+6. Configuration
+7. How it works
+8. Limits
+9. Contributing
+10. License, last
 
 - **A runnable command in the first screenful**, copy-pasteable: install, one command, expected
   result. Install precedes usage; Quick Start is simply both, hoisted to the top. Never make someone
   scroll for it. Say how few commands it takes, and say when the download can be deleted.
-- **Every command surface gets a table** - CLI flags, slash commands, API - not paragraphs. Put it
-  early; it is what people scan for.
+- **Every command surface gets a table**: CLI flags, slash commands, an API. Put it early, because
+  it is what people scan for.
 - **Name the shell differences instead of assuming POSIX.** If the commands are shell commands, add a
   short table of what changes per shell (PowerShell aliases `curl` to `Invoke-WebRequest`; CMD has no
-  `~`). Check, don't guess - most "you need to install X" advice is wrong, and the honest answer is
-  usually a fallback using what the reader already has.
-- **Length follows scope; cut filler, never content.** No word limit - if it feels long, add
+  `~`). Check before you write it: most "you need to install X" advice is wrong, and the honest answer
+  is usually a fallback using what the reader already has.
+- **Length follows scope; cut filler, never content.** There is no word limit. If it feels long, add
   navigation or move detail into `docs/` rather than deleting information to hit a number. Out:
   padded intros, badge walls, emoji headings, a section restating another, docs for what you didn't
   build, broken links.
 - **A localised edit keeps the existing structure.** The order above is for a new or substantially
   reorganised README; a one-line correction does not become a restructuring pass.
-- **Docs move in the same diff.** A change that alters behaviour, setup, or config updates the README /
-  docs / `.env.example` with it.
+- **Docs move in the same diff.** A change that alters behaviour, setup, or config updates the README,
+  the docs and `.env.example` with it.

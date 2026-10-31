@@ -36,7 +36,8 @@ litigation (ADA, EAA).
 ## Internationalisation
 
 - No user-facing string hardcoded in markup or logic. It goes through the project's i18n layer from
-  the first day, because retrofitting costs an order of magnitude more.
+  the first day, because retrofitting costs an order of magnitude more. A project with no i18n layer
+  yet: keep the new strings in one place and flag the gap; building the layer is the user's decision.
 - Defaulting to English is fine. The rule is about **where strings live**, not how many languages
   ship.
 - Never build a sentence by concatenation - word order differs across languages.
@@ -56,7 +57,7 @@ leave. Roughly:
 | Wait | Show |
 |---|---|
 | Under ~1s | Nothing. Just render the result. |
-| ~1-3s | A plain spinner. No text needed. |
+| ~1-3s | A skeleton for a data view (above); a plain spinner for an action. No text needed. |
 | ~3-10s | Say what is happening - "finding the best match" beats a bare spinner, because a wait you understand is shorter than one you don't. |
 | Over ~10s | A progress bar. People stay patient when they can see movement toward an end. |
 

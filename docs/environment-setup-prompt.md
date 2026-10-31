@@ -15,15 +15,15 @@ context for every session, whether it fires or not.
 
 | Profile | What | Why |
 |---|---|---|
-| **Core** (everyone) | Context7 MCP | The kit's `context7.md` rule sends library and API questions to it instead of stale training data |
+| **Core** (everyone) | Context7 MCP, gitleaks | The kit's `context7.md` rule sends library and API questions to Context7 instead of stale training data; the kit's pre-commit hook adds a gitleaks scan to its own secret patterns when gitleaks is on PATH (`winget install --id Gitleaks.Gitleaks --exact` on Windows, `brew install gitleaks` elsewhere) |
 | **Web and UI** | Playwright CLI and its skill, Chrome DevTools MCP, Impeccable, `frontend-design` | Real-browser proof of UI work (Section 5) and design quality |
 | **Optional** | Superpowers, ponytail, headroom | They work alongside the kit, but each costs context or latency, so opt in knowingly |
 
 The kit's session-start check suggests the Core items and, in a project set up as a web or UI app,
 the Web and UI items, when they are missing. It reads `~/.the-agent-kit/recommended.json`, which
-`install.sh --setup` keeps current: delete an entry (or list its id under `dismissed`) to stop it being
+`install.sh` keeps current: delete an entry (or list its id under `dismissed`) to stop it being
 suggested, or add your own with an id of your own. The Optional profile is never suggested at session
-start; `install.sh --check` lists what is missing. It never installs anything.
+start; `install.sh check` lists what is missing. It never installs anything.
 
 ---
 
@@ -132,7 +132,7 @@ claude mcp add chrome-devtools --scope user -- npx -y chrome-devtools-mcp@latest
 ### Step 3: Web and UI skills (Web and UI profile)
 
 Skip this step unless the profile is Web and UI. Both are plain skill folders. Install a skill **once**,
-where Codex reads it, and link it into the other tools, the way `install.sh --setup` installs the kit's
+where Codex reads it, and link it into the other tools, the way `install.sh` installs the kit's
 own skills:
 
 1. Put the real folder in `~/.agents/skills/<name>`. Codex reads it there.

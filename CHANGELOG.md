@@ -11,6 +11,161 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-31
+
+### Added
+
+- Three adherence cases: `49-assessment-not-change` (a "why is this slow?" question answered, not
+  patched), `50-announce-versus-run` (a step the agent decided on is run, not announced at the end of
+  the turn) and `51-progress-updates` (a line before the work starts, a recap that leads with the
+  outcome). Rules for 49 and 51 were drafted and left out: the 0.5.1 rules already pass both.
+- `test/adherence/run.sh --clean-config`: every Claude arm runs on the clean config folder the vanilla
+  arm uses, so two rule sets can be compared without a third arm and without your own setup in either.
+- gitleaks joins the recommended tools for every agent. Without it the pre-commit hook still scans
+  for the common key formats, but skips the gitleaks pass with no warning, so the session-start check
+  now names it when it is missing. A recommended item can be a program on PATH (`"command"`).
+
+### Changed
+
+- **One installer, four commands.** `install.sh` installs or reinstalls: your machine, then, inside a
+  git repo, that project, and it ends by running `check`. `install.sh update` fetches the latest kit and
+  runs its install, so the project you run it in is updated too. `install.sh uninstall` takes out the
+  project you run it in, then the machine's entries, then `~/.the-agent-kit` itself, asked first and
+  checked after; the folder stays while a hook you changed still runs the guard from it.
+  `install.sh check` is the doctor, and now also checks a project's kit files against its record.
+  `--lean` and `--print` replace `--extension` and `--global`. **What you have to do:** nothing yet.
+  The old names (`--setup`, `--update`, `--update-rules`, `--undo`, `--extension`, `--global`,
+  `--check`) work as they did in this release and print the new name; they go in the next one. One
+  change in behaviour: a bare `./install.sh` run outside a git repo now sets up the machine, instead of
+  writing the rules into the folder it ran in.
+- **An update takes out the old kit, then installs the new one.** `~/.the-agent-kit` is built in full and
+  swapped in, so a file the kit no longer ships is gone. Everything the kit puts in your own files
+  (settings rules, hooks and keys, Codex's `config.toml`, git's `core.hooksPath`, the skill copies and
+  links, Antigravity's entries) is listed in an install record, so an entry a later kit drops is
+  removed, and one it changes is updated. What you changed yourself is kept and named in the output.
+  Each run ends by reading everything back, and fails if anything is not in place. `setup/machine.py`
+  replaces `setup/merge-settings.py`. Its first run also takes out rules older kits shipped that no
+  update ever removed: the `git add`, `commit` and `push` asks, two `Write(...)` denies, and the
+  secret-file read denies from before 2026-08-20, which silently overrode the current asks (you could
+  not let the agent read a secret file even by approving it).
+- **The kit's own folder is protected.** A new deny rule, `Edit(~/.the-agent-kit/**)`, stops an agent's
+  file tools from changing the kit, its command guard or its install record.
+- **Uninstalling is complete and asks first.** It used to remove only the machine-wide skills and
+  Antigravity's check, and left your settings for you to restore from backups. It now takes out
+  everything the install record lists, settings entries and `core.hooksPath` included, after your yes
+  (or `AGENT_KIT_APPLY=1`), and checks nothing of the kit's is left. `install.sh uninstall` does this
+  and more (above); the old `--undo` does the machine's half.
+- **A project install brings the project to the kit, every time.** Running `install.sh` in a project
+  that already has the kit used to leave every existing file alone; only `--update-rules` refreshed
+  them. Now any run replaces the kit's own files and the rules around your `PROJECT-CONFIG` block,
+  even where they were edited. Nothing is lost: an edit git holds shows in `git diff`, and one it
+  does not hold (uncommitted, or in an ignored folder) is saved beside the file as
+  `<file>.bak-agent-kit-<time>` first. It also removes a file the kit no longer ships unless you
+  edited it. Nothing is written or removed through a symlink or junction. `.agents/the-agent-kit.json`, committed with the project,
+  records what the kit wrote. A project recorded by a newer kit is left alone until you update yours.
+  `setup/project.py` replaces the shell functions that did this one case at a time.
+- **An overnight run no longer stops on routine commands.** Replayed against the 1,140 permission
+  prompts one user answered in a week, about half no longer appear, and of the rest, all but 275 now
+  time out on their own instead of waiting for you. Those 275 are pushes, deletes outside the project,
+  added dependencies, rules-file edits and the like.
+  - A local `git commit` never asks: it is undoable and never leaves your machine. Pushes, pull
+    requests and merges still ask.
+  - `rm -rf` (and `Remove-Item -Recurse`) asks only when a target could be outside the project or the
+    temp folder. A folder the same command made with `mktemp` counts as temp.
+  - Adding a dependency still asks, now from the guard, which tells `pnpm add x` from
+    `pnpm install --frozen-lockfile`: installing what the lockfile declares, `npx`, `uvx`, `bunx` and
+    `pnpm dlx` no longer ask. Claude Code honours an ask rule even in auto mode and bypass permissions
+    mode, with no time limit, so the old rules stalled unattended runs.
+  - The `curl | sh` check fires only when a download feeds the shell, not on `grep "a|sh.exe"`.
+  - `install.sh` (and `install.sh update`) removes the old ask rules from your settings. The README
+    says what still stops an unattended run in each permission mode, and how to quiet Claude Code's
+    own prompt on commands it cannot parse.
+- **The rules, against the Claude 5.5, GPT-6 and Gemini 3 guidance** (each change is one commit on
+  `develop`, kept only if the adherence eval agrees; `docs/rules-manifest.md` lists them with sources).
+  A role line opens the file. High-risk work does what does not depend on the user first and asks only
+  the decisions that would change the work. A step the agent decided on is run, not announced at the end
+  of the turn, and a long session is never a reason to stop. Test-first applies where the repository
+  keeps tests for that kind of code, sized like the neighbours. A test that looks wrong is said so, not
+  worked around. The two-attempt stop continues from a new angle. Compaction keeps decisions, open items,
+  modified files and test commands. Files are edited in place, not rewritten. Installing what the
+  lockfile declares is not adding a dependency. Bold is reserved for the hard lines. The prose-tell list
+  moved to `writing-docs`, and the evidence table in Section 5 is one sentence. Measured on Sonnet 5.5
+  against 0.5.1 and a vanilla baseline on 20 cases: no case worse, 89% against 86%, equal cost per pass.
+  The final text, after two unneeded lines came out and the 0.5.1 push-back line went back in, was
+  measured on Opus 5.5 against 0.5.1 across all 51 cases (no case worse) and on the speed panel against
+  vanilla (23/24 against 10/24, cost per pass below vanilla's).
+- The Claude Code settings now set `includeGitInstructions: false`: Claude Code's own commit and
+  pull-request instructions competed with AGENTS.md Section 7 and are where the attribution trailer
+  comes from. The git status snapshot Claude Code adds at start goes with them; the safety invariant
+  already asks for `git status` before editing. An existing install gains the key on its next install; a
+  value you set yourself is kept.
+- The two read-only performance agents (`bounded-reader`, `reviewer`) no longer load the project's
+  rules (`omitClaudeMd`): a lookup needs facts, not 4,800 tokens of behaviour rules, and the lead
+  already applies them. `implementer` keeps them, because it writes code.
+- The three task-matched skills describe when to use them first and no longer list their contents:
+  Codex shortens long skill descriptions before anything else, and Claude Code loads the body on use.
+- `docs/branches-and-releases.md`: the release gate now includes `/doctor prompt-audit` when the
+  rules changed.
+- The performance profile's comment now says what the effort setting does on each model: medium is
+  already the default on Opus 5.5, Sonnet 5.5 and Haiku 5.5; the setting only lowers Fable 5.1 and Opus 5.
+
+### Fixed
+
+- Rules that told the agent two incompatible things now agree: how many tests a behaviour change needs,
+  how a corrected test is committed, skeleton or spinner for a short wait, what to do in a project with
+  no i18n layer, money as decimal or integer minor units, which style guide wins on dashes, and that
+  each release step still needs your request.
+- The pre-commit hook blocked every commit once gitleaks was installed: it read a clean gitleaks
+  result as a finding. It now runs `gitleaks git --staged` on 8.19 and later and `protect --staged`
+  before that, and blocks only on a finding.
+- The adherence eval on Windows: a claude.ai login turns the PowerShell tool on by default and the
+  harness allowlist holds only Bash rules, so a test run sent through PowerShell was denied and scored as
+  the agent's failure. Agent cells now run with the PowerShell tool off.
+- The adherence harness recorded a multi-turn case's tokens, turn count and durations from its last
+  turn only, beside a whole-session cost. They are now added up over every turn. Rows written before
+  2026-10-23 for cases 16 and 27 carry last-turn tokens; their cost column was always right.
+- `summarize.py` now reports the cost bar in three parts: the fixed overhead the rules add to every
+  cell (extra context written, in tokens and dollars), the marginal cost ratio over the cases both arms
+  always pass, and the cost of a pass. One total ratio hid that the overhead alone exceeds the 1.25x
+  bar on a 90-second task.
+- `CLAUDE.md`'s comment said Claude Code does not read `AGENTS.md`; it has since 2.1.277. The import
+  stays for older versions and never loads the file twice.
+
+### Security
+
+- The command guard's Claude Code hook now carries `onFailure: "block"` and a 15-second timeout: a
+  guard that crashes, times out or cannot start (no Python) blocks the command instead of letting it
+  through (Claude Code 2.1.295 or later; earlier versions ignore the field). `install.sh check` says
+  so when Python is missing. An existing install gains both fields on its next install; a value you set
+  yourself is kept, which is also how you opt out.
+- The guard's prompt hook now fails towards "nothing authorized": if reading the prompt crashes, or the
+  grant record cannot be written, the previous turn's commit or push grant is dropped rather than kept.
+
+- The command guard now asks before a release or force-push override is set from PowerShell
+  (`$env:`, `Set-Item env:`), .NET (`SetEnvironmentVariable`) or `setx`. Before, it caught only a
+  shell assignment, and the last two also reach every later shell.
+- The command guard now asks before an agent removes its tool's marker variable (`env -u`, `unset`,
+  `Remove-Item env:` and its aliases, an empty assignment, also inside `sh -c` or `pwsh -Command`) or
+  clears the environment for a push. The pre-push
+  hook reads that marker to refuse a force-push override from an agent, so removing it would make
+  the agent's push look like yours.
+- The command guard now covers Claude Code's PowerShell tool. Before, it ran only on Bash, so on Windows
+  every command sent through PowerShell skipped it. It reads PowerShell's own escapes: ``git push
+  `--force`` is a force push and `gc .\.env` reads a secret. `iwr ... | iex` is asked like `curl | sh`.
+  An existing install's guard gains the PowerShell tool on its next install; a matcher you set yourself is kept.
+- Closed guard bypasses: the command inside `bash -c '...'`, `sh -lc`, `eval`, `cmd /c` and
+  `pwsh -Command` is now checked like any other, so `bash -c 'git push -f'` is refused. A wrapper's own
+  options (`timeout -s KILL 60 git push --force`, `nice -n`, `sudo -u`, `exec -a`, `xargs -I{}`,
+  `env -S` in every spelling) no longer hide the command they run. In PowerShell, `rm -Recurse`,
+  `-Recurse:$true` and `rd /s` are asked like `rm -rf`; `git push --mirror` and `--prune` are refused like a
+  force push and a push grant never covers them; a line continuation no longer splits `--force` from its
+  push; a second heredoc can no longer hide a command behind a commit grant. On Codex, `gh pr merge` and
+  `gh pr create` are refused. PowerShell's `Remove-Item -Recurse` is asked like `rm -rf`. Reading a
+  secret file through the shell (`cat .env`, `Get-Content`, `~/.ssh` keys) is asked on Claude Code and
+  Antigravity and refused on Codex. A
+  command that names the turn-grant file is asked, and a payload the guard does not expect no longer
+  crashes it.
+
 ## [0.5.1] - 2026-10-22
 
 ### Fixed
@@ -253,7 +408,8 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.5.1...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.6.0...develop
+[0.6.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.0
 [0.5.1]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.5.1
 [0.5.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.5.0
 [0.4.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.4.0

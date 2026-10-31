@@ -27,7 +27,7 @@ Two long-lived branches, one shared history:
   merge commit is needed, its message says what the branch adds, never git's default "Merge branch
   'worktree-agent-...'".
 - The install commands in `README.md` fetch from `main`, so **what users install is the last release**,
-  not the tip of development. `install.sh --update` follows the same path.
+  not the tip of development. `install.sh update` follows the same path.
 
 **Why not the alternatives.** A merge commit into `main` would carry every `develop` commit onto
 `main`, which is what this model exists to avoid. Feature branches squash-merged straight into `main`
@@ -48,9 +48,12 @@ history other people may have pulled.
 
 ## Cutting a release (only when the owner says so)
 
-1. **Gate.** On `develop`: `sh test/run-tests.sh` passes (free and offline), `sh install.sh --check`
+1. **Gate.** On `develop`: `sh test/run-tests.sh` passes (free and offline), `sh install.sh check`
    reports no FAIL, and every user-visible change since the last release has an entry under
-   `## [Unreleased]` in `CHANGELOG.md`. There is no CI in this repo; that suite is the gate.
+   `## [Unreleased]` in `CHANGELOG.md`. There is no CI in this repo; that suite is the gate. If the
+   rules changed, also run Claude Code's `/doctor prompt-audit` in this repo: it flags instructions
+   written for older models, references to files or commands that do not exist, and files that
+   contradict each other.
 2. **Version the changelog.** Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, add a fresh empty
    `## [Unreleased]` above it, update the compare links at the bottom, and commit on `develop` as
    `release: X.Y.Z`. There is no version file to bump: the tag is the version, and `install.sh` stamps
@@ -139,7 +142,7 @@ pull request and publishes the release.
 The rules already say this; they are not restated here. `AGENTS.md` Section 0 sizes the ceremony,
 Section 5 defines what "done" means and what proof it needs, and the safety invariants cover
 dependencies, secrets and the worktree. The one thing specific to this repo: `test/run-tests.sh` and
-`install.sh --check` are the gates, and `test/adherence/run.sh` is the paid, deliberately separate
+`install.sh check` are the gates, and `test/adherence/run.sh` is the paid, deliberately separate
 measurement that grades a change to the rules.
 
 ## Adopting this in your own project

@@ -1,5 +1,5 @@
 # The Agent Kit: launcher for the session-start check on Antigravity (see hooks.json beside this file).
-# Kit-owned; install.sh --setup replaces it. Antigravity splits a hook command on whitespace and ignores
+# Kit-owned; install.sh replaces it. Antigravity splits a hook command on whitespace and ignores
 # quotes, so a path under a home folder with a space cannot be passed; hooks run from the folder that
 # holds hooks.json, so the hook calls this file by bare name and it finds the check from here.
 import os, runpy, sys

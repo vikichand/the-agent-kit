@@ -25,8 +25,13 @@ scan '\-\-\-\-\-BEGIN[A-Z ]*PRIVATE KEY\-\-\-\-\-'                   'private ke
 scan 'eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{6,}'  'JWT / signed token (eyJ...)'
 
 if command -v gitleaks >/dev/null 2>&1; then
-  gitleaks git --staged --no-banner -q >/dev/null 2>&1; rc=$?
-  [ "$rc" != 0 ] && gitleaks protect --staged --no-banner >/dev/null 2>&1; rc=$?
+  # 8.19 replaced `protect` with `git`. Both exit 1 for a leak and for an unknown command, so the help
+  # list decides which to run, not a retry on failure.
+  if gitleaks --help 2>&1 | grep -qE '^[[:space:]]+git[[:space:]]'; then
+    gitleaks git --staged --no-banner >/dev/null 2>&1; rc=$?
+  else
+    gitleaks protect --staged --no-banner >/dev/null 2>&1; rc=$?
+  fi
   [ "$rc" = 1 ] && hits="$hits
   - gitleaks detected a secret in staged content"
 fi

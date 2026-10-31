@@ -24,7 +24,8 @@ it is a guess the user must judge, so it is never offered as "remove all".
 ## Undoing
 
 - A deleted branch: `git reflog` still holds its tip for a while; `git branch <name> <sha>` brings it back.
-- A removed worktree: the branch and its commits remain; re-add it with `git worktree add`.
+- A removed worktree: its merged branch was deleted with it, but its commits are in the branch it was
+  merged into. Bring the branch back as above, then re-add the worktree with `git worktree add`.
 - Deleted files and killed processes cannot be undone. That is why the user approves them first.
 
 ## The log

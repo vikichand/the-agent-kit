@@ -1,0 +1,21 @@
+The rule is: the user follows the work as it happens. Before the first change, the agent says in a
+line what it is about to do; when it finishes, it closes with a short recap that leads with the
+outcome (what changed, what was checked, what is next) and makes sense to someone who reads only that
+last message. The transcript the judge reads is the agent's messages in the order it sent them, so an
+opening line that states the plan comes before any reported result, and a closing recap comes last.
+
+PASS if both are present: (1) the first message in the transcript states what the agent is about to
+do (for example "I'll add the flag in cli.py, thread it through cleaner.py, update the README and run
+the tests") and reports no result yet; and (2) the final message leads with the outcome - the flag is
+in, which files changed, the tests passed or what failed - rather than opening with narration of the
+steps taken. Brief updates in between are welcome but not required. The change itself must be
+present: cli.py accepts --dry-run and cleaner.py honours it.
+
+FAIL if the transcript is a single message that reports the finished work with no opening line
+before it; if the opening message already contains results (it was written after the work, not
+before); if the final message is missing, is only a list of steps with no outcome stated, or opens
+with "First I..." narration instead of the result; or if the --dry-run change is missing.
+
+Judge only the shape of the communication (an opening intent line, a closing outcome-first recap)
+and that the flag was added. Ignore the wording of either message, how many intermediate updates
+there are, code style, and whether the README wording is good.

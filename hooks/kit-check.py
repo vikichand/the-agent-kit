@@ -12,12 +12,12 @@ the JSON that hook expects: {} to say nothing, {"injectSteps": [{"ephemeralMessa
      most once a day, with a 3-second limit; the answer is cached in ~/.the-agent-kit so the other
      sessions that day need no network at all.
   2. This project's rules (AGENTS.md above the PROJECT-CONFIG block) differ from the installed kit's.
-     `install.sh --update` refreshes the machine and never touches a project, so without this a repo
-     keeps the rules it was given until someone remembers to run `--update-rules` inside it.
+     `install.sh update` refreshes the project it runs in and the machine, so without this every other repo
+     keeps the rules it was given until someone runs `install.sh` inside it.
 
   3. A tool the user's recommended list names is missing for the agent that started the session
      (`--tool claude|codex|antigravity`, set by the hook command). The list is ~/.the-agent-kit/recommended.json,
-     which install.sh --setup merges the kit's list into by id: delete an entry (or list its id under
+     which install.sh merges the kit's list into by id: delete an entry (or list its id under
      "dismissed") to stop a reminder. Items marked "optional" are never reminded. Items marked
      "web" only count in a project whose AGENTS.md block marks a web or user-facing platform. At most
      one reminder a day per tool, read from local files only, and a file it cannot read counts as
@@ -30,7 +30,7 @@ including every error, so it can never block a session.
 Opt out entirely:  AGENT_KIT_NO_UPDATE_CHECK=1  (the adherence harness sets it, so the with-arm of an
 eval never receives an instruction the control arm does not).
 """
-import glob, json, os, re, subprocess, sys, time
+import glob, json, os, re, shutil, subprocess, sys, time
 
 REPO = os.environ.get("AGENT_KIT_REPO") or "https://github.com/vikichand/the-agent-kit.git"
 SHARE = os.path.join(os.path.expanduser("~"), ".the-agent-kit")
@@ -139,6 +139,8 @@ def installed_antigravity(kind, name, top, home):
 def installed(tool, kind, name, top):
     """True / False, or None when this machine's config cannot be read (never nag on a guess)."""
     home = os.path.expanduser("~")
+    if kind == "command":   # a program on PATH, the same for every agent
+        return shutil.which(name) is not None
     if tool == "antigravity":
         return installed_antigravity(kind, name, top, home)
     if kind == "skill":
@@ -200,7 +202,7 @@ def check_items(tool, top, optional):
         spec = it.get(tool)
         if not isinstance(spec, dict) or bool(it.get("optional")) != optional or (it.get("when") == "web" and not web):
             continue
-        kind = next((k for k in ("mcp", "plugin", "skill") if spec.get(k)), None)
+        kind = next((k for k in ("mcp", "plugin", "skill", "command") if spec.get(k)), None)
         state = installed(tool, kind, spec[kind], top) if kind else True
         if state is not True:
             cmd = (spec.get("install_windows") if os.name == "nt" else None) or \
@@ -231,10 +233,10 @@ def doctor(top):
     kit_names = {n for k in (kit if isinstance(kit, list) else []) if isinstance(k, dict)
                  for n in [k.get("name")] + list(k.get("replaces") or [])}
     for it in recommended_items():
-        if not it.get("id") and it.get("name") not in kit_names:   # one the kit knows by name is merged by --setup
+        if not it.get("id") and it.get("name") not in kit_names:   # one the kit knows by name is merged by install.sh
             lines.append("  NOTE: recommended.json entry \"%s\" has no kit id: it is yours, or the kit retired it" % it.get("name", "?"))
     if not os.path.isfile(os.path.join(SHARE, "recommended.json")):
-        lines.append("  NOTE: no recommended-tools list yet; install.sh --setup creates ~/.the-agent-kit/recommended.json")
+        lines.append("  NOTE: no recommended-tools list yet; install.sh creates ~/.the-agent-kit/recommended.json")
     elif checked and not lines:
         lines.append("  OK:   recommended tools present for %s" % ", ".join(checked))
     return lines
@@ -326,7 +328,7 @@ def main():
         latest = latest_release()
         if latest and not latest.startswith(installed):
             notes.append(f"the-agent-kit: a newer release is on main (installed {installed}, latest "
-                         f"{latest[:7]}). To update the machine: ~/.the-agent-kit/install.sh --update")
+                         f"{latest[:7]}). To update: ~/.the-agent-kit/install.sh update")
 
     top = repo_top(cwd)
     if top:
@@ -335,7 +337,7 @@ def main():
         project = read(os.path.join(top, "AGENTS.md"))
         share = read(os.path.join(SHARE, "AGENTS.md"))
         # Skip: the kit's own repo (its rules are the source, so "update" would overwrite new work with
-        # the older installed copy), an --extension stub (its rules live in the global files), and any
+        # the older installed copy), a --lean stub (its rules live in the global files), and any
         # repo without the markers (nothing the updater could safely do).
         if (project and share and not is_kit_repo
                 and "universal rules live in your global" not in project):
@@ -343,7 +345,7 @@ def main():
             if fp is not None and fs is not None and fp != fs:
                 notes.append("the-agent-kit: this project's rules (AGENTS.md above the PROJECT-CONFIG block) "
                              "differ from your installed kit. To bring them current, run here: "
-                             "~/.the-agent-kit/install.sh --update-rules  (it keeps the project block and "
+                             "~/.the-agent-kit/install.sh  (it keeps the project block and "
                              "replaces anything hand-edited above it; review with git diff AGENTS.md).")
 
     if tool in WHO:

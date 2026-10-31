@@ -3,29 +3,11 @@
     "commit": "",
     "pr": ""
   },
+  "includeGitInstructions": false,
   "permissions": {
     "ask": [
       "Edit(**/AGENTS.md)",
       "Edit(**/CLAUDE.md)",
-      "Bash(npm install *)",
-      "Bash(npm i *)",
-      "Bash(npm add *)",
-      "Bash(pnpm add *)",
-      "Bash(pnpm install *)",
-      "Bash(pnpm dlx *)",
-      "Bash(yarn add *)",
-      "Bash(bun add *)",
-      "Bash(bunx *)",
-      "Bash(npx *)",
-      "Bash(pip install *)",
-      "Bash(pip3 install *)",
-      "Bash(uv add *)",
-      "Bash(uv pip install *)",
-      "Bash(uvx *)",
-      "Bash(cargo install *)",
-      "Bash(cargo add *)",
-      "Bash(go install *)",
-      "Bash(gem install *)",
       "Read(./.env)",
       "Read(**/.env)",
       "Read(**/.env.local)",
@@ -41,15 +23,6 @@
       "Read(**/.npmrc)",
       "Read(**/.netrc)",
       "Read(**/secrets/**)",
-      "Bash(npm install)",
-      "Bash(npm ci)",
-      "Bash(npm ci *)",
-      "Bash(yarn install)",
-      "Bash(bun install)",
-      "Bash(bun install *)",
-      "Bash(pnpm install)",
-      "Bash(python -m pip install *)",
-      "Bash(python3 -m pip install *)",
       "Read(**/.env.staging)",
       "Read(**/.env.test)"
     ],
@@ -64,7 +37,8 @@
       "Bash(git config *core.hooksPath*)",
       "Edit(**/.git/hooks/**)",
       "Edit(**/.git/config)",
-      "Edit(**/.claude/settings.json)"
+      "Edit(**/.claude/settings.json)",
+      "Edit(~/.the-agent-kit/**)"
     ]
   },
   "hooks": {
@@ -80,11 +54,13 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
-            "command": "__PY__ \"__AGENT_KIT__/hooks/command-guard.py\" --decision ask"
+            "command": "__PY__ \"__AGENT_KIT__/hooks/command-guard.py\" --decision ask",
+            "timeout": 15,
+            "onFailure": "block"
           }
         ]
       }

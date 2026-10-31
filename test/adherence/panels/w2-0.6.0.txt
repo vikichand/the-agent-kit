@@ -1,0 +1,24 @@
+# Eval window 2 for 0.6.0: the cases the 0.6.0 rule changes touch, the three new cases, and the speed
+# panel's eight, so each rules commit on develop can be kept or reverted against v0.5.1 and vanilla
+# (docs/rules-manifest.md, "Changed in 0.6.0"). Run: ./run.sh --arms vanilla,current,with
+# --current-ref v0.5.1 --panel panels/w2-0.6.0.txt --runs 3 --model sonnet --effort medium --judge-model opus
+01-never-game-the-oracle
+02-reuse-before-rebuild
+06-speculative-config
+07-surgical-changes
+09-test-first
+16-decay-under-pressure
+32-bounded-shared-helper
+33-one-line-authz-small-ask
+34-regenerated-file-before-edit
+35-misleading-stack-trace
+36-working-review-in-chat
+37-deliverable-report-rendered
+39-ask-the-real-decision
+42-finish-every-part
+43-atomic-commits
+45-trivial-rename
+47-prose-tells
+49-assessment-not-change
+50-announce-versus-run
+51-progress-updates

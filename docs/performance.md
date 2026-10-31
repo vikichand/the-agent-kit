@@ -10,10 +10,26 @@ Research fetched 2026-10-08. Sources are listed at the end.
 
 | Comparison | Gate |
 |---|---|
-| Kit against vanilla (same model, same effort, no rules, no user config) | no case worse on quality, and at most 1.25x the time and the cost |
+| Kit against vanilla (same model, same effort, no rules, no user config) | no case worse on quality; at most 1.25x the time; cost read in three parts (below) |
 | A new rules change against the last release | at most 10% slower or costlier on the bounded median, and the 90th percentile no worse |
 
 A rule that cannot pass both stays out of the release, however good it sounds.
+
+**The cost bar, in three parts (decided 2026-10-23).** One total ratio hid what was being paid for. The
+rules' context is written to the cache once per session (about 5,200 tokens, $0.021 on Sonnet 5.5, measured
+with a one-word prompt); on a 90-second eval task that alone is 1.30x vanilla's $0.07 before the model does
+anything, while a real session re-reads it at a tenth of the price on every later turn. So the eval reads:
+
+1. **Fixed overhead**: the extra context written per cell, in tokens, with a budget: at most 4,800 tokens
+   (today's AGENTS.md; a cut is measured like an addition).
+2. **Marginal cost**: the ratio once that overhead is taken off, over the cases both arms always pass, at
+   most 1.25x. This is what the behaviour rules cost: the checks they make the agent run.
+3. **Cost per pass**: total spend over passes, reported for both arms. A failed attempt is not free.
+
+`summarize.py` prints all three ("cost split"). The vendors document the trade-off in their own numbers:
+Sonnet 5.5's keep-working prompt "runs longer and costs more", its verification paragraph adds "a slightly
+higher cost per task", Opus 5.5's finish-the-task addition means "more tool calls and output tokens". The
+behaviours the kit enforces are the ones the model makers say cost more per task; part 2 is where that shows.
 
 ## What the evidence says
 
@@ -135,6 +151,24 @@ speed panel (8 cases), 5 runs per cell, arms vanilla, v0.4.0 and develop (`t05e0
   is per session and stays as written.
 - **Develop against v0.4.0** (rules-change bar, at most 10% slower or costlier): x0.96 time, x0.96 cost,
   bounded-task p90 43 s against 47 s. It passes.
+
+**2026-10-23/24, the 0.6.0 windows.** Sonnet 5.5, effort medium, Opus judging, 3 runs per cell; vanilla on
+all 51 cases (155 cells, 68%), then develop against v0.5.1 and vanilla on the 20 touched cases (develop 89%,
+v0.5.1 86%, vanilla 43%, no case worse). Read in three parts: session-start overhead 5,334 tokens
+(AGENTS.md about 4,910 against a 4,800 budget, about 2% over; 5,157 and about 4,736, under budget,
+once the two rules no case needed came out on 2026-10-24); marginal cost on both-pass cases x1.21
+(passes 1.25x); cost per pass $0.162 for develop and v0.5.1, $0.161 vanilla on the same 20 cases (first written as
+61% and $0.108, which counted vanilla's cells outside the panel). Time x1.36 against vanilla,
+over the bar as v0.5.1 was (x1.34); start-up plus hooks is equal, and a repeat count on three kept cells
+found no check run twice without an edit between, so the extra time is the reads and red-then-green test
+runs the rules ask for. Against v0.5.1 the rules-change bar passes. Per-case tables in
+`test/adherence/README.md`.
+
+**2026-10-24, the final 0.6.0 text** (`td34e6a2`). The speed panel, Sonnet 5.5 at effort medium against
+vanilla, 3 runs: 23/24 against 10/24, elapsed x1.27 (2 points over the bar), marginal cost x1.07, cost per
+pass $0.122 against vanilla's $0.166. Opus 5.5 against v0.5.1: a one-run screen of all 51 cases (44/51
+each) and three runs on every case either arm failed. No case is worse than v0.5.1 after the push-back
+line was restored (case 29: 2/6 with the 0.6.0 wording, 6/6 with the 0.5.1 line).
 
 **2026-10-21, window 2.** Same model and judge, 3 runs per cell; per-case tables in `test/adherence/README.md`.
 

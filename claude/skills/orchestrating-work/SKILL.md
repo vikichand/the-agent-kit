@@ -1,6 +1,6 @@
 ---
 name: orchestrating-work
-description: Use when deciding whether to delegate to subagents or split a task across agents, models or tools - picking the shape (do it, ask, delegate, fan out, hand off), writing a worker's contract, freezing shared interfaces before fan-out, escalating a failure, and integrating returned work. Also use when asked to parallelise, fan out, split this up, use subagents, or run work in parallel.
+description: Use before delegating to subagents or splitting a task across agents, models or tools, when asked to parallelise, fan out, split this up, use subagents or run work in parallel, and while waiting on background work. Covers the shape of the split, the worker's contract, integration and progress updates.
 ---
 
 # Orchestrating work across agents and models
@@ -29,6 +29,14 @@ integration time, when they are most expensive to unpick. Keep at most two worke
 delegation layer: workers do not spawn workers. Dispatch them without blocking and keep working;
 read their results when they arrive.
 
+**Keep the user posted while work runs.** Before dispatching, say in a line what is running and what
+you are doing meanwhile. While workers, background commands or long checks run, report at each point
+you regain control, and at least every ten minutes: what is done, what is left, what is running now.
+Where the tool can wake you (Claude Code: a scheduled wake-up or a Monitor on the task's output),
+arm it before you wait; Codex and Antigravity cannot, so poll in short steps rather than one long
+wait. Stopping a background task kills only its shell: check that its children are gone before you
+report it stopped.
+
 Never use a subagent to repeat a check you already ran on your own work. An independent reviewer is
 for high-risk judged work (`AGENTS.md` Section 5): it gets the spec, the diff and the evidence, not
 your reasoning, and the agent that wrote the work never reviews it.
@@ -46,7 +54,8 @@ A worker gets the outcome, not line-by-line steps:
 - **Return**: what changed, the evidence, assumptions made, deviations, and anything unresolved.
 
 **Name the model and effort on every dispatch.** An unnamed worker inherits the lead's model and
-effort, the most expensive combination in the session. Route by how completely the slice is specified
+effort, the most expensive combination in the session (Claude Code's Agent tool takes `model` and
+`effort` directly; a custom agent's frontmatter sets them once). Route by how completely the slice is specified
 and how easy a wrong result is to detect, never by budget alone: a cheap model on a complete spec with
 a strong check is good economics; a cheap model on an ambiguous slice returns a guess that looks
 finished. Before raising effort for a hard slice, compare the next effort level with a stronger model

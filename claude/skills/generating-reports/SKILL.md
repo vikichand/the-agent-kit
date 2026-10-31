@@ -1,6 +1,6 @@
 ---
 name: generating-reports
-description: Use when asked to write a report, audit, review, plan or status document that a human will read, or to save one to the repo - covers the dual-format rule for deliverables (markdown as the source of truth, a self-contained styled HTML render for human review), the structure that makes a plan machine-executable, and when a plan or review is a working artifact that stays markdown-only. Also use when asked to write up findings or plan this feature as a document.
+description: Use when asked for a report, audit, review, plan or status document that a human will read, to save one to the repo, to write up findings, or to plan a feature as a document. Decides whether it is a deliverable (markdown source plus an HTML render) or a working note that stays markdown.
 ---
 
 # Reports and plans: markdown for agents, HTML for humans
@@ -63,7 +63,8 @@ review found") always run from the markdown.
   most common docs failure is a reference that keeps lapsing into tutorial.
 - **Follow the project's declared style guide** from `PROJECT-CONFIG`; absent one, Google's
   developer documentation style guide is the default for developer-facing prose. Declaring a
-  standard matters more than which one.
+  standard matters more than which one. Where a guide and `writing-docs` differ (dashes, arrows),
+  `writing-docs` wins.
 - **Commit messages follow the `writing-docs` skill** (`AGENTS.md` Section 7: one logical change per
   commit; Section 8: no attribution trailers).
 - the `writing-docs` skill still governs: no AI prose tells, working path first, tables for what people

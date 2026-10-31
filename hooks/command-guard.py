@@ -23,20 +23,32 @@ It does its best to flag: `--no-verify` / `core.hooksPath` set via the CLI (anyw
 direct `.git/config` / `GIT_CONFIG_GLOBAL` writes; force/delete push; and destructive commands
 (`rm -rf`, `git reset --hard`, `git clean`, `curl|sh`). Needs python3.
 """
-import sys, json, re, shlex, argparse, os, tempfile
+import sys, json, re, shlex, argparse, os, posixpath
 
 WRAPPERS = {"timeout", "time", "nice", "nohup", "stdbuf", "xargs", "sudo", "doas",
             "env", "command", "builtin", "bash", "sh", "zsh", "exec"}
+# Options of a wrapper that consume the NEXT token. Without them `timeout -s KILL 60 git push --force`
+# read KILL as the command and the push went unseen.
+WRAPPER_VALUE = {
+    "timeout": {"-s", "--signal", "-k", "--kill-after"},
+    "nice": {"-n", "--adjustment"},
+    "env": {"-u", "--unset", "-C", "--chdir"},
+    "stdbuf": {"-i", "-o", "-e", "--input", "--output", "--error"},
+    "sudo": {"-u", "-g", "-C", "-D", "-h", "-p", "-r", "-t", "-U", "-R", "--user", "--group", "--chdir"},
+    "doas": {"-u", "-C"},
+    "xargs": {"-I", "-n", "-L", "-P", "-s", "-d", "-E", "-a", "--max-args", "--max-procs", "--delimiter"},
+    "time": {"-f", "-o", "--format", "--output"},
+    "exec": {"-a"},
+}
 PUSH_REASON = {
     "ask":  "git push needs your approval each time (per-run, not persistent). Approve only if you asked for this push.",
-    "deny": "git push is guarded on this tool - run it yourself. The agent may commit freely; pushing is left to you.",
+    "deny": "git push is guarded on this tool: run it yourself. Pushing is left to you.",
 }
 # One-time, turn-scoped grants (Claude ask-mode only). See capture_intent() / load_grants().
-COMMIT_ASK = "git commit: approve here, or just ask me in chat to commit. It runs without a prompt only in the same turn you request a commit."
-COMMIT_OK  = "git commit: authorized by your request this turn."
 PUSH_OK    = "git push: authorized by your request this turn."
 PR_ASK     = "gh pr create: approve here, or ask me in chat to open the PR."
 PR_OK      = "gh pr create: authorized by your request this turn."
+PR_DENY    = "opening or merging a pull request is guarded on this tool: run it yourself, like a push."
 MERGE_ASK  = "gh pr merge always needs your approval - a merge is never authorized by a chat request."
 HOOKSPATH_DENY = "core.hooksPath is being set - that points git's hooks elsewhere and disables the guards. Blocked."
 NOVERIFY_DENY  = "`--no-verify` skips the git guard hooks (secret scan, attribution, push guard). Blocked."
@@ -45,6 +57,8 @@ GITCFG_DENY    = "writing git config directly (.git/config or GIT_CONFIG_GLOBAL/
 OVERRIDE_ASK   = ("this sets a guard override (AGENT_KIT_RELEASE / AGENT_KIT_ALLOW_FORCE / AGENT_KIT_APPLY): it lets a "
                   "push through the pre-push hook, or lets the installer write your Claude Code and Codex settings "
                   "without asking you in a terminal. A chat request never covers it - approve only if you meant it.")
+MARKER_ASK     = ("this removes the variable that tells the pre-push hook an agent is pushing (or clears the whole "
+                  "environment), so the hook would treat the push as yours. Approve only if you meant it.")
 
 GIT_GLOBAL_VALUE = ("-c", "-C", "--git-dir", "--work-tree", "--namespace", "--super-prefix",
                     "--config-env", "--attr-source")   # git globals that consume the NEXT token as a value
@@ -66,10 +80,21 @@ def verb_tokens(tokens):
     i = 0
     while i < len(tokens):
         raw = tokens[i]
-        if base(raw).lower() in WRAPPERS:
+        w = base(raw).lower()
+        if w in WRAPPERS:
             i += 1
-            while i < len(tokens) and (re.match(r"^-?\d+[a-z]?$", tokens[i]) or tokens[i] == "-u"):
-                i += 2 if tokens[i] == "-u" else 1
+            while i < len(tokens) and (tokens[i].startswith("-") or re.match(r"^\d+[a-z]?$", tokens[i])):
+                t = tokens[i]
+                split = (tokens[i + 1] if t in ("-S", "--split-string") and i + 1 < len(tokens) else
+                         t[2:] if t.startswith("-S") and len(t) > 2 else
+                         t.split("=", 1)[1] if t.startswith("--split-string=") else None)
+                if w == "env" and split is not None:
+                    rest = tokens[i + (1 if t in ("-S", "--split-string") else 0) + 1:]
+                    try:                                   # env -S 'git push --force': the value IS the command
+                        return verb_tokens(shlex.split(split) + rest)
+                    except ValueError:
+                        return split.split() + rest
+                i += 2 if tokens[i] in WRAPPER_VALUE.get(w, ()) else 1
             continue
         if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", raw):
             i += 1
@@ -138,6 +163,126 @@ def regenerable_path(p):
     return segs[-1] in REGENERABLE
 
 
+# A recursive delete runs without a prompt when every target is inside the project (the session's
+# working directory) or the temp folder. main() sets CWD, and turns RELATIVE_OK off when the command
+# also changes directory to anywhere it cannot place inside them.
+CWD = ""
+CMD = ""
+_KEEP = {".git", ".claude", ".codex", ".agents", ".gemini", ".ssh", ".gnupg", ".aws"}
+SHELL_KEYWORDS = ("if", "then", "else", "elif", "do", "while", "until", "!", "time")
+VARS = None
+RELATIVE_OK = True
+_ROOTS = []
+
+
+def _norm(p):
+    """An absolute path in one comparable form: forward slashes, Git Bash's /c/ as c:/, `..` resolved."""
+    q = p.replace("\\", "/")
+    if os.name == "nt":
+        q = re.sub(r"^/([A-Za-z])(?=/|$)", r"\1:", q).lower()
+    return posixpath.normpath(q)
+
+
+def safe_roots():
+    if not _ROOTS:
+        import tempfile  # here, not at the top: it costs 12 ms and only a recursive delete needs it
+        home = _norm(os.path.expanduser("~"))
+        # No cwd from the host: only the temp folder. The hook's own working folder could be anywhere.
+        for r in map(_norm, ([CWD] if CWD else []) + [tempfile.gettempdir(), "/tmp"]):
+            # A session opened in home, a drive root or above home would make everything "the project".
+            if r != home and not home.startswith(r + "/") and posixpath.dirname(r) != r \
+                    and not re.fullmatch(r"[a-z]:/?", r, re.I):
+                _ROOTS.append(r)
+    return _ROOTS
+
+
+def shell_vars():
+    """Variables the command sets to one literal or to a plain `mktemp`, and the temp folder's own names.
+    A name set twice to different values, or to anything else, stays unknown."""
+    if VARS is None:
+        import tempfile
+        tmp = tempfile.gettempdir().replace("\\", "/")
+        found = {"TEMP": tmp, "TMP": tmp, "TMPDIR": tmp}
+        for m in re.finditer(r"(?:^|[\s;&|(])(?:export\s+)?([A-Za-z_]\w*)=(?:\"?\$\(\s*mktemp\b([^)]*)\)\"?"
+                             r"|\"([^\"$`]*)\"|'([^']*)'|([^\s;&|$`'\"()]*))(?=$|[\s;&|)])", CMD):
+            if m.group(2) is not None:   # mktemp -p DIR / --tmpdir=DIR can create anywhere
+                val = None if re.search(r"(^|\s)(-p|--tmpdir)", m.group(2)) else tmp + "/mktemp"
+            else:
+                val = next(g for g in m.group(3, 4, 5) if g is not None)
+                # Globs and braces expand, and a value with a space splits wherever $x is used unquoted.
+                if re.search(r"[*?\[{},\\]", val) or (re.search(r"\s", val) and any(
+                        CMD[:u.start()].count('"') % 2 == 0 for u in re.finditer(r"\$\{?%s\b" % m.group(1), CMD))):
+                    val = None
+            found[m.group(1)] = val if found.get(m.group(1), val) == val else None
+        for name in found:   # set again some other way: `read x`, `for x in`, `unset x`, `x+=`, ...
+            if re.search(r"\b(?:read|unset|declare|typeset|local|let|readonly|for|select|getopts|mapfile)\b"
+                         r"[^;&|\n]*\b%s\b|\b%s\+=" % (name, name), CMD):
+                found[name] = None
+        globals()["VARS"] = found
+    return VARS
+
+
+def contained(p):
+    """True when deleting p cannot reach outside the project or the temp folder, and p is neither."""
+    if "{}" in CMD:     # find -exec / xargs -I fill in `{}`: the real target is unknown
+        return False
+    if "$" in p:
+        v = shell_vars()
+        p = re.sub(r"\$\{(\w+)\}|\$(\w+)", lambda m: v.get(m.group(1) or m.group(2)) or "\0", p)
+    q = p.replace("\\", "/")
+    # An unknown variable, ~, brace expansion or a PowerShell list (`x,D:\y`) can name anything.
+    if not q or any(ch in q for ch in "\0$`~{},"):
+        return False
+    # A colon past a drive letter is a provider or another drive (HKCU:\, FileSystem::D:\, Cert:\).
+    if ":" in (q[2:] if re.match(r"^[A-Za-z]:", q) else q):
+        return False
+    segs = q.split("/")
+    # `...` or `.. ` can read as `..` on Windows; the kit's own folders and secrets always ask.
+    if any(re.fullmatch(r"[. ]+", s) and s not in (".", "..") or s.lower() in _KEEP or s.lower().startswith(".env")
+           for s in segs):
+        return False
+    if any(ch in q for ch in "*?["):
+        # A glob only in the last segment, after a literal first character: `e2e-*` is a family of
+        # entries, while `*` is everything and `.*` can reach `..`.
+        head, _, last = q.rpartition("/")
+        if not re.fullmatch(r"[\w-][^/]*", last) or any(ch in head for ch in "*?["):
+            return False
+        q = head + "/x" if head else "x"
+    if q.startswith("/") or re.match(r"^[A-Za-z]:", q):
+        n = _norm(q)
+        return any(n.startswith(r + "/") for r in safe_roots())
+    segs = [s for s in q.split("/") if s and s != "."]
+    return RELATIVE_OK and bool(segs) and ".." not in segs and bool(CWD) and _norm(CWD) in safe_roots()
+
+
+# PowerShell's delete commands and aliases. `rm` is not here: as a POSIX command it keeps the -rf rule above.
+PS_REMOVE = {"remove-item", "ri", "del", "erase", "rd", "rmdir"}
+PS_REMOVE_VALUE = ("-path", "-literalpath", "-filter", "-include", "-exclude")
+# Commands that print a file's contents. A secret file read with one of them lands in the transcript.
+READERS = {"cat", "type", "less", "more", "head", "tail", "grep", "egrep", "fgrep", "rg", "bat", "nl", "xxd",
+           "od", "strings", "base64", "awk", "sed", "cut", "sort", "get-content", "gc", "select-string", "sls",
+           "findstr", "format-hex"}
+_TEMPLATE = (".example", ".sample", ".template", ".dist", ".defaults", ".schema")
+
+
+def secret_path(p):
+    """The same files the Claude settings ask before reading: .env and its variants (templates excepted),
+    keys and certificates, cloud and package-manager credentials, and anything under a secrets folder."""
+    q = p.replace("\\", "/").strip("'\"").rstrip("/")
+    segs = [x for x in q.lower().split("/") if x]
+    if not segs:
+        return False
+    b = segs[-1]
+    if b.endswith(".pub"):
+        return False
+    if b == ".env" or (b.startswith(".env.") and not b.endswith(_TEMPLATE)):
+        return True
+    if b.endswith((".pem", ".p12", ".pfx")) or b in ("id_rsa", "id_ed25519", "id_ecdsa", "id_dsa",
+                                                    ".npmrc", ".netrc", ".pgpass", "credentials"):
+        return b != "credentials" or ".aws" in segs
+    return "secrets" in segs[:-1] or ".gnupg" in segs[:-1]
+
+
 def is_no_verify(flags):                       # git-CONTEXT use (we already know it's a git commit/push)
     return any(a.lower().startswith("--no-v") for a in flags)
 
@@ -149,7 +294,7 @@ def sets_hookspath(tok):                        # a token that SETS core.hooksPa
 
 def is_force_push(args):
     flags = flags_only(args, PUSH_VALUE_FLAGS)
-    if any(a.lower().startswith("--for") or a.lower().startswith("--de") or a == "-d" for a in flags):
+    if any(a.lower().startswith(("--for", "--de", "--mir", "--pru")) or a == "-d" for a in flags):
         return True
     if short_has(flags, "f") or short_has(flags, "d"):
         return True
@@ -164,8 +309,9 @@ def is_force_push(args):
 # cannot write to) reads each message and records which of commit / push / pr the user asked for,
 # keyed to the session id. The PreToolUse guard then lets exactly those operations through with no
 # prompt, for that turn only. Every new user message OVERWRITES the record, so a grant never
-# survives into a later turn: the agent can never commit, push or open a PR on its own initiative,
-# only in the same turn you asked, or by approving the normal prompt (which is it asking you).
+# survives into a later turn: the agent can never push or open a PR on its own initiative, only in
+# the same turn you asked, or by approving the normal prompt (which is it asking you). A local commit
+# needs no grant: it is undoable and never leaves the machine, so it runs without a prompt.
 #
 # Detection is deliberately CONSERVATIVE and fails toward the prompt: it grants only on a clear
 # request and vetoes on any nearby negation or noun usage ("the commit", "the push logs"). A missed
@@ -179,6 +325,7 @@ _DET = r"(?:the|this|that|these|those|a|an|last|latest|previous|prior|earlier|fi
 
 
 def _grant_path(session):
+    import tempfile  # here, not at the top: it costs 12 ms on every guarded call and only grants need it
     sid = re.sub(r"[^A-Za-z0-9_-]", "", session or "")[:64] or "nosession"
     return os.path.join(tempfile.gettempdir(), "agent-kit-grant-" + sid + ".json")
 
@@ -200,7 +347,11 @@ def save_grants(session, grants):
         with open(_grant_path(session), "w") as f:
             json.dump({"authorized": sorted(grants)}, f)
     except Exception:
-        pass
+        # A write that fails must not leave the previous turn's grant live: no record means no grant.
+        try:
+            os.remove(_grant_path(session))
+        except Exception:
+            pass
 
 
 def _asked(text, v):
@@ -257,6 +408,7 @@ def detect_grants(prompt):
     return g
 
 
+GRANT_ASK = "this names the kit's turn-grant file, which only the prompt hook should write. Approve only if you meant it."
 TIDY_ASK = ("this deletes branches, worktrees or files, or kills processes, and none of it can be undone. "
             "Approve only if you chose these items in /tidy.")
 
@@ -292,6 +444,36 @@ def shell_payload(prog, toks):
             out.append([s for s in (x.strip("(){}") for x in shlex.split(part)) if s])
         except ValueError:
             out.append(part.split())
+    return out
+
+
+SHELLS = {"bash", "sh", "zsh", "dash", "ksh", "fish"}
+
+
+def inner_commands(cmd):
+    """The command strings that a shell, eval or Windows shell in `cmd` runs. `bash -c 'git push -f'` holds
+    its command in one quoted word, which every check would otherwise read as a single name. Matched
+    anywhere in a segment, so `echo bash -c '...'` is read too: the cost is a prompt, never a miss."""
+    out = []
+    for part in split_ops(cmd):
+        try:
+            toks = shlex.split(part)
+        except ValueError:
+            continue
+        for i, t in enumerate(toks):
+            prog = base(t).lower()
+            if prog == "eval":
+                out.append(" ".join(toks[i + 1:]))
+            elif prog in ("cmd", "pwsh", "powershell"):
+                out += [shlex.join(s) for s in shell_payload(prog, toks[i:]) or ()]
+            elif prog in SHELLS:
+                j = i + 1
+                while j < len(toks) and toks[j][:1] in "-+":
+                    if re.match(r"^-[A-Za-z]*c[A-Za-z]*$", toks[j]):      # -c, -lc, -xc
+                        if j + 1 < len(toks):
+                            out.append(toks[j + 1])
+                        break
+                    j += 2 if toks[j] in ("-o", "+o", "-O", "+O") else 1   # set -o pipefail takes a value
     return out
 
 
@@ -343,7 +525,53 @@ def classify(tokens, decision, grants=frozenset()):
     # break /tidy there, so this is Claude and Antigravity only.
     if toks and decision == "ask" and kit_destructive(toks):
         return "ask", TIDY_ASK
+    if toks and decision == "ask":
+        pkg = added_dependency(toks)
+        if pkg:
+            return "ask", DEP_ASK % pkg
     return None
+
+
+# Package managers and the subcommands that add a package when they name one. A bare or flags-only
+# install (`npm install`, `pnpm install --frozen-lockfile`) installs what the lockfile declares.
+_ADDERS = {"npm": ("install", "i", "add", "in"), "pnpm": ("install", "i", "add"), "yarn": ("add",),
+           "bun": ("install", "i", "add", "a"), "pip": ("install",), "pip3": ("install",), "uv": ("add",),
+           "cargo": ("add", "install"), "go": ("install", "get"), "gem": ("install",), "poetry": ("add",),
+           "pipx": ("install", "run"), "bundle": ("add",), "deno": ("add", "install"), "dotnet": ("package",)}
+# Not -w: npm's takes a workspace name but pnpm's is a switch, so it stays a token and npm's
+# `-w ws` reads `ws` as the package. That over-asks; it never lets a package through unasked.
+_DEP_VALUE = ("-r", "--requirement", "-c", "--constraint", "--workspace", "--filter", "-C", "--dir", "--cwd",
+              "--prefix", "--path", "--registry", "--target", "-t")
+DEP_ASK = ("this adds a dependency (%s). Approve after checking it is the real, maintained package you want: "
+           "typo-squatted names are a live attack.")
+
+
+def added_dependency(toks):
+    """The package a command adds, or None. `uv pip install` and `python -m pip install` count as pip."""
+    verb = base(toks[0]).lower()
+    rest = toks[1:]
+    if _LAUNCHER.match(verb) and rest[:2] == ["-m", "pip"]:
+        verb, rest = "pip", rest[2:]
+    if re.fullmatch(r"pip\d*(?:\.\d+)?", verb):
+        verb = "pip"
+    if verb == "uv" and rest[:1] in (["pip"], ["tool"]):        # uv pip install / uv tool install
+        verb, rest = ("pip" if rest[0] == "pip" else "pipx"), rest[1:]
+    if verb == "dotnet" and rest[:1] == ["add"]:                 # dotnet add [project] package x
+        rest = rest[1:]
+        rest = rest[rest.index("package"):] if "package" in rest else []
+    ops, skip = [], False
+    for a in drop_values(rest, _DEP_VALUE):
+        redirect = re.match(r"^\d*(?:>>?|<)(.*)$", a)   # `2>&1`, `> log.txt`, `>/dev/null`
+        if skip or redirect:
+            skip = bool(redirect) and not redirect.group(1)
+            continue
+        if not a.startswith("-"):
+            ops.append(a)
+    if verb not in _ADDERS or not ops or ops[0] not in _ADDERS[verb]:
+        return None
+    # A local path (`./packages/ui`, `file:./CMS`) is the project's own code, not a registry package.
+    pkgs = [a for a in ops[1:] if not re.match(r"^(?:file:|link:|portal:)?(?:\.{1,2}(?:/|$)|/)", a)]
+    return pkgs[0] if pkgs else None
 
 
 def _classify(tokens, decision, grants):
@@ -378,9 +606,7 @@ def _classify(tokens, decision, grants):
         if sub == "commit":
             if is_no_verify(flags_only(args, COMMIT_VALUE_FLAGS)) or short_has(flags_only(args, COMMIT_VALUE_FLAGS), "n"):
                 return "deny", NOVERIFY_DENY
-            if decision == "ask":                       # Claude: silent only if you asked this turn
-                return ("allow", COMMIT_OK) if "commit" in grants else ("ask", COMMIT_ASK)
-            return None                                  # Codex (deny): commit freely, as before
+            return None                                  # local and undoable: no prompt on any tool
         if sub == "reset" and any(a.lower().startswith("--h") for a in args):
             return decision, "`git reset --hard` irreversibly discards changes."
         if sub == "clean" and (short_has(args, "f") or any(a.lower().startswith("--f") for a in args)):
@@ -407,6 +633,11 @@ def _classify(tokens, decision, grants):
         # Scan for the pr subcommand rather than assuming position: a value-taking global flag
         # (`--repo o/r`) leaves its value sitting among the operands.
         ops = [a for a in rest if not a.startswith("-")]
+        if decision == "deny":                           # Codex: no grants and no ask, so like a push
+            for k in range(len(ops) - 1):
+                if ops[k].lower() == "pr" and ops[k + 1].lower() in ("create", "merge"):
+                    return "deny", PR_DENY
+            return None
         if decision == "ask":
             for k in range(len(ops) - 1):
                 if ops[k].lower() == "pr":
@@ -423,12 +654,25 @@ def _classify(tokens, decision, grants):
         recursive = "r" in letters or any(a.lower().startswith("--r") for a in ftoks)
         force = "f" in letters or any(a.lower().startswith("--f") for a in ftoks)
         if recursive and force:
-            # Silent ONLY when every operand is regenerable build output. One stray target - an
-            # absolute path, a glob, a source dir - and the whole command asks, as before.
+            # Silent only when every operand is build output or sits inside the project or the temp
+            # folder. One target that could reach outside them and the whole command asks.
             targets = [a for a in rest if not a.startswith("-")]
-            if targets and all(regenerable_path(t) for t in targets):
+            if targets and all(regenerable_path(t) or contained(t) for t in targets):
                 return None
             return decision, "`rm -rf` irreversibly deletes files."
+    if verb in PS_REMOVE or (POWERSHELL and verb == "rm"):   # in PowerShell, rm is Remove-Item
+        fl = [a.lower().split(":")[0] for a in rest if a.startswith("-")]      # -Recurse:$true
+        cmd_s = verb in ("rd", "rmdir", "del", "erase") and any(a.lower() == "/s" for a in rest)
+        if cmd_s or any(len(a) > 1 and "-recurse".startswith(a) for a in fl):
+            targets = [a for a in drop_values(rest, PS_REMOVE_VALUE)
+                       if not a.startswith("-") and not re.match(r"^/[A-Za-z]$", a)]
+            if targets and all(regenerable_path(t) or contained(t) for t in targets):
+                return None
+            return decision, "`%s -Recurse` irreversibly deletes a folder and everything in it." % toks[0]
+    if verb in READERS:
+        hit = next((a for a in rest if not a.startswith("-") and secret_path(a)), None)
+        if hit:
+            return decision, "this reads `%s`, a file that holds secrets. Approve only if you meant to show it." % hit
     if verb in ("dd", "mkfs") or verb.startswith("mkfs"):
         return decision, "`%s` can irreversibly destroy data." % verb
     if verb == "chmod" and any(a == "777" or a.endswith("777") or "+s" in a for a in rest):
@@ -454,6 +698,9 @@ _MSG_HEREDOC = re.compile(
 def strip_message_heredocs(cmd):
     def strip(m):
         if not m.group(3) and ("$(" in m.group(5) or "`" in m.group(5)):
+            return m.group(0)
+        line = m.string[m.string.rfind("\n", 0, m.start()) + 1:m.end(1)]
+        if line.count("<<") > 1:                         # `bash <<B; git commit -F - <<A`: B's body runs first
             return m.group(0)
         return m.group(1) + m.group(6)
     return _MSG_HEREDOC.sub(strip, cmd)
@@ -488,7 +735,134 @@ def split_ops(cmd):
     return parts
 
 
+OVERRIDE_VAR = re.compile(r"AGENT_KIT_(?:RELEASE|ALLOW_FORCE|APPLY)$")
+# The pre-push hook refuses AGENT_KIT_ALLOW_FORCE in a shell carrying one of these; an agent that removes
+# its marker makes its push look like yours.
+MARKER_VAR = re.compile(r"(?:CLAUDE_CODE_CHILD_SESSION|CODEX_THREAD_ID|ANTIGRAVITY_CONVERSATION_ID)$")
+PS_ENV_SET = {"set-item", "si", "new-item", "ni", "set-content", "sc", "add-content", "ac"}
+PS_ENV_WRITE = {"remove-item", "ri", "del", "erase", "rm", "rd", "rmdir", "clear-item", "cli",
+                "clear-content", "clc"} | PS_ENV_SET
+SHELL_KEYWORDS = {"if", "then", "else", "elif", "do", "while", "until", "!", "time"}
+_ASSIGN = re.compile(r"^([A-Za-z_]\w*)(?:\[[^\]]*\])?\+?=(.*)$", re.S)   # X=v, X+=v, X[0]=v
+
+
+def _var_hit(name, removing=False):
+    if MARKER_VAR.match(name):
+        return "marker"
+    return None if removing or not OVERRIDE_VAR.match(name) else "override"
+
+
+def _assign_hit(tok):
+    """A NAME=value word: setting an override, or emptying a marker (a non-empty marker still marks)."""
+    m = _ASSIGN.match(tok)
+    if not m:
+        return None
+    h = _var_hit(m.group(1))
+    return h if h == "override" or (h == "marker" and not m.group(2)) else None
+
+
+def env_tamper(cmd, depth=0):
+    """'override' when a command sets a pre-push override, 'marker' when it removes an agent's marker,
+    else None. Read per command, by its name and arguments, so a commit message, a grep pattern or an
+    echo that only mentions a variable is not taken for setting it.
+    ponytail: literal names only; indirection (unset ${x}_ID), string building ("AGENT_KIT_"+"RELEASE"),
+    interpreters (os.environ.pop), wildcards (env:CODEX*), here-strings, tmux, git aliases and the registry
+    get through. The force-push deny and the pre-push hook stay behind it."""
+    for part in split_ops(cmd):
+        try:
+            toks = [s for s in (t.strip("(){}") for t in shlex.split(part)) if s]
+        except ValueError:
+            toks = part.split()
+        hit = _tamper(toks, depth) if toks else None
+        if hit:
+            return hit
+    return None
+
+
+def _tamper(toks, depth):
+    joined = " ".join(toks)
+    m = re.search(r"SetEnvironmentVariable\(\s*([A-Za-z_]\w*)", joined, re.I)   # .NET, persists with 'User'
+    if m and _var_hit(m.group(1)):
+        return _var_hit(m.group(1))
+    m = re.match(r"^\$\{?env:([A-Za-z_]\w*)\}?\s*(=)?", toks[0], re.I)            # PowerShell $env:X = v
+    if m and (m.group(2) or (len(toks) > 1 and toks[1].startswith("="))):
+        return _var_hit(m.group(1))
+    i = 0
+    while i < len(toks):                                                          # X=v, wrappers, env, sh -c
+        t, b = toks[i], base(toks[i]).lower()
+        if _ASSIGN.match(t):
+            if _assign_hit(t):
+                return _assign_hit(t)
+        elif b == "env":
+            return _env_tamper(toks[i + 1:], depth)
+        elif b in ("sh", "bash", "zsh", "dash"):
+            rest = toks[i + 1:]
+            k = next((j for j, a in enumerate(rest) if re.match(r"^-[A-Za-z]*c[A-Za-z]*$", a)), -1)   # -c, -lc
+            return env_tamper(rest[k + 1], depth + 1) if 0 <= k < len(rest) - 1 and depth < 3 else None
+        elif b not in WRAPPERS and b not in SHELL_KEYWORDS and not re.match(r"^-?\d+[a-z]?$", t):
+            break
+        i += 1
+    verb = toks[i:]
+    if not verb:
+        return None
+    prog, rest = base(verb[0]).lower(), verb[1:]
+    payload = shell_payload(prog, verb)
+    if payload is not None:
+        return next((h for h in (_tamper(p, depth + 1) for p in payload if p) if h), None) if depth < 3 else None
+    if prog == "eval" and depth < 3:
+        return env_tamper(" ".join(rest), depth + 1)
+    if prog == "unset":
+        return next((h for h in (_var_hit(a, removing=True) for a in rest) if h), None)
+    if prog in ("export", "declare", "typeset", "readonly", "set"):
+        if (prog == "set" and rest and rest[0] in ("-e", "--erase")) or "-n" in rest or "+x" in rest:
+            # fish set -e X; export -n X and declare +x X stop passing X to the commands that follow
+            return next((h for h in (_var_hit(a, removing=True) for a in rest if a[0] not in "-+") if h), None)
+        words = [a for a in rest if not a.startswith("-")]
+        for j, a in enumerate(words):                                             # X=v, fish set -x X v
+            h = _assign_hit(a) if "=" in a else _var_hit(a) if prog == "set" and j + 1 < len(words) else None
+            if h:
+                return h
+        return None
+    if prog == "setx":
+        names = [a for a in rest if not a.startswith("/")]
+        return _var_hit(names[0]) if names else None
+    if prog in PS_ENV_WRITE:
+        for a in rest:
+            m = re.match(r"^(?:-(?:literal)?path:)?env:\\?([A-Za-z_]\w*)$", a, re.I)
+            if m:
+                return _var_hit(m.group(1), removing=prog not in PS_ENV_SET)
+        return None
+    return None
+
+
+def _env_tamper(rest, depth):
+    """`env [-i|-] [-u X] [X=v] cmd ...`: removing a marker, setting an override, or clearing it all for a push."""
+    clears, i = False, 0
+    while i < len(rest):
+        a = rest[i]
+        if a in ("-i", "-", "--ignore-environment"):
+            clears = True
+        elif a in ("-u", "--unset") and i + 1 < len(rest):
+            i += 1
+            if _var_hit(rest[i], removing=True):
+                return "marker"
+        elif a.startswith("--unset=") or (a.startswith("-u") and len(a) > 2):
+            if _var_hit(a.split("=", 1)[-1] if "=" in a else a[2:], removing=True):
+                return "marker"
+        elif _ASSIGN.match(a):
+            if _assign_hit(a):
+                return _assign_hit(a)
+        elif not a.startswith("-"):
+            inner = rest[i:]
+            if clears and re.search(r"\bpush\b", " ".join(inner)):               # also env -i sh -c "git push"
+                return "marker"
+            return _tamper(inner, depth + 1) if depth < 3 else None
+        i += 1
+    return None
+
+
 ANTIGRAVITY = False   # set by --tool antigravity: its PreToolUse contract differs from Claude's and Codex's
+POWERSHELL = False    # set for Claude Code's PowerShell tool, where rm is Remove-Item
 
 
 def emit(decision, reason):
@@ -503,7 +877,11 @@ def emit(decision, reason):
 
 def capture_intent(data):
     """UserPromptSubmit: record which git-writes the user's OWN message authorizes, for this turn."""
-    save_grants(data.get("session_id") or "", detect_grants(data.get("prompt", "")))
+    try:
+        grants = detect_grants(data.get("prompt", ""))
+    except Exception:
+        grants = frozenset()   # a crash here must fail towards "nothing authorized", never keep the last turn's grant
+    save_grants(data.get("session_id") or "", grants)
     sys.exit(0)
 
 
@@ -530,10 +908,29 @@ def main():
         call = call if isinstance(call, dict) and call.get("name") == "run_command" else {}
         cmd = (call.get("args") or {}).get("CommandLine", "")
     else:
-        cmd = data.get("tool_input", {}).get("command", "")
+        ti = data.get("tool_input")
+        cmd = ti.get("command", "") if isinstance(ti, dict) else ""
     if not isinstance(cmd, str) or not cmd:
         sys.exit(0)
+    if data.get("tool_name") == "PowerShell":
+        global POWERSHELL
+        POWERSHELL = True
+        # PowerShell's escape is the backtick (`--force is --force, a trailing ` continues the line) and its
+        # backslash is a path separator, which the POSIX parsing below would eat: .\.env must stay .env.
+        cmd = re.sub(r"`(.)", r"\1", re.sub(r"`\r?\n", "", cmd)).replace("\\", "/")
     cmd = strip_message_heredocs(cmd)   # a commit message is data, not commands (see _MSG_HEREDOC)
+    cmd = re.sub(r"\\\r?\n", "", cmd)    # the shell joins a backslash-newline: `push \<newline>--force` is one word list
+    # What `bash -c`, eval, `cmd /c` and `pwsh -Command` run is checked as its own lines, three levels deep.
+    todo = [cmd]
+    for _ in range(3):
+        todo = [c for s in todo for c in inner_commands(s)]
+        if not todo:
+            break
+        cmd += "\n" + "\n".join(todo)
+    # The grant file is written by the prompt hook. A command that names it could forge a grant. This
+    # raises the bar for an accident only: the agent's shell can write any file this hook can.
+    if re.search(r"agent-kit-grant", cmd, re.I):
+        emit(args.decision, GRANT_ASK)
     # Grants only exist in Claude ask-mode; Codex (deny) never consults them.
     grants = load_grants(data.get("session_id") or "") if args.decision == "ask" else frozenset()
 
@@ -543,8 +940,16 @@ def main():
     if re.search(r"(?:^|[\s;&|(])(?:export\s+)?AGENT_KIT_(?:RELEASE|ALLOW_FORCE|APPLY)\s*=",
                  re.sub(r"[\"'\\]", "", cmd)):
         emit(args.decision, OVERRIDE_ASK)
+    tamper = env_tamper(cmd)   # PowerShell, .NET, setx, fish, wrappers; and removing an agent's marker
+    if tamper == "override":
+        emit(args.decision, OVERRIDE_ASK)
+    if tamper == "marker":
+        emit(args.decision, MARKER_ASK)
 
-    if re.search(r"\|\s*(sudo\s+)?(ba|z)?sh\b", cmd, re.IGNORECASE):   # curl ... | sh / SH / bash / BASH
+    # curl ... | sh / SH / bash / BASH, and PowerShell's iwr ... | iex. Only a download feeding the shell:
+    # `grep "a|sh.exe"` and `printf y | sh install.sh` run nothing fetched.
+    if re.search(r"\b(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod|downloadstring|net\.webclient)\b[^\n;]*"
+                 r"\|\s*(?:(sudo\s+)?(ba|z)?sh|iex|invoke-expression)\b", cmd, re.IGNORECASE):
         emit(args.decision, "piping a download straight into a shell (curl | sh) runs unreviewed code.")
 
     # bar-raise (NOT a boundary): direct git-config writes can point hooks elsewhere; the sandbox is the real fix
@@ -566,13 +971,35 @@ def main():
     # One Bash call gets ONE decision, so the MOST RESTRICTIVE segment must win: deny > ask > allow.
     # Without this ranking a chained command silently downgrades - `git push && git commit` with only
     # commit granted would end on `allow` and run the ungranted push promptless.
+    global CWD, CMD, RELATIVE_OK
+    CWD = data.get("cwd") if isinstance(data.get("cwd"), str) else ""
+    CMD = cmd
+    for part in split_ops(cmd):                      # `cd / && rm -rf usr` is not a delete inside the project
+        try:
+            raw = [s for s in (x.strip("(){}") for x in shlex.split(part)) if s]
+        except ValueError:
+            RELATIVE_OK = False                      # unreadable: it may change directory
+            continue
+        while raw and raw[0] in SHELL_KEYWORDS:
+            raw = raw[1:]                            # `if true; then cd /; rm -rf x; fi`
+        if any(a in ("-C", "--chdir", "--cd") or a.startswith(("--chdir=", "--cd=")) for a in raw):
+            RELATIVE_OK = False                      # `env -C / rm -rf x`, `wsl --cd /`
+        t = verb_tokens(raw)
+        if t and base(t[0]).lower() in ("cd", "pushd", "popd", "chdir", "set-location", "sl", "push-location"):
+            dest = [a for a in t[1:] if not a.startswith("-")]
+            if not dest or not contained(dest[0].rstrip("/\\") + "/x"):   # the folder itself, or inside
+                RELATIVE_OK = False
     rank = {"allow": 0, "ask": 1, "deny": 2}
     best = None
     for part in split_ops(cmd):
         try:
-            toks = [s for s in (x.strip("(){}") for x in shlex.split(part)) if s]
+            words = shlex.split(part)
         except ValueError:
-            continue
+            words = part.split()     # unbalanced quotes: read the words anyway, never skip the segment
+        # An option keeps its braces: stripping `xargs -I{}` to `-I` made it take `git` as its value.
+        toks = [s for s in (x.strip("()" if x.startswith("-") else "(){}") for x in words) if s]
+        while toks and toks[0] in SHELL_KEYWORDS:       # `for i in 1; do rm -rf /; done`
+            toks = toks[1:]
         res = classify(toks, args.decision, grants)
         if res:
             if res[0] == "deny":
@@ -584,4 +1011,10 @@ def main():
     sys.exit(0)
 
 
-main()
+try:
+    main()
+except SystemExit:
+    raise
+except Exception:
+    # Fail closed on a host without onFailure: an unexpected crash asks (Codex, which cannot ask, denies).
+    emit("deny" if "deny" in sys.argv else "ask", "the command guard could not read this command, so it stops it for you to check.")

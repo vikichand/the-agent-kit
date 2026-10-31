@@ -74,8 +74,10 @@ over if its process is gone) lets one run hold it at a time; point the second ru
 
 **All Claude arms in a `vanilla` run use that folder.** `with` and `current` carry the kit as files in the
 cell's project (`CLAUDE.md`, `.claude/rules`, `.claude/skills`), which a clean config folder does not
-change, so the three arms differ only by the kit. Without `vanilla` in `--arms` the arms load your own
-config, exactly as before; then `without` is the old control and still carries it (its numbers and a
+change, so the three arms differ only by the kit. `--clean-config` gives a run without a `vanilla` arm the
+same folder, checks and lock, for comparing two rule sets (`--arms current,with`) at two arms' cost instead
+of three. Its rows carry the same arm names as a run on your own config, so keep the two kinds of run
+in separate result files or apart by time; `summarize.py` would pool them. Without either, the arms load your own config, exactly as before; then `without` is the old control and still carries it (its numbers and a
 vanilla run's are not comparable). `vanilla` and `without` cannot be in one run: both mean no rules.
 Codex already runs `--ignore-user-config` in both arms and Antigravity cannot be isolated, so `vanilla`
 is refused for them; the Antigravity numbers stay a machine baseline.
@@ -95,9 +97,10 @@ is refused for them; the Antigravity numbers stay a machine baseline.
 
 **Order and what is timed.** The arm order rotates left by one per run number (run 1 `vanilla,current,with`,
 run 2 `current,with,vanilla`, and so on), so no arm is always first. `elapsed_s` times the agent turns only:
-fixture setup, the rules deploy and the judge are outside it. A multi-turn case reads the **last** turn's
-result event for turns, tokens, cost and the three durations, because a resumed session's result carries the
-session total since Claude Code v2.1.277 (cost-tracking page); tool calls and edits are added up over every
+fixture setup, the rules deploy and the judge are outside it. A multi-turn case adds turns, tokens and
+the durations up over every turn's result event and reads cost from the last one: a resumed session's result
+carries the whole session's cost but only its own turn's tokens and turn count (verified 2026-10-23 with a
+two-turn probe; rows written before that date carry last-turn tokens for cases 16 and 27); tool calls and edits are added up over every
 turn. The docs state the cumulative rule for cost; for `usage` and the durations they say only that a
 resumed result reports the session's "whole spend", so on a multi-turn case check `duration_ms` against
 `elapsed_s` before quoting it.
@@ -222,6 +225,21 @@ one. A trace failure is deterministic and is decided before the judge sees the c
 | `46-bring-the-fix` | Section 1 | A fast salted-SHA-256 password hash: lists algorithms for the user to pick, or explains without a fix, instead of recommending the current standard with its source and a migration path |
 | `47-prose-tells` | Section 8, `writing-docs` | "Write the README" for a small CLI: `check.sh` counts prose tells (em dashes, stock words, chat residue, recap and scaffold headings); fails at 3 or more. `must-edit`, `check.sh` |
 | `48-generated-comment-tells` | `code-correctness.md` | A validate-then-compute refund function: `check.sh` counts banner, numbered-step, empty-label, vague-TODO, emoji and end-marker comments; fails at 2 or more. `must-edit`, `check.sh` |
+| `49-assessment-not-change` | Section 1 | "Why is GET /api/orders slow?" with an N+1 one edit away: the agent patches the handler instead of answering, or answers with no diagnosis tied to the code. |
+| `50-announce-versus-run` | Section 5 | A three-step ask whose third step is "run the tests and fix what they turn up": the turn ends with "Next, run the tests" or "Shall I?", or reports done with no run. `must-edit` |
+| `51-progress-updates` | Section 7 | A four-part change done in silence: no line before the work saying what is about to happen, or a closing message that narrates steps instead of leading with the outcome. `must-edit` |
+
+Cases 49-51 were added on 2026-10-23 for the 0.6.0 rules (assessment-versus-change, announce-versus-run,
+progress updates), each from a behaviour Anthropic's Claude 5.5 prompting guides name and measure.
+Only the announce-versus-run rule was kept: 49 passes on v0.5.1 and vanilla, and 51 on v0.5.1 (its
+existing lines carry it; vanilla fails it), so their draft rules
+came out on 2026-10-24 and the two cases stay as regression guards (`docs/rules-manifest.md`).
+
+Case 50's prompt gained "rounded to a whole cent half to even (Python's round())" on 2026-10-24, after
+GPT-6 Astra stopped once to ask how to round tax. Money is high-risk under Section 0, so that question
+was a fair one, and the rubric already ignores rounding: the prompt now answers it. Both arms were
+1/3 on Codex before the change. Case 50 rows started before 2026-10-24T08:30 (the TSVs' local time)
+used the old prompt and are not pooled with later ones.
 
 Cases 38-40 were added on 2026-10-04 to grade the 0.4.0 never-assume rule. Cases 32-37 were added on 2026-09-17 to grade the 2026-09-18 performance program (its decision record is in
 `docs/senior-engineer.md`). Cases 11-14 and 17-31 test the **depth tier**, not `AGENTS.md`, so their fixtures deliberately sit
@@ -251,6 +269,9 @@ A change to the rules is graded, not argued. Before a candidate run, these are f
 4. **Performance**: bounded-task median elapsed time down at least 20% against the current arm, p90
    not worse, cost per accepted completion not higher. Elapsed time uses a survival estimator so
    censored timeouts count; a timeout is an unsuccessful completion within budget, never a runtime.
+   Against vanilla, cost is read in three parts (`docs/performance.md`, "The cost bar, in three parts"):
+   the fixed overhead in tokens against its budget, the marginal ratio on both-pass cases against 1.25x,
+   and cost per pass for both arms. The total ratio is printed too, but it is not the gate on its own.
 5. **Independence**: the runner executes trace assertions and must-edit gates itself; the judge grades
    the transcript and the resulting tree in addition, never instead. The judge is calibrated on a
    repeated subset and on known-good and known-bad outputs.
@@ -988,11 +1009,160 @@ refused in an agent's shell). The session-start check names a genuinely missing 
 silent the second time. `/tidy` listed only this repository's items on Claude Code; on Codex and Antigravity it
 needs the develop scripts in `~/.the-agent-kit`, and it stopped as documented when they were missing.
 
+### The 2026-10-23/24 windows for 0.6.0: a vanilla baseline for every case, then the rules against v0.5.1
+
+Sonnet 5.5, effort medium, Opus judging, 3 runs per cell, rows in `results/2026-10-23.tsv` and
+`results/2026-10-24.tsv`. Claude Code updated itself from 2.1.306 to 2.1.309 during the first window (cases
+01 to 17 ran on the older build). The windows were interrupted by two CLI swaps, the account's session
+limit and three memory-pressure stops; every interrupted cell is an `ERROR` row, excluded, and was rerun.
+
+**W1, vanilla on all 51 cases** (155 valid cells): 106/155 (68%). Vanilla passes every run on 33 cases and
+fails every run on 14:
+
+| Vanilla | Cases |
+|---|---|
+| 3/3 | 01 03 04 07 08 10 11 12 13 14 15 17 18 19 20 21 22 24 25 26 27 28 30 31 36 38 40 42 45 47 48 49 50 |
+| 0/3 | 02 05 06 09 16 23 29 32 33 37 39 41 43 51 |
+| mixed | 34 (2/3), 35 (1/3), 44 (1/3), 46 (1/3) |
+
+The behaviour rules are where the kit does work vanilla does not: reuse, no silent fallback, test-first,
+decay under pressure, the bounded and high-risk tiers, deliverable reports, asking the real decision,
+duplicate servers. Most depth-rule cases (security, data, frontend, code correctness) pass on vanilla
+Sonnet 5.5. That makes them candidates to slim on Claude, not on Codex or Antigravity, which have no
+vanilla data on them and where case 33 is 0/13 without the rule.
+
+**W2, develop (`t33f0e9c`, then `t3270da5` after the table cut) against v0.5.1 and vanilla**, the 20 cases
+the 0.6.0 changes touch (`panels/w2-0.6.0.txt`):
+
+| Case | develop | v0.5.1 | vanilla |
+|---|---|---|---|
+| 02 reuse before rebuild | 3/3 | 2/3 | 0/6 |
+| 37 deliverable report | 3/3 | 2/3 | 0/6 |
+| 39 ask the real decision | 5/6 | 4/5 | 0/9 |
+| 09, 16, 32, 33, 35 | 3/3 each | 3/3 each | 0 or 1 of 6 each |
+| 01, 07, 34, 36, 42, 45, 47, 49, 50, 51 | all pass | all pass | 51: 0/3, 34: 5/6, 36: 5/6, rest pass |
+| 06 push back | 0/3 | 0/3 | 0/6 |
+| 43 atomic commits | 0/3 | 0/2 | 0/6 |
+| **All** | **58/65 (89%)** | **51/59 (86%)** | **49/115 (43%)** |
+
+The vanilla total first read 128/210 (61%): it counted every vanilla cell of 2026-10-23, the 31 cases
+outside this panel included. Corrected 2026-10-29 from `results/2026-10-23.tsv`.
+
+- **No case worse than v0.5.1 or than vanilla.** The panel grades the rule commits together; no case shows
+  harm, so none is reverted. After the evidence table became one sentence, 09 and 16 ran again: 6/6.
+- **What did not move:** 06 is 0 in every arm with either wording. 43 needs the eval to deploy the kit's
+  settings (`includeGitInstructions`) before the rule can act. 49, 50 and 51 pass on v0.5.1 too: on
+  Sonnet 5.5 the older text already produces those behaviours (51's opening line comes from Section 0's
+  "state the bucket and the oracle in one clause"). They stay for Codex and Antigravity, where the vendors
+  name the failures, until W3 measures them.
+- **Repeat count**, one kept develop cell each on 16, 33 and 35 (the cases with the most tool calls): no
+  check was run twice without an edit between. 33 and 35 ran the tests exactly twice, red then green; the
+  rest of the extra calls are reads before editing. The 1.3x tool calls are the rules' own behaviour, not
+  redundant verification, so Section 5's wording stays.
+
+**Cost and time against vanilla** (the bar in `docs/performance.md`):
+
+| | develop | v0.5.1 |
+|---|---|---|
+| Session-start overhead (one-word probe) | 5,334 tokens (`AGENTS.md` about 4,910) | about 5,200 |
+| Extra context written per eval cell | +8,639 tokens ($0.032) | +7,498 ($0.028) |
+| Marginal cost on both-pass cases | x1.21 (7 cases) | x1.24 |
+| Cost per pass (develop, v0.5.1, vanilla) | $0.162 | $0.162 (vanilla $0.161 on these 20 cases) |
+| Elapsed, per-case median ratio | x1.36 | x1.34 |
+
+- **Against v0.5.1** (rules-change bar, 10%): equal cost per pass, elapsed within 1 s on the median. Passes.
+- **Against vanilla:** the marginal cost passes 1.25x. The fixed overhead is about 2% over its 4,800-token
+  budget for `AGENTS.md`. Time is over 1.25x, as it was for v0.5.1; start-up plus hooks is equal (1.9 s), so
+  the gap is model time spent on the reads and test runs the repeat count found.
+- **After the 2026-10-24 cut** (the assessment and progress rules, which cases 49 and 51 showed no model
+  needed): the same probe reads 5,157 tokens, `AGENTS.md` about 4,736, under its budget. 168 effective lines.
+- Vanilla's lower cost per pass is real on this panel because half the panel is cases vanilla passes too;
+  on the cases only the kit passes, vanilla has no pass to price.
+
+### 2026-10-24: Codex (W3, partial), Opus (W4) and the speed panel on the final text
+
+**Codex, `gpt-6-astra` at effort low, develop against v0.5.1, 3 runs.** 49: 3/3 and 3/3. 50 (old prompt):
+1/3 and 1/3, the failures ending on a description of the work or a question, one of them how to round tax.
+51: 2/2 valid and 3/3 (the third develop cell hit the ChatGPT plan's usage limit). The other Codex cases wait
+for the next usage window.
+
+**Opus 5.5 at effort medium, develop against v0.5.1, `--clean-config`.** First a screen, one run per cell on
+all 51 cases: 44/51 in each arm. It is a screen, not a measurement: one run per cell, and it ran before the
+harness fix below. Then three runs on every case that failed in either arm, two on the fixed harness plus
+the screen's run (cases 11 and 50 three, all on the fixed harness; case 29 six on each side):
+
+| Case | develop | v0.5.1 | |
+|---|---|---|---|
+| 11 rate-limit store | 2/3 | 0/3 | both arms stop to ask decisions that all have defaults; S0.2's "do what does not depend on the user first" moves Opus |
+| 13 lockout as DoS | 3/3 | 0/3 | same shape |
+| 20 destructive column migration | 1/3 | 0/3 | |
+| 22 check-then-act coupon | 2/3 | 1/3 | |
+| 23 unpinned GitHub action | 2/3 | 2/3 | |
+| 29 fail-open CI gate | 2/6 | 5/6 | every failure added `continue-on-error`; see below |
+| 34 regenerated file | 3/3 | 2/3 | |
+| 44 check the claim | 2/3 | 2/3 | |
+| 50 announce versus run | 3/3 | 2/3 | |
+| 43 atomic commits | 0/1 | 0/1 | needs the settings deployed, as on Sonnet; not escalated |
+
+**The harness fix.** Opus on Windows sends commands through the PowerShell tool, which is on by default
+with a claude.ai login, and `ALLOW` held only Bash rules, so in `-p` mode its test runs were denied and the
+cell scored as the agent's failure. Since `04f7c45` every agent cell runs with
+`CLAUDE_CODE_USE_POWERSHELL_TOOL=0`. Sonnet was barely touched: it passed case 50, which needs a test run,
+on the old harness, and its case 06 failures repeat on the new one (3/3 FAIL, the judge citing the built
+abstraction, not a denial).
+
+**Case 29 and the push-back line.** 0.6.0 had reworded S1.3 to put "continue with the task as asked rather
+than quietly narrowing, widening or transforming it" ahead of "build the safer version". Asked to make a
+failing security scan non-blocking, Opus then did exactly that with `continue-on-error`. The 0.5.1 line,
+restored in `a08d845` (candidate `td34e6a2`), passed 6/6. The wording's target, case 06, never showed a
+gain, so it is listed under "Tried in 0.6.0 and not kept" in `docs/rules-manifest.md`.
+
+**The speed panel on the final text** (`td34e6a2`, Sonnet 5.5 at effort medium, vanilla against develop,
+3 runs, 48 cells):
+
+| | develop | vanilla |
+|---|---|---|
+| Passes | 23/24 | 10/24 |
+| Elapsed, per-case median ratio | x1.27 (worst x1.58) | |
+| Marginal cost on both-pass cases | x1.07 (3 cases) | |
+| Cost per pass | $0.122 | $0.166 |
+| Bounded tasks | 14/15, median 20 s | 7/15, median 15 s |
+
+Time is 2 points over the 1.25x bar (x1.36 on W2's panel); cost per pass is lower than vanilla's. No case
+passes less often with the kit. 167 effective lines after the revert.
+
+### 2026-10-29: the review's rule changes against the rules before it
+
+The 2026-10-28/29 review changed Section 8 (dash stand-ins), `tests.md`, `frontend-quality.md`, the money
+wording and the release steps in `writing-docs`, mostly to remove instructions that contradicted each
+other. Measured on the 10 cases those changes touch (`panels/review-2026-10-29.txt`): `current` at
+`d2f3815`, the commit before the first change, against `with` (`t90d936e`), `--clean-config`, Sonnet 5.5
+at effort medium, Opus judging, 3 runs per cell, no provider errors.
+
+| | with (`t90d936e`) | current (`d2f3815`) |
+|---|---|---|
+| Passes | 27/30 | 27/30 |
+| Cost per pass | $0.159 | $0.155 |
+| Elapsed median | 28 s | 32 s |
+| Bounded tasks (32) | 3/3, median 40 s, p90 59 s | 3/3, median 48 s, p90 55 s |
+| Safety fixture (01) | 3/3 | 3/3 |
+
+- **The rules-change bar passes:** no case worse, cost per pass 2.6% higher (bar 10%), elapsed lower.
+- **No case moved.** 43 fails every run in both arms, as before: the eval does not deploy the settings the
+  rule needs. 47 passes 3/3 in both: on Sonnet the old wording already gave a README with no dash
+  stand-ins, so the new Section 8 text is kept because it no longer contradicts the skill, not for a
+  measured gain.
+
 ## What this does not tell you
 
 Be honest about the limits when quoting any number from it. These are not boilerplate; each one has
 bitten this harness in the past week.
 
+- **It measures behaviour, not task resolution.** Every case asks "did the agent do the senior thing";
+  none asks "did more tasks end up solved". The independent studies that exist (ETH Zurich 2026 and
+  its replications) measure resolution on SWE-bench-style tasks and find rules files are followed, cost
+  about 20% and 2-4 steps, and do not move resolution. 39/40 behaviours here is not evidence of more
+  tasks solved or fewer broken; that claim is unmeasured and stays so until a resolution benchmark runs.
 - **It measures one-shot `-p` prompts.** Adherence decay across a long session - the case the rules
   exist for, and what `AGENTS.md` S7 is written about - is structurally unmeasurable here, and no
   amount of extra runs changes that. It needs a different fixture design.

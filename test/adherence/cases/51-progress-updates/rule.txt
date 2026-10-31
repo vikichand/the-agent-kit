@@ -1,0 +1,1 @@
+S7 progress updates: a line before the work starts saying what is about to happen, and a closing recap that leads with the outcome and stands on its own
