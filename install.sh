@@ -1,22 +1,22 @@
 #!/bin/sh
 # the-agent-kit installer.
 #
-#   ./install.sh              per-project (self-contained): full rules (AGENTS.md + a CLAUDE.md that
-#                             imports it, so nothing is duplicated) + git hooks in THIS repo. Run again,
-#                             it brings the project to this kit (setup/project.py, .agents/the-agent-kit.json)
-#   ./install.sh --extension  per-project (extends global): project-config stub + git hooks
-#   ./install.sh --setup      machine-wide, all of it: copy the kit to ~/.the-agent-kit, turn on the git
-#                             hooks, add the kit to your Claude Code and Codex settings, and install its
-#                             skills once for all three tools and wire Antigravity's session-start check
-#                             (asks first)
-#   ./install.sh --undo       take out everything the install record lists (settings entries, git
-#                             hooks, skills, Antigravity's check), asked first and verified after
-#   ./install.sh --global     machine-wide, by hand: copy the kit and PRINT the snippets to merge yourself
-#   ./install.sh --update     pull the latest kit from GitHub into ~/.the-agent-kit, then run --setup
-#   ./install.sh --update-rules  refresh THIS repo's AGENTS.md to the kit's current rules; the
-#                             project's PROJECT-CONFIG block is preserved byte-for-byte
-#   ./install.sh --check      doctor: verify the interpreter resolves and the guard actually fires
+#   ./install.sh              install or reinstall: copy the kit to ~/.the-agent-kit, add it to your Claude
+#                             Code, Codex and Antigravity settings, git hooks and skills (asks first), then,
+#                             inside a git repo, bring that project to this kit (full rules: AGENTS.md + a
+#                             CLAUDE.md that imports it, path rules, skills, git hooks). Ends with check
+#   ./install.sh --lean       the same, but the project gets a project-config stub that extends your global rules
+#   ./install.sh --print      machine-wide, by hand: copy the kit and PRINT the snippets to merge yourself
+#   ./install.sh update       pull the latest kit from GitHub, then install it as above
+#   ./install.sh uninstall    take out what the kit installed in this project and on this machine (asked
+#                             first, verified after), then the kit's own folder
+#   ./install.sh check        doctor: what is installed, and that the guard actually fires
 #   ./install.sh --tidy       list orphaned MCP trees; add --kill to terminate them
+# Every install and update first removes what the old kit put in and this one no longer ships, from the
+# install records (setup/machine.py, setup/project.py). The old names (--setup, --update, --update-rules,
+# --undo, --extension, --global, --check) still work for one release, as they did, and print the new one.
+# `install.sh project` is the project half on its own (the test suite uses it).
+# cli: install update uninstall check  (update_kit looks for this line in the installer it downloads)
 #
 # Safe by design: never overwrites an existing CLAUDE.md or git hook, or an AGENTS.md's PROJECT-CONFIG
 # block (the rules around it are the kit's). In your tool settings it
@@ -27,7 +27,7 @@
 set -eu
 
 KIT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-MODE="${1:-project}"
+MODE="${1:-}"
 # Where --update pulls from. Overridable so a fork (or the test suite) can point elsewhere.
 KIT_REPO="${AGENT_KIT_REPO:-https://github.com/vikichand/the-agent-kit.git}"
 
@@ -63,9 +63,28 @@ git_hooks_dir() {  # $1 = repo root -> absolute hooks dir (worktree/submodule sa
   printf '%s' "$d"
 }
 
+hooks_in_repo() {  # $1 = hooks dir, $2 = repo root -> true when the hooks dir is inside this repo's folder
+  # A repo sets its own core.hooksPath (and its .git can name another git dir), so a cloned or unpacked one
+  # could name any folder: the kit writes and removes git hooks only inside the repo's own folder. pwd -P
+  # resolves links, and `..` is refused because a missing folder before it cannot be resolved. A linked
+  # worktree or a submodule keeps its hooks outside its folder, so there they are left for you to add.
+  case "/$1/" in */../*) return 1 ;; esac
+  d=$1; while [ ! -d "$d" ]; do d=$(dirname "$d"); done
+  d=$(cd "$d" 2>/dev/null && pwd -P) && r=$(cd "$2" 2>/dev/null && pwd -P) || return 1
+  case "$d/" in "$r"/*) return 0 ;; esac
+  return 1
+}
+
 install_git_hooks() {  # $1 = repo root
   hd=$(git_hooks_dir "$1")
   [ -n "$hd" ] || { say "  ! not a git repo - skipped the git hooks."; return; }
+  if same_dir "$hd" "$HOME/.the-agent-kit/git-hooks"; then
+    say "  = git hooks: core.hooksPath is the kit's own folder, so the kit's hooks already run here."; return
+  fi
+  if ! hooks_in_repo "$hd" "$1"; then
+    say "  ! git hooks: this repo's core.hooksPath points outside it ($hd) - left alone. Copy the kit's hooks there by hand if you want them."
+    return
+  fi
   mkdir -p "$hd"
   for h in commit-msg pre-commit pre-push; do
     if [ -e "$hd/$h" ]; then
@@ -175,13 +194,13 @@ write_ag_launcher() {  # $1 = target. Antigravity splits a hook command on white
   # command. Hooks run from the folder holding hooks.json, so this launcher sits there, is called by
   # bare name, and hands the call to the machine-wide guard.
   cat > "$1" <<'LAUNCH'
-# The Agent Kit: launcher for the command guard (see .agents/hooks.json). Kit-owned; --update-rules
+# The Agent Kit: launcher for the command guard (see .agents/hooks.json). Kit-owned; install.sh
 # replaces it. Antigravity cannot pass a quoted path to a hook, so the guard is found from here.
 import os, runpy, sys
 
 guard = os.path.join(os.path.expanduser("~"), ".the-agent-kit", "hooks", "command-guard.py")
 if not os.path.isfile(guard):
-    sys.stderr.write("the-agent-kit: no guard at %s; run install.sh --setup. Command not checked.\n" % guard)
+    sys.stderr.write("the-agent-kit: no guard at %s; run install.sh. Command not checked.\n" % guard)
     sys.exit(0)
 sys.argv = [guard] + sys.argv[1:]
 runpy.run_path(guard, run_name="__main__")
@@ -258,21 +277,19 @@ project() {  # $1 = install | uninstall | check, $2 = repo root, then flags -> s
     --kit-time "$(kit_time)" --py "$py" "$@"
 }
 
-install_project() {   # self-contained: full rules + git hooks
-  root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+install_project() {   # self-contained: full rules + git hooks. $1 = repo root (default: this repo, or here)
+  root=${1:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}
   say "Installing FULL rules + git hooks into: $root"
   # AGENTS.md holds the rules (the cross-tool standard: Codex, Cursor, Aider, Copilot...). Claude Code
   # reads CLAUDE.md only, so CLAUDE.md IMPORTS AGENTS.md rather than duplicating it - one source of
   # truth, no drift. Everything the kit writes here is in .agents/the-agent-kit.json (setup/project.py).
   prc=0; project install "$root" --apply || prc=$?
   install_git_hooks "$root"
-  hr
-  say "Tool-layer guard is machine-wide - run once:  ./install.sh --setup   then:  ./install.sh --check"
-  [ "$prc" = 0 ] || exit 1
+  [ "$prc" = 0 ]
 }
 
-install_extension() { # lean: project-config stub + git hooks
-  root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+install_extension() { # lean: project-config stub + git hooks. $1 = repo root (default: this repo, or here)
+  root=${1:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}
   say "Installing project EXTENSION into: $root"
   if [ ! -e "$HOME/.claude/CLAUDE.md" ] && [ ! -e "$HOME/.codex/AGENTS.md" ]; then
     say "  ! WARNING: no global rules found (~/.claude/CLAUDE.md or ~/.codex/AGENTS.md). This stub carries NO"
@@ -280,7 +297,21 @@ install_extension() { # lean: project-config stub + git hooks
   fi
   prc=0; project install "$root" --lean --apply || prc=$?
   install_git_hooks "$root"
-  [ "$prc" = 0 ] || exit 1
+  [ "$prc" = 0 ]
+}
+
+same_dir() {  # $1 $2 -> true when both name the same folder (Windows: git says C:/x, sh says /c/x)
+  a=$(cd "$1" 2>/dev/null && pwd -P) && b=$(cd "$2" 2>/dev/null && pwd -P) && [ "$(nat "$a")" = "$(nat "$b")" ]
+}
+
+project_root() {  # the repo the project half works on: the git repo this runs in, or empty
+  # Never outside a git repo (run from your home folder, a plain install would write the rules there), and
+  # never the home folder (a dotfiles repo), the share, or the kit's own checkout (the kit is not its own project).
+  r=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
+  for x in "$HOME" "$HOME/.the-agent-kit" "$KIT"; do
+    same_dir "$r" "$x" && return 0
+  done
+  printf '%s' "$r"
 }
 
 merge_recommended() {  # $1 = the kit's list  $2 = the user's list (~/.the-agent-kit/recommended.json)  $3 = plan | apply (default)
@@ -449,7 +480,7 @@ install_global() {  # copy the kit, then PRINT the settings snippets for a hand 
   # set -e ("are the same file"). Refreshing the share is --update's job.
   if [ "$KIT" = "$share" ]; then
     say "This IS the installed copy - nothing to copy onto itself. To refresh it from GitHub:"
-    say "    $share/install.sh --update"
+    say "    $share/install.sh update"
     return 0
   fi
   copy_share
@@ -457,7 +488,7 @@ install_global() {  # copy the kit, then PRINT the settings snippets for a hand 
   py=$(detect_py)
   if [ -z "$py" ]; then
     hr; say "  ! WARNING: no working python found - the tool-layer guard will not run. Install Python 3"
-    say "    and re-run, or fix the interpreter in the snippet below. ('./install.sh --check' verifies.)"; py="python3"
+    say "    and re-run, or fix the interpreter in the snippet below. ('./install.sh check' verifies.)"; py="python3"
   fi
 
   hr
@@ -486,7 +517,7 @@ install_global() {  # copy the kit, then PRINT the settings snippets for a hand 
   cat "$KIT/codex/config.toml"
 
   hr
-  say "THE KIT'S SKILLS - one real copy for all three tools (--setup does this for you, after asking):"
+  say "THE KIT'S SKILLS - one real copy for all three tools (install.sh does this for you, after asking):"
   say "  copy each folder in $share/skills to ~/.agents/skills/<name>   (Codex reads it there)"
   say "  link ~/.claude/skills/<name> to that copy: ln -s on macOS and Linux; on Windows a junction, which needs no admin:"
   say "      cmd //c mklink /J <link> <target>      (remove it later with rmdir, never rm -rf)"
@@ -503,8 +534,8 @@ install_global() {  # copy the kit, then PRINT the settings snippets for a hand 
   # command printed with that path is already broken by the time anyone reads it. $share is where
   # the kit actually lives afterwards.
   say "The tool guard is NOT active until you merge the snippet(s) above - then verify:"
-  say "    $share/install.sh --check"
-  say "Optional global rules (lets projects stay lean via --extension), review the merge first:"
+  say "    $share/install.sh check"
+  say "Optional global rules (lets projects stay lean via --lean), review the merge first:"
   say "    cat \"$share/AGENTS.md\" >> ~/.claude/CLAUDE.md   ;   cat \"$share/AGENTS.md\" >> ~/.codex/AGENTS.md"
   say "    mkdir -p ~/.gemini && cat \"$share/AGENTS.md\" >> ~/.gemini/AGENTS.md"
   say "Antigravity: the guard hook stays per project; run $share/install.sh inside each project."
@@ -533,7 +564,7 @@ confirm() {  # consent to write the user's settings: a terminal answer, or AGENT
     return 1
   fi
   say "  Nothing changed: there is no terminal to ask you in. To apply the changes listed above, run"
-  say "  $HOME/.the-agent-kit/install.sh --setup in a terminal, or AGENT_KIT_APPLY=1 in front of it."
+  say "  $HOME/.the-agent-kit/install.sh in a terminal, or AGENT_KIT_APPLY=1 in front of it."
   return 1
 }
 
@@ -562,7 +593,7 @@ setup_machine() {  # --setup: everything a machine needs, applied with the user'
     say "Already set up: your settings, git hooks and skills carry the kit."
     return 0
   fi
-  confirm || return 0
+  confirm || { DECLINED=1; return 0; }   # install_all leaves the project alone after a no
   arc=0
   if [ "$mrc" = 10 ]; then
     # Bound to the plan shown above: if anything changed since the yes, machine.py applies nothing.
@@ -580,7 +611,7 @@ setup_machine() {  # --setup: everything a machine needs, applied with the user'
   if [ "$vrc" != 0 ]; then
     say "  ! the install did not finish: these are still not as the kit installs them:"
     say "$vout"
-    say "  Fix what is named above, then run $share/install.sh --setup again."
+    say "  Fix what is named above, then run $share/install.sh again."
     exit 1
   fi
   say "Verified: everything the kit installs on this machine is in place."
@@ -600,7 +631,7 @@ uninstall_machine() {  # --undo: take out everything the install record lists, w
   share="$HOME/.the-agent-kit"
   py=$(detect_py)
   [ -n "$py" ] || { say "  ! no working Python 3 found - uninstalling needs it."; exit 2; }
-  [ -f "$share/setup/machine.py" ] || { say "  ! $share/setup/machine.py is missing - nothing to uninstall with. Re-run install.sh --setup first."; exit 2; }
+  [ -f "$share/setup/machine.py" ] || { say "  ! $share/setup/machine.py is missing - nothing to uninstall with. Run install.sh first."; exit 2; }
   say "UNINSTALL - everything the kit installed on this machine comes out; what you changed yourself stays"
   urc=0; uplan=$(machine uninstall "$share" "$py" 2>&1) || urc=$?
   if [ -n "$uplan" ]; then say "$uplan"; else say "  nothing of the kit's is installed here"; fi
@@ -652,14 +683,155 @@ update_kit() {  # refresh ~/.the-agent-kit from GitHub, so the clone stays dispo
   # kept going here would resume at a stale offset inside the NEW file and execute whatever fragment
   # of a line landed there ("sac: command not found", observed). exec replaces this process, so not
   # one more byte is read from the file being replaced. Keep the tail below inside the handoff.
+  # A kit from before the four commands knows only --setup (machine only), so it is asked for that; so is
+  # one run by the old --update, which did the machine only.
+  m=--setup; [ "${1:-}" = --setup ] || ! grep -q '^# cli: install update uninstall check' "$tmp/kit/install.sh" || m=install
   exec sh -c '
-    AGENT_KIT_APPLY= sh "$1/install.sh" --setup || exit $?
+    AGENT_KIT_APPLY= sh "$1/install.sh" "$4" || exit $?
     rm -rf "$2"
     rm -f "$3/.update-check"   # cached before this update, it would call an older main "newer" until tomorrow
     printf "%s\n" "------------------------------------------------------------"
-    printf "%s\n" "The kit in ~/.the-agent-kit is current. Then, in each project:"
-    printf "%s\n" "    ~/.the-agent-kit/install.sh --update-rules     # new rules in, your PROJECT-CONFIG kept"
-  ' _ "$tmp/kit" "$tmp" "$share"
+    printf "%s\n" "The kit in ~/.the-agent-kit is current. In each of your other projects, run:"
+    printf "%s\n" "    ~/.the-agent-kit/install.sh     # brings the project to the new kit, your PROJECT-CONFIG kept"
+  ' _ "$tmp/kit" "$tmp" "$share" "$m"
+}
+
+install_all() {  # install.sh [--lean]: the machine, then the project this runs in, then check
+  setup_machine
+  root=$(project_root)
+  prc=0
+  hr
+  if [ -n "$root" ] && [ "${DECLINED:-}" = 1 ]; then
+    say "Nothing changed in this project either: you did not say yes above. Run this again to install it."
+  elif [ -n "$root" ]; then
+    say "THE KIT IN THIS PROJECT"
+    if [ "${1:-}" = lean ]; then install_extension "$root" || prc=1; else install_project "$root" || prc=1; fi
+  else
+    say "No project here (not inside a git repo, or it is your home folder or the kit itself): the machine only."
+    say "To add the kit to a project, run $HOME/.the-agent-kit/install.sh inside it."
+  fi
+  # Done means checked: the same doctor as install.sh check, run where the project is.
+  drc=0; ( [ -z "$root" ] || cd "$root"; doctor ) || drc=$?
+  [ "$prc" = 0 ] && [ "$drc" = 0 ] || exit 1
+}
+
+uninstall_all() {  # install.sh uninstall: this project's kit files, the machine's entries, then the kit's folder
+  share="$HOME/.the-agent-kit"
+  py=$(detect_py)
+  [ -n "$py" ] || { say "  ! no working Python 3 found - uninstalling needs it."; exit 2; }
+  root=$(project_root)
+  say "UNINSTALL - everything the kit installed here and on this machine comes out; what you changed yourself stays"
+  prc=0; pplan=""; khooks=""; mrc=0; mplan=""; keep=""
+  if [ -n "$root" ]; then
+    pplan=$(project uninstall "$root" 2>&1) || prc=$?
+    case "$prc" in 0|10) ;; *)
+      # A project's record is the project's, so anyone who can commit can make it unreadable or "newer":
+      # that stops the project half only, never the machine's.
+      hr; say "THIS PROJECT ($root)"; say "$pplan"
+      say "  ! this project's kit files could not be handled (named above), so they are left as they are."
+      pplan=""; prc=0; root="" ;;
+    esac
+  fi
+  if [ -n "$root" ]; then
+    # Git hooks the kit copied into this clone: only an exact copy of the kit's, and only inside the repo
+    # (a repo's own core.hooksPath could name any folder). Hooks the global core.hooksPath points at go
+    # with the kit's folder.
+    hd=$(git_hooks_dir "$root"); hnote=""
+    if [ -n "$hd" ] && ! same_dir "$hd" "$share/git-hooks" && hooks_in_repo "$hd" "$root"; then
+      for h in commit-msg pre-commit pre-push; do
+        if [ -f "$hd/$h" ] && cmp -s "$KIT/hooks/$h" "$hd/$h"; then khooks="$khooks $h"
+        elif [ -f "$hd/$h" ] && grep -q 'the-agent-kit' "$hd/$h" 2>/dev/null; then
+          hnote="$hnote
+  = left the git hook $hd/$h: it names the kit but is not this kit's copy (an older kit's, or edited); remove it by hand"
+        fi
+      done
+    fi
+    if [ -n "$pplan$khooks$hnote" ]; then
+      hr; say "THIS PROJECT ($root)"
+      [ -z "$pplan" ] || say "$pplan"
+      for h in $khooks; do say "  - remove the git hook $h (an exact copy of the kit's)"; done
+      [ -z "$hnote" ] || say "${hnote#?}"
+    fi
+  fi
+  if [ -f "$share/setup/machine.py" ]; then
+    mplan=$(machine uninstall "$share" "$py" 2>&1) || mrc=$?
+    [ -z "$mplan" ] || { hr; say "THIS MACHINE"; say "$mplan"; }
+    [ "$mrc" = 0 ] || [ "$mrc" = 10 ] || { say "Fix the file named above (it could not be read safely), then run this again."; exit 1; }
+  elif [ -d "$share" ]; then
+    keep="it has no setup/machine.py to take the kit out of your settings with: run $share/install.sh first, then this again"
+  fi
+  [ -d "$share" ] && [ -z "$keep" ] && { hr; say "  - remove $share: the kit itself, its install record and your recommended-tools list"; }
+  if [ "$prc" != 10 ] && [ -z "$khooks" ] && [ "$mrc" != 10 ] && { [ ! -d "$share" ] || [ -n "$keep" ]; }; then
+    [ -z "$keep" ] || say "Kept $share: $keep."
+    say "  nothing of the kit's is installed here"; return 0
+  fi
+  hr
+  confirm || return 0
+  arc=0
+  if [ "$prc" = 10 ]; then
+    # Bound to the plan shown above, as the machine's is by --expect: a project that changed since is asked about again.
+    now=$(project uninstall "$root" 2>&1) || true
+    if [ "$now" != "$pplan" ]; then
+      say "  ! this project changed since you said yes: nothing changed. Run it again to see the new plan."; exit 1
+    fi
+    aout=$(project uninstall "$root" --apply 2>&1) || arc=1
+    printf '%s\n' "$aout" | grep -E '^  (!|=)' || true
+  fi
+  for h in $khooks; do rm -f "$hd/$h" || { arc=1; say "  ! could not remove $hd/$h"; }; done
+  if [ "$mrc" = 10 ]; then
+    pf=$(mktemp) && printf '%s\n' "$mplan" > "$pf"
+    aout=$(AGENT_KIT_APPLY=1 machine uninstall "$share" "$py" --apply --expect "$(nat "$pf")" 2>&1) || arc=1
+    rm -f "$pf"
+    printf '%s\n' "$aout" | grep -E '^  (!|=|Backups)' || true
+  fi
+  # Done means checked, while machine.py is still here to check with: nothing of the kit's is left.
+  left=""
+  if [ -n "$root" ]; then
+    vrc=0; vout=$(project uninstall "$root" 2>&1) || vrc=$?
+    [ "$vrc" = 0 ] || left="$left$vout
+"
+    for h in $khooks; do [ -e "$hd/$h" ] && left="$left  $hd/$h
+"; done
+  fi
+  if [ -f "$share/setup/machine.py" ]; then
+    vrc=0; vout=$(machine uninstall "$share" "$py" 2>&1) || vrc=$?
+    [ "$vrc" = 0 ] || left="$left$vout
+"
+  fi
+  if [ -n "$left" ]; then
+    say "  ! the uninstall did not finish; still in place:"; printf '%s' "$left"
+    say "  Fix what is named above, then run this again."; exit 1
+  fi
+  say "Verified: nothing the kit installed is left here or on this machine, apart from anything named above as yours."
+  [ "$arc" = 0 ] || exit 1
+  if [ ! -d "$share" ] || [ -n "$keep" ]; then
+    [ -z "$keep" ] || say "Kept $share: $keep."
+    return 0
+  fi
+  # An entry you changed is kept, and may still run the kit's guard from the share: removing the share
+  # under it would break that hook (Claude Code blocks every command when its guard cannot start). The
+  # record says so, and so does any hook still naming a script in the share, whatever the record says.
+  for f in "$HOME/.claude/settings.json" "$HOME/.codex/hooks.json" "$HOME/.gemini/config/hooks.json"; do
+    grep -qiE 'the-agent-kit[\\/]+hooks' "$f" 2>/dev/null && keep="$keep ${f#"$HOME/"}"
+  done
+  if [ -f "$share/.install-record.json" ] || [ -n "$keep" ]; then
+    say "Kept $share: hooks you changed still run the kit's scripts from it${keep:+ (in$keep)}. Remove them, then run this again."
+    return 0
+  fi
+  # The share goes last, in an exec'd shell: this script may be $share/install.sh, and sh reads it by byte
+  # offset as it goes, so nothing more may be read from it once the folder is being deleted (as in update_kit).
+  exec sh -c '
+    rm -rf "$1" 2>/dev/null
+    if [ -e "$1" ]; then
+      printf "%s\n" "  ! could not remove all of $1 (a file in use?): close Claude Code, Codex and Antigravity, then delete it."
+      exit 1
+    fi
+    printf "%s\n" "Removed $1. The kit is uninstalled; your settings files keep backups beside them as *.bak-agent-kit-<time>."
+  ' _ "$share"
+}
+
+alias_of() {  # $1 = old name, $2 = new: an old name still works this release, and says what replaces it
+  say "Note: '$1' is now '$2' and goes in the next release; it runs as before this time." >&2
 }
 
 
@@ -672,7 +844,7 @@ update_rules() {  # refresh the universal rules in this repo's AGENTS.md, preser
   fi
   # An --extension stub carries no universal rules on purpose - they live in the global files.
   if grep -q 'universal rules live in your global' "$tgt" 2>/dev/null; then
-    say "  = this AGENTS.md is an --extension stub: the universal rules live in your GLOBAL files"
+    say "  = this AGENTS.md is a --lean stub: the universal rules live in your GLOBAL files"
     say "    (~/.claude/CLAUDE.md / ~/.codex/AGENTS.md) - update those; this file only holds project config."
     exit 0
   fi
@@ -691,7 +863,7 @@ update_rules() {  # refresh the universal rules in this repo's AGENTS.md, preser
 
 doctor() {
   dfail=0
-  hr; say "the-agent-kit --check (doctor)"
+  hr; say "the-agent-kit check (doctor)"
   # The compatibility tuple: a measurement or a bug report means nothing without the tool versions.
   for cli in claude codex agy; do
     v=$($cli --version 2>/dev/null | head -1)
@@ -740,7 +912,7 @@ doctor() {
   # The /tidy skill is copied into each project but its scripts live on the machine: a project installed
   # before they shipped, or cloned onto another machine, has the skill and nothing for it to run.
   if { [ -d .claude/skills/tidy ] || [ -d .agents/skills/tidy ]; } && [ ! -f "$HOME/.the-agent-kit/hooks/tidy-scan.py" ]; then
-    say "  NOTE: /tidy is installed in this project but its scripts are missing; run install.sh --setup"
+    say "  NOTE: /tidy is installed in this project but its scripts are missing; run install.sh"
   fi
   # The settings are where the tool guard and the session-start check are wired. Checking the scripts
   # alone reported all OK on a machine whose Codex had no guard at all (2026-09-29).
@@ -749,11 +921,20 @@ doctor() {
     src=0; m=$(machine check "$share" "$py" --brief 2>&1) || src=$?
     case "$src" in
       0) say "  OK:   $m" ;;
-      10) say "  WARN: $m - run: $share/install.sh --setup" ;;
+      10) say "  WARN: $m - run: $share/install.sh" ;;
       *) say "  WARN: $m" ;;
     esac
   elif [ -n "$py" ] && [ -d "$share" ]; then
-    say "  WARN: $share predates the install record - run: $share/install.sh --update"
+    say "  WARN: $share predates the install record - run: $share/install.sh update"
+  fi
+  # The project's half, from its own record: a file the kit ships that is missing, changed or retired.
+  if [ -n "$py" ] && [ -f .agents/the-agent-kit.json ] && [ -f "$KIT/setup/project.py" ]; then
+    pc=0; project check "$(pwd)" >/dev/null 2>&1 || pc=$?
+    case "$pc" in
+      0) say "  OK:   the kit's files in this project: current (.agents/the-agent-kit.json)" ;;
+      10) say "  WARN: the kit's files in this project are not this kit's - run: $share/install.sh here" ;;
+      *) say "  WARN: the kit's files in this project could not be checked - run: $share/install.sh here, and read what it says" ;;
+    esac
   fi
   hd=$(git_hooks_dir "$(pwd)")
   if [ -z "$hd" ]; then
@@ -862,12 +1043,12 @@ HKCHK
     if [ "$hk" = ok ] && [ -f .agents/agent-kit-guard.py ] && [ ! -L .agents/agent-kit-guard.py ]; then
       say "  OK:   Antigravity guard wired (.agents/hooks.json + .agents/agent-kit-guard.py)"
       if [ ! -f "$HOME/.the-agent-kit/hooks/command-guard.py" ]; then
-        say "  WARN: the launcher has no guard to call (~/.the-agent-kit/hooks/command-guard.py missing): commands pass UNCHECKED. Run install.sh --setup."
+        say "  WARN: the launcher has no guard to call (~/.the-agent-kit/hooks/command-guard.py missing): commands pass UNCHECKED. Run install.sh."
       fi
     elif [ "$hk" = other ]; then
       say "  WARN: the Antigravity guard command in .agents/hooks.json is not the kit's - it is not wired, whatever else it runs."
     elif [ -d .agents ]; then
-      say "  NOTE: Antigravity guard not wired in this project - run ./install.sh --update-rules here."
+      say "  NOTE: Antigravity guard not wired in this project - run ./install.sh here."
     fi
     if [ -e CLAUDE.md ]; then
       if grep -q '@AGENTS.md' CLAUDE.md 2>/dev/null; then
@@ -903,15 +1084,24 @@ print("  WARN: %d orphaned MCP processes (%.1f MB) - run: install.sh --tidy (add
 # this line runs when sourced that way.
 if [ "${AGENT_KIT_LIB:-0}" = 1 ]; then return 0 2>/dev/null || exit 0; fi
 
-USAGE="Usage: ./install.sh [--setup | --update | --update-rules | --undo | --check | --tidy [--kill] [reaper options] | --extension | --global]"
+USAGE="Usage: ./install.sh [install [--lean | --print] | update | uninstall | check | --tidy [--kill] [reaper options]]"
+[ "$MODE" = install ] && MODE=${2:-install}
 case "$MODE" in
-  --setup|setup)                setup_machine ;;
-  --global|global)              install_global ;;
-  --extension|extension)        install_extension ;;
-  --update|update)              update_kit ;;
-  --update-rules|update-rules)  update_rules ;;
-  --undo|undo)                  uninstall_machine ;;
-  --check|check|doctor)         doctor ;;
+  ""|install)                   install_all ;;
+  --lean|lean)                  install_all lean ;;
+  --print)                      install_global ;;
+  update)                       update_kit ;;
+  uninstall)                    uninstall_all ;;
+  check|doctor)                 doctor ;;
+  project|--project)            install_project || exit 1 ;;
+  # The old names, as they were (alias_of says what replaces each).
+  --setup|setup)                alias_of --setup install; setup_machine ;;
+  --global|global)              alias_of --global "install --print"; install_global ;;
+  --extension|extension)        alias_of --extension "install --lean"; install_extension || exit 1 ;;
+  --update)                     alias_of --update update; update_kit --setup ;;
+  --update-rules|update-rules)  alias_of --update-rules "install (inside the project)"; update_rules ;;
+  --undo|undo)                  alias_of --undo uninstall; uninstall_machine ;;
+  --check)                      alias_of --check check; doctor ;;
   --tidy|tidy)
     shift
     py=$(detect_py)

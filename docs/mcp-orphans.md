@@ -26,13 +26,13 @@ A normal exit does not reproduce it.
 - **`install.sh --tidy [--kill] [--min-age-minutes N] [--json]`** runs the reaper. It is only the quick check for
   leftover MCP servers. The [`/tidy` skill](tidy.md) is the full cleanup: it also covers duplicate and idle dev
   servers, merged branches, stale worktrees and leftover files, and asks you group by group.
-- **`install.sh --check`** prints one line: `OK` (no orphans), `WARN` (count and size), or `NOTE` (unavailable).
+- **`install.sh check`** prints one line: `OK` (no orphans), `WARN` (count and size), or `NOTE` (unavailable).
 
 The kit never edits an MCP config for you. It only prints and documents the commands below.
 
 ## Adopt it
 
-After `install.sh --setup`, the wrapper is at `~/.the-agent-kit/hooks/mcp-wrap.py`. On Windows use the full
+After the install, the wrapper is at `~/.the-agent-kit/hooks/mcp-wrap.py`. On Windows use the full
 path under your user folder. The interpreter may be `python` or `py -3`. Replace `<package>` with the server's
 npm package.
 

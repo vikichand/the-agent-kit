@@ -33,11 +33,12 @@ type `curl.exe` instead of `curl`; on CMD use `%USERPROFILE%` for `~` ([Your she
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/vikichand/the-agent-kit/main/install.sh
-sh install.sh --setup
+sh install.sh
 ```
 
-It copies the kit to `~/.the-agent-kit`, turns on its git hooks, and adds it to your Claude Code and
-Codex settings. It lists every change and asks before writing anything, and backs your files up first.
+Run it outside any project. It copies the kit to `~/.the-agent-kit`, turns on its git hooks, and adds it
+to your Claude Code, Codex and Antigravity settings. It lists every change and asks before writing
+anything, backs your files up first, and ends by checking that everything it installed is in place.
 Then delete the downloaded `install.sh` and restart Claude Code, Codex and Antigravity.
 In Codex, run `/hooks` once and trust the kit's two hooks: Codex skips a new or changed hook until
 you do, without a warning.
@@ -49,22 +50,23 @@ cd /path/to/project
 ~/.the-agent-kit/install.sh
 ```
 
-Then paste the prompt from `~/.the-agent-kit/docs/project-setup-prompt.md` into your agent, inside the
-project, once. It records your build and test commands, so the agent stops guessing them.
+Inside a git repo the same command also brings the machine current (nothing to do the second time),
+then sets up the project and checks both. Then paste the prompt from
+`~/.the-agent-kit/docs/project-setup-prompt.md` into your agent, inside the project, once. It records your build and test commands, so the agent stops guessing them.
 
 **3. Check it:**
 
 ```bash
-~/.the-agent-kit/install.sh --check
+~/.the-agent-kit/install.sh check
 ```
 
-No `FAIL` means you are done.
+No `FAIL` means you are done. Install, update and uninstall each end with this check on their own.
 
 ### Updating
 
 ```bash
-~/.the-agent-kit/install.sh --update          # your machine: the new kit, plus any new settings (asks first)
-~/.the-agent-kit/install.sh --update-rules    # inside each project: the new rules; your project's own block is kept
+~/.the-agent-kit/install.sh update    # the new kit on your machine (asks first), and the project you run it in
+~/.the-agent-kit/install.sh           # inside each other project: the new rules; your project's own block is kept
 ```
 
 You do not need to remember: when a session starts, the kit tells you when a new release is out and
@@ -77,15 +79,15 @@ Paste this into Claude Code or Codex, **inside the project you want set up**:
 ```text
 Set up The Agent Kit for me, machine-wide and then in this project.
 
-1. If ~/.the-agent-kit/install.sh exists, run `~/.the-agent-kit/install.sh --update`. Otherwise
-   download https://raw.githubusercontent.com/vikichand/the-agent-kit/main/install.sh into a temporary
-   folder OUTSIDE this project, run `sh install.sh --setup` there, and delete the download.
+1. If ~/.the-agent-kit/install.sh exists, run `~/.the-agent-kit/install.sh update` from this project's
+   root. Otherwise download https://raw.githubusercontent.com/vikichand/the-agent-kit/main/install.sh
+   into a temporary folder OUTSIDE this project, run `sh install.sh` there, delete the download, and
+   then run `~/.the-agent-kit/install.sh` from this project's root.
 2. Show me the settings changes it listed. Only if I say yes, run
-   `AGENT_KIT_APPLY=1 ~/.the-agent-kit/install.sh --setup` to apply them.
-3. From this project's root, run `~/.the-agent-kit/install.sh`, or `~/.the-agent-kit/install.sh
-   --update-rules` if the kit is already here, and then show me `git diff AGENTS.md`.
+   `AGENT_KIT_APPLY=1 ~/.the-agent-kit/install.sh` from this project's root to apply them.
+3. Show me `git diff AGENTS.md`.
 4. Follow the prompt in ~/.the-agent-kit/docs/project-setup-prompt.md for this project.
-5. Run `~/.the-agent-kit/install.sh --check`, show me the output, and remind me to restart the agent.
+5. Show me the check the last run ended with, and remind me to restart the agent.
 
 Change nothing outside what these steps name, and summarise what you did at the end.
 ```
@@ -99,7 +101,7 @@ see ([Limits](#limits)).
 
 ## Every step, in detail
 
-### What `--setup` does
+### What `install.sh` does on your machine
 
 1. **Copies the kit** to `~/.the-agent-kit`: rules, hooks, installer and docs. The download is then
    disposable. Each run replaces that copy whole, so a file the kit stopped shipping does not linger,
@@ -134,22 +136,23 @@ see ([Limits](#limits)).
 
    | Tool | Where | How |
    |---|---|---|
-   | Codex | `~/.agents/skills/<name>` | the one real copy, marked as the kit's so a later `--setup` can refresh it |
+   | Codex | `~/.agents/skills/<name>` | the one real copy, marked as the kit's so a later install can refresh it |
    | Claude Code | `~/.claude/skills/<name>` | a directory link to that copy: a junction on Windows (no admin rights), a symlink elsewhere |
    | Antigravity | `~/.gemini/config/skills.json` | an entry for `~/.agents/skills`, limited to the kit's four names |
 
    It creates and removes only what it made. A folder or link of yours with the same name is left as it
-   is, with a warning; a tool you do not have gets nothing. `install.sh --undo` removes the kit's links,
+   is, with a warning; a tool you do not have gets nothing. `install.sh uninstall` removes the kit's links,
    copies and `skills.json` names (a junction goes with `rmdir`, never `rm -rf`), along with everything
    else the install record lists.
 
 Nothing is written until you answer yes. Run it again at any time: when everything is in place it says
-so and changes nothing. Prefer to merge by hand? `install.sh --global` copies the kit and prints the
+so and changes nothing. Prefer to merge by hand? `install.sh --print` copies the kit and prints the
 snippets, and the skill steps, instead.
 
 ### What a project gets
 
-`~/.the-agent-kit/install.sh`, run inside a project, writes:
+`~/.the-agent-kit/install.sh`, run inside a project's git repo, writes (outside a git repo, and in the
+kit's own checkout, it sets up the machine only):
 
 - `AGENTS.md`, the rules, with an empty block at the bottom for this project's own settings;
 - a one-line `CLAUDE.md` that imports it, so Claude Code, Codex and Antigravity read the same file;
@@ -192,37 +195,50 @@ lean per-project install:
 ```bash
 cat ~/.the-agent-kit/AGENTS.md >> ~/.claude/CLAUDE.md      # and ~/.codex/AGENTS.md for Codex
 mkdir -p ~/.gemini && cat ~/.the-agent-kit/AGENTS.md >> ~/.gemini/AGENTS.md  # Antigravity
-cd /path/to/project && ~/.the-agent-kit/install.sh --extension
+cd /path/to/project && ~/.the-agent-kit/install.sh --lean
 ```
 
 **One thing this costs you, tested:** `~/.claude/rules/` is *not* read: path-scoped rules only load
 from a project's own `.claude/rules/`. So global rules give you the universal floor everywhere but
-none of the depth tier. `--extension` still installs the depth tier into the project, which is why
+none of the depth tier. `--lean` still installs the depth tier into the project, which is why
 it is in the command above. Global rules also stay on your machine, so cloud agents, CI and
-teammates see only what is committed in the repo. And the global copy is a paste, so `--update`
+teammates see only what is committed in the repo. And the global copy is a paste, so `update`
 does not refresh it: after an update, delete the old block from the global file and run the `cat`
-again. The depth tier in each project still updates through `--update-rules`.
+again. The depth tier in each project still updates when you run `install.sh --lean` there.
 
 Antigravity reads `~/.gemini/AGENTS.md` in every project. Its guard hook stays per project: run
-`~/.the-agent-kit/install.sh` inside each project. `--setup` touches `~/.gemini/config` only for the skills entry and the session-start check above.
+`~/.the-agent-kit/install.sh` inside each project. On the machine it touches `~/.gemini/config` only for the skills entry and the session-start check above.
 
 ### Check it worked
 
 ```bash
-~/.the-agent-kit/install.sh --check
+~/.the-agent-kit/install.sh check
 ```
 
 Run it inside a project. It reports the git hooks as **live**, the tool guard firing, and your settings
-carrying the kit. A `WARN` about `PROJECT-CONFIG` is expected until you run the setup prompt.
+carrying the kit, and the project's kit files matching its record. A `WARN` about `PROJECT-CONFIG` is
+expected until you run the setup prompt.
 
-### Undo
+### Uninstall
 
-`install.sh --undo` takes out everything the install record lists: the kit's rules, hooks and keys in
-your Claude Code and Codex settings, git's `core.hooksPath`, the skill copies and links, the
-`skills.json` names and the Antigravity check hook. It asks first, keeps anything you changed (and names
-it), and ends by checking nothing of the kit's is left. Every file it changes is backed up beside itself
-(`*.bak-agent-kit-<time>`). The kit itself is the `~/.the-agent-kit` folder, and a project's rules are
-its `AGENTS.md`, `CLAUDE.md`, `.claude/` and `.agents/skills/`.
+```bash
+cd /path/to/project && ~/.the-agent-kit/install.sh uninstall
+```
+
+It takes out everything the two install records list, in this order:
+1. **The project you run it in:** the kit's files (rules, skills, the Antigravity launcher and hook
+   entry, `CLAUDE.md` and `AGENTS.md` when they are still exactly what the kit wrote), and the git
+   hooks in `.git/hooks` that are exact copies of the kit's. Another tool's hook stays.
+2. **The machine:** the kit's rules, hooks and keys in your Claude Code and Codex settings, git's
+   `core.hooksPath`, the skill copies and links, the `skills.json` names and the Antigravity check hook.
+3. **The kit itself**, the `~/.the-agent-kit` folder, last.
+
+It asks first, keeps anything you changed (and names it), and checks that nothing of the kit's is left
+before it removes the folder. If you changed a kit hook, that hook may still run the guard from the
+folder, so the folder stays until you remove the hook. Every settings file it changes is backed up
+beside itself (`*.bak-agent-kit-<time>`). A project with your own `PROJECT-CONFIG` block keeps its
+`AGENTS.md`: delete it by hand if you want it gone. Run it once in each project that has the kit; run it
+from any other folder to take out the machine's half only.
 
 ### Your shell
 
@@ -235,17 +251,16 @@ its `AGENTS.md`, `CLAUDE.md`, `.claude/` and `.agents/skills/`.
 **No `curl`?** You never need it. This does the same job with git, which the kit requires anyway:
 
 ```bash
-git clone https://github.com/vikichand/the-agent-kit.git && cd the-agent-kit && ./install.sh --setup
+git clone https://github.com/vikichand/the-agent-kit.git && cd the-agent-kit && ./install.sh
 ```
 
 ### Updating, in detail
 
-`--update` downloads the latest release, checks it really is the kit before touching anything, reports
-`old -> new`, and then runs `--setup` from the new copy, so a new hook or setting reaches your settings
-files the same way the first install did: listed, asked, backed up. It changes nothing inside any
-project. `--update-rules` is the per-project half: run it inside each project to bring in the new rules,
-the deeper rules and the skills, with the project's own block kept. `--update` is machine-wide and works
-from any folder; `--update-rules` and `--check` act on the project you are standing in.
+`update` downloads the latest release, checks it really is the kit before touching anything, reports
+`old -> new`, and then runs the new copy's install, so a new hook or setting reaches your settings
+files the same way the first install did: listed, asked, backed up. Run inside a project, it then
+brings that project to the new kit too; every other project is brought current by running
+`~/.the-agent-kit/install.sh` inside it, with the project's own block kept.
 
 **Why projects hold a copy at all.** Keeping the rules in each repo, rather than pointing every project
 at one machine-wide file, is deliberate: teammates, CI and cloud agents see only what is committed, and
@@ -260,14 +275,14 @@ When a session starts, the kit checks three things and says nothing unless one n
   once a day with a 3-second limit; the answer is cached so the rest of that day's sessions need no
   network. You see one line: the installed and latest versions, and the command to run.
 - **This project's rules differ from your installed kit.** Compared locally, every session. You see one
-  line telling you to run `--update-rules` here. It is silent in the kit's own repo, whose rules are the
-  source, and for an `--extension` stub, whose rules live globally.
+  line telling you to run `install.sh` here. It is silent in the kit's own repo, whose rules are the
+  source, and for a `--lean` stub, whose rules live globally.
 - **A recommended tool is missing** for the agent you started (Claude Code, Codex or Antigravity). The agent is
   told to say so once, in one line, with the install command for each. The list is
-  `~/.the-agent-kit/recommended.json`. `--setup` (so `--update`) merges the kit's list into it by id:
+  `~/.the-agent-kit/recommended.json`. Each install (so each update) merges the kit's list into it by id:
   new items arrive and changed ones are replaced, while an entry you delete, or an id you add to its
   `dismissed` list, never comes back. Entries without an id are yours and are never touched. The optional
-  tools (superpowers, ponytail, headroom) are never reminded; `--check` lists them. By default it names Context7 and gitleaks everywhere,
+  tools (superpowers, ponytail, headroom) are never reminded; `check` lists them. By default it names Context7 and gitleaks everywhere,
   and in a project set up as a web or UI app also Playwright, Chrome DevTools, Impeccable and
   `frontend-design` (the reasons are in
   [`docs/environment-setup-prompt.md`](docs/environment-setup-prompt.md)). It reads local config
@@ -276,7 +291,7 @@ When a session starts, the kit checks three things and says nothing unless one n
 It **never updates or installs anything itself**: running downloaded code at session start, unasked, is exactly the
 supply-chain shape the kit's rules forbid, so it only tells you what to run. It exits cleanly on every
 error, so an offline machine or a broken check never blocks a session, and when everything is current
-it prints nothing, so it costs no context. `--setup` wires it into Claude Code and Codex as a `SessionStart`
+it prints nothing, so it costs no context. The install wires it into Claude Code and Codex as a `SessionStart`
 hook (`hooks/kit-check.py`). Antigravity has no `SessionStart` event, so there it runs as a global
 `PreInvocation` hook in `~/.gemini/config/hooks.json`: Antigravity fires that before every model call, so
 the check acts only on the first call of each conversation and answers `{}` to every other. Your other
@@ -291,7 +306,7 @@ ignored, and `.env` is ignored while `.env.example` stays readable, the same car
 permission rules make.
 
 Needs `git`, POSIX `sh` / `awk` / `grep` (bundled with git), and Python 3 for the tool-layer guard.
-On Windows a bare `python3` can be a no-op Store stub, so `--check` verifies the interpreter actually
+On Windows a bare `python3` can be a no-op Store stub, so `check` verifies the interpreter actually
 runs Python 3 and picks the fastest working one. An existing `CLAUDE.md` or git hook is left
 untouched, and an `AGENTS.md` keeps your `PROJECT-CONFIG` block.
 
@@ -345,7 +360,7 @@ and the installer is the adapter between them:
 |---|---|---|---|
 | Floor (`AGENTS.md`) | via the one-line `CLAUDE.md` import | read directly | read directly |
 | Depth tier (6 rules) | `.claude/rules/`, loads by file path | 4 of 6 as `.agents/skills/`, loads by task match; the 2 path-shaped ones (`code-correctness`, `tests`) don't port and stay one-liners in the floor | the same 4 skills, plus the 2 path-shaped ones as glob rules in `.agents/rules/` |
-| Task tier (4 skills) | `.claude/skills/`, and machine-wide by link from `--setup` | `.agents/skills/`, same files, and the machine-wide copy in `~/.agents/skills` | `.agents/skills/`, shared with Codex, and `skills.json` for the machine-wide copy |
+| Task tier (4 skills) | `.claude/skills/`, and machine-wide by link from the machine install | `.agents/skills/`, same files, and the machine-wide copy in `~/.agents/skills` | `.agents/skills/`, shared with Codex, and `skills.json` for the machine-wide copy |
 | Git-layer guards | yes | yes | yes |
 | Tool-layer guard | `ask`, machine-wide | `deny`, machine-wide | asks every time, per project (`.agents/hooks.json`) |
 | Turn-scoped git grants | yes | no (deny mode; you push) | no (it asks; you approve) |
@@ -438,7 +453,7 @@ which keep only a name and description in context and load the body when the tas
 installer writes four of the six rule files into `.agents/skills/` with their `paths:` frontmatter
 swapped for a task description: web security fires on "add a login endpoint", the data layer on "write
 a migration", and so on. The body is byte-identical to the rule, generated from the one source, and
-`--update-rules` regenerates it. Two rules don't port, and it's better to say so than to fake it:
+`install.sh` regenerates it. Two rules don't port, and it's better to say so than to fake it:
 `code-correctness.md` applies to any source file and `tests.md` to any test file, and the only honest
 description for either is "use when writing code", which fires always or never. Codex gets their
 one-line versions in `AGENTS.md`. Appending them to `AGENTS.md` in full was rejected on arithmetic:
@@ -509,19 +524,32 @@ run under `git` itself, so they survive flag-reordering, `--no-verify`, Codex, a
 
 ## Install
 
-Quick Start covers the usual path. The installer's modes:
+Quick Start covers the usual path. One installer, four commands:
 
-| Mode | Scope | What it does |
-|---|---|---|
-| `--setup` | machine | Copy the kit to `~/.the-agent-kit`, take out what the old kit installed and the new one no longer ships, then turn on its git hooks, add it to your Claude Code and Codex settings, and install its four skills once for all three tools, plus Antigravity's session-start check: listed, asked, backed up, then verified. Safe to re-run. Antigravity's command guard is still wired per project. |
-| `--undo` | machine | Take out everything the install record lists (settings entries, git hooks, skills, Antigravity's check), asked first and verified after. A kit entry you changed is kept and named. |
-| `--update` | machine | Fetch the latest kit, check it is the kit, then run `--setup` from it. Needs no kit beside it, so one downloaded `install.sh` bootstraps everything. |
-| `--global` | machine | By hand: copy the kit and **print** the settings snippets and the git-hooks command for you to apply. |
-| *(none)* | project | Full rules (`AGENTS.md` plus a `CLAUDE.md` that imports it), the depth tier and skills for all three tools (`.claude/` for Claude Code, `.agents/` for Codex and Antigravity), and this repo's git hooks. Run again, it brings the project to this kit: what the old kit wrote and this one no longer ships comes out (`.agents/the-agent-kit.json`). |
-| `--extension` | project | Project block only, for when the universal rules already live in your global files, so nothing is duplicated into context. |
-| `--update-rules` | project | The same as a plain install, for a project that already has the kit: the current rules around `PROJECT-CONFIG` (kept byte-for-byte), and every kit file brought current. Stops on a project without `AGENTS.md` or its markers. |
-| `--check` | project | Doctor: interpreter, guard firing, per-hook identity, settings wiring, the recommended and optional tools missing for each tool installed here, rules-file size, and one line on orphaned MCP processes. |
-| `--tidy` | machine | List orphaned MCP server processes left by a crashed agent. Dry run; add `--kill` to end exactly the listed trees. See [`docs/mcp-orphans.md`](docs/mcp-orphans.md). This is only the quick check for leftover MCP servers; the `/tidy` skill covers branches, worktrees, files and dev servers too. |
+| Command | What it does |
+|---|---|
+| `install.sh` | Install or reinstall. On the machine: copy the kit to `~/.the-agent-kit`, take out what the old kit installed and the new one no longer ships, then turn on its git hooks, add it to your Claude Code and Codex settings, install its four skills once for all three tools, and wire Antigravity's session-start check: listed, asked, backed up, then verified. Inside a git repo, then the project: full rules (`AGENTS.md` plus a `CLAUDE.md` that imports it), the depth tier and skills for all three tools (`.claude/` for Claude Code, `.agents/` for Codex and Antigravity), Antigravity's command guard and this repo's git hooks, with what the old kit wrote and this one no longer ships taken out (`.agents/the-agent-kit.json`). Ends with `check`. Safe to re-run. |
+| `install.sh --lean` | The same, but the project gets only its own block, for when the universal rules already live in your global files, so nothing is duplicated into context. |
+| `install.sh --print` | By hand: copy the kit and **print** the settings snippets and the git-hooks command for you to apply. |
+| `install.sh update` | Fetch the latest kit, check it is the kit, then run its install. Needs no kit beside it, so one downloaded `install.sh` bootstraps everything. |
+| `install.sh uninstall` | Take out what the install records list: the project you run it in, then the machine, then `~/.the-agent-kit`. Asked first and checked after; a kit entry you changed is kept and named. |
+| `install.sh check` | Doctor: interpreter, guard firing, per-hook identity, settings wiring, the project's kit files against its record, the recommended and optional tools missing for each tool installed here, rules-file size, and one line on orphaned MCP processes. |
+| `install.sh --tidy` | List orphaned MCP server processes left by a crashed agent. Dry run; add `--kill` to end exactly the listed trees. See [`docs/mcp-orphans.md`](docs/mcp-orphans.md). This is only the quick check for leftover MCP servers; the `/tidy` skill covers branches, worktrees, files and dev servers too. |
+
+The names before this release still work in it, as they did, and print the new name: `--setup` (the
+machine half of `install.sh`), `--update`, `--update-rules` (the project half), `--undo` (the machine
+half of `uninstall`), `--extension`, `--global` and `--check`. They go in the next release.
+
+**Why not a plugin.** Claude Code, Codex and Antigravity each have plugins, and the kit could ship its
+hooks and skills as one. It does not, because a plugin would not replace the install record, only sit
+beside it. Checked on 2026-10-31 against the docs and Claude Code 2.1.316:
+- **Claude Code** names every skill in a plugin after the plugin (`/tidy` became `/the-agent-kit:tidy`
+  in a test). A plugin's `settings.json` carries only `agent` and `subagentStatusLine`, so the
+  permission rules and the other keys still need the record.
+- **Codex** documents plugin installs only through `/plugins` in a session, with no command for a
+  script. Its plugin hooks also need trusting before they run, as the kit's hooks do now.
+- **Antigravity** documents plugin hooks for its CLI only. Its app and IDE docs list workspace and
+  global hooks and no plugin ones, so there the command guard could stop running.
 
 > **Merge, don't replace.** If your `settings.json` already has `permissions` or `hooks`, fold these
 > keys into them. Pasting the whole snippet over an existing file wipes what's there.
@@ -534,7 +562,7 @@ both tools at once. A symlink works too but needs Administrator or Developer Mod
 **Two limits, both enforced silently.** Codex truncates past 32 KiB (`project_doc_max_bytes`) with no
 warning, and the cap covers the *combined* `AGENTS.md` chain, so nested files count. Claude Code
 loads `CLAUDE.md` in full but [targets](https://code.claude.com/docs/en/memory) "under 200 lines",
-since "longer files consume more context and reduce adherence". `--check` reports both.
+since "longer files consume more context and reduce adherence". `check` reports both.
 [Block-level HTML comments are stripped](https://code.claude.com/docs/en/memory) before the content
 reaches Claude, so notes inside `<!-- -->` cost nothing and are excluded from the count.
 
@@ -542,7 +570,7 @@ reaches Claude, so notes inside `<!-- -->` cost nothing and are excluded from th
 
 Those tools work by pointing `core.hooksPath` at their own directory, which makes git ignore `.git/hooks`
 entirely. Install the kit first and add one of them later and the kit's hooks go **silently inert**.
-`./install.sh --check` catches exactly this: it prints the active `core.hooksPath` and marks any hook slot
+`./install.sh check` catches exactly this: it prints the active `core.hooksPath` and marks any hook slot
 the kit doesn't own as `FAIL`.
 
 To run both, call the kit's hook from theirs. With Husky, forwarding arguments matters (`commit-msg` gets
@@ -624,15 +652,15 @@ human named "Claude" is safe. Fail-closed: if stripping would empty the message,
 rather than silently rewritten.
 
 **Tool config** (`claude/settings.json`, `codex/config.toml`, `codex/hooks.json`) is added to your
-settings by `--setup`, or printed by `--global` for you to merge. On Claude Code it kills the native attribution trailer
+settings by `install.sh`, or printed by `install.sh --print` for you to merge. On Claude Code it kills the native attribution trailer
 (`attribution.commit/pr:""`) and turns off Claude Code's own commit and pull-request instructions
 (`includeGitInstructions:false`), which competed with Section 7 and are where that trailer comes from (the
 setting is machine-wide: in a project without the kit's rules you lose that built-in guidance too, while the
 guard below still denies the dangerous git commands everywhere); the command guard carries
 `onFailure:"block"` and a 15-second timeout (Claude Code 2.1.295 or later; earlier versions ignore the
 field), so a guard that crashes, times out or cannot start blocks the command instead of letting it through
-(`--check` tells you when Python is missing; fix that from your own terminal, the agent cannot). To opt out
-of a field the kit sets on its hook, set it to the value you want: `--setup` never overwrites a value, only
+(`check` tells you when Python is missing; fix that from your own terminal, the agent cannot). To opt out
+of a field the kit sets on its hook, set it to the value you want: an install never overwrites a value, only
 adds a missing one. It asks before `git push` and `gh pr create` *unless your own message that turn
 asked for it* (a one-time, turn-scoped grant, below); asks on adding a dependency; asks on secret-file reads (a
 visible prompt naming the file, a precaution without a hard stop); and denies `--no-verify`/force and
@@ -693,7 +721,7 @@ Four config choices are deliberate, because the obvious "more locked down" setti
 ## Verify
 
 ```bash
-./install.sh --check                     # doctor: interpreter, guard firing, per-hook status, rules files
+./install.sh check                      # doctor: interpreter, guard firing, per-hook status, rules files
 sh test/run-tests.sh                     # git-layer hooks + doctor, end-to-end
 python3 test/command_guard_cases.py      # command-guard corpus (181 cases: guard + grants + intent + Antigravity)
 sh test/adherence/run.sh                 # do the SOFT rules actually fire? (costs tokens)
@@ -709,7 +737,7 @@ empty placeholder. That last one matters most. Without it the agent guesses this
 lint commands, which is the largest hallucination surface the kit has.
 
 **Interpreter cost.** The tool guard spawns Python on every Bash call, so the interpreter choice is a real
-per-call tax. `--check` reports which one it picked. Measured on one Windows 11 machine: `py -3` 140 ms,
+per-call tax. `check` reports which one it picked. Measured on one Windows 11 machine: `py -3` 140 ms,
 `python3` 237 ms, because a bare `python3` there is usually the slower WindowsApps alias. The probe checks
 the major version, so a legacy Python 2 is rejected rather than selected and then crashing the guard.
 
@@ -728,9 +756,9 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
 - **`core.hooksPath` can be set via a *file*, not just a flag.** `command-guard` catches the CLI forms and
   flags direct `.git/config` writes, but a text scan can't read a config file it never sees. The durable
   fix is the OS sandbox plus denying write access to `.git/config`.
-- **Anything that owns `core.hooksPath` shadows other hooks.** A global `--global` install, or a tool like
+- **Anything that owns `core.hooksPath` shadows other hooks.** A global install, or a tool like
   Husky / lefthook / pre-commit, redirects git away from `.git/hooks`. Whoever sets it last wins, and the
-  hooks in the old location go silently inert. The installer warns before setting it, and `--check` prints
+  hooks in the old location go silently inert. The installer warns before setting it, and `check` prints
   the current value; if another tool owns it, merge the kit's hooks into that directory.
 - **Attribution fixes the message, not the author identity.** Keep your own `user.name` / `user.email` in
   git config. It's a *known-bot* denylist, so a brand-new tool's trailer may need adding.
@@ -845,7 +873,7 @@ shows every change and when it landed. **`main`** holds releases only: each rele
 from `develop`, squash-merged into one commit and tagged `vX.Y.Z`, so `main` reads as a list of
 releases. A GitHub ruleset allows `main` to change only that way, and the kit's pre-push hook refuses
 direct pushes to it. The install commands above fetch from `main`, so what you install is the last
-release rather than the tip of development, and `--update` follows the same path.
+release rather than the tip of development, and `update` follows the same path.
 
 The full process, the commit-message convention, and how a release is cut are in
 [`docs/branches-and-releases.md`](docs/branches-and-releases.md). Changes go in

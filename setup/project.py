@@ -63,13 +63,13 @@ IMPORTER = """<!-- Claude Code reads CLAUDE.md, not AGENTS.md, so this file impo
 # Antigravity splits a hook command on whitespace and ignores quotes, so a guard path under a home folder
 # with a space breaks the hook, and a broken hook blocks every command. Hooks run from the folder holding
 # hooks.json, so this launcher sits there, is called by bare name, and hands the call to the machine guard.
-LAUNCHER = """# The Agent Kit: launcher for the command guard (see .agents/hooks.json). Kit-owned; --update-rules
+LAUNCHER = """# The Agent Kit: launcher for the command guard (see .agents/hooks.json). Kit-owned; install.sh
 # replaces it. Antigravity cannot pass a quoted path to a hook, so the guard is found from here.
 import os, runpy, sys
 
 guard = os.path.join(os.path.expanduser("~"), ".the-agent-kit", "hooks", "command-guard.py")
 if not os.path.isfile(guard):
-    sys.stderr.write("the-agent-kit: no guard at %s; run install.sh --setup. Command not checked.\\n" % guard)
+    sys.stderr.write("the-agent-kit: no guard at %s; run install.sh. Command not checked.\\n" % guard)
     sys.exit(0)
 sys.argv = [guard] + sys.argv[1:]
 runpy.run_path(guard, run_name="__main__")
@@ -554,7 +554,7 @@ def main():
             # The record is the project's, so anyone who can commit can set it: the refusal is said, and
             # one variable gets past it.
             print("  ! this project was installed by a newer kit than this one: nothing changed. Update the kit"
-                  " first (install.sh --update), then run this again; or, to install this kit anyway,"
+                  " first (install.sh update), then run this again; or, to install this kit anyway,"
                   " AGENT_KIT_FORCE=1 in front of the same command.")
             return 1
         desired = pj.desired()

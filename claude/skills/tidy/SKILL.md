@@ -19,7 +19,7 @@ python ~/.the-agent-kit/hooks/tidy-scan.py scan --json
 ```
 
 On Windows use `py -3` or `python`, whichever works. If the file is missing, tell the user to run
-`~/.the-agent-kit/install.sh --setup` and stop. Add `--stale-days N` only if the user asks for a different age.
+`~/.the-agent-kit/install.sh` and stop. Add `--stale-days N` only if the user asks for a different age.
 The scan changes nothing. It prints items with an `id`, a `group`, `evidence` and a `confidence`, and `notes`
 (tell the user what the notes say: skipped processes, hidden secret-like files, orphans elsewhere).
 

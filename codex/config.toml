@@ -30,4 +30,4 @@ network_access = true
 # If you must exclude a specific variable, name it explicitly and use the current `filters` field.
 # The older `exclude` key still parses but is documented as legacy.
 
-# The command-guard PreToolUse hook lives in codex/hooks.json (merged separately by ./install.sh --global).
+# The command-guard PreToolUse hook lives in codex/hooks.json (./install.sh merges it, or prints it with --print).

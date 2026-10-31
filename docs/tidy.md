@@ -18,7 +18,7 @@ You do. It is user-invoked only.
 On Antigravity the agent could start the read-only scan by itself. Every removal still needs your yes in chat
 and goes through the scanner's checks.
 
-The skill needs the scripts at `~/.the-agent-kit/hooks/`, which `install.sh --setup` installs.
+The skill needs the scripts at `~/.the-agent-kit/hooks/`, which `install.sh` installs.
 
 ## The groups
 

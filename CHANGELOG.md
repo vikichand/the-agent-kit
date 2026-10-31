@@ -25,6 +25,17 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ### Changed
 
+- **One installer, four commands.** `install.sh` installs or reinstalls: your machine, then, inside a
+  git repo, that project, and it ends by running `check`. `install.sh update` fetches the latest kit and
+  runs its install, so the project you run it in is updated too. `install.sh uninstall` takes out the
+  project you run it in, then the machine's entries, then `~/.the-agent-kit` itself, asked first and
+  checked after; the folder stays while a hook you changed still runs the guard from it.
+  `install.sh check` is the doctor, and now also checks a project's kit files against its record.
+  `--lean` and `--print` replace `--extension` and `--global`. **What you have to do:** nothing yet.
+  The old names (`--setup`, `--update`, `--update-rules`, `--undo`, `--extension`, `--global`,
+  `--check`) work as they did in this release and print the new name; they go in the next one. One
+  change in behaviour: a bare `./install.sh` run outside a git repo now sets up the machine, instead of
+  writing the rules into the folder it ran in.
 - **An update takes out the old kit, then installs the new one.** `~/.the-agent-kit` is built in full and
   swapped in, so a file the kit no longer ships is gone. Everything the kit puts in your own files
   (settings rules, hooks and keys, Codex's `config.toml`, git's `core.hooksPath`, the skill copies and
@@ -37,10 +48,11 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   not let the agent read a secret file even by approving it).
 - **The kit's own folder is protected.** A new deny rule, `Edit(~/.the-agent-kit/**)`, stops an agent's
   file tools from changing the kit, its command guard or its install record.
-- **`--undo` is a full uninstall and asks first.** It used to remove only the machine-wide skills and
+- **Uninstalling is complete and asks first.** It used to remove only the machine-wide skills and
   Antigravity's check, and left your settings for you to restore from backups. It now takes out
   everything the install record lists, settings entries and `core.hooksPath` included, after your yes
-  (or `AGENT_KIT_APPLY=1`), and checks nothing of the kit's is left.
+  (or `AGENT_KIT_APPLY=1`), and checks nothing of the kit's is left. `install.sh uninstall` does this
+  and more (above); the old `--undo` does the machine's half.
 - **A project install brings the project to the kit, every time.** Running `install.sh` in a project
   that already has the kit used to leave every existing file alone; only `--update-rules` refreshed
   them. Now any run replaces the kit's own files and the rules around your `PROJECT-CONFIG` block,
@@ -63,7 +75,7 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
     `pnpm dlx` no longer ask. Claude Code honours an ask rule even in auto mode and bypass permissions
     mode, with no time limit, so the old rules stalled unattended runs.
   - The `curl | sh` check fires only when a download feeds the shell, not on `grep "a|sh.exe"`.
-  - `install.sh --setup` (and `--update`) removes the old ask rules from your settings. The README
+  - `install.sh` (and `install.sh update`) removes the old ask rules from your settings. The README
     says what still stops an unattended run in each permission mode, and how to quiet Claude Code's
     own prompt on commands it cannot parse.
 - **The rules, against the Claude 5.5, GPT-6 and Gemini 3 guidance** (each change is one commit on
@@ -83,7 +95,7 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 - The Claude Code settings now set `includeGitInstructions: false`: Claude Code's own commit and
   pull-request instructions competed with AGENTS.md Section 7 and are where the attribution trailer
   comes from. The git status snapshot Claude Code adds at start goes with them; the safety invariant
-  already asks for `git status` before editing. An existing install gains the key on `--setup`; a
+  already asks for `git status` before editing. An existing install gains the key on its next install; a
   value you set yourself is kept.
 - The two read-only performance agents (`bounded-reader`, `reviewer`) no longer load the project's
   rules (`omitClaudeMd`): a lookup needs facts, not 4,800 tokens of behaviour rules, and the lead
@@ -121,8 +133,8 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 - The command guard's Claude Code hook now carries `onFailure: "block"` and a 15-second timeout: a
   guard that crashes, times out or cannot start (no Python) blocks the command instead of letting it
-  through (Claude Code 2.1.295 or later; earlier versions ignore the field). `install.sh --check` says
-  so when Python is missing. An existing install gains both fields on `--setup`; a value you set
+  through (Claude Code 2.1.295 or later; earlier versions ignore the field). `install.sh check` says
+  so when Python is missing. An existing install gains both fields on its next install; a value you set
   yourself is kept, which is also how you opt out.
 - The guard's prompt hook now fails towards "nothing authorized": if reading the prompt crashes, or the
   grant record cannot be written, the previous turn's commit or push grant is dropped rather than kept.
@@ -138,7 +150,7 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 - The command guard now covers Claude Code's PowerShell tool. Before, it ran only on Bash, so on Windows
   every command sent through PowerShell skipped it. It reads PowerShell's own escapes: ``git push
   `--force`` is a force push and `gc .\.env` reads a secret. `iwr ... | iex` is asked like `curl | sh`.
-  An existing install's guard gains the PowerShell tool on `--setup`; a matcher you set yourself is kept.
+  An existing install's guard gains the PowerShell tool on its next install; a matcher you set yourself is kept.
 - Closed guard bypasses: the command inside `bash -c '...'`, `sh -lc`, `eval`, `cmd /c` and
   `pwsh -Command` is now checked like any other, so `bash -c 'git push -f'` is refused. A wrapper's own
   options (`timeout -s KILL 60 git push --force`, `nice -n`, `sudo -u`, `exec -a`, `xargs -I{}`,
