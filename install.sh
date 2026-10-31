@@ -22,8 +22,8 @@
 # block (the rules around it are the kit's). In your tool settings it
 # changes only the kit's own entries, listed in an install record (setup/machine.py): what the old kit put
 # in and the new one no longer ships comes out, what you changed stays. After you say yes, with a backup
-# first, and verified after; --global prints them for a hand merge
-# instead. Run --check to confirm what is actually live.
+# first, and verified after; --print prints them for a hand merge
+# instead. Run check to confirm what is actually live.
 set -eu
 
 KIT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -1108,7 +1108,6 @@ case "$MODE" in
     [ -n "$py" ] || { say "Python 3 unavailable - cannot run orphan check"; exit 1; }
     exec $py "$KIT/hooks/mcp-orphans.py" "$@"
     ;;
-  ""|project|--project)         install_project ;;
   -h|--help)                    say "$USAGE" ;;
   *) say "Unknown mode: $MODE"; say "$USAGE"; exit 2 ;;
 esac
