@@ -1004,9 +1004,11 @@ EOF
   [ "$kc" = 1 ] && [ "$kt" = True ] && pass "M4 an older kit hook is updated in place, not duplicated" || bad "M4 kit hook duplicated or stale (count $kc, current $kt)"
   b=$(ls -t "$g/.claude/"settings.json.bak-agent-kit-* 2>/dev/null | head -1)
   [ -n "$b" ] && cmp -s "$b" "$g/orig.json" && pass "M4 the original was backed up before writing" || bad "M4 no faithful backup"
-  # The same hook spelled another way (/c/... against C:/..., backslashes) is the same hook: a working
-  # file is not rewritten over spelling. Found on a real machine whose entries were merged by hand.
-  $PY - "$(wq "$g/.claude/settings.json")" <<'EOF'
+  # A Git Bash path (/c/x, /tmp/x) works only while Git Bash converts it for Python; with
+  # MSYS_NO_PATHCONV=1 Python gets it as is, the guard never starts and Claude Code blocks every call.
+  # An earlier install wrote /c/x, so an update respells it rather than calling it the same hook.
+  ng=$(cygpath -m "$g" 2>/dev/null || printf '%s' "$g")
+  $PY - "$(wq "$g/.claude/settings.json")" <<'PY'
 import json, re, sys
 p = sys.argv[1]; d = json.load(open(p, encoding='utf-8'))
 for ev in d['hooks'].values():
@@ -1014,11 +1016,25 @@ for ev in d['hooks'].values():
         for h in b['hooks']:
             h['command'] = re.sub(r'([A-Za-z]):/', lambda m: '/' + m.group(1).lower() + '/', h['command'])
 json.dump(d, open(p, 'w', encoding='utf-8'))
-EOF
+PY
+  su 1
+  [ "$(jq_ "$g/.claude/settings.json" "sum('$ng/.the-agent-kit/hooks/' in h['command'] for ev in d['hooks'].values() for b in ev for h in b['hooks'])")" = 3 ] \
+    && pass "M4 a kit hook with a Git Bash path (/c/...) is rewritten to the native path" || bad "M4 a hook command uses a shell-only path: $(cat "$g/.claude/settings.json")"
+  # The same hook spelled with backslashes (C:\x for C:/x) is the same hook: a working file is not
+  # rewritten over spelling. Found on a real machine whose entries were merged by hand.
+  $PY - "$(wq "$g/.claude/settings.json")" <<'PY'
+import json, re, sys
+p = sys.argv[1]; d = json.load(open(p, encoding='utf-8'))
+for ev in d['hooks'].values():
+    for b in ev:
+        for h in b['hooks']:
+            h['command'] = re.sub(r'([A-Za-z]):/([^"]*)', lambda m: m.group(1) + ':\\' + m.group(2).replace('/', '\\'), h['command'])
+json.dump(d, open(p, 'w', encoding='utf-8'))
+PY
   cp "$g/.claude/settings.json" "$g/respelled.json"
   su 1
   cmp -s "$g/.claude/settings.json" "$g/respelled.json" && has 'already' "$o" \
-    && pass "M4 a kit hook spelled with another path form is recognised, not rewritten" || bad "M4 path spelling caused a rewrite: $o"
+    && pass "M4 a kit hook spelled with backslashes is recognised, not rewritten" || bad "M4 path spelling caused a rewrite: $o"
   printf '{ not json' > "$g/.claude/settings.json"
   su 1
   [ "$(cat "$g/.claude/settings.json")" = '{ not json' ] && [ "$src" != 0 ] && has 'settings.json' "$o" \

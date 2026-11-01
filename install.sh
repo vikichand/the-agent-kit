@@ -547,7 +547,7 @@ machine() {  # $1 = install | uninstall | check, $2 = share, $3 = python, then f
   # Everything the kit puts outside its own folder goes through machine.py and its install record.
   m_act=$1; m_share=$2; m_py=$3; shift 3
   $m_py "$(nat "$m_share/setup/machine.py")" "$m_act" --home "$(nat "$HOME")" --share "$(nat "$m_share")" \
-    --share-cmd "$m_share" --py "$m_py" "$@"
+    --share-cmd "$(nat "$m_share")" --py "$m_py" "$@"
 }
 
 confirm() {  # consent to write the user's settings: a terminal answer, or AGENT_KIT_APPLY=1

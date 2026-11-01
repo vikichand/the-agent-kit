@@ -11,6 +11,13 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- On Windows, the Claude Code hooks named the kit by its Git Bash path (`/c/Users/...`). With
+  `MSYS_NO_PATHCONV=1` set, Python got that path unconverted, the guard never started and Claude Code
+  blocked every tool call. The hooks now use the Windows path (`C:/Users/...`), and `install.sh update`
+  rewrites the entries an earlier install wrote.
+
 ## [0.6.0] - 2026-10-31
 
 ### Added
