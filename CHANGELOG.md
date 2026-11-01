@@ -11,6 +11,15 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-02
+
+### Fixed
+
+- On Windows, the Claude Code hooks named the kit by its Git Bash path (`/c/Users/...`). With
+  `MSYS_NO_PATHCONV=1` set, Python got that path unconverted, the guard never started and Claude Code
+  blocked every tool call. The hooks now use the Windows path (`C:/Users/...`), and `install.sh update`
+  rewrites the entries an earlier install wrote.
+
 ## [0.6.0] - 2026-10-31
 
 ### Added
@@ -408,7 +417,8 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.6.0...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.6.1...develop
+[0.6.1]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.1
 [0.6.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.0
 [0.5.1]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.5.1
 [0.5.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.5.0

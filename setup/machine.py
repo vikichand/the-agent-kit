@@ -83,10 +83,10 @@ AG_CMD = re.compile(r"(python3?|py -3) agent-kit-check\.py --tool antigravity")
 # ---- small helpers ---------------------------------------------------------------------------------
 
 def canon(cmd):
-    """One spelling for the same command: Git Bash hands Windows programs `C:/x` for `/c/x`, and a hand
-    merge may use either (or backslashes). Comparing raw strings rewrote working files over spelling."""
+    """One spelling for the same command: a hand merge may write `C:\\x` or `c:/x` for `C:/x`. Comparing
+    raw strings rewrote working files over spelling. A Git Bash `/c/x` is not folded in: under
+    MSYS_NO_PATHCONV=1 Python gets it unconverted, so that hook never starts and is rewritten."""
     c = (cmd or "").replace("\\", "/")
-    c = re.sub(r'(^|[\s"\'])/([a-zA-Z])/', lambda m: m.group(1) + m.group(2) + ":/", c)
     return re.sub(r'(^|[\s"\'])([A-Z]):/', lambda m: m.group(1) + m.group(2).lower() + ":/", c)
 
 
