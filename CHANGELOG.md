@@ -11,6 +11,8 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-02
+
 ### Fixed
 
 - On Windows, the Claude Code hooks named the kit by its Git Bash path (`/c/Users/...`). With
@@ -415,7 +417,8 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.6.0...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.6.1...develop
+[0.6.1]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.1
 [0.6.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.0
 [0.5.1]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.5.1
 [0.5.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.5.0
