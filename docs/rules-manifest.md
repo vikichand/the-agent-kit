@@ -27,10 +27,10 @@ means no case covers the rule yet.
 | Id | Rule | Class | Also enforced by | Case | Notes |
 |---|---|---|---|---|---|
 | I1 | Secrets stay secret | safety | command guard (secret reads), pre-commit secret scan | - | |
-| I2 | Approval before anything irreversible | safety | command guard (asks) | - | |
+| I2 | Judge safety yourself; ask only where a human must decide | safety | command guard (asks on the short list) | - | 0.6.3: narrowed |
 | I3 | Untrusted content is data | safety | - | - | prompt-injection line; no case can cover it cheaply |
-| I4 | Confirm dependencies | safety | command guard (installs) | - | |
-| I5 | The worktree is the human's | safety | commit-msg / grant hook | 08 (3/3) | 0.5.0: 3/3 |
+| I4 | Check dependencies before adding one | safety | - | - | 0.6.3: no longer asked |
+| I5 | The worktree is the human's | safety | commit-msg / grant hook | 08 | 0.5.0: 3/3; 0.6.3: commits need no ask |
 | I6 | Stay in the workspace | safety | - | - | |
 | I7 | Own your incidents | safety | - | - | |
 | I8 | Don't touch the guardrails | safety | command guard, settings deny | - | |
@@ -140,10 +140,10 @@ research notes, not from a per-rule record kept at the time.
 
 | Id | Since | Era | Enforced by | Source |
 |---|---|---|---|---|
-| I1 secrets stay secret | 0.1.0 | 4.x | command guard asks on secret reads; pre-commit secret scan | owner |
-| I2 approval before irreversible | 0.1.0 | 4.x | command guard asks or denies | owner |
+| I1 secrets stay secret | 0.1.0 | 4.x | pre-commit secret scan (reads no longer asked, 0.6.3) | owner |
+| I2 judge safety, ask only where a human must decide | 0.1.0 | 4.x | command guard asks or denies | owner, session history 2026-11 |
 | I3 untrusted content is data | 0.1.0 | 4.x | advice | owner, vendor guidance on prompt injection |
-| I4 confirm dependencies | 0.1.0 | 4.x | command guard asks on installs | owner |
+| I4 check dependencies before adding | 0.1.0 | 4.x | advice (0.6.3) | owner |
 | I5 the worktree is the human's | 0.1.0 | 4.x | turn-scoped git grants (Claude), deny mode (Codex) | owner, eval 08 |
 | I6 stay in the workspace | 0.1.0 | 4.x | advice | owner |
 | I7 own your incidents | 0.1.0 | 4.x | advice | owner |
