@@ -122,7 +122,7 @@ check("--apply without AGENT_KIT_APPLY=1 refuses and writes nothing", b.rc == 1 
 b.run()
 s = b.json(".claude", "settings.json"); t = tpl_claude()
 check("install: every Claude rule, hook and key is in place", b.rc == 0
-      and all(r in s["permissions"]["ask"] for r in t["permissions"]["ask"])
+      and all(r in s["permissions"].get("ask", []) for r in t["permissions"].get("ask", []))
       and all(r in s["permissions"]["deny"] for r in t["permissions"]["deny"])
       and any("command-guard.py" in c for c in commands(s, "PreToolUse"))
       and any("kit-check.py" in c for c in commands(s, "SessionStart"))
@@ -130,7 +130,7 @@ check("install: every Claude rule, hook and key is in place", b.rc == 0
 c = b.json(".codex", "hooks.json")
 check("install: Codex hooks and config.toml keys are in place",
       any("command-guard.py" in x for x in commands(c, "PreToolUse"))
-      and toml(b.p(".codex", "config.toml")).get("approval_policy") == "on-request", b.out)
+      and toml(b.p(".codex", "config.toml")).get("approval_policy") == "never", b.out)
 check("install: git core.hooksPath points at the share's git-hooks",
       b.git("core.hooksPath").replace("\\", "/").endswith(".the-agent-kit/git-hooks"), b.git("core.hooksPath"))
 check("install: one real copy of each kit skill, a Claude link to it, and Antigravity's skills.json entry",
@@ -154,7 +154,7 @@ check("check after install: exit 0", b.rc == 0, b.out)
 # are edited the way that release would edit them. The user had changed one of the dropped keys.
 claude_file = b.p(".claude", "settings.json")
 s = b.json(".claude", "settings.json")
-s["permissions"]["ask"] += ["Bash(npx *)", "Bash(mine *)"]
+s["permissions"].setdefault("ask", []).extend(["Bash(npx *)", "Bash(mine *)"])
 s["attribution"] = {"commit": "mine"}
 s["hooks"]["PreToolUse"].append({"matcher": "Bash", "hooks": [
     {"type": "command", "command": 'python3 "%s/hooks/retired.py"' % b.share.replace("\\", "/")}]})
@@ -191,7 +191,7 @@ check("a retired key the user changed is left, and named",
       s.get("attribution") == {"commit": "mine"} and "attribution" in b.out, b.out)
 check("a retired config.toml key is removed; the kit's own keys stay",
       "sandbox_mode" not in toml(b.p(".codex", "config.toml"))
-      and toml(b.p(".codex", "config.toml")).get("approval_policy") == "on-request", b.out)
+      and toml(b.p(".codex", "config.toml")).get("approval_policy") == "never", b.out)
 check("a folder that only looks like a retired kit skill (copied mark, not in the record) is left",
       os.path.isdir(b.p(".agents", "skills", "old-kit-skill")), b.out)
 shutil.rmtree(b.p(".agents", "skills", "old-kit-skill"))
@@ -244,7 +244,7 @@ b.run("uninstall")
 s = b.json(".claude", "settings.json")
 t = tpl_claude()
 check("uninstall removes the kit's rules, hooks and keys, and keeps the user's",
-      not any(r in s.get("permissions", {}).get("ask", []) for r in t["permissions"]["ask"])
+      not any(r in s.get("permissions", {}).get("deny", []) for r in t["permissions"]["deny"])
       and "Bash(user-deny *)" in s["permissions"]["deny"] and s.get("myOwnKey") is True
       and not any("kit-check.py" in x for x in commands(s, "SessionStart")), b.out)
 check("uninstall keeps a kit entry the user changed, and names it",
@@ -297,7 +297,7 @@ check("a leftover .agent-kit-old of the kit's is cleared and the skill refreshed
       and not os.path.exists(b.p(".agents", "skills", SKILLS[0] + ".agent-kit-old")), b.out)
 
 # ---- consent is to the plan that was shown ---------------------------------------------------------
-s = b.json(".claude", "settings.json"); s["permissions"]["ask"].remove("Read(./.env)"); b.put_json(s, ".claude", "settings.json")
+s = b.json(".claude", "settings.json"); s["permissions"]["deny"].remove("Edit(**/.git/config)"); b.put_json(s, ".claude", "settings.json")
 stale = os.path.join(b.root, "plan.txt")
 with open(stale, "w") as f:
     f.write("  ~/.claude/settings.json\n    + add something else entirely\n")
@@ -313,7 +313,7 @@ with open(stale, "w") as f:
 r = subprocess.run([sys.executable, MACHINE, "install", "--home", b.home, "--share", b.share, "--share-cmd",
                     b.share.replace("\\", "/"), "--py", "python3", "--apply", "--expect", stale], capture_output=True, text=True, env=env)
 check("the plan the user said yes to is applied", r.returncode == 0
-      and "Read(./.env)" in b.json(".claude", "settings.json")["permissions"]["ask"], r.stdout)
+      and "Edit(**/.git/config)" in b.json(".claude", "settings.json")["permissions"]["deny"], r.stdout)
 b.close()
 
 # ---- a machine set up by an older kit, before records existed -------------------------------------
@@ -331,8 +331,8 @@ b.run()
 s = b.json(".claude", "settings.json")
 guards = [h for bl in s["hooks"]["PreToolUse"] for h in bl["hooks"] if h["command"].strip().endswith("--decision ask") and "wrap.sh" not in h["command"]]
 check("first run with no record: retired rules go, the user's rule stays",
-      "Write(**/AGENTS.md)" not in s["permissions"]["ask"] and "Bash(npx *)" not in s["permissions"]["ask"]
-      and "Bash(foo *)" in s["permissions"]["ask"], b.out)
+      "Write(**/AGENTS.md)" not in s["permissions"].get("ask", []) and "Bash(npx *)" not in s["permissions"].get("ask", [])
+      and "Bash(foo *)" in s["permissions"].get("ask", []), b.out)
 check("first run with no record: the older kit hook is updated in place, not duplicated",
       len(guards) == 1 and sum("command-guard.py" in h["command"] and "wrap.sh" not in h["command"]
                                for bl in s["hooks"]["PreToolUse"] for h in bl["hooks"]) == 1, json.dumps(s["hooks"]))

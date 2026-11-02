@@ -4,9 +4,10 @@
 #   https://learn.chatgpt.com/docs/config-file/config-reference
 # (Codex has no "ask" decision, so the tool guard DENIES where Claude Code would prompt.)
 
-# Pause before running commands / applying edits instead of auto-approving them.
+# Never stop to ask: the sandbox below is the boundary, a command it refuses fails back to the agent,
+# and the tool guard denies what Claude Code would ask about. An unattended run never waits on a prompt.
 # Valid values: untrusted | on-request | never | { granular = { ... } }
-approval_policy = "on-request"
+approval_policy = "never"
 
 # Confine writes to the workspace.
 # Valid values: read-only | workspace-write | danger-full-access
