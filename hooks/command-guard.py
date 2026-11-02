@@ -40,20 +40,18 @@ WRAPPER_VALUE = {
     "time": {"-f", "-o", "--format", "--output"},
     "exec": {"-a"},
 }
-PUSH_REASON = {
-    "ask":  "git push needs your approval each time (per-run, not persistent). Approve only if you asked for this push.",
-    "deny": "git push is guarded on this tool: run it yourself. Pushing is left to you.",
-}
-# One-time, turn-scoped grants (Claude ask-mode only). See capture_intent() / load_grants().
-PUSH_OK    = "git push: authorized by your request this turn."
-PR_ASK     = "gh pr create: approve here, or ask me in chat to open the PR."
-PR_OK      = "gh pr create: authorized by your request this turn."
-PR_DENY    = "opening or merging a pull request is guarded on this tool: run it yourself, like a push."
-MERGE_ASK  = "gh pr merge always needs your approval - a merge is never authorized by a chat request."
+# One-time, turn-scoped grants (Claude ask-mode only). See capture_intent() / load_grants(). A push, a new
+# pull request and a merge reach other people, so each runs only in the turn you asked for it.
+PUSH_OK   = "git push: authorized by your request this turn."
+PUSH_ASK  = "git push: approve here, or ask me in chat to push."
+PUSH_DENY = "git push is guarded on this tool: run it yourself. Pushing is left to you."
+GRANT_OK  = "%s: authorized by your request this turn."
+PR_ASK    = "%s: approve here, or ask me in chat to do it."
+PR_DENY   = "opening or merging a pull request is guarded on this tool: run it yourself, like a push."
 HOOKSPATH_DENY = "core.hooksPath is being set - that points git's hooks elsewhere and disables the guards. Blocked."
 NOVERIFY_DENY  = "`--no-verify` skips the git guard hooks (secret scan, attribution, push guard). Blocked."
 FORCE_DENY     = "force/delete push is blocked - it rewrites or removes remote history. Use the pre-push override only if truly intended."
-GITCFG_DENY    = "writing git config directly (.git/config or GIT_CONFIG_GLOBAL/SYSTEM) can disable the guard hooks - review carefully."
+GITCFG_DENY    = "writing git config directly (.git/config or GIT_CONFIG_GLOBAL/SYSTEM) can disable the guard hooks. Blocked."
 OVERRIDE_ASK   = ("this sets a guard override (AGENT_KIT_RELEASE / AGENT_KIT_ALLOW_FORCE / AGENT_KIT_APPLY): it lets a "
                   "push through the pre-push hook, or lets the installer write your Claude Code and Codex settings "
                   "without asking you in a terminal. A chat request never covers it - approve only if you meant it.")
@@ -258,37 +256,12 @@ def contained(p):
 # PowerShell's delete commands and aliases. `rm` is not here: as a POSIX command it keeps the -rf rule above.
 PS_REMOVE = {"remove-item", "ri", "del", "erase", "rd", "rmdir"}
 PS_REMOVE_VALUE = ("-path", "-literalpath", "-filter", "-include", "-exclude")
-# Commands that print a file's contents. A secret file read with one of them lands in the transcript.
-READERS = {"cat", "type", "less", "more", "head", "tail", "grep", "egrep", "fgrep", "rg", "bat", "nl", "xxd",
-           "od", "strings", "base64", "awk", "sed", "cut", "sort", "get-content", "gc", "select-string", "sls",
-           "findstr", "format-hex"}
-_TEMPLATE = (".example", ".sample", ".template", ".dist", ".defaults", ".schema")
-
-
-def secret_path(p):
-    """The same files the Claude settings ask before reading: .env and its variants (templates excepted),
-    keys and certificates, cloud and package-manager credentials, and anything under a secrets folder."""
-    q = p.replace("\\", "/").strip("'\"").rstrip("/")
-    segs = [x for x in q.lower().split("/") if x]
-    if not segs:
-        return False
-    b = segs[-1]
-    if b.endswith(".pub"):
-        return False
-    if b == ".env" or (b.startswith(".env.") and not b.endswith(_TEMPLATE)):
-        return True
-    if b.endswith((".pem", ".p12", ".pfx")) or b in ("id_rsa", "id_ed25519", "id_ecdsa", "id_dsa",
-                                                    ".npmrc", ".netrc", ".pgpass", "credentials"):
-        return b != "credentials" or ".aws" in segs
-    return "secrets" in segs[:-1] or ".gnupg" in segs[:-1]
-
-
 def is_no_verify(flags):                       # git-CONTEXT use (we already know it's a git commit/push)
     return any(a.lower().startswith("--no-v") for a in flags)
 
 
 def sets_hookspath(tok):                        # a token that SETS core.hooksPath (not a filename that contains it)
-    t = tok.lower()
+    t = tok.lower().replace("'", "").replace('"', "")
     return "core.hookspath=" in t or "=core.hookspath" in t or t == "core.hookspath"
 
 
@@ -328,7 +301,7 @@ def is_force_push(args):
 # only as trustworthy as the machine, and the real boundary stays the git-layer hooks + branch
 # protection. Codex (--decision deny) never consults grants; its behaviour is unchanged.
 
-_NEG = r"(?:do\s*n['o]?t|don['o]?t|do not|never|no need(?:\s+to)?|without|hold\s*off(?:\s+on)?|not\s+yet|wait(?:\s+to)?|skip|avoid)"
+_NEG = r"(?:do\s*n['o]?t|don['o]?t|do not|never|no need(?:\s+to)?|no|nothing|without|hold\s*off(?:\s+on)?|not\s+yet|wait(?:\s+to)?|skip|avoid)"
 _DET = r"(?:the|this|that|these|those|a|an|last|latest|previous|prior|earlier|first|second|next|initial|original|my|your|his|her|their|our|each|every|which|whose|another|same|broken|failing|bad|wrong|old|new)"
 
 
@@ -338,22 +311,25 @@ def _grant_path(session):
     return os.path.join(tempfile.gettempdir(), "agent-kit-grant-" + sid + ".json")
 
 
-def load_grants(session):
+def load_grants(session, with_time=False):
     if not session:
-        return frozenset()
+        return (frozenset(), 0.0) if with_time else frozenset()
     try:
         with open(_grant_path(session), "r") as f:
-            return frozenset(json.load(f).get("authorized", []))
+            d = json.load(f)
+        g = frozenset(d.get("authorized", []))
+        return (g, float(d.get("issued", 0))) if with_time else g
     except Exception:
-        return frozenset()
+        return (frozenset(), 0.0) if with_time else frozenset()
 
 
-def save_grants(session, grants):
+def save_grants(session, grants, issued=None):
     if not session:
         return
     try:
+        import time
         with open(_grant_path(session), "w") as f:
-            json.dump({"authorized": sorted(grants)}, f)
+            json.dump({"authorized": sorted(grants), "issued": issued or time.time()}, f)
     except Exception:
         # A write that fails must not leave the previous turn's grant live: no record means no grant.
         try:
@@ -365,6 +341,14 @@ def save_grants(session, grants):
 def _asked(text, v):
     """True only when `text` reads as a request to run verb `v` (commit|push), unvetoed."""
     vg = v + r"(?:e?s|ed|ing)?"
+    # A question is not a request ("should I push?", "push is blocked, why?"), except "can you push it?".
+    text = " ".join(q for q in re.split(r"(?<=[.!?])\s+", text)
+                    if not q.rstrip().endswith("?") or re.match(r"\s*(?:(?:ok(?:ay)?|so|and|then|also|please)\W+)*"
+                                                              r"(?:can|could|would|will)\s+you\b", q))
+    if re.search(r"\b(?:whether|if)\b[^.!?]*?\b" + vg + r"\b", text):
+        return False                                                                     # "check whether we need to push"
+    if re.search(r"\b(?:he|she|they|someone|somebody|a\s+teammate|the\s+client)\s+(?:asked|told|wants?|wanted|said)\b", text):
+        return False                                                                     # someone else's request
     if re.search(_NEG + r"\s+(?:\w+\s+){0,3}?" + vg + r"\b", text):                       # "don't push", "hold off on pushing"
         return False
     if re.search(r"\b" + vg + r"\b\s+(?:\w+\s+){0,3}?(?:later|yet|tomorrow|afterwards?|once|after|when)\b", text):
@@ -373,13 +357,18 @@ def _asked(text, v):
         return False                                                                     # "later we'll push"
     reqs = [                                                                             # verb right after an action cue
         r"(?:can|could|would|will)\s+you\s+(?:please\s+|now\s+|then\s+|also\s+)?" + vg + r"\b",
-        r"(?:^|[.!?]\s+|\bplease\b|\bnow\b|\bthen\b|\balso\b|\band\b|\bfirst\b|go\s+ahead\s+and)\s*" + vg + r"\b",
+        r"(?:^|[.!?]\s+|\bplease\b|\bnow\b|\bthen\b|\balso\b|\band\b|\bfirst\b|go\s+ahead\s+and)\s*" + v + r"\b",
         r"let'?s\s+" + vg + r"\b",
     ]
     if any(re.search(p, text) for p in reqs):
         return True
-    obj = re.search(r"\b" + vg + r"\s+(?:it|this|that|these|those|the|my|all|everything|now|up|origin|them)\b", text)
-    ser = re.search(r"\b" + vg + r"\b\s*(?:,|;|\.|!|\band\b|\bthen\b|$)", text)           # "commit, push, and ..."
+    if re.search(r"\b(?:what|which|why|how\s+much|how\s+many|when|where)\b[^.!?]*?\b" + vg + r"\b", text):
+        return False                                                                     # "what are we pushing up"
+    vn = v + r"(?:e?s|ing)?"                                                             # no -ed: "I merged it" reports
+    obj = re.search(r"\b" + vn + r"\s+(?:it|this|that|these|those|the|my|all|everything|now|up|origin|them|both|any)\b", text)
+    ser = re.search(r"\b" + vn + r"\b\s*(?:,|;|\.|!|\?|/|\band\b|\bthen\b|$)", text)       # "commit, push, and ..."
+    if re.search(r"\b(?:do|make)\s+(?:a|the)\s+(?:\w+\s+)?(?:git\s+)?" + v + r"\b", text):
+        return True                                                                      # "do the final push"
     if obj or ser:
         return not re.search(_DET + r"\s+" + v + r"\b", text)                            # reject noun usage "the commit"
     return False
@@ -413,26 +402,29 @@ def detect_grants(prompt):
         g.add("push")
     if _asked_pr(text):
         g.add("pr")
+    if _asked(text, r"merge?") and not re.search(r"\bmerge\s+(?:main|master|develop)\s+into\b", text) and (
+            re.search(r"\b(?:prs?|pull[\s-]*requests?)\b", text)
+            or re.search(r"\bmerg\w*\s+(?:\w+\s+){0,3}?(?:to|into)\s+(?:the\s+)?(?:main|master|develop)\b", text)):
+        g.add("merge")                              # merge the PR, merge it to main
+    if _asked_release(text):
+        g |= {"push", "pr", "merge"}
     return g
 
 
+def _asked_release(text):
+    """"cut 0.6.0", "release 0.3.1", "create the releases", "do all the releases needed"."""
+    if re.search(_NEG + r"\s+(?:\w+\s+){0,3}?(?:cut|release)", text):
+        return False
+    noun = r"(?!\s+(?:notes?|builds?|branch(?:es)?|candidates?|tags?|is|are|was|has|features?|list|changelog|page|process|script|workflow|pipeline|checklist)\b)"
+    ver = r"v?\d+\.\d+(?:\.\d+)?(?!\.?\d)" + noun
+    return bool(re.search(r"\bcut\s+(?:the\s+|a\s+)?(?:release\s+)?" + ver, text)
+                or re.search(r"(?:^|[.!?,]\s+|\band\b|\bthen\b|\bplease\b|\bnow\b)\s*release\s+" + ver, text)
+                or re.search(r"\b(?:create|cut|do|prepare|publish)\s+(?:all\s+)?(?:the\s+|any\s+)?"
+                             r"(?:new\s+)?releases?\b" + noun, text))
+
+
 GRANT_ASK = "this names the kit's turn-grant file, which only the prompt hook should write. Approve only if you meant it."
-TIDY_ASK = ("this deletes branches, worktrees or files, or kills processes, and none of it can be undone. "
-            "Approve only if you chose these items in /tidy.")
-
-
-_LAUNCHER = re.compile(r"^(python[\d.]*|pythonw[\d.]*|py|pypy[\d.]*|uv|uvx|pipx)$")
-# Launcher options that consume the NEXT token; its value (`-X pycache_prefix=a.py`, `--with-requirements r.py`)
-# is not the script. Not exhaustive: an unlisted value flag whose value ends in .py still hides the script.
-_VALUE_OPTS = {"-X", "-W", "-c", "-m", "-p", "-f", "--with", "--with-requirements", "--with-editable", "--python",
-               "--project", "--directory", "--env-file", "--package", "--extra", "--group", "--index", "--spec",
-               "--pip-args", "--find-links"}
 _PS_CMD = re.compile(r"^-c(o(m(m(a(n(d)?)?)?)?)?)?$", re.I)
-
-
-def has_word(rest, word):
-    """`word` as its own token, or glued to a redirect/operator (`apply>out.txt` is one shlex token)."""
-    return any(t == word or re.match(re.escape(word) + r"[<>|&;]", t) for t in rest)
 
 
 def shell_payload(prog, toks):
@@ -485,104 +477,7 @@ def inner_commands(cmd):
     return out
 
 
-def kit_destructive(toks):
-    """The kit's own cleanup scripts, in the step that removes things: tidy-scan/tidy-procs `apply` and
-    mcp-orphans `--kill`. Only the command's own script counts: the program itself, or the
-    first .py/.sh argument of a python launcher (`uv run python`, `py -3`) that is not an option or an
-    option's value, or the payload of a `cmd /c` / `pwsh -Command` wrapper. A tidy name sitting in another
-    command's arguments (`git push -o tidy-scan.py -o apply`) is not a tidy run. Matched by file name, so
-    unquoted Windows paths (shlex eats their backslashes) are seen. A --dry-run is NOT exempt: a token that
-    only reads like one (a redirect target: `apply ... > --dry-run`) would buy silence, and one extra
-    prompt on a dry run is cheap."""
-    prog = base(toks[0]).lower()
-    inner = shell_payload(prog, toks)
-    if inner is not None:
-        return any(t and kit_destructive(verb_tokens(t) or [""]) for t in inner)
-    if prog.endswith((".py", ".sh")):
-        i = 0
-    elif _LAUNCHER.match(prog):
-        i, skip = None, False
-        for k, t in enumerate(toks[1:], 1):
-            if skip:
-                skip = False
-            elif t.startswith("-"):
-                skip = t in _VALUE_OPTS
-            elif "=" not in t and base(t).lower().endswith((".py", ".sh")):
-                i = k
-                break
-        if i is None:
-            return False
-    else:
-        return False
-    name, rest = base(toks[i]).lower(), toks[i + 1:]
-    if name.endswith(("tidy-scan.py", "tidy-procs.py")):
-        return has_word(rest, "apply")
-    if name.endswith("mcp-orphans.py"):
-        return has_word(rest, "--kill")
-    if name.endswith("install.sh"):                 # --tidy --kill execs mcp-orphans.py
-        return has_word(rest, "--tidy") and has_word(rest, "--kill")
-    return False
-
-
 def classify(tokens, decision, grants=frozenset()):
-    res = _classify(tokens, decision, grants)
-    if res:
-        return res                                   # every deny (and other ask) wins over the tidy prompt
-    toks = verb_tokens(tokens)
-    # Codex hooks cannot ask ("permissionDecision: ask ... parsed but not supported yet"), and a deny would
-    # break /tidy there, so this is Claude and Antigravity only.
-    if toks and decision == "ask" and kit_destructive(toks):
-        return "ask", TIDY_ASK
-    if toks and decision == "ask":
-        pkg = added_dependency(toks)
-        if pkg:
-            return "ask", DEP_ASK % pkg
-    return None
-
-
-# Package managers and the subcommands that add a package when they name one. A bare or flags-only
-# install (`npm install`, `pnpm install --frozen-lockfile`) installs what the lockfile declares.
-_ADDERS = {"npm": ("install", "i", "add", "in"), "pnpm": ("install", "i", "add"), "yarn": ("add",),
-           "bun": ("install", "i", "add", "a"), "pip": ("install",), "pip3": ("install",), "uv": ("add",),
-           "cargo": ("add", "install"), "go": ("install", "get"), "gem": ("install",), "poetry": ("add",),
-           "pipx": ("install", "run"), "bundle": ("add",), "deno": ("add", "install"), "dotnet": ("package",)}
-# Not -w: npm's takes a workspace name but pnpm's is a switch, so it stays a token and npm's
-# `-w ws` reads `ws` as the package. That over-asks; it never lets a package through unasked.
-_DEP_VALUE = ("-r", "--requirement", "-c", "--constraint", "--workspace", "--filter", "-C", "--dir", "--cwd",
-              "--prefix", "--path", "--registry", "--target", "-t")
-DEP_ASK = ("this adds a dependency (%s). Approve after checking it is the real, maintained package you want: "
-           "typo-squatted names are a live attack.")
-
-
-def added_dependency(toks):
-    """The package a command adds, or None. `uv pip install` and `python -m pip install` count as pip."""
-    verb = base(toks[0]).lower()
-    rest = toks[1:]
-    if _LAUNCHER.match(verb) and rest[:2] == ["-m", "pip"]:
-        verb, rest = "pip", rest[2:]
-    if re.fullmatch(r"pip\d*(?:\.\d+)?", verb):
-        verb = "pip"
-    if verb == "uv" and rest[:1] in (["pip"], ["tool"]):        # uv pip install / uv tool install
-        verb, rest = ("pip" if rest[0] == "pip" else "pipx"), rest[1:]
-    if verb == "dotnet" and rest[:1] == ["add"]:                 # dotnet add [project] package x
-        rest = rest[1:]
-        rest = rest[rest.index("package"):] if "package" in rest else []
-    ops, skip = [], False
-    for a in drop_values(rest, _DEP_VALUE):
-        redirect = re.match(r"^\d*(?:>>?|<)(.*)$", a)   # `2>&1`, `> log.txt`, `>/dev/null`
-        if skip or redirect:
-            skip = bool(redirect) and not redirect.group(1)
-            continue
-        if not a.startswith("-"):
-            ops.append(a)
-    if verb not in _ADDERS or not ops or ops[0] not in _ADDERS[verb]:
-        return None
-    # A local path (`./packages/ui`, `file:./CMS`) is the project's own code, not a registry package.
-    pkgs = [a for a in ops[1:] if not re.match(r"^(?:file:|link:|portal:)?(?:\.{1,2}(?:/|$)|/)", a)]
-    return pkgs[0] if pkgs else None
-
-
-def _classify(tokens, decision, grants):
     toks = verb_tokens(tokens)
     if not toks:
         return None
@@ -609,51 +504,27 @@ def _classify(tokens, decision, grants):
             if is_no_verify(flags_only(args, PUSH_VALUE_FLAGS)):
                 return "deny", NOVERIFY_DENY
             if decision == "ask":                       # Claude: silent only if you asked this turn
-                return ("allow", PUSH_OK) if "push" in grants else ("ask", PUSH_REASON["ask"])
-            return decision, PUSH_REASON[decision]       # Codex (deny): push is left to the human
+                return ("allow", PUSH_OK) if "push" in grants else ("ask", PUSH_ASK)
+            return "deny", PUSH_DENY                     # Codex: no grants and no ask, so pushing is yours
         if sub == "commit":
             if is_no_verify(flags_only(args, COMMIT_VALUE_FLAGS)) or short_has(flags_only(args, COMMIT_VALUE_FLAGS), "n"):
                 return "deny", NOVERIFY_DENY
             return None                                  # local and undoable: no prompt on any tool
-        if sub == "reset" and any(a.lower().startswith("--h") for a in args):
-            return decision, "`git reset --hard` irreversibly discards changes."
-        if sub == "clean" and (short_has(args, "f") or any(a.lower().startswith("--f") for a in args)):
-            return decision, "`git clean -f` irreversibly deletes untracked files."
-        if sub in ("checkout", "restore") and any(a in (".", "./") for a in args):
-            return decision, "`git %s .` discards uncommitted changes irreversibly." % sub
-        # The rules name "deleting branches" as needing approval, so the guard has to actually ask.
-        # Only the FORCE form: -D (or -d --force) drops an UNMERGED branch and its commits become
-        # unreachable. Plain -d already refuses on unmerged work, so git gates that itself and
-        # flagging it would just add noise to routine cleanup. Case matters here (-d is not -D), and
-        # short_has() is deliberately case-insensitive, so this checks the flags directly.
-        if sub == "branch":
-            fl = flags_only(args, ())
-            shorts = [a[1:] for a in fl if re.match(r"^-[A-Za-z]+$", a)]
-            forced = any("D" in s for s in shorts) or (
-                (any("d" in s for s in shorts) or any(a.lower() == "--delete" for a in fl))
-                and (any("f" in s for s in shorts) or any(a.lower() == "--force" for a in fl))
-            )
-            if forced:
-                return decision, "`git branch -D` force-deletes an unmerged branch; its commits become unreachable."
+        # reset --hard, clean -f, checkout ., branch -D: local to this repo, so no prompt (owner decision
+        # 2026-11-02: only actions that truly need a human ask; an unattended run must not wait on these).
         return None
 
-    if verb == "gh":                                     # gh pr create is grantable; gh pr merge always asks
+    if verb == "gh":                                     # opening or merging a pull request: only when asked
         # Scan for the pr subcommand rather than assuming position: a value-taking global flag
         # (`--repo o/r`) leaves its value sitting among the operands.
         ops = [a for a in rest if not a.startswith("-")]
-        if decision == "deny":                           # Codex: no grants and no ask, so like a push
-            for k in range(len(ops) - 1):
-                if ops[k].lower() == "pr" and ops[k + 1].lower() in ("create", "merge"):
+        for k in range(len(ops) - 1):
+            act = ops[k + 1].lower()
+            if ops[k].lower() == "pr" and act in ("create", "merge"):
+                grant = "pr" if act == "create" else "merge"
+                if decision == "deny":                   # Codex: no grants and no ask
                     return "deny", PR_DENY
-            return None
-        if decision == "ask":
-            for k in range(len(ops) - 1):
-                if ops[k].lower() == "pr":
-                    act = ops[k + 1].lower()
-                    if act == "create":
-                        return ("allow", PR_OK) if "pr" in grants else ("ask", PR_ASK)
-                    if act == "merge":
-                        return "ask", MERGE_ASK
+                return ("allow", GRANT_OK % ("gh pr " + act)) if grant in grants else ("ask", PR_ASK % ("gh pr " + act))
         return None
 
     if verb == "rm":
@@ -677,14 +548,8 @@ def _classify(tokens, decision, grants):
             if targets and all(regenerable_path(t) or contained(t) for t in targets):
                 return None
             return decision, "`%s -Recurse` irreversibly deletes a folder and everything in it." % toks[0]
-    if verb in READERS:
-        hit = next((a for a in rest if not a.startswith("-") and secret_path(a)), None)
-        if hit:
-            return decision, "this reads `%s`, a file that holds secrets. Approve only if you meant to show it." % hit
     if verb in ("dd", "mkfs") or verb.startswith("mkfs"):
         return decision, "`%s` can irreversibly destroy data." % verb
-    if verb == "chmod" and any(a == "777" or a.endswith("777") or "+s" in a for a in rest):
-        return decision, "over-permissive / setuid chmod."
     return None
 
 
@@ -883,13 +748,33 @@ def emit(decision, reason):
     sys.exit(0)
 
 
+_CONTINUE = re.compile(r"(?:(?:ok(?:ay)?|cool|great|yes|yep|sure|thanks|right)[\s,.!]+)*(?:please\s+)?"
+                       r"(?:continue|carry\s+on|keep\s+going|go\s+on|resume|proceed|go\s+for\s+it|go\s+ahead)"
+                       r"(?:\s+(?:from\s+)?where\s+you\s+left\s+off|\s+with\s+(?:it|that|everything(?:\s+that'?s\s+left)?))?"
+                       r"[\s.!]*", re.I)
+CARRY_SECONDS = 2 * 3600
+
+
+def is_continue(prompt):
+    """A bare "continue" (after a break, or a session limit) asks for no new work. A leading sentence
+    about the break is allowed; any other clause ("continue, but don't push") makes it a new message."""
+    p = re.sub(r"^\s*(?:[^.!?]*\b(?:sorry|interrupted|disconnected|limit|renewed|back)\b[^.!?]*[.!?]\s*)+", "",
+               (prompt or "").strip().lower())
+    return len(p) <= 80 and not re.search(r"\b" + _NEG + r"\b", p) and bool(_CONTINUE.fullmatch(p))
+
+
 def capture_intent(data):
     """UserPromptSubmit: record which git-writes the user's OWN message authorizes, for this turn."""
     try:
-        grants = detect_grants(data.get("prompt", ""))
+        import time
+        grants, issued = detect_grants(data.get("prompt", "")), None
+        if not grants and is_continue(data.get("prompt", "")):
+            grants, issued = load_grants(data.get("session_id") or "", with_time=True)
+            if time.time() - issued > CARRY_SECONDS:   # the original time is kept, so continues never refresh it
+                grants = frozenset()
     except Exception:
-        grants = frozenset()   # a crash here must fail towards "nothing authorized", never keep the last turn's grant
-    save_grants(data.get("session_id") or "", grants)
+        grants, issued = frozenset(), None   # a crash must fail towards "nothing authorized", never keep the last grant
+    save_grants(data.get("session_id") or "", grants, issued)
     sys.exit(0)
 
 
@@ -962,7 +847,7 @@ def main():
 
     # bar-raise (NOT a boundary): direct git-config writes can point hooks elsewhere; the sandbox is the real fix
     if re.search(r"(>>?|\btee\b)\s*\S*\.git[/\\]config\b", cmd) or re.search(r"\bGIT_CONFIG_(GLOBAL|SYSTEM)\b\s*=", cmd):
-        emit(args.decision, GITCFG_DENY)
+        emit("deny", GITCFG_DENY)
 
     try:
         whole = [s for s in (t.strip("(){}") for t in shlex.split(cmd)) if s]

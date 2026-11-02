@@ -95,9 +95,8 @@ as `.env.backup` are never listed (the scan says that secret-like files exist, b
   every duplicate when the socket listing is unavailable, because then "newest" is a guess.
 - `apply` passes the same repository scope to the process scanner and re-scans inside it, so an id copied from
   another repo's scan no longer matches and is skipped.
-- On Claude Code and Antigravity the command guard asks before `tidy-scan.py apply`, `tidy-procs.py apply`
-  (dry runs included, so a stray `--dry-run` token cannot buy silence) and `mcp-orphans.py --kill`, so the prompt does not depend on the model following the
-  skill. Codex hooks cannot ask, so there the skill's own confirmation is the gate.
+- The skill's own confirmation is the gate on every tool: it lists the items and you choose. The command
+  guard no longer asks a second time before `apply` or `--kill` (0.6.3).
 - Removing a worktree also deletes its merged branch, and only when the item's label names it (this holds for
   missing worktrees too). Missing worktrees are pruned all together, so `apply` skips them unless you approved
   every prunable one. If `git status` cannot be read in a worktree, it is low confidence and `apply` refuses it.

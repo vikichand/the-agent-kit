@@ -1050,7 +1050,7 @@ PY
   printf 'model = "x"\n\n[projects.a]\ntrust_level = "trusted"\n' > "$g/.codex/config.toml"
   su 1
   t=$($PY -c "import tomllib,sys; d=tomllib.load(open(sys.argv[1],'rb')); print(d.get('approval_policy'), d.get('sandbox_mode'), d['sandbox_workspace_write']['network_access'], d['projects']['a']['trust_level'], d['model'])" "$(wq "$g/.codex/config.toml")" 2>&1)
-  [ "$t" = "on-request workspace-write True trusted x" ] && pass "M6 Codex config: kit settings added at top level, the user's tables unchanged" || bad "M6 Codex config wrong: [$t] $o"
+  [ "$t" = "never workspace-write True trusted x" ] && pass "M6 Codex config: kit settings added at top level, the user's tables unchanged" || bad "M6 Codex config wrong: [$t] $o"
   [ "$(jq_ "$g/.codex/hooks.json" "any('command-guard.py' in h['command'] and '--decision deny' in h['command'] for b in d['hooks']['PreToolUse'] for h in b['hooks'])")" = True ] \
     && pass "M6 Codex hooks.json created with the guard" || bad "M6 Codex guard not wired: $o"
   # Codex runs a new or changed hook only after the user trusts it in /hooks (it stores a hash of each
@@ -1075,10 +1075,10 @@ EOF
   [ "$(jq_ "$g/.codex/hooks.json" "$cn")" = True ] \
     && [ "$(jq_ "$g/.codex/hooks.json" "sum('command-guard.py' in h['command'] for b in d['hooks']['PreToolUse'] for h in b['hooks'])")" = 1 ] \
     && pass "M14 a Codex hook in the Git Bash spelling is corrected in place" || bad "M14 Git Bash spelling kept or duplicated: $(cat "$g/.codex/hooks.json")"
-  printf 'approval_policy = "never"\n[projects.a]\ntrust_level = "trusted"\n' > "$g/.codex/config.toml"
+  printf 'approval_policy = "untrusted"\n[projects.a]\ntrust_level = "trusted"\n' > "$g/.codex/config.toml"
   su 1
   t=$($PY -c "import tomllib,sys; print(tomllib.load(open(sys.argv[1],'rb'))['approval_policy'])" "$(wq "$g/.codex/config.toml")" 2>&1)
-  [ "$t" = never ] && pass "M7 a setting the user already chose is kept, not overwritten" || bad "M7 user's approval_policy overwritten: [$t]"
+  [ "$t" = untrusted ] && pass "M7 a setting the user already chose is kept, not overwritten" || bad "M7 user's approval_policy overwritten: [$t]"
   # The machine helper itself refuses to write without consent, so running it directly is no way around it.
   printf '{}' > "$g/.claude/settings.json"
   mrc=0; m=$(AGENT_KIT_APPLY= $PY "$KIT/setup/machine.py" install --home "$G" --share "$(wq "$g/.the-agent-kit")" --share-cmd x --py python --apply 2>&1) || mrc=$?

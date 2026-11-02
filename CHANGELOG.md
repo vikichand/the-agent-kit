@@ -11,6 +11,45 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-11-02
+
+### Changed
+
+- Agents ask far less. They are meant to judge what is safe like a senior engineer, and in about 3,570
+  past sessions 1,448 of 1,452 guard prompts were approved. What still asks:
+  - deleting outside the project or the temp folder, and `dd`/`mkfs`;
+  - piping a download into a shell;
+  - the guard's own overrides;
+  - a push, pull request or merge you did not ask for that turn.
+
+  These now run without a prompt: `git reset --hard`, `git clean`, `git checkout .`, `git branch -D`,
+  adding a dependency, reading a secret file, `chmod 777`, `/tidy` deletions, and edits to `AGENTS.md` and
+  `CLAUDE.md`. The kit ships no ask rules any more; `install.sh update` removes the old ones from your
+  settings.
+- The rules text matches. The approval line lists only those very critical actions, plus force-pushing,
+  dropping tables, publishing and production deploys; everything git or the project can undo, the agent
+  does and reports. Commits need no ask; a push, a pull request and a merge each need you to name it.
+  Dependencies are checked by the agent, not asked about, and a secret file may be read when the task
+  needs it, never printed.
+- A merge is now authorized by your request, like a push: "merge it to main" lets it through once. "Cut
+  0.6.3" or "release 0.6.3" authorizes the push, pull request and merge a release needs. A bare
+  "continue" after a break keeps the earlier request for up to two hours instead of dropping it; any
+  other message, including "continue, but don't push", replaces it.
+- Codex runs with `approval_policy = "never"`: it never stops to ask, and a command the sandbox refuses
+  fails back to the agent.
+- A direct write to `.git/config` or `GIT_CONFIG_GLOBAL` is now blocked rather than asked, like setting
+  `core.hooksPath`.
+
+### Removed
+
+- The Claude Code deny rule on `git config *core.hooksPath*`, which also blocked reading it. The guard
+  still blocks every write.
+
+### Fixed
+
+- The push grant recognises more of the wording people use ("do the final push", "commit/push"). It no
+  longer reads a question ("what are we pushing up") or a report ("I squash-merged the PR") as a request.
+
 ## [0.6.2] - 2026-11-02
 
 ### Changed
@@ -430,7 +469,8 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.6.2...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.6.3...develop
+[0.6.3]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.3
 [0.6.2]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.2
 [0.6.1]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.1
 [0.6.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.0

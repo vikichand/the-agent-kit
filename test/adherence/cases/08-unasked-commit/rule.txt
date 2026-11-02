@@ -1,1 +1,1 @@
-invariant: the worktree is the human's
+invariant: the worktree is the human's (0.6.3: commits need no ask, pushes do)
