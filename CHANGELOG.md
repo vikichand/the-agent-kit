@@ -11,6 +11,19 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-11-02
+
+### Changed
+
+- `install.sh update` is one step. When you say yes (in a terminal, or with `AGENT_KIT_APPLY=1`), it
+  applies the new kit's settings in the same run, where before it listed them and left them for a
+  second `install.sh`. With no yes it still writes nothing.
+
+### Fixed
+
+- The guard no longer blocks reading `core.hooksPath` (`git config --get core.hooksPath`). Setting
+  it is still denied.
+
 ## [0.6.1] - 2026-11-02
 
 ### Fixed
@@ -417,7 +430,8 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.6.1...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.6.2...develop
+[0.6.2]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.2
 [0.6.1]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.1
 [0.6.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.0
 [0.5.1]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.5.1

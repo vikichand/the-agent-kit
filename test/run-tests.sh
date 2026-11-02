@@ -676,13 +676,19 @@ head=$( (cd "$w/src" && git init -q -b main && git add -A \
 if [ -z "$head" ]; then
   echo "SKIP: could not build a source repo - --update not exercised"
 else
-  # AGENT_KIT_APPLY=1 on --update must NOT apply settings that just arrived from the network: the update
-  # lists them, and applying is a second, separate step taken after seeing that list.
+  # Update is one step: with no yes it lists the settings changes and writes nothing; with the yes
+  # (AGENT_KIT_APPLY=1, or a terminal) it applies them in the same run, so nothing is left pending.
   mkdir -p "$w/.claude" "$w/.the-agent-kit"
   printf '{"checked": 9999999999, "latest": "0000000"}\n' > "$w/.the-agent-kit/.update-check"
-  d=$(HOME="$w" AGENT_KIT_APPLY=1 AGENT_KIT_REPO="$w/src" sh "$KIT/install.sh" --update 2>&1) || bad "U5 --update exited non-zero"
+  d=$(HOME="$w" AGENT_KIT_APPLY= AGENT_KIT_REPO="$w/src" sh "$KIT/install.sh" --update </dev/null 2>&1) || bad "U5 --update exited non-zero"
   [ ! -e "$w/.claude/settings.json" ] && has 'settings.json' "$d" \
-    && pass "U5 --update lists the settings changes but never applies them itself" || bad "U5 --update applied network-sourced settings"
+    && pass "U5 update with no yes lists the settings changes and writes nothing" || bad "U5 update wrote settings without consent"
+  printf 'old\n' > "$w/.the-agent-kit/.kit-version"
+  printf '{"checked": 9999999999, "latest": "0000000"}\n' > "$w/.the-agent-kit/.update-check"
+  d=$(HOME="$w" USERPROFILE="$(cygpath -m "$w" 2>/dev/null || printf '%s' "$w")" AGENT_KIT_APPLY=1 AGENT_KIT_REPO="$w/src" sh "$KIT/install.sh" --update </dev/null 2>&1) || bad "U5 --update exited non-zero"
+  c=$(HOME="$w" USERPROFILE="$(cygpath -m "$w" 2>/dev/null || printf '%s' "$w")" sh "$w/.the-agent-kit/install.sh" check </dev/null 2>&1)
+  grep -q 'command-guard.py' "$w/.claude/settings.json" 2>/dev/null && has 'installed and current' "$c" \
+    && pass "U5 update with the yes applies the settings in the same run" || bad "U5 update left the settings pending: $(printf '%s' "$d" | grep -E 'WARN|pending' | head -3)"
   [ -f "$w/.the-agent-kit/AGENTS.md" ] && pass "U5 --update populated a fresh ~/.the-agent-kit" || bad "U5 kit not installed"
   [ "$(cat "$w/.the-agent-kit/.kit-version" 2>/dev/null)" = "$head" ] \
     && pass "U5 version stamped from the source commit" || bad "U5 .kit-version wrong or missing"
@@ -693,7 +699,7 @@ else
   d=$(HOME="$w" AGENT_KIT_REPO="$w/src" sh "$KIT/install.sh" --update 2>&1)
   has 'already at' "$d" && pass "U6 second --update is a no-op" || bad "U6 no-op NOT detected"
   # U6b: update (the new name) run inside a project brings that project to the downloaded kit too.
-  # The machine is made current first, with consent: update applies nothing on its own, and a project
+  # The machine is made current first, with consent: update with no yes applies nothing, and a project
   # is left alone while the machine's changes wait for a yes.
   HOME="$w" USERPROFILE="$(cygpath -m "$w" 2>/dev/null || printf '%s' "$w")" AGENT_KIT_APPLY=1 sh "$KIT/install.sh" --setup </dev/null >/dev/null 2>&1
   mkdir -p "$w/p" && (cd "$w/p" && git init -q) && printf 'old\n' > "$w/.the-agent-kit/.kit-version"

@@ -292,6 +292,14 @@ def sets_hookspath(tok):                        # a token that SETS core.hooksPa
     return "core.hookspath=" in t or "=core.hookspath" in t or t == "core.hookspath"
 
 
+_SCOPE = r"(?:[ \t]+--(?:global|local|system|worktree|show-origin|no-includes))*"
+_HP_READ = re.compile(r"[ \t]*git[ \t]+config" + _SCOPE + r"[ \t]+(?:--get|--get-all|get)" + _SCOPE + r"[ \t]+core\.hookspath[ \t\r\n]*", re.I)
+
+
+def hookspath_read_only(cmd):                   # the whole command is one plain read: nothing chained can hide a write
+    return bool(_HP_READ.fullmatch(cmd))
+
+
 def is_force_push(args):
     flags = flags_only(args, PUSH_VALUE_FLAGS)
     if any(a.lower().startswith(("--for", "--de", "--mir", "--pru")) or a == "-d" for a in flags):
@@ -963,7 +971,9 @@ def main():
 
     # best-effort hook-disable scan over CLI tokens (prose values excluded so a message can't false-trip)
     scan = drop_values(whole, PROSE_FLAGS)
-    if any(sets_hookspath(t) for t in scan):
+    # `git config --get core.hooksPath` only reads it. Only that exact command passes, alone: one extra
+    # operand or flag (`--comment --get core.hooksPath /x`) or a chained, quote-split write can set it.
+    if not hookspath_read_only(cmd) and any(sets_hookspath(t) for t in scan):
         emit("deny", HOOKSPATH_DENY)
     if any(_NOVERIFY.match(t) for t in scan):
         emit("deny", NOVERIFY_DENY)
