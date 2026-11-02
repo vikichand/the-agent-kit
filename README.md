@@ -94,8 +94,8 @@ Change nothing outside what these steps name, and summarise what you did at the 
 
 An agent has no terminal to answer the installer's question, so it lists the changes and stops; step 2
 is your answer. `AGENT_KIT_APPLY=1` is that consent, and once the kit is installed its guard asks you
-before any agent command sets it (on Codex it refuses: run it yourself). An update never applies
-settings on its own, even with that flag set. This makes the obvious routes ask, not every route: an
+before any agent command sets it (on Codex it refuses: run it yourself). `install.sh update`
+applies the new kit's settings in the same run when you give the same yes. This makes the obvious routes ask, not every route: an
 agent that fakes a terminal, or writes the file some other way, is outside what a command check can
 see ([Limits](#limits)).
 

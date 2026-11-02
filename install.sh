@@ -554,8 +554,8 @@ confirm() {  # consent to write the user's settings: a terminal answer, or AGENT
   # AGENT_KIT_APPLY is the only way without a terminal, and the kit's tool guard asks the user before any
   # agent command sets it: an agent cannot rewrite its own permissions without the human saying yes.
   [ "${AGENT_KIT_APPLY:-}" = 1 ] && return 0
-  # Settings that just arrived with an update are applied only by an answer given after seeing them: in
-  # a terminal, the question below; otherwise a separate --setup, run once the list above has been read.
+  # update hands this same yes to the installer it downloads, so one update applies the new settings. That
+  # adds nothing an attacker lacks: update already runs that installer. In a terminal, the question below.
   if [ -t 0 ]; then
     printf 'Apply these changes? [y/N] '
     read -r ans || ans=""
@@ -687,7 +687,7 @@ update_kit() {  # refresh ~/.the-agent-kit from GitHub, so the clone stays dispo
   # one run by the old --update, which did the machine only.
   m=--setup; [ "${1:-}" = --setup ] || ! grep -q '^# cli: install update uninstall check' "$tmp/kit/install.sh" || m=install
   exec sh -c '
-    AGENT_KIT_APPLY= sh "$1/install.sh" "$4" || exit $?
+    sh "$1/install.sh" "$4" || exit $?   # your yes (a terminal, or AGENT_KIT_APPLY=1) carries over: one run, nothing left pending
     rm -rf "$2"
     rm -f "$3/.update-check"   # cached before this update, it would call an older main "newer" until tomorrow
     printf "%s\n" "------------------------------------------------------------"
