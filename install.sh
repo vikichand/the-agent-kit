@@ -877,7 +877,7 @@ doctor() {
   else
     say "  OK:   python = $py"
     d=$(printf '%s' '{"tool_input":{"command":"git push"}}'         | $py "$KIT/hooks/command-guard.py" --decision ask 2>/dev/null)
-    case "$d" in *'"ask"'*)  say "  OK:   command-guard fires on 'git push'" ;; *) dfail=1; say "  FAIL: command-guard emitted no decision for 'git push'" ;; esac
+    case "$d" in *'"deny"'*'was not requested'*)  say "  OK:   command-guard holds an unrequested 'git push'" ;; *) dfail=1; say "  FAIL: command-guard did not hold an unrequested 'git push'" ;; esac
     f=$(printf '%s' '{"tool_input":{"command":"git push --force"}}' | $py "$KIT/hooks/command-guard.py" --decision ask 2>/dev/null)
     case "$f" in *'"deny"'*) say "  OK:   force-push is denied" ;; *) dfail=1; say "  FAIL: force-push not denied" ;; esac
     n=$(printf '%s' '{"tool_input":{"command":"git commit -an -m x"}}' | $py "$KIT/hooks/command-guard.py" --decision ask 2>/dev/null)
