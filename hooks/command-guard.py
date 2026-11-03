@@ -41,12 +41,17 @@ WRAPPER_VALUE = {
     "exec": {"-a"},
 }
 # One-time, turn-scoped grants (Claude ask-mode only). See capture_intent() / load_grants(). A push, a new
-# pull request and a merge reach other people, so each runs only in the turn you asked for it.
+# pull request and a merge reach other people, so each runs only in the turn you asked for it. Without
+# that request it is refused, never asked: a prompt waits with no time limit and would stall an unattended
+# run, while a refusal lets the agent finish and leave the work committed for the user to review.
+_HOLD     = (" was not requested in the user's message this turn, so it is held. Keep the work committed "
+             "locally, finish the task, and end your report with what is ready (branch and commits); the "
+             "user will ask for it after reviewing.")
 PUSH_OK   = "git push: authorized by your request this turn."
-PUSH_ASK  = "git push: approve here, or ask me in chat to push."
+PUSH_HOLD = "git push" + _HOLD
 PUSH_DENY = "git push is guarded on this tool: run it yourself. Pushing is left to you."
 GRANT_OK  = "%s: authorized by your request this turn."
-PR_ASK    = "%s: approve here, or ask me in chat to do it."
+PR_HOLD   = "%s" + _HOLD
 PR_DENY   = "opening or merging a pull request is guarded on this tool: run it yourself, like a push."
 HOOKSPATH_DENY = "core.hooksPath is being set - that points git's hooks elsewhere and disables the guards. Blocked."
 NOVERIFY_DENY  = "`--no-verify` skips the git guard hooks (secret scan, attribution, push guard). Blocked."
@@ -186,7 +191,9 @@ def safe_roots():
         import tempfile  # here, not at the top: it costs 12 ms and only a recursive delete needs it
         home = _norm(os.path.expanduser("~"))
         # No cwd from the host: only the temp folder. The hook's own working folder could be anywhere.
-        for r in map(_norm, ([CWD] if CWD else []) + [tempfile.gettempdir(), "/tmp"]):
+        # The temp folder in both spellings: Windows may give its 8.3 short name (C:/Users/VIKASH~1/...).
+        tmp = tempfile.gettempdir()
+        for r in map(_norm, ([CWD] if CWD else []) + [tmp, os.path.realpath(tmp), "/tmp"]):
             # A session opened in home, a drive root or above home would make everything "the project".
             if r != home and not home.startswith(r + "/") and posixpath.dirname(r) != r \
                     and not re.fullmatch(r"[a-z]:/?", r, re.I):
@@ -228,8 +235,9 @@ def contained(p):
         v = shell_vars()
         p = re.sub(r"\$\{(\w+)\}|\$(\w+)", lambda m: v.get(m.group(1) or m.group(2)) or "\0", p)
     q = p.replace("\\", "/")
-    # An unknown variable, ~, brace expansion or a PowerShell list (`x,D:\y`) can name anything.
-    if not q or any(ch in q for ch in "\0$`~{},"):
+    # An unknown variable, a leading ~, brace expansion or a PowerShell list (`x,D:\y`) can name anything.
+    # A ~ inside a word is literal to the shell (an 8.3 short name such as VIKASH~1).
+    if not q or q.startswith("~") or any(ch in q for ch in "\0$`{},"):
         return False
     # A colon past a drive letter is a provider or another drive (HKCU:\, FileSystem::D:\, Cert:\).
     if ":" in (q[2:] if re.match(r"^[A-Za-z]:", q) else q):
@@ -504,7 +512,7 @@ def classify(tokens, decision, grants=frozenset()):
             if is_no_verify(flags_only(args, PUSH_VALUE_FLAGS)):
                 return "deny", NOVERIFY_DENY
             if decision == "ask":                       # Claude: silent only if you asked this turn
-                return ("allow", PUSH_OK) if "push" in grants else ("ask", PUSH_ASK)
+                return ("allow", PUSH_OK) if "push" in grants else ("deny", PUSH_HOLD)
             return "deny", PUSH_DENY                     # Codex: no grants and no ask, so pushing is yours
         if sub == "commit":
             if is_no_verify(flags_only(args, COMMIT_VALUE_FLAGS)) or short_has(flags_only(args, COMMIT_VALUE_FLAGS), "n"):
@@ -524,7 +532,7 @@ def classify(tokens, decision, grants=frozenset()):
                 grant = "pr" if act == "create" else "merge"
                 if decision == "deny":                   # Codex: no grants and no ask
                     return "deny", PR_DENY
-                return ("allow", GRANT_OK % ("gh pr " + act)) if grant in grants else ("ask", PR_ASK % ("gh pr " + act))
+                return ("allow", GRANT_OK % ("gh pr " + act)) if grant in grants else ("deny", PR_HOLD % ("gh pr " + act))
         return None
 
     if verb == "rm":
@@ -740,8 +748,12 @@ POWERSHELL = False    # set for Claude Code's PowerShell tool, where rm is Remov
 
 def emit(decision, reason):
     if ANTIGRAVITY:
-        # Plain "ask" honours cached Always-Allow grants; force_ask makes each push its own question.
-        print(json.dumps({"decision": "force_ask" if decision == "ask" else decision, "reason": reason}))
+        # Nothing waits on a person: what Claude Code would ask about is refused and left for the user, and
+        # what the guard passes is approved, so Antigravity's own prompt never stalls an unattended run.
+        if decision == "ask":
+            decision, reason = "deny", ("held for the user: " + reason + " Skip this step, finish the rest, "
+                                        "and name it in your report.")
+        print(json.dumps({"decision": "auto_approve" if decision == "allow" else decision, "reason": reason}))
         sys.exit(0)
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PreToolUse", "permissionDecision": decision, "permissionDecisionReason": reason}}))
@@ -778,6 +790,40 @@ def capture_intent(data):
     sys.exit(0)
 
 
+def antigravity_grants(data):
+    """Antigravity has no prompt hook, but since 1.4.7 every hook gets `lastUserInput`, the user's latest
+    message: the same turn-scoped grant Claude's prompt hook records. A bare "continue" walks back through
+    the transcript (the user's own entries only) to the message it continues, within CARRY_SECONDS."""
+    try:
+        last = data.get("lastUserInput")
+        if not isinstance(last, str):
+            return frozenset()
+        grants = detect_grants(last)
+        if grants or not is_continue(last):
+            return grants
+        import time, calendar
+        path = data.get("transcriptPath")
+        msgs = []
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                try:
+                    d = json.loads(line)
+                    issued = calendar.timegm(time.strptime(str(d.get("created_at"))[:19], "%Y-%m-%dT%H:%M:%S"))
+                except (ValueError, TypeError):
+                    continue   # a blank or partial line, or an odd timestamp: skip it, keep the rest
+                if isinstance(d, dict) and d.get("type") == "USER_INPUT" and d.get("source") == "USER_EXPLICIT":
+                    m = re.search(r"<USER_REQUEST>\s*(.*?)\s*</USER_REQUEST>", str(d.get("content") or ""), re.S)
+                    msgs.append((issued, m.group(1) if m else ""))
+        # Newest first by time, not file order: a line appended out of turn does not become the latest.
+        for issued, text in sorted(msgs, key=lambda x: x[0], reverse=True):
+            if is_continue(text):
+                continue
+            return detect_grants(text) if time.time() - issued <= CARRY_SECONDS else frozenset()
+    except Exception:
+        pass
+    return frozenset()   # unreadable or unknown: nothing authorized
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--decision", choices=("ask", "deny"), default="ask")
@@ -796,7 +842,7 @@ def main():
     if args.tool == "antigravity":
         global ANTIGRAVITY
         ANTIGRAVITY = True
-        args.decision = "ask"   # Antigravity can ask the user; there are no turn grants (no prompt hook)
+        args.decision = "ask"   # Claude's rules and turn grants; emit() turns ask into a refusal
         call = data.get("toolCall")
         call = call if isinstance(call, dict) and call.get("name") == "run_command" else {}
         cmd = (call.get("args") or {}).get("CommandLine", "")
@@ -822,10 +868,14 @@ def main():
         cmd += "\n" + "\n".join(todo)
     # The grant file is written by the prompt hook. A command that names it could forge a grant. This
     # raises the bar for an accident only: the agent's shell can write any file this hook can.
-    if re.search(r"agent-kit-grant", cmd, re.I):
+    # Antigravity's transcript is the same kind of source for a carried grant.
+    if re.search(r"agent-kit-grant|transcript(?:_full)?\.jsonl|antigravity-cli[/\\]+brain", cmd, re.I):
         emit(args.decision, GRANT_ASK)
-    # Grants only exist in Claude ask-mode; Codex (deny) never consults them.
-    grants = load_grants(data.get("session_id") or "") if args.decision == "ask" else frozenset()
+    # Grants exist in Claude and Antigravity; Codex (deny) never consults them.
+    if ANTIGRAVITY:
+        grants = antigravity_grants(data)
+    else:
+        grants = load_grants(data.get("session_id") or "") if args.decision == "ask" else frozenset()
 
     # The pre-push overrides. Asked every time, never covered by a grant: a release push to a
     # release-only branch, or a forced push, is the owner's act, not something a chat request authorizes.
@@ -903,7 +953,16 @@ def main():
                 best = res
     if best:
         emit(*best)
+    # Approve only what the guard could read. Code it cannot see into (an encoded PowerShell command, a git
+    # alias, inline interpreter code) falls through to Antigravity's own policy and its reviewer.
+    if ANTIGRAVITY and not _OPAQUE.search(cmd):
+        emit("allow", "the command guard found nothing here that needs you.")
     sys.exit(0)
+
+
+_OPAQUE = re.compile(r"(?:^|\s)-e(?:nc(?:odedcommand)?|c)?\s+[A-Za-z0-9+/=]{16,}|\balias\.|"
+                     r"\b(?:python[\d.]*|py|node|deno|bun|ruby|perl|php|pwsh|powershell)(?:\.exe)?\s+(?:-[\w.-]+\s+)*-[ceE]\b",
+                     re.I)
 
 
 try:

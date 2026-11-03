@@ -362,8 +362,8 @@ and the installer is the adapter between them:
 | Depth tier (6 rules) | `.claude/rules/`, loads by file path | 4 of 6 as `.agents/skills/`, loads by task match; the 2 path-shaped ones (`code-correctness`, `tests`) don't port and stay one-liners in the floor | the same 4 skills, plus the 2 path-shaped ones as glob rules in `.agents/rules/` |
 | Task tier (4 skills) | `.claude/skills/`, and machine-wide by link from the machine install | `.agents/skills/`, same files, and the machine-wide copy in `~/.agents/skills` | `.agents/skills/`, shared with Codex, and `skills.json` for the machine-wide copy |
 | Git-layer guards | yes | yes | yes |
-| Tool-layer guard | `ask`, machine-wide | `deny`, machine-wide | asks every time, per project (`.agents/hooks.json`) |
-| Turn-scoped git grants | yes | no (deny mode; you push) | no (it asks; you approve) |
+| Tool-layer guard | `ask`, machine-wide | `deny`, machine-wide | approves or refuses, never asks, per project (`.agents/hooks.json`) |
+| Turn-scoped git grants | yes | no (deny mode; you push) | yes, from the hook's `lastUserInput` (Antigravity 1.4.7+) |
 | Session-start update check | yes | yes | yes, on the first call of each conversation (a global `PreInvocation` hook; Antigravity has no `SessionStart` event) |
 | Measured | 48 cases, Sonnet | 15 cases, see [Limits](#limits) | 13 cases, small sample, see [Limits](#limits) |
 
@@ -507,7 +507,7 @@ decision record in [`docs/senior-engineer.md`](docs/senior-engineer.md) before u
 |---|---|---|
 | **Rules** | `CLAUDE.md`, a one-line `@AGENTS.md` import | `AGENTS.md`, the file itself |
 | **commit** | runs without a prompt: it is local and undoable. `--no-verify` **denied** | runs |
-| **push / open or merge a PR** | runs **only when your message that turn asked for it** ("push it", "merge it to main", "cut 0.6.3"); otherwise the tool hook **asks**. Force and `--no-verify` **denied**, grant or not | tool hook **denies** (you push and merge) |
+| **push / open or merge a PR** | runs **only when your message that turn asked for it** ("push it", "merge it to main", "cut 0.6.3"); otherwise the tool hook **refuses** and the agent reports it ready to push. Force and `--no-verify` **denied**, grant or not | tool hook **denies** (you push and merge) |
 | **force / delete to `main`** | git `pre-push` blocks it | git `pre-push` (same file) |
 | **secrets in a commit** | git `pre-commit` blocks staged secrets | same file |
 | **destructive cmds** (`rm -rf` or `Remove-Item -Recurse` outside the project and temp folder, `dd`, `mkfs`, `curl\|sh`) | tool hook **asks** | tool hook **denies** |
@@ -516,8 +516,9 @@ decision record in [`docs/senior-engineer.md`](docs/senior-engineer.md) before u
 | **self-protection** | `deny` writes to `.git/hooks`, `.git/config`, settings and the kit's folder, and setting `core.hooksPath` | `config.toml` (sandbox) |
 
 Codex has no `ask`, so where Claude prompts, Codex **denies** and you do it yourself. Antigravity gets
-the same guard as a workspace hook: its denials match Claude's, and where Claude asks it asks every
-time (`force_ask`), so an earlier "always allow" never covers a later push. The git-layer hooks
+the same guard as a workspace hook, with Claude's turn grants. It never asks: where Claude asks it
+refuses, and a command it has no objection to it approves (`auto_approve`), so Antigravity's own prompt
+never stalls a run. The git-layer hooks
 run under `git` itself, so they survive flag-reordering, `--no-verify`, Codex, and MCP-driven commits.
 `command-guard.py` is the fast prompt-time catch on top.
 
@@ -660,11 +661,12 @@ guard below still denies the dangerous git commands everywhere); the command gua
 field), so a guard that crashes, times out or cannot start blocks the command instead of letting it through
 (`check` tells you when Python is missing; fix that from your own terminal, the agent cannot). To opt out
 of a field the kit sets on its hook, set it to the value you want: an install never overwrites a value, only
-adds a missing one. It asks before `git push`, `gh pr create` and `gh pr merge` *unless your own message
+adds a missing one. It refuses `git push`, `gh pr create` and `gh pr merge` *unless your own message
 that turn asked for it* (a one-time, turn-scoped grant, below), and denies `--no-verify`/force, setting
 `core.hooksPath`, and writes to `.git/hooks`, `.git/config`, `.claude/settings.json` and `~/.the-agent-kit`.
-It ships no ask rules. On Codex it sets `approval_policy=never` and `sandbox_mode=workspace-write`, so Codex
-never stops to ask; `codex/hooks.json` wires the deny-mode hook.
+It ships no ask rules. On Codex it sets `approval_policy=on-request` with `approvals_reviewer=auto_review`
+and `sandbox_mode=workspace-write`: what the sandbox refuses goes to Codex's reviewer agent, never to you,
+which is what lets a commit write `.git`. `codex/hooks.json` wires the deny-mode hook.
 
 These config choices are deliberate, because the obvious "more locked down" setting makes the agent worse:
 
@@ -672,7 +674,8 @@ These config choices are deliberate, because the obvious "more locked down" sett
   what is safe, do it, and report. In about 3,570 sessions the owner approved 1,448 of 1,452 guard prompts,
   so 0.6.3 cut them down. What still asks: deleting outside the project or the temp folder, `dd`/`mkfs`,
   piping a download into a shell, the guard's own overrides (`AGENT_KIT_APPLY`, `AGENT_KIT_RELEASE`,
-  `AGENT_KIT_ALLOW_FORCE`), and a push, pull request or merge you did not ask for. Commits, deletes inside
+  `AGENT_KIT_ALLOW_FORCE`). A push, pull request or merge you did not ask for is refused, not asked, so it
+  never stalls a run: the agent leaves its commits local and reports them ready. Commits, deletes inside
   the project, `git reset --hard`/`clean`/`branch -D`, adding a dependency, reading a secret file and
   editing `AGENTS.md` run without a prompt; the rules still tell the agent to check a package name, never
   print a secret, and never discard your uncommitted work. A deny never waits: the agent gets a "no" and
@@ -684,8 +687,9 @@ These config choices are deliberate, because the obvious "more locked down" sett
   "cut 0.6.3", which is all three), a `UserPromptSubmit` hook reads your *own* words (a hook the agent
   cannot write to) and lets exactly that operation through for that turn. A bare "continue" after a break
   keeps the grant for up to two hours; any other message resets it. A grant never covers force-push or `--no-verify`.
-  Detection falls back to the prompt, so a missed phrasing costs one click, never a silent push. Codex
-  (deny-mode) ignores grants and leaves pushing and merging to you.
+  A missed phrasing is refused, never a silent push: the agent says it is ready and you ask again. Codex
+  (deny-mode) ignores grants and leaves pushing and merging to you. Antigravity reads the same request
+  from its hook's `lastUserInput`.
 
 - **Running unattended.** In auto mode (`claude --permission-mode auto`) and bypass permissions mode
   (`--dangerously-skip-permissions`) alike, what still stops a run until you answer is the short list
@@ -698,7 +702,10 @@ These config choices are deliberate, because the obvious "more locked down" sett
   mode's switch for them, `CLAUDE_CODE_EVEN_MORE_DANGEROUSLY_SKIP_PERMISSIONS=1`, has no effect while any
   ask or deny rule covers Bash, Read or Edit, which the kit's deny rules do. Both variables work only in the
   environment that starts `claude`, not in a settings file's `env` block
-  ([permission modes](https://code.claude.com/docs/en/permission-modes)).
+  ([permission modes](https://code.claude.com/docs/en/permission-modes)). Codex never asks you (its
+  reviewer agent decides). Antigravity's guard never asks either. Its headless `agy -p` refuses every
+  command unless you pass `--dangerously-skip-permissions`, and the guard's refusals still hold under that
+  flag (checked with agy 1.4.8).
 - **Codex keeps network access on.** The rules require verifying library and API behaviour against the
   version in use rather than recalling it. Switching the sandbox off the network does not make the agent safer, it
   makes it fall back on training data. Anthropic's own guidance notes that when two instructions conflict,

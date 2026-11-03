@@ -160,8 +160,9 @@ Honest labelling inside the skill: the contract-freeze pattern and the verify-RE
   also strips `Claude-Session:` and other agent session-link trailers; keeps your body and real co-authors. Fail-closed if stripping empties the message.
 
 **Tool layer**: `command-guard.py`, a PreToolUse hook (**ask** on Claude Code / **deny** on Codex /
-**asks every time** on Antigravity, as a per-project hook in `.agents/hooks.json` reached through a launcher,
-because Antigravity cannot pass a quoted path to a hook).
+**auto_approve or deny, never ask** on Antigravity, with turn grants read from the hook's `lastUserInput`,
+as a per-project hook in `.agents/hooks.json` reached through a launcher, because Antigravity cannot pass
+a quoted path to a hook). An unrequested push, pull request or merge is refused on every tool, never asked.
 A **best-effort prompt nudge, not a boundary.** Flags hook-disable vectors (`--no-verify`, CLI `core.hooksPath`),
 direct `.git/config` / `GIT_CONFIG_GLOBAL` writes, force/delete push, and destructive commands
 (`rm -rf`, `reset --hard`, `clean`, `branch -D`, `curl|sh`). Wrapper/case/bundle/abbreviation-aware.
@@ -189,7 +190,7 @@ itself. `install.sh check` lists what is missing, optional items included. Off w
   Ordinary work is deliberately untouched: file/folder creation, builds, tests, and dev servers never prompt.
   **`git commit`, `git push`, and `gh pr create` are gated by the command-guard, not a static `ask` rule**
   (they were removed from the ask list): a `UserPromptSubmit` hook records which git-writes the user's *own*
-  message authorized that turn, and the guard emits `allow` for exactly those, `ask` otherwise - so the agent
+  message authorized that turn, and the guard emits `allow` for exactly those, `deny` otherwise - so the agent
   never writes to git on its own, "commit this" is not permission to push, and the grant resets every message.
   Force-push, `--no-verify`, and `gh pr merge` are never covered by a grant, and the guard-`allow` works only
   because there is no `ask` rule to override it - the remaining `ask` rules (secrets, `AGENTS.md`/`CLAUDE.md`
@@ -198,10 +199,10 @@ itself. `install.sh check` lists what is missing, optional items included. Off w
   worth naming: `gh pr create` pushes the branch itself when needed, so authorizing a PR can push without a
   separate `push` grant (it matches the flow of asking for one); and a chained command gets the single most
   restrictive verdict across its segments (deny > ask > allow), so a granted op never tows an ungranted one
-  through - `git push && git commit` with only `commit` granted asks for the whole line. Detection also drops
+  through - `git push && git commit` with only `commit` granted is refused as a whole. Detection also drops
   fenced / quoted / inline-code spans first, so a git verb the user pasted from a log or a teammate mints
   nothing. Codex (deny-mode) ignores grants entirely: it commits freely and leaves pushing to the human.
-- **`codex/config.toml`**: `approval_policy=never` (never stops to ask) · `sandbox_mode=workspace-write` · network **on**, deliberately
+- **`codex/config.toml`**: `approval_policy=on-request` + `approvals_reviewer=auto_review` (what the sandbox refuses goes to Codex's reviewer agent, never to you; a commit's `.git` write needs it) · `sandbox_mode=workspace-write` · network **on**, deliberately
   (Section 5 requires verifying facts against the version in use; switching it off just sends the agent back to memory) · no hand-written env exclude
   list (Codex excludes secret names by default, and a broad one strips `DATABASE_URL` and breaks builds invisibly).
   **`codex/hooks.json`** wires the deny-mode hook.

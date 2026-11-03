@@ -130,7 +130,7 @@ check("install: every Claude rule, hook and key is in place", b.rc == 0
 c = b.json(".codex", "hooks.json")
 check("install: Codex hooks and config.toml keys are in place",
       any("command-guard.py" in x for x in commands(c, "PreToolUse"))
-      and toml(b.p(".codex", "config.toml")).get("approval_policy") == "never", b.out)
+      and toml(b.p(".codex", "config.toml")).get("approval_policy") == "on-request", b.out)
 check("install: git core.hooksPath points at the share's git-hooks",
       b.git("core.hooksPath").replace("\\", "/").endswith(".the-agent-kit/git-hooks"), b.git("core.hooksPath"))
 check("install: one real copy of each kit skill, a Claude link to it, and Antigravity's skills.json entry",
@@ -191,7 +191,7 @@ check("a retired key the user changed is left, and named",
       s.get("attribution") == {"commit": "mine"} and "attribution" in b.out, b.out)
 check("a retired config.toml key is removed; the kit's own keys stay",
       "sandbox_mode" not in toml(b.p(".codex", "config.toml"))
-      and toml(b.p(".codex", "config.toml")).get("approval_policy") == "never", b.out)
+      and toml(b.p(".codex", "config.toml")).get("approval_policy") == "on-request", b.out)
 check("a folder that only looks like a retired kit skill (copied mark, not in the record) is left",
       os.path.isdir(b.p(".agents", "skills", "old-kit-skill")), b.out)
 shutil.rmtree(b.p(".agents", "skills", "old-kit-skill"))
