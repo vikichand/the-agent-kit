@@ -77,7 +77,8 @@ OLD_MATCHERS = {"Bash|PowerShell": ("Bash",)}
 # (or one the current templates ship): the record lives in a folder an agent can write to, so it is never
 # trusted to say what else is the kit's. Add a key here when the templates gain one; keep it when they drop it.
 KIT_KEYS = ("attribution", "includeGitInstructions", "worktree")
-KIT_TOML = (("", "approval_policy"), ("", "sandbox_mode"), ("sandbox_workspace_write", "network_access"))
+KIT_TOML = (("", "approval_policy"), ("", "approvals_reviewer"), ("", "sandbox_mode"),
+            ("sandbox_workspace_write", "network_access"))
 NAME = re.compile(r"^(?!\.)[\w.-]+$")   # a skill name: never "." or "..", never hidden
 # The skills older kits shipped, before the record: only these names may be taken as an older kit's copy.
 LEGACY_SKILLS = ("generating-reports", "orchestrating-work", "tidy", "writing-docs")
