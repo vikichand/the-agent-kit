@@ -11,10 +11,12 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-11-04
+
 ### Changed
 
-- Nothing an agent does waits on you any more, so an overnight run finishes. A push, pull request or
-  merge you did not ask for that turn is refused instead of asked: the agent keeps its commits local,
+- A push, pull request or merge no longer stops an overnight run to wait for you. One you did not ask
+  for that turn is refused instead of asked: the agent keeps its commits local,
   finishes the task, and ends its report with what is ready to push. Say "push it" after you review.
   Asking for it in your message still lets it through, as before.
 - Codex commits now work. It runs with `approval_policy = "on-request"` and
@@ -25,7 +27,8 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 - Antigravity never waits either. The guard approves the commands it has no objection to, refuses what
   Claude Code would ask about (deleting outside the project, `curl | sh`, the guard overrides), and now
   reads your latest message, so "push it" or "merge the PR" works there as it does in Claude Code,
-  "continue" included. Needs Antigravity 1.4.7 or later. For headless `agy -p` runs, add
+  "continue" included. Code the guard cannot read (an encoded PowerShell command, a git alias, inline
+  `python -c`) goes to Antigravity's own reviewer instead. Needs Antigravity 1.4.7 or later. For headless `agy -p` runs, add
   `--dangerously-skip-permissions`: headless mode refuses every command otherwise, and the guard's
   refusals still hold under that flag.
 
@@ -492,7 +495,8 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.6.3...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.6.4...develop
+[0.6.4]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.4
 [0.6.3]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.3
 [0.6.2]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.2
 [0.6.1]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.1
