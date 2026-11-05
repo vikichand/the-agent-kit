@@ -26,6 +26,9 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   project until you do.
 - When the Antigravity guard crashes, or every Python the entry tries fails, the command is refused with a
   reason instead of relying on an exit code Antigravity does not document.
+- The docs no longer say Claude Code ignores `AGENTS.md`. Since 2.1.277 it reads `AGENTS.md` when no
+  `CLAUDE.md` or `CLAUDE.local.md` exists; the kit keeps its `@AGENTS.md` import, which a personal
+  `CLAUDE.local.md` cannot switch off.
 - `install.sh check` warns when `.agents/` holds a file that Antigravity's hook could run instead of the
   guard: one named like a Python interpreter (`py.bat`, `python.exe`), or a stray `.py` module.
 

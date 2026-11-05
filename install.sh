@@ -225,8 +225,8 @@ install_project() {   # self-contained: full rules + git hooks. $1 = repo root (
   root=${1:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}
   say "Installing FULL rules + git hooks into: $root"
   # AGENTS.md holds the rules (the cross-tool standard: Codex, Cursor, Aider, Copilot...). Claude Code
-  # reads CLAUDE.md only, so CLAUDE.md IMPORTS AGENTS.md rather than duplicating it - one source of
-  # truth, no drift. Everything the kit writes here is in .agents/the-agent-kit.json (setup/project.py).
+  # reads AGENTS.md itself only while no CLAUDE.md or CLAUDE.local.md exists, so CLAUDE.md IMPORTS
+  # AGENTS.md rather than duplicating it - one source of truth, no drift. Everything the kit writes here is in .agents/the-agent-kit.json (setup/project.py).
   prc=0; project install "$root" --apply || prc=$?
   install_git_hooks "$root"
   [ "$prc" = 0 ]

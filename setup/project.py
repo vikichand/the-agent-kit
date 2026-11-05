@@ -62,7 +62,7 @@ STUB = """<!-- The universal rules live in your global ~/.claude/CLAUDE.md (and 
 <!-- Run the setup prompt (~/.the-agent-kit/docs/project-setup-prompt.md) to fill this in (~15-30 lines, one screen). -->
 <!-- PROJECT-CONFIG:END -->
 """
-IMPORTER = """<!-- Claude Code reads CLAUDE.md, not AGENTS.md, so this file imports the rules instead of copying them.
+IMPORTER = """<!-- Claude Code reads AGENTS.md itself only while no CLAUDE.md or CLAUDE.local.md exists, so this file imports the rules instead of copying them.
      One source of truth, nothing to keep in sync. Put Claude-Code-only notes BELOW the import line. -->
 @AGENTS.md
 """

@@ -555,8 +555,9 @@ beside it. Checked on 2026-10-31 against the docs and Claude Code 2.1.316:
 > keys into them. Pasting the whole snippet over an existing file wipes what's there.
 
 **Why two rules files.** `AGENTS.md` is the cross-tool standard (Codex, Cursor, Aider, Copilot).
-Claude Code reads `CLAUDE.md` and *not* `AGENTS.md`, so the kit follows Anthropic's documented
-pattern: `CLAUDE.md` contains `@AGENTS.md` and nothing else. One source of truth, and an edit reaches
+Claude Code reads `AGENTS.md` on its own only when no `CLAUDE.md` or `CLAUDE.local.md` exists (2.1.277
+and later), so one personal `CLAUDE.local.md` would switch the rules off. The kit follows Anthropic's
+documented pattern instead: `CLAUDE.md` contains `@AGENTS.md` and nothing else. One source of truth, and an edit reaches
 both tools at once. A symlink works too but needs Administrator or Developer Mode on Windows.
 
 **Two limits, both enforced silently.** Codex truncates past 32 KiB (`project_doc_max_bytes`) with no

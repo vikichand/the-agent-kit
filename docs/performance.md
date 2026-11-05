@@ -27,8 +27,8 @@ anything, while a real session re-reads it at a tenth of the price on every late
 3. **Cost per pass**: total spend over passes, reported for both arms. A failed attempt is not free.
 
 `summarize.py` prints all three ("cost split"). The vendors document the trade-off in their own numbers:
-Sonnet 5.5's keep-working prompt "runs longer and costs more", its verification paragraph adds "a slightly
-higher cost per task", Opus 5.5's finish-the-task addition means "more tool calls and output tokens". The
+Sonnet 5.5's keep-working prompt means sessions at low and medium effort "run longer and cost more", its
+verification paragraph adds "a slightly higher cost per task", Opus 5.5's finish-the-task addition means "more tool calls and output tokens". The
 behaviours the kit enforces are the ones the model makers say cost more per task; part 2 is where that shows.
 
 ## What the evidence says
