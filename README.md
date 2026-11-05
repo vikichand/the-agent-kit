@@ -517,8 +517,9 @@ decision record in [`docs/senior-engineer.md`](docs/senior-engineer.md) before u
 
 Codex has no `ask`, so where Claude prompts, Codex **denies** and you do it yourself. Antigravity gets
 the same guard as a workspace hook, with Claude's turn grants. It never asks: where Claude asks it
-refuses, and a command it has no objection to it approves (`auto_approve`), so Antigravity's own prompt
-never stalls a run. The git-layer hooks
+refuses, and a command it has no objection to it approves (`auto_approve`), which Antigravity's docs say
+skips its own prompt. Headless `agy -p` ignores that approval and refuses every command that needs a
+permission unless you pass `--dangerously-skip-permissions` (agy 1.5.1). The git-layer hooks
 run under `git` itself, so they survive flag-reordering, `--no-verify`, Codex, and MCP-driven commits.
 `command-guard.py` is the fast prompt-time catch on top.
 
@@ -724,7 +725,8 @@ These config choices are deliberate, because the obvious "more locked down" sett
   ([permission modes](https://code.claude.com/docs/en/permission-modes)). Codex never asks you (its
   reviewer agent decides). Antigravity's guard never asks either. Its headless `agy -p` refuses every
   command unless you pass `--dangerously-skip-permissions`, and the guard's refusals still hold under that
-  flag (checked with agy 1.4.8).
+  flag (checked with agy 1.5.1). A hook's approval does not lift that refusal, and the run still exits 0,
+  so a lead that delegates to `agy` treats an empty response as a failed slice.
 - **Codex keeps network access on.** The rules require verifying library and API behaviour against the
   version in use rather than recalling it. Switching the sandbox off the network does not make the agent safer, it
   makes it fall back on training data. Anthropic's own guidance notes that when two instructions conflict,

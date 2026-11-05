@@ -26,6 +26,10 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   project until you do.
 - When the Antigravity guard crashes, or every Python the entry tries fails, the command is refused with a
   reason instead of relying on an exit code Antigravity does not document.
+- The orchestration skill no longer says a headless `agy` worker waits forever on a permission prompt.
+  On agy 1.5.1 it refuses every such command at once, and a hook's approval does not lift that, so a
+  worker that runs commands needs `--dangerously-skip-permissions` (with your approval, in its own
+  worktree; the guard's denials still hold), and an empty response counts as a failed slice.
 - The docs no longer say Claude Code ignores `AGENTS.md`. Since 2.1.277 it reads `AGENTS.md` when no
   `CLAUDE.md` or `CLAUDE.local.md` exists; the kit keeps its `@AGENTS.md` import, which a personal
   `CLAUDE.local.md` cannot switch off.

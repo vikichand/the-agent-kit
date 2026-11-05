@@ -19,18 +19,22 @@ use the CLI as below. Check flags with `--help` on the installed version before 
 |---|---|---|
 | Read-only task | `codex exec -C <dir> --json -o result.md - < brief.md` (read-only is the default sandbox) | `agy -p "Read brief.md and carry it out." --mode plan --output-format json --print-timeout <secs>s` |
 | Task that edits files | add `-s workspace-write`, in a dedicated worktree | `--mode accept-edits` instead of `plan`, in a dedicated worktree |
+| Task that runs commands (tests, builds) | as above: the sandbox runs them | `--dangerously-skip-permissions`, in a dedicated worktree, only with the user's approval (below) |
 | Model and effort | `-m <model> -c model_reasoning_effort="<level>"` | `--model <model> --effort <level>` |
 | Follow-up turn | `codex exec resume <thread_id> -c 'sandbox_mode="workspace-write"' -o result.md - < brief2.md`; the thread id is in the first `--json` event | `agy -p "<prompt>" --conversation <conversation_id>`; the id is in the JSON result |
 | The answer | the `-o` file | the `response` field of the JSON result |
 
 - `codex exec resume` has no `-s` or `-C`: a follow-up that edits files must restate the sandbox with
   `-c 'sandbox_mode="workspace-write"'`, or it runs read-only.
-- A headless `agy` run waits forever on a permission prompt. `plan` and `accept-edits` were verified to
-  finish read-only and file-edit tasks without one; whether a shell command in `accept-edits` prompts is
-  not verified, so set `--print-timeout` and an outer timeout. Never pass
-  `--dangerously-skip-permissions` unless the user approved it for that run.
-- Judge the result, not the exit code: Antigravity exits 0 even when a tool call was denied. Read the
-  result, then check the worktree with `git diff` and the slice's own checks (section 5 of the skill).
+- A headless `agy` run refuses at once every shell command that needs a permission, and an approval from
+  a hook (the kit's guard included) does not change that (agy 1.5.1). `plan` and `accept-edits` finish
+  read-only and file-edit tasks. A worker that has to run commands needs `--dangerously-skip-permissions`:
+  pass it only when the user has approved it, for that run or once for unattended work, and only in a
+  dedicated worktree. The kit's guard hook stays the backstop, since a hook's deny holds under the flag.
+  Always set `--print-timeout` and an outer timeout; a run the timeout cuts short exits 3.
+- Judge the result, not the exit code: Antigravity exits 0 even when a tool call was denied. An empty
+  `response`, or "auto-denied" on stderr, means the worker did nothing: re-route the slice. Otherwise read
+  the result, then check the worktree with `git diff` and the slice's own checks (section 5 of the skill).
 - The worker never commits unless the brief says so.
 
 ## Handing back
