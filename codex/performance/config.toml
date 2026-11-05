@@ -12,7 +12,7 @@ model_reasoning_effort = "medium"  # medium won Claude's 2026-10-21 effort sweep
 
 [agents]
 enabled = true
-default_subagent_model = "gpt-6-sol"
+default_subagent_model = "gpt-6.1-sol"
 default_subagent_reasoning_effort = "medium"
 max_concurrent_threads_per_session = 2   # excludes the primary thread. Codex also has max_depth
                                          # (documented as the v1 recursion limit); left unset, so nesting
