@@ -11,6 +11,13 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+### Added
+
+- `install.sh check` suggests an AI-aware `.gitignore`
+  ([the-ultimate-gitignore-ai](https://github.com/vikichand/the-ultimate-gitignore-ai)) in a git repo that
+  has none, and says so when it is present. It never writes the file.
+- The README says which kit files to commit.
+
 ### Changed
 
 - Antigravity's session-start check is a `SessionStart` hook, which agy 1.5.1 documents, instead of a
@@ -21,13 +28,6 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 - The Codex performance profile's implementer and default subagent model is `gpt-6.1-sol`, which Codex
   now lists first ("near-Astra performance at a lower cost"). The README's Codex results were measured on
   `gpt-6-sol` and say so.
-
-### Added
-
-- `install.sh check` suggests an AI-aware `.gitignore`
-  ([the-ultimate-gitignore-ai](https://github.com/vikichand/the-ultimate-gitignore-ai)) in a git repo that
-  has none, and says so when it is present. It never writes the file.
-- The README says which kit files to commit.
 
 ### Fixed
 
