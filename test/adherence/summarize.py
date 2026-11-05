@@ -34,6 +34,7 @@ PRICES = {
     "gpt-6-astra": (10.00, 1.00, 50.00),
     "gpt-6-luna": (0.10, 0.01, 0.50),
     "gpt-6-sol": (2.00, 0.20, 10.00),
+    "gpt-6.1-sol": (2.00, 0.10, 10.00),   # same page, fetched 2026-11-06
     "gemini-3.8-flash": (0.75, 0.075, 3.75),
 }
 # Claude cache-WRITE price, USD per 1M tokens, by the model column's family (the eval records "sonnet/medium").

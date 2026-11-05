@@ -732,8 +732,9 @@ These config choices are deliberate, because the obvious "more locked down" sett
   makes it fall back on training data. Anthropic's own guidance notes that when two instructions conflict,
   the model may pick one arbitrarily, so the kit does not ship that conflict. Set it `false` when reviewing
   untrusted code and expect doc lookups to fail loudly.
-- **No hand-written env-var exclude list.** Codex already excludes secret-looking names by default. A broad
-  custom list (`*_URL`, `*KEY*`) strips `DATABASE_URL`, `VITE_API_URL`, and `KEYCLOAK_*` out of the
+- **No hand-written env-var exclude list.** Codex passes every variable to commands by default, names with
+  `KEY`, `SECRET` or `TOKEN` included (codex-cli 0.166.0), so keep real secrets out of the environment you
+  start it from. A broad custom list (`*_URL`, `*KEY*`) strips `DATABASE_URL`, `VITE_API_URL`, and `KEYCLOAK_*` out of the
   environment, so commands fail for a reason the agent cannot see, and it then invents a cause.
 
 ## Verify

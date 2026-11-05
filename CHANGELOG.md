@@ -32,6 +32,11 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   project until you do.
 - When the Antigravity guard crashes, or every Python the entry tries fails, the command is refused with a
   reason instead of relying on an exit code Antigravity does not document.
+- The Codex config notes said Codex strips secret-looking variables from commands by default. It does
+  not: with codex-cli 0.166.0 a variable named `*_SECRET`, `*_API_KEY` or `*_TOKEN` reaches every command,
+  so keep real secrets out of the environment you start Codex from.
+- The orchestration skill and the Codex performance profile no longer name `agents.max_depth`, which the
+  Codex config reference no longer lists.
 - The orchestration skill no longer says a headless `agy` worker waits forever on a permission prompt.
   On agy 1.5.1 it refuses every such command at once, and a hook's approval does not lift that, so a
   worker that runs commands needs `--dangerously-skip-permissions` (with your approval, in its own
