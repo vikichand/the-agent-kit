@@ -406,6 +406,11 @@ git config core.hooksPath .git/hooks
 
 d=$(sh "$KIT/install.sh" --check 2>&1)
 has 'pre-commit not installed' "$d" && pass "D1 missing hook reported" || bad "D1 missing hook NOT reported"
+has 'no AI-aware .gitignore' "$d" && pass "D1g missing AI .gitignore suggested" || bad "D1g missing AI .gitignore NOT suggested"
+printf '# >>> the-ultimate-gitignore-ai:START\n' > .gitignore
+d2=$(sh "$KIT/install.sh" --check 2>&1); rm -f .gitignore
+has 'carries the-ultimate-gitignore-ai' "$d2" && ! has 'no AI-aware .gitignore' "$d2" \
+  && pass "D1h AI .gitignore recognised, no suggestion" || bad "D1h AI .gitignore not recognised"
 
 for h in commit-msg pre-commit pre-push; do cp "$KIT/hooks/$h" ".git/hooks/$h"; chmod +x ".git/hooks/$h"; done
 d=$(sh "$KIT/install.sh" --check 2>&1)

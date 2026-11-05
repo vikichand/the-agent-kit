@@ -960,6 +960,13 @@ doctor() {
         dfail=1; say "  FAIL: $hd/$h is NOT the kit's - that guard is INACTIVE. Merge the kit's $h into it."
       fi
     done
+    # Suggest only: a .gitignore is the project's, and one added after the first commit untracks nothing.
+    if grep -q 'the-ultimate-gitignore-ai:START' .gitignore 2>/dev/null; then
+      say "  OK:   .gitignore carries the-ultimate-gitignore-ai"
+    else
+      say "  NOTE: no AI-aware .gitignore - agent overrides (*.local.*) and session files can be committed by"
+      say "        accident. See https://github.com/vikichand/the-ultimate-gitignore-ai (kit README: Customise per project)."
+    fi
   fi
   # Rules files. Both tools enforce a limit SILENTLY: Codex truncates AGENTS.md past
   # project_doc_max_bytes (32 KiB default, no warning); Claude Code loads CLAUDE.md in full but

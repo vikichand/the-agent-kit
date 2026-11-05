@@ -603,6 +603,24 @@ for launch readiness.
 The full senior-engineer trait ledger behind these bars, with rationale and sources, is
 **[docs/senior-engineer.md](docs/senior-engineer.md)**.
 
+**Commit the kit's files, and give the repo an AI-aware `.gitignore`.** `AGENTS.md`, `.claude/` and
+`.agents/` are team config, so they belong in git; per-developer overrides (`*.local.*`) and agent session
+state do not. **[the-ultimate-gitignore-ai](https://github.com/vikichand/the-ultimate-gitignore-ai)** draws
+that line for Claude Code, Codex, Antigravity and about twenty other tools, and agrees with the kit by
+design. Add it before the first commit: a `.gitignore` never untracks a file that is already committed.
+
+```sh
+curl -o .gitignore https://raw.githubusercontent.com/vikichand/the-ultimate-gitignore-ai/main/ultimate.gitignore
+```
+
+Appending to a `.gitignore` you already have: `curl -s <same URL> >> .gitignore`.
+
+One kit file names your machine: the Antigravity guard entry in `.agents/hooks.json` calls the Python the
+installer found (`py -3` on Windows, `python3` elsewhere), and Antigravity blocks every command when a hook
+cannot start. On a team that mixes Windows with macOS or Linux, either keep `.agents/hooks.json` out of git
+(a line below the gitignore's `:END` marker) or have everyone run the installer and accept that the entry
+changes with whoever ran it last.
+
 ## What each guard does
 
 **command-guard** (`hooks/command-guard.py`, tool layer) runs as a PreToolUse hook, `--decision ask` on

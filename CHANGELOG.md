@@ -11,6 +11,14 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+### Added
+
+- `install.sh check` suggests an AI-aware `.gitignore`
+  ([the-ultimate-gitignore-ai](https://github.com/vikichand/the-ultimate-gitignore-ai)) in a git repo that
+  has none, and says so when it is present. It never writes the file.
+- The README says which kit files to commit, and warns that `.agents/hooks.json` names the installing
+  machine's Python, which breaks Antigravity on a teammate's machine with a different OS.
+
 ## [0.6.4] - 2026-11-04
 
 ### Changed
