@@ -16,8 +16,18 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 - `install.sh check` suggests an AI-aware `.gitignore`
   ([the-ultimate-gitignore-ai](https://github.com/vikichand/the-ultimate-gitignore-ai)) in a git repo that
   has none, and says so when it is present. It never writes the file.
-- The README says which kit files to commit, and warns that `.agents/hooks.json` names the installing
-  machine's Python, which breaks Antigravity on a teammate's machine with a different OS.
+- The README says which kit files to commit.
+
+### Fixed
+
+- The Antigravity guard entry in `.agents/hooks.json` is one command for every OS. It used to name the
+  installing machine's Python, so a committed file blocked every Antigravity command for a teammate on
+  another OS. Run the installer in a project once to update an older entry; `install.sh check` flags the
+  project until you do.
+- When the Antigravity guard crashes, or every Python the entry tries fails, the command is refused with a
+  reason instead of relying on an exit code Antigravity does not document.
+- `install.sh check` warns when `.agents/` holds a file that Antigravity's hook could run instead of the
+  guard: one named like a Python interpreter (`py.bat`, `python.exe`), or a stray `.py` module.
 
 ## [0.6.4] - 2026-11-04
 

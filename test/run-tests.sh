@@ -833,6 +833,43 @@ else
   printf '%s' "$o" | grep -q '"decision": "deny"' \
     && pass "A3 the launcher runs the installed guard: a force push is denied" \
     || bad "A3 the launcher did not deny a force push (got: $o)"
+  # A3b-A3d: hooks.json is committed, so its one command has to work on every teammate's OS. Antigravity runs
+  # it through `sh -c` on Unix and `cmd /c` on Windows (its hooks doc); each interpreter in the || chain runs
+  # only when the one before it fails. Fakes stand in for a machine with no `py`, and for a crash.
+  agc=$($PY -c "import json,sys; print(json.load(open(sys.argv[1]))['the-agent-kit']['PreToolUse'][0]['hooks'][0]['command'])" "$hj")
+  # The fake python3 calls the real one by absolute path: by name it would find itself first on PATH and loop.
+  fb=$(mktemp -d); rpy=$($PY -c "import sys; print(sys.executable.replace(chr(92), '/'))")
+  printf '#!/bin/sh\nexec "%s" "$@"\n' "$rpy" > "$fb/python3"
+  printf '#!/bin/sh\nexit 127\n' > "$fb/py"; chmod +x "$fb/py" "$fb/python3"
+  push='{"toolCall":{"name":"run_command","args":{"CommandLine":"git push --force"}}}'
+  o=$(cd "$u/.agents" && printf '%s' "$push" | HOME="$ah" USERPROFILE="$(wp "$ah")" PATH="$fb:$PATH" sh -c "$agc" 2>/dev/null)
+  printf '%s' "$o" | grep -q '"decision": "deny"' \
+    && pass "A3b the hook command finds the next Python when py is missing: a force push is denied" \
+    || bad "A3b the hook command did not reach the guard without py (got: $o)"
+  printf '#!/bin/sh\ncat >/dev/null\nexit 1\n' > "$fb/py"
+  o=$(cd "$u/.agents" && printf '%s' "$push" | HOME="$ah" USERPROFILE="$(wp "$ah")" PATH="$fb:$PATH" sh -c "$agc" 2>/dev/null); rc=$?
+  # Antigravity's doc defines the stdout decision, not what a nonzero exit means, so a failure is refused in-band.
+  [ "$rc" -eq 0 ] && printf '%s' "$o" | grep -q '"decision": "deny"' && printf '%s' "$o" | grep -q 'guard did not run' \
+    && pass "A3c a Python that read the input and failed leaves the next one refusing the command" \
+    || bad "A3c a failed first attempt was not refused in-band (rc=$rc, got: $o)"
+  rm -rf "$fb"
+  ch=$(mktemp -d); mkdir -p "$ch/.the-agent-kit/hooks"
+  printf 'import sys\nsys.stdin.read()\nraise RuntimeError("boom")\n' > "$ch/.the-agent-kit/hooks/command-guard.py"
+  o=$(cd "$u/.agents" && printf '%s' "$push" | HOME="$ch" USERPROFILE="$(wp "$ch")" $PY agent-kit-guard.py --tool antigravity 2>/dev/null); rc=$?
+  [ "$rc" -eq 0 ] && printf '%s' "$o" | grep -q '"decision": "deny"' \
+    && pass "A3e a guard that crashes refuses the command in-band" \
+    || bad "A3e a crashing guard did not refuse the command (rc=$rc, got: $o)"
+  rm -rf "$ch"
+  if command -v cmd.exe >/dev/null 2>&1; then
+    o=$(cd "$u/.agents" && printf '%s' "$push" | HOME="$ah" USERPROFILE="$(wp "$ah")" cmd.exe //d //c "$agc" 2>/dev/null)
+    printf '%s' "$o" | grep -q '"decision": "deny"' \
+      && pass "A3d the hook command runs under cmd /c: a force push is denied" \
+      || bad "A3d the hook command failed under cmd /c (got: $o)"
+    o=$(cd "$u/.agents" && printf '%s' "$push" | HOME="$ah" USERPROFILE="$(wp "$ah")" cmd.exe //d //c "nosuchpy-xyz agent-kit-guard.py --tool antigravity || $agc" 2>/dev/null)
+    printf '%s' "$o" | grep -q '"decision": "deny"' \
+      && pass "A3f under cmd /c a missing interpreter falls through to the next: a force push is denied" \
+      || bad "A3f cmd /c did not fall through past a missing interpreter (got: $o)"
+  else pass "A3d (no cmd.exe on this platform; skipped)"; pass "A3f (no cmd.exe on this platform; skipped)"; fi
   rm -rf "$ah"
   # A4: --update-rules restores a stale launcher and glob rule, and re-adds a removed hook entry.
   printf 'stale\n' > "$u/.agents/agent-kit-guard.py"; printf 'stale\n' > "$u/.agents/rules/tests.md"
@@ -870,6 +907,16 @@ else
     && bad "A7 --check calls a hostile hooks.json wired" \
     || { printf '%s' "$o" | grep -q 'Antigravity guard.*not the kit' && pass "A7 --check rejects a hooks.json whose guard command is not the kit's" \
          || bad "A7 --check says nothing about a hostile Antigravity hook"; }
+  rm -rf "$u"
+  # A7b: cmd /c looks in the hook's folder before PATH, and Python puts the launcher's folder first on
+  # sys.path, so a committed .agents/py.bat or .agents/runpy.py would run instead of the guard.
+  u=$(mktemp -d) && (cd "$u" && git init -q && sh "$KIT/install.sh" project >/dev/null 2>&1 \
+      && printf '@exit /b 0\n' > .agents/py.bat && printf 'x = 1\n' > .agents/runpy.py)
+  o=$(cd "$u" && sh "$KIT/install.sh" --check 2>&1)
+  ! printf '%s' "$o" | grep -q 'OK:   Antigravity guard wired' && printf '%s' "$o" | grep -q 'WARN:.*py.bat' \
+    && printf '%s' "$o" | grep -q 'WARN:.*runpy.py' \
+    && pass "A7b --check names a planted interpreter or module in .agents/ and does not call the guard wired" \
+    || bad "A7b --check missed a planted .agents/py.bat or runpy.py"
   rm -rf "$u"
   # U21: global guidance includes Antigravity, but machine setup leaves its home files alone.
   g=$(mktemp -d) || exit 2

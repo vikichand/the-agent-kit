@@ -189,63 +189,10 @@ rule_to_glob() {  # $1 = rule file -> Antigravity glob rule on stdout: `paths:` 
        {print}' "$1"
 }
 
-write_ag_launcher() {  # $1 = target. Antigravity splits a hook command on whitespace and ignores quotes,
-  # so a guard path under a home folder with a space breaks the hook, and a broken hook blocks every
-  # command. Hooks run from the folder holding hooks.json, so this launcher sits there, is called by
-  # bare name, and hands the call to the machine-wide guard.
-  cat > "$1" <<'LAUNCH'
-# The Agent Kit: launcher for the command guard (see .agents/hooks.json). Kit-owned; install.sh
-# replaces it. Antigravity cannot pass a quoted path to a hook, so the guard is found from here.
-import os, runpy, sys
-
-guard = os.path.join(os.path.expanduser("~"), ".the-agent-kit", "hooks", "command-guard.py")
-if not os.path.isfile(guard):
-    sys.stderr.write("the-agent-kit: no guard at %s; run install.sh. Command not checked.\n" % guard)
-    sys.exit(0)
-sys.argv = [guard] + sys.argv[1:]
-runpy.run_path(guard, run_name="__main__")
-LAUNCH
-}
-
-merge_ag_hooks() {  # $1 = .agents/hooks.json. Add-only: the user's own hook entries are never touched.
-  py=$(detect_py)
-  if [ -z "$py" ]; then say "  ! no Python 3 found - Antigravity guard hook not written (the guard needs it)."; return 0; fi
-  r=$($py - "$1" "$py agent-kit-guard.py --tool antigravity" <<'MERGE'
-import json, os, sys, tempfile
-path, cmd = sys.argv[1], sys.argv[2]
-data = {}
-if os.path.islink(path):
-    print("symlink"); sys.exit(0)
-if os.path.exists(path):
-    try:
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f)
-    except ValueError:
-        print("unreadable"); sys.exit(0)
-if not isinstance(data, dict):
-    print("unreadable"); sys.exit(0)
-if "the-agent-kit" in data:
-    print("kept"); sys.exit(0)
-data["the-agent-kit"] = {"PreToolUse": [{"matcher": "run_command", "hooks": [
-    {"type": "command", "command": cmd, "timeout": 15}]}]}
-fd, tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(path)), prefix=".hooks.", suffix=".tmp")
-with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
-    json.dump(data, f, indent=2); f.write("\n")
-os.replace(tmp, path)   # a kill mid-write must never leave the user's hooks.json half written
-print("added")
-MERGE
-)
-  case "$r" in
-    added)      say "  + wired the command guard into .agents/hooks.json (Antigravity)" ;;
-    unreadable) say "  ! .agents/hooks.json is not a JSON object - left untouched; the Antigravity guard is NOT wired." ;;
-    symlink)    say "  ! .agents/hooks.json is a symlink - left untouched; the Antigravity guard is NOT wired." ;;
-  esac
-}
-
 install_antigravity() {  # $1 = repo root. Antigravity reads AGENTS.md and the .agents/skills Codex gets
   # (the three skills and four domain rules). What only it has: glob-triggered rules, for the two
-  # path-shaped depth files Codex skips, and a workspace PreToolUse hook for the command guard. The four
-  # domain rules stay skills only; writing them here too would load them twice.
+  # path-shaped depth files Codex skips. The four domain rules stay skills only; writing them here too
+  # would load them twice. The guard hook and its launcher come from setup/project.py alone.
   src=""
   [ -d "$KIT/claude/rules" ] && src="$KIT/claude/rules"
   [ -z "$src" ] && [ -d "$KIT/rules" ] && src="$KIT/rules"
@@ -257,9 +204,6 @@ install_antigravity() {  # $1 = repo root. Antigravity reads AGENTS.md and the .
       say "  + wrote .agents/rules/$n.md (Antigravity: loads when a matching file is touched)"
     fi
   done
-  mkdir -p "$1/.agents"
-  [ -e "$1/.agents/agent-kit-guard.py" ] || [ -L "$1/.agents/agent-kit-guard.py" ] || write_ag_launcher "$1/.agents/agent-kit-guard.py"
-  merge_ag_hooks "$1/.agents/hooks.json"
 }
 
 kit_time() {  # the commit time of the kit being installed: a project recorded by a newer kit is left alone
@@ -274,7 +218,7 @@ project() {  # $1 = install | uninstall | check, $2 = repo root, then flags -> s
   py=$(detect_py)
   [ -n "$py" ] || { say "  ! no working Python 3 found - the kit's project install and its guard both need it."; exit 2; }
   $py "$(nat "$KIT/setup/project.py")" "$pr_act" --root "$(nat "$pr_root")" --kit "$(nat "$KIT")" \
-    --kit-time "$(kit_time)" --py "$py" "$@"
+    --kit-time "$(kit_time)" "$@"
 }
 
 install_project() {   # self-contained: full rules + git hooks. $1 = repo root (default: this repo, or here)
@@ -1038,16 +982,23 @@ doctor() {
     hk="absent"
     if [ -n "$py" ] && [ -f .agents/hooks.json ]; then
       hk=$($py - .agents/hooks.json <<'HKCHK' 2>/dev/null
-import json, re, sys
+import json, sys
 try:
     c = json.load(open(sys.argv[1], encoding="utf-8"))["the-agent-kit"]["PreToolUse"][0]["hooks"][0]["command"]
 except Exception:
     print("absent"); sys.exit(0)
-print("ok" if re.fullmatch(r"(python3?|py -3) agent-kit-guard\.py --tool antigravity", str(c)) else "other")
+one = [p + " agent-kit-guard.py --tool antigravity" for p in ("py -3", "python3", "python")]   # setup/project.py AG_CMD
+print("ok" if str(c) in one + [" || ".join(one)] else "other")
 HKCHK
 )
     fi
-    if [ "$hk" = ok ] && [ -f .agents/agent-kit-guard.py ] && [ ! -L .agents/agent-kit-guard.py ]; then
+    # cmd /c looks in the hook's folder before PATH, and Python puts the launcher's folder first on sys.path,
+    # so a file there named like an interpreter, or any other .py, runs instead of the guard.
+    pl=$(ls -A .agents 2>/dev/null | grep -iE '^(pyw?|python[0-9.]*w?)(\.(com|exe|bat|cmd|vbs|vbe|js|jse|wsf|wsh|msc))?$|\.py$' \
+      | grep -vx 'agent-kit-guard.py' | tr '\n' ' ')
+    if [ -n "$pl" ]; then
+      say "  WARN: .agents/ holds $pl- the Antigravity hook can run these instead of the guard. Remove them."
+    elif [ "$hk" = ok ] && [ -f .agents/agent-kit-guard.py ] && [ ! -L .agents/agent-kit-guard.py ]; then
       say "  OK:   Antigravity guard wired (.agents/hooks.json + .agents/agent-kit-guard.py)"
       if [ ! -f "$HOME/.the-agent-kit/hooks/command-guard.py" ]; then
         say "  WARN: the launcher has no guard to call (~/.the-agent-kit/hooks/command-guard.py missing): commands pass UNCHECKED. Run install.sh."

@@ -615,11 +615,11 @@ curl -o .gitignore https://raw.githubusercontent.com/vikichand/the-ultimate-giti
 
 Appending to a `.gitignore` you already have: `curl -s <same URL> >> .gitignore`.
 
-One kit file names your machine: the Antigravity guard entry in `.agents/hooks.json` calls the Python the
-installer found (`py -3` on Windows, `python3` elsewhere), and Antigravity blocks every command when a hook
-cannot start. On a team that mixes Windows with macOS or Linux, either keep `.agents/hooks.json` out of git
-(a line below the gitignore's `:END` marker) or have everyone run the installer and accept that the entry
-changes with whoever ran it last.
+The Antigravity guard entry in `.agents/hooks.json` runs on every teammate's machine, whatever OS ran the
+installer. Antigravity runs a hook through `cmd /c` on Windows and `sh -c` elsewhere, and the entry tries
+`py -3`, then `python3`, then `python`, moving to the next only when one cannot run. An entry written by a
+kit older than this one names a single Python and blocks every Antigravity command on a machine without it:
+run the installer once in that project and commit the result.
 
 ## What each guard does
 
@@ -803,8 +803,8 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
   has no session-start event, so the update check is a `PreInvocation` hook that acts on the first call of
   each conversation; it is built from Antigravity's documented hook contract and tested against canned
   payloads, but not yet seen in a live conversation, and `invocationNum` is not documented to start at any
-  value, so the check keys on the conversation id alone; it splits a hook command on
-  whitespace and ignores quotes, which is why the guard and the check run through launchers beside their
+  value, so the check keys on the conversation id alone; a quoted hook path with a space broke its hooks
+  in testing (it runs a hook through `cmd /c` or `sh -c`), which is why the guard and the check run through launchers beside their
   `hooks.json`, and that
   launcher relies on hooks running from the folder that holds `hooks.json`, verified on Windows only; and
   the guard is advisory against the agent itself, because `.agents/hooks.json` is a project file the agent
