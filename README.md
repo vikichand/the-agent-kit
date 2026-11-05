@@ -119,7 +119,7 @@ see ([Limits](#limits)).
    | Claude Code | `~/.claude/settings.json` | the command guard, the session-start check, and the ask and deny rules |
    | Codex | `~/.codex/hooks.json` | the command guard and the session-start check |
    | Codex | `~/.codex/config.toml` | approval, sandbox and network settings |
-   | Antigravity | `~/.gemini/config/hooks.json` | the session-start check, as a `PreInvocation` hook run through a launcher beside it (your other hooks there are kept) |
+   | Antigravity | `~/.gemini/config/hooks.json` | the session-start check, as a `SessionStart` hook run through a launcher beside it (your other hooks there are kept) |
 
    Every run takes out what the old kit put in, then puts in the new kit. An install record
    (`~/.the-agent-kit/.install-record.json`) lists each entry the kit wrote and its value, so an entry a
@@ -292,10 +292,10 @@ It **never updates or installs anything itself**: running downloaded code at ses
 supply-chain shape the kit's rules forbid, so it only tells you what to run. It exits cleanly on every
 error, so an offline machine or a broken check never blocks a session, and when everything is current
 it prints nothing, so it costs no context. The install wires it into Claude Code and Codex as a `SessionStart`
-hook (`hooks/kit-check.py`). Antigravity has no `SessionStart` event, so there it runs as a global
-`PreInvocation` hook in `~/.gemini/config/hooks.json`: Antigravity fires that before every model call, so
-the check acts only on the first call of each conversation and answers `{}` to every other. Your other
-hooks in that file are kept. To switch it off, set `AGENT_KIT_NO_UPDATE_CHECK=1`.
+hook (`hooks/kit-check.py`), and into Antigravity as a global `SessionStart` hook in
+`~/.gemini/config/hooks.json`, which runs once when a conversation starts and not again when it is
+resumed (agy 1.5.1). An older kit wired it to `PreInvocation`, which fires before every model call; the
+next install moves that entry. Your other hooks in that file are kept. To switch it off, set `AGENT_KIT_NO_UPDATE_CHECK=1`.
 
 ### Also worth having
 
@@ -364,7 +364,7 @@ and the installer is the adapter between them:
 | Git-layer guards | yes | yes | yes |
 | Tool-layer guard | `ask`, machine-wide | `deny`, machine-wide | approves or refuses, never asks, per project (`.agents/hooks.json`) |
 | Turn-scoped git grants | yes | no (deny mode; you push) | yes, from the hook's `lastUserInput` (Antigravity 1.4.7+) |
-| Session-start update check | yes | yes | yes, on the first call of each conversation (a global `PreInvocation` hook; Antigravity has no `SessionStart` event) |
+| Session-start update check | yes | yes | yes, once per conversation (a global `SessionStart` hook) |
 | Measured | 48 cases, Sonnet | 15 cases, see [Limits](#limits) | 13 cases, small sample, see [Limits](#limits) |
 
 **The guards:** hooks at the **git layer** (reorder-proof, covering Claude Code, Codex, Antigravity, plain `git`,
@@ -803,11 +803,9 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
   rule, no better with them. The duplicate-server case showed no gain there either: the baseline already does
   not hop ports. So the two glob rules ship on the strength of their Claude Code
   measurements, not an Antigravity one: Antigravity delivers a glob rule inside the tool output of the file
-  that triggered it, where a model may weigh it as untrusted content. Other limits are Antigravity's own: it
-  has no session-start event, so the update check is a `PreInvocation` hook that acts on the first call of
-  each conversation; it is built from Antigravity's documented hook contract and tested against canned
-  payloads, but not yet seen in a live conversation, and `invocationNum` is not documented to start at any
-  value, so the check keys on the conversation id alone; a quoted hook path with a space broke its hooks
+  that triggered it, where a model may weigh it as untrusted content. Other limits are Antigravity's own: the update check's
+  `SessionStart` event was seen live from a workspace `hooks.json` in a headless `agy -p` run (once per
+  conversation, not on resume), not yet from the global file or in the IDE; a quoted hook path with a space broke its hooks
   in testing (it runs a hook through `cmd /c` or `sh -c`), which is why the guard and the check run through launchers beside their
   `hooks.json`, and that
   launcher relies on hooks running from the folder that holds `hooks.json`, verified on Windows only; and

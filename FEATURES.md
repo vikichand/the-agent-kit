@@ -173,9 +173,8 @@ stray operand.
 **MCP orphans**: `mcp-wrap.py` launches an MCP server so it dies with the agent (Job Object on Windows, process group on POSIX; verified on Windows and Linux, not macOS).
 `mcp-orphans.py` lists, and with `--kill` ends, orphaned MCP trees that match known patterns. See [`docs/mcp-orphans.md`](docs/mcp-orphans.md).
 
-**Session start**: `kit-check.py`, a SessionStart hook on Claude Code and Codex, and on Antigravity (which has no
-SessionStart event) a global PreInvocation hook that acts on the first call of each conversation and always
-answers in JSON. One line when a newer release is on `main` (checked at most daily), when this project's rules
+**Session start**: `kit-check.py`, a SessionStart hook on Claude Code, Codex and Antigravity (there a global
+hook that runs once per conversation and always answers in JSON). One line when a newer release is on `main` (checked at most daily), when this project's rules
 differ from the installed kit, or when a tool on your `~/.the-agent-kit/recommended.json` is missing for the
 agent in use (at most daily; web items only in web projects; optional items never): the agent is told to tell
 you once, in one line, with the install command for each. Silent otherwise; never updates or installs anything

@@ -315,8 +315,8 @@ if [ -n "$PY" ]; then
   has 'tell the user once, in one line' "$o" && has 'claude mcp add --transport http context7' "$o" && has 'claude mcp add chrome-devtools' "$o" \
     && [ "$(printf '%s\n' "$o" | wc -l | tr -d ' ')" = 1 ] \
     && pass "K19 one line, telling the agent to relay the missing tools and their commands once" || bad "K19 reminder wording or length wrong: $o"
-  # K20-K27: Antigravity. It has no SessionStart event but a PreInvocation hook that fires before EVERY model
-  # call and answers in JSON ({} for nothing, {"injectSteps":[{"ephemeralMessage":...}]} to speak) with the
+  # K20-K27: Antigravity. The check runs as its SessionStart hook, but an older kit's PreInvocation entry
+  # fires before EVERY model call until reinstalled, and both answer in JSON ({} for nothing, {"injectSteps":[{"ephemeralMessage":...}]} to speak) with the
   # conversation id and the workspace in the payload. The check must speak once per conversation, say
   # nothing otherwise, and be cheap on the calls it skips.
   ka() {  # $1 = conversation id (empty = none), $2 = workspace -> stdout
@@ -1644,13 +1644,13 @@ else
   bad "no python - machine-wide skills NOT tested"
 fi
 
-# ---------- Antigravity session-start check: a global PreInvocation hook ----------
-# Antigravity has no SessionStart event. Its built-in docs (agy-customizations/docs/hooks.md) define a
-# PreInvocation hook, "Before the model is called", fed {"conversationId", "invocationNum", ...} and
-# answered with {"injectSteps":[{"ephemeralMessage":"..."}]}, in a hooks.json in the global customization
-# root ~/.gemini/config. --setup merges one named hook into that file, which other tools also write to:
-# every existing entry is kept, the write is atomic, and a second run changes nothing. The hook command
-# is split on whitespace with quotes ignored, so it calls a launcher beside hooks.json by bare name.
+# ---------- Antigravity session-start check: a global SessionStart hook ----------
+# Antigravity's built-in docs (agy-customizations/docs/hooks.md, agy 1.5.1) define a SessionStart hook that
+# runs once when a conversation starts, answered with {"injectSteps":[{"ephemeralMessage":"..."}]}, in a
+# hooks.json in the global customization root ~/.gemini/config. Older kits used PreInvocation, which fires
+# before every model call. --setup merges one named hook into that file, which other tools also write to:
+# every existing entry is kept, the write is atomic, and a second run changes nothing. The hook calls a
+# launcher beside hooks.json by bare name, because a quoted path with a space breaks a hook.
 echo "== Antigravity session-start check =="
 if [ -n "$PY" ]; then
   wq() { cygpath -m "$1" 2>/dev/null || printf '%s' "$1"; }
@@ -1665,13 +1665,13 @@ if [ -n "$PY" ]; then
   cmp -s "$(HJ)" "$g/orca.json" && [ ! -e "$g/.gemini/config/agent-kit-check.py" ] \
     && pass "G0 no consent: hooks.json and the config folder are untouched" || bad "G0 wrote Antigravity files without consent: $o"
   su 1
-  $PY - "$(wq "$(HJ)")" "$(wq "$g/orca.json")" <<'EOF' && pass "G1 the check is one named PreInvocation hook; every entry that was there is kept exactly" || bad "G1 hooks.json wrong: $(cat "$(HJ)")"
+  $PY - "$(wq "$(HJ)")" "$(wq "$g/orca.json")" <<'EOF' && pass "G1 the check is one named SessionStart hook; every entry that was there is kept exactly" || bad "G1 hooks.json wrong: $(cat "$(HJ)")"
 import json, re, sys
 d, o = json.load(open(sys.argv[1], encoding="utf-8")), json.load(open(sys.argv[2], encoding="utf-8"))
 assert d["orca-status"] == o["orca-status"], "existing hook changed"
 mine = d["the-agent-kit-check"]
-assert list(mine) == ["PreInvocation"], list(mine)
-h = mine["PreInvocation"][0]
+assert list(mine) == ["SessionStart"], list(mine)
+h = mine["SessionStart"][0]
 assert re.fullmatch(r"(python3?|py -3) agent-kit-check\.py --tool antigravity", h["command"]), h
 assert h["type"] == "command" and h["timeout"] == 10 and '"' not in h["command"]
 EOF
@@ -1701,23 +1701,48 @@ EOF
   # Stale = an older spelling of the kit's own command (another interpreter): the whole entry is the kit's.
   $PY - "$(wq "$(HJ)")" <<'EOF'
 import json, sys
-p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); h = d["the-agent-kit-check"]["PreInvocation"][0]
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); h = d["the-agent-kit-check"]["SessionStart"][0]
 h["command"] = ("python3 " if h["command"].startswith("py -3 ") else "py -3 ") + "agent-kit-check.py --tool antigravity"
 h["timeout"] = 99
 json.dump(d, open(p, "w", encoding="utf-8"))
 EOF
   su 1
-  ! grep -q '^stale$' "$g/.gemini/config/agent-kit-check.py" && [ "$(hk "$(HJ)" "d['the-agent-kit-check']['PreInvocation'][0]['timeout']")" = 10 ] && [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status', 'the-agent-kit-check']" ] \
+  ! grep -q '^stale$' "$g/.gemini/config/agent-kit-check.py" && [ "$(hk "$(HJ)" "d['the-agent-kit-check']['SessionStart'][0]['timeout']")" = 10 ] && [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status', 'the-agent-kit-check']" ] \
     && pass "G5 a stale launcher and a stale kit entry are brought current" || bad "G5 stale files not refreshed: $o"
   # G5b: the kit's current command with a value the user set (a longer timeout): the user's, kept.
   $PY - "$(wq "$(HJ)")" <<'EOF'
 import json, sys
-p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); d["the-agent-kit-check"]["PreInvocation"][0]["timeout"] = 99
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); d["the-agent-kit-check"]["SessionStart"][0]["timeout"] = 99
 json.dump(d, open(p, "w", encoding="utf-8"))
 EOF
   su 1
-  [ "$(hk "$(HJ)" "d['the-agent-kit-check']['PreInvocation'][0]['timeout']")" = 99 ] \
+  [ "$(hk "$(HJ)" "d['the-agent-kit-check']['SessionStart'][0]['timeout']")" = 99 ] \
     && pass "G5b a value the user set on the kit's own entry is kept" || bad "G5b user's timeout overwritten: $o"
+  # G5c: an older kit's PreInvocation entry, with the current command, is the kit's: moved to SessionStart.
+  $PY - "$(wq "$(HJ)")" <<'EOF'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); v = d["the-agent-kit-check"]
+d["the-agent-kit-check"] = {"PreInvocation": [dict(v["SessionStart"][0], timeout=10)]}
+json.dump(d, open(p, "w", encoding="utf-8"))
+EOF
+  su 1
+  [ "$(hk "$(HJ)" "sorted(d['the-agent-kit-check'])")" = "['SessionStart']" ] && [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status', 'the-agent-kit-check']" ] \
+    && pass "G5c an older kit's PreInvocation entry is moved to SessionStart" || bad "G5c the PreInvocation entry was not migrated: $(cat "$(HJ)")"
+  # G5d: a timeout the user set on that old entry moves with it, and a later run keeps it.
+  $PY - "$(wq "$(HJ)")" <<'EOF'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); v = d["the-agent-kit-check"]
+d["the-agent-kit-check"] = {"PreInvocation": [dict(v["SessionStart"][0], timeout=30)]}
+json.dump(d, open(p, "w", encoding="utf-8"))
+EOF
+  su 1; t1=$(hk "$(HJ)" "d['the-agent-kit-check']['SessionStart'][0]['timeout']"); su 1
+  [ "$t1" = 30 ] && [ "$(hk "$(HJ)" "d['the-agent-kit-check']['SessionStart'][0]['timeout']")" = 30 ] \
+    && pass "G5d a timeout set on the old entry moves to SessionStart and stays" || bad "G5d the user's timeout was lost in the move (got $t1): $(cat "$(HJ)")"
+  $PY - "$(wq "$(HJ)")" <<'EOF'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); d["the-agent-kit-check"]["SessionStart"][0]["timeout"] = 10
+json.dump(d, open(p, "w", encoding="utf-8"))
+EOF
   $PY - "$(wq "$(HJ)")" <<'EOF'
 import json, sys
 p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); d["the-agent-kit-check"] = {"PreInvocation": [{"command": "echo mine"}]}
@@ -1731,6 +1756,17 @@ EOF
   src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY=1 sh "$KIT/install.sh" --undo </dev/null 2>&1) || src=$?
   [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status']" ] && [ ! -e "$g/.gemini/config/agent-kit-check.py" ] \
     && pass "G7 --undo removes the kit's hook and launcher and keeps the other tool's hooks" || bad "G7 undo wrong: $(cat "$(HJ)")"
+  # G7b: undo also removes an older kit's PreInvocation entry.
+  printf '%s\n' "$orca" > "$(HJ)"; su 1
+  $PY - "$(wq "$(HJ)")" <<'EOF'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); v = d["the-agent-kit-check"]
+d["the-agent-kit-check"] = {"PreInvocation": v["SessionStart"]}
+json.dump(d, open(p, "w", encoding="utf-8"))
+EOF
+  src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY=1 sh "$KIT/install.sh" --undo </dev/null 2>&1) || src=$?
+  [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status']" ] \
+    && pass "G7b --undo removes an older kit's PreInvocation entry too" || bad "G7b undo left the old entry: $(cat "$(HJ)")"
   rm -rf "$g"
   # G8: a hooks.json that is not a JSON object, or is a symlink, is never rewritten or written through.
   home_; printf '{ not json' > "$(HJ)"; su 1
@@ -1763,7 +1799,7 @@ EOF
   # G11: --global prints the hook for a hand merge and writes nothing under ~/.gemini.
   g=$(mktemp -d) || exit 2; G=$(wq "$g"); mkdir -p "$g/.gemini/config"
   o=$(HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --global 2>&1)
-  has 'PreInvocation' "$o" && has 'agent-kit-check.py' "$o" && [ ! -e "$g/.gemini/config/hooks.json" ] \
+  has '{"SessionStart":' "$o" && has 'agent-kit-check.py' "$o" && [ ! -e "$g/.gemini/config/hooks.json" ] \
     && pass "G11 --global prints the Antigravity hook and writes none of it" || bad "G11 --global omits or wrote the Antigravity hook"
   rm -rf "$g"
 else

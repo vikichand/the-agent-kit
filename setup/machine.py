@@ -292,7 +292,7 @@ class Machine:
         if os.path.isdir(self.cfg) and os.path.isfile(launch_src) and os.path.isfile(os.path.join(self.share, "hooks", "kit-check.py")):
             out.append({"kind": "file", "path": os.path.join(self.cfg, "agent-kit-check.py"), "src": launch_src, "value": file_hash(launch_src)})
             out.append({"kind": "agentry", "file": os.path.join(self.cfg, "hooks.json"), "key": HOOK_KEY,
-                        "value": {"PreInvocation": [{"type": "command", "command": self.py + " agent-kit-check.py --tool antigravity", "timeout": 10}]}})
+                        "value": {"SessionStart": [{"type": "command", "command": self.py + " agent-kit-check.py --tool antigravity", "timeout": 10}]}})
         return out
 
     def hook_entries(self, f, t):
@@ -338,7 +338,12 @@ class Machine:
         if e["kind"] == "hook":
             c = v["hook"].get("command")
             return c if norm(e["file"]) == norm(os.path.join(self.codex, "hooks.json")) else canon(c)
-        return v["PreInvocation"][0].get("command")
+        # The event is part of the kit's spelling: an older kit used PreInvocation. A recorded value may be
+        # hand-edited, so a malformed one reads as no command rather than crashing the plan.
+        ev = next(iter(v), "") if isinstance(v, dict) else ""
+        h = v.get(ev) if ev else None
+        h = h[0] if isinstance(h, list) and h and isinstance(h[0], dict) else {}
+        return "%s %s" % (ev, h.get("command"))
 
     def same(self, e, cur, val):
         if e["kind"] == "hook" and cur is not ABSENT:
@@ -370,7 +375,8 @@ class Machine:
                 if e["key"] not in data:
                     return ABSENT
                 v = data[e["key"]]
-                h = v.get("PreInvocation") if isinstance(v, dict) and list(v) == ["PreInvocation"] else None
+                h = (v[next(iter(v))] if isinstance(v, dict) and list(v) in (["SessionStart"], ["PreInvocation"])
+                     else None)
                 ok = (isinstance(h, list) and len(h) == 1 and isinstance(h[0], dict)
                       and AG_CMD.fullmatch(str(h[0].get("command", ""))) is not None)
                 return v if ok else "not-the-kit's"
@@ -809,7 +815,7 @@ def plan(m, action, record):
             continue
         r = rec_by.get(i)
         if e["kind"] in ("dir", "link", "file") or r is None or m.same(e, cur, r["value"]) \
-                or (e["kind"] == "hook" and m.command(e, cur) != m.command(e, r["value"])):
+                or (e["kind"] in ("hook", "agentry") and m.command(e, cur) != m.command(e, r["value"])):
             take_out(e)
         else:
             m.notes.append("%s: left %s as it is: the kit no longer ships it, but you changed it" % (m.where(e), m.label(e)))
@@ -877,7 +883,14 @@ def plan(m, action, record):
             ours = m.command(e, cur) != m.command(e, e["value"]) or (r is not None and m.same(e, cur, r["value"]))
         else:
             ours = m.same(e, cur, r["value"]) if r else m.legacy_owned(e, cur)
-        if ours:
+        if ours and k == "agentry" and next(iter(cur)) != next(iter(e["value"])) \
+                and m.command(e, cur).split(" ", 1)[1] == m.command(e, e["value"]).split(" ", 1)[1]:
+            # Only the event moved (PreInvocation to SessionStart): what the user set on the handler moves
+            # with it. The record keeps the kit's own value, so the next run reads a carried value as theirs.
+            ev = next(iter(e["value"]))
+            m.set(dict(e, value={ev: [dict(cur[next(iter(cur))][0], command=e["value"][ev][0]["command"])]}))
+            changes.append((m.where(e), "~", "move %s to %s" % (m.label(e), ev)))
+        elif ours:
             m.set(e); changes.append((m.where(e), "~", "update %s" % m.label(e)))
         else:
             done = m.fill_hook(e) if k == "hook" else []

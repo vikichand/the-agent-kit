@@ -4,9 +4,10 @@
 Runs once when a session starts (Claude Code and Codex both call SessionStart hooks; matcher
 `startup`). Whatever it prints becomes context for the agent, so it prints NOTHING when everything is
 current - the common case costs zero tokens - and one line per thing you can act on otherwise.
-Antigravity has no SessionStart event; with `--tool antigravity` this runs as a PreInvocation hook
-(before every model call), acts only on the first call of each conversation id, and always answers in
-the JSON that hook expects: {} to say nothing, {"injectSteps": [{"ephemeralMessage": ...}]} to speak:
+With `--tool antigravity` this runs as Antigravity's SessionStart hook (an older kit wired it to
+PreInvocation, which fires before every model call), acts only on the first call of each conversation
+id either way, and always answers in the JSON those hooks expect: {} to say nothing,
+{"injectSteps": [{"ephemeralMessage": ...}]} to speak:
 
   1. A newer release of the kit is on `main`. Checked with `git ls-remote` (no clone, no download) at
      most once a day, with a 3-second limit; the answer is cached in ~/.the-agent-kit so the other
@@ -313,8 +314,9 @@ def main():
     except (ValueError, OSError):
         data = {}
     if tool == "antigravity":
-        # PreInvocation fires before EVERY model call and blocks the loop while it runs, so a conversation
-        # that has already been served is answered here, before any git or network work.
+        # SessionStart runs once per conversation, but an older kit's PreInvocation entry fires before EVERY
+        # model call until the next install moves it, so a served conversation is answered here, before any
+        # git or network work.
         if not first_invocation(data):
             print("{}")
             return
@@ -353,7 +355,7 @@ def main():
         if line:
             notes.append(line)
 
-    if tool == "antigravity":   # the documented PreInvocation output: {} to stay silent, injectSteps to speak
+    if tool == "antigravity":   # the documented hook output: {} to stay silent, injectSteps to speak
         print(json.dumps({"injectSteps": [{"ephemeralMessage": "\n".join(notes)}]} if notes else {}))
     elif notes:
         print("\n".join(notes))

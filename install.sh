@@ -468,10 +468,10 @@ install_global() {  # copy the kit, then PRINT the settings snippets for a hand 
   say "  add {\"path\": \"~/.agents/skills\", \"include_only\": [<the skill names>]} to \"entries\" in ~/.gemini/config/skills.json (Antigravity)"
 
   hr
-  say "ANTIGRAVITY SESSION-START CHECK - Antigravity has no SessionStart event, so it runs as a PreInvocation hook"
-  say "  that acts on the first call of each conversation. Copy $share/hooks/agent-kit-check.py to"
-  say "  ~/.gemini/config/, then add this under its own name to ~/.gemini/config/hooks.json (keep your other hooks):"
-  say "    \"the-agent-kit\": {\"PreInvocation\": [{\"type\": \"command\", \"command\": \"$py agent-kit-check.py --tool antigravity\", \"timeout\": 10}]}"
+  say "ANTIGRAVITY SESSION-START CHECK - a SessionStart hook, run once when a conversation starts. Copy"
+  say "  $share/hooks/agent-kit-check.py to ~/.gemini/config/, then add this under its own name to"
+  say "  ~/.gemini/config/hooks.json (keep your other hooks; replace an older \"PreInvocation\" entry of the kit's):"
+  say "    \"the-agent-kit-check\": {\"SessionStart\": [{\"type\": \"command\", \"command\": \"$py agent-kit-check.py --tool antigravity\", \"timeout\": 10}]}"
 
   hr
   # $share, never $KIT. Under --update, $KIT is a temp clone this run deletes on its way out, so a
