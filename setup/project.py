@@ -66,9 +66,10 @@ IMPORTER = """<!-- Claude Code reads CLAUDE.md, not AGENTS.md, so this file impo
      One source of truth, nothing to keep in sync. Put Claude-Code-only notes BELOW the import line. -->
 @AGENTS.md
 """
-# Antigravity splits a hook command on whitespace and ignores quotes, so a guard path under a home folder
-# with a space breaks the hook, and a broken hook blocks every command. Hooks run from the folder holding
-# hooks.json, so this launcher sits there, is called by bare name, and hands the call to the machine guard.
+# Antigravity runs a hook command through cmd /c or sh -c, and a quoted path with a space broke its hooks in
+# testing, so a guard path under a home folder with a space is not safe to name, and a broken hook blocks
+# every command. Hooks run from the folder holding hooks.json, so this launcher sits there, is called by
+# bare name, and hands the call to the machine guard.
 LAUNCHER = """# The Agent Kit: launcher for the command guard (see .agents/hooks.json). Kit-owned; install.sh
 # replaces it. Antigravity cannot pass a quoted path to a hook, so the guard is found from here.
 import io, json, os, runpy, sys
