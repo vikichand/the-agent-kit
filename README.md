@@ -778,7 +778,7 @@ These config choices are deliberate, because the obvious "more locked down" sett
   worker CLI a Claude Code lead starts inherits the lead's environment. Add
   `"env": {"CLAUDE_CODE_SUBPROCESS_ENV_SCRUB": "1"}` to `~/.claude/settings.json` (Claude Code 2.1.83 and
   later) and Claude Code strips credentials, matched by name or by value, from its Bash commands, hooks
-  and stdio MCP servers, so from every worker they start. GitHub tokens and proxy settings stay
+  and stdio MCP servers, and so from every worker those start. GitHub tokens and proxy settings stay
   ([environment variables](https://code.claude.com/docs/en/env-vars)). Checked on 2.1.318, set from the
   shell and from the settings file: an `*_API_KEY` variable was removed and a plain one kept. The kit
   leaves it off, because an MCP server that reads an API key from the environment it
