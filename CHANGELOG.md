@@ -36,6 +36,8 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   It fails the pull request while the description holds a session link or a `*-Session:` trailer,
   because a squash merge turns the description into the commit message and no commit-msg hook sees it.
   The README says how to copy it in, and the release steps now merge with an explicit body.
+  The `writing-docs` skill says the same: keep a squash-merge description free of session links and
+  merge with an explicit body.
 
 ### Changed
 
