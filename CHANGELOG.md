@@ -32,6 +32,10 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   to add by hand when you say no. `install.sh check` warns while the formatter would still touch
   `.agents/` or `.claude/`. A reformatted kit file used to read as your edit on the next install, and
   could fail the project's own format gate.
+- An optional pull-request workflow, `docs/templates/pr-description.yml`, for projects that squash-merge.
+  It fails the pull request while the description holds a session link or a `*-Session:` trailer,
+  because a squash merge turns the description into the commit message and no commit-msg hook sees it.
+  The README says how to copy it in, and the release steps now merge with an explicit body.
 
 ### Changed
 

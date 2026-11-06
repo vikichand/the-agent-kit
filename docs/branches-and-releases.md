@@ -69,11 +69,17 @@ history other people may have pulled.
    ```
 
 4. **Squash-merge it.** The squash commit is the release. GitHub appends the pull request number to
-   the title: `the-agent-kit X.Y.Z (#N)`.
+   the title: `the-agent-kit X.Y.Z (#N)`. GitHub builds that commit from the description, so no
+   commit-msg hook sees it: pass the reviewed notes as the body, which keeps a session link someone
+   added to the description out of `main`.
 
    ```bash
-   gh pr merge <N> --squash
+   gh pr merge <N> --squash --body-file release-notes.md
    ```
+
+   A project that squash-merges can also copy `docs/templates/pr-description.yml` into its
+   `.github/workflows/`: it fails the pull request while the description holds a session link or a
+   `*-Session:` trailer.
 
 5. **Tag the release commit** with an annotated tag, and publish the release:
 

@@ -1422,6 +1422,8 @@ if [ -n "$PY" ]; then
   cp "$c/.claude/CLAUDE.md" "$c/claude.twice"; gi 1
   cmp -s "$c/.claude/CLAUDE.md" "$c/claude.twice" && has 'markers more than once' "$o" \
     && pass "G6 markers that appear twice: named and left as they are" || bad "G6 a doubly marked file was rewritten or not named"
+  [ -f "$c/.the-agent-kit/docs/templates/pr-description.yml" ] \
+    && pass "G7 the share carries the optional pull-request description template" || bad "G7 docs/templates not copied to the share"
   rm -rf "$c"
 fi
 
@@ -1463,6 +1465,24 @@ if [ -n "$PY" ]; then
     && pass "F8 a config that already excludes the kit's files is left alone" || bad "F8 offered again: $(printf '%s' "$o" | grep -A4 FORMATTER)"
   rm -rf "$c"
 fi
+
+# ---------- pull-request description template ----------
+# A squash merge takes the description as the commit message, past the commit-msg hook. The template's
+# script, run as the workflow runs it (the body in env), must fail on a session link or trailer, in any
+# case, and pass a clean description, including one that only mentions a session in prose.
+echo "== pull-request description template =="
+pr_=$(awk '/run: \|/ { p = 1; next } p' "$KIT/docs/templates/pr-description.yml" | sed 's/^          //')
+prd() { BODY=$1 sh -c "$pr_" >/dev/null 2>&1; }
+if [ -n "$pr_" ] && ! prd 'Adds X.
+
+https://claude.ai/code/session_ABC' && ! prd 'claude-SESSION: abc' && prd 'Adds X. This session found a bug.' && prd ''; then
+  pass "PR1 the description check fails on a session link or trailer and passes a clean body"
+else
+  bad "PR1 the pull-request description check is wrong"
+fi
+grep -q 'timeout-minutes:' "$KIT/docs/templates/pr-description.yml" && ! grep -q 'uses:' "$KIT/docs/templates/pr-description.yml" \
+  && grep -q 'BODY: \${{ github.event.pull_request.body }}' "$KIT/docs/templates/pr-description.yml" \
+  && pass "PR2 the template has a timeout, no third-party action, and the body only in env" || bad "PR2 template shape wrong"
 
 # ---------- recommended tools list: refreshed by --setup, never re-adds what the user dismissed ----------
 # The list is seeded once and then the user's, but a list that never learns about new upstream items goes

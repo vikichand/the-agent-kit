@@ -557,6 +557,8 @@ copy_share() {  # copy this kit into ~/.the-agent-kit, so the download it came f
     git -C "$KIT" check-ignore -q "$f" 2>/dev/null && continue
     cp "$f" "$st/docs/"
   done
+  # Optional files a project copies in by hand (the pull-request description check), named in the README.
+  [ -d "$KIT/docs/templates" ] && mkdir -p "$st/docs/templates" && cp "$KIT/docs/templates/"* "$st/docs/templates/"
   mkdir -p "$st/rules"
   cp "$KIT/claude/rules/"*.md "$st/rules/" 2>/dev/null || cp "$KIT/rules/"*.md "$st/rules/" 2>/dev/null || true
   # Replace the share's skills wholesale. `cp -r src dest` with dest already present copies INTO it,

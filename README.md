@@ -639,6 +639,20 @@ curl -o .gitignore https://raw.githubusercontent.com/vikichand/the-ultimate-giti
 
 Appending to a `.gitignore` you already have: `curl -s <same URL> >> .gitignore`.
 
+**Squash-merging? Check the pull request description too.** A squash merge builds the commit on the
+server from the pull request description, so the kit's commit-msg hook never sees it, and a session
+link left in the description lands on your main branch. Merge with an explicit body
+(`gh pr merge <N> --squash --body-file notes.md`), and to catch it in review, copy the optional workflow
+the kit ships:
+
+```sh
+mkdir -p .github/workflows && cp ~/.the-agent-kit/docs/templates/pr-description.yml .github/workflows/
+```
+
+It fails the pull request while the description holds a `claude.ai/code` link or a `*-Session:`
+trailer. It passes the description to its script through `env`, runs no third-party action, and stops
+after two minutes.
+
 The Antigravity guard entry in `.agents/hooks.json` runs on every teammate's machine, whatever OS ran the
 installer. Antigravity runs a hook through `cmd /c` on Windows and `sh -c` elsewhere, and the entry tries
 `py -3`, then `python3`, then `python`, moving to the next only when one cannot run. An entry written by a
