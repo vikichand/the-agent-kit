@@ -53,9 +53,10 @@ A worker gets the outcome, not line-by-line steps:
   without changing what they expect. It stops and reports instead of deciding.
 - **Return**: what changed, the evidence, assumptions made, deviations, and anything unresolved.
 
-**Name the model and effort on every dispatch.** An unnamed worker inherits the lead's model and
-effort, the most expensive combination in the session (Claude Code's Agent tool takes `model` and
-`effort` directly; a custom agent's frontmatter sets them once). Route by how completely the slice is specified
+**Name the model and effort on every dispatch.** An unnamed worker inherits the lead's model and, on
+that model, the lead's effort, which is the most expensive combination in the session (Claude Code's Agent tool takes
+`model` and `effort` directly; a custom agent's frontmatter sets them once; `CLAUDE_CODE_SUBAGENT_EFFORT`
+sets the effort for workers that name none). Route by how completely the slice is specified
 and how easy a wrong result is to detect, never by budget alone: a cheap model on a complete spec with
 a strong check is good economics; a cheap model on an ambiguous slice returns a guess that looks
 finished. Before raising effort for a hard slice, compare the next effort level with a stronger model

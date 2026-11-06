@@ -194,8 +194,8 @@ through the `@AGENTS.md` import, but Codex and Antigravity read them as text (bo
   biases toward correctness over raw speed; Section 0 keeps that overhead off trivial tasks. It is a
   floor, not a guarantee: the hard oracle is a passing test (Section 5).
 - **One source of truth.** `AGENTS.md` is the cross-tool file read by Codex, Antigravity, Cursor, Aider,
-  Copilot and others. Claude Code reads `CLAUDE.md`, which is a one-line `@AGENTS.md` import, never a
-  second copy.
+  Copilot and others. Claude Code gets it through `CLAUDE.md`, a one-line `@AGENTS.md` import, never a
+  second copy (Claude Code reads `AGENTS.md` on its own only while no `CLAUDE.md` or `CLAUDE.local.md` exists).
 - **The depth tier.** Longer, situational rules live in `claude/rules/*.md` with `paths:` frontmatter and
   load only when a matching file is opened. Codex and Antigravity get four of the six as task-matched
   skills in `.agents/skills/`; Antigravity also gets the two path-shaped ones as glob rules.

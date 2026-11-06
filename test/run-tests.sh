@@ -315,8 +315,8 @@ if [ -n "$PY" ]; then
   has 'tell the user once, in one line' "$o" && has 'claude mcp add --transport http context7' "$o" && has 'claude mcp add chrome-devtools' "$o" \
     && [ "$(printf '%s\n' "$o" | wc -l | tr -d ' ')" = 1 ] \
     && pass "K19 one line, telling the agent to relay the missing tools and their commands once" || bad "K19 reminder wording or length wrong: $o"
-  # K20-K27: Antigravity. It has no SessionStart event but a PreInvocation hook that fires before EVERY model
-  # call and answers in JSON ({} for nothing, {"injectSteps":[{"ephemeralMessage":...}]} to speak) with the
+  # K20-K27: Antigravity. The check runs as its SessionStart hook, but an older kit's PreInvocation entry
+  # fires before EVERY model call until reinstalled, and both answer in JSON ({} for nothing, {"injectSteps":[{"ephemeralMessage":...}]} to speak) with the
   # conversation id and the workspace in the payload. The check must speak once per conversation, say
   # nothing otherwise, and be cheap on the calls it skips.
   ka() {  # $1 = conversation id (empty = none), $2 = workspace -> stdout
@@ -387,6 +387,34 @@ EOF
   o=$(ka conv-tools2 "$k/proj"); [ "$o" = '{}' ] && pass "K29 Antigravity: Context7 present in mcp_config.json: silent" || bad "K29 spoke although Context7 is configured: $o"
   printf 'not json' > "$k/home/.gemini/config/mcp_config.json"; rm -f "$k/home/.the-agent-kit/.tools-check"
   o=$(ka conv-tools3 "$k/proj"); [ "$o" = '{}' ] && pass "K30 Antigravity: an unreadable mcp_config.json is 'cannot tell', not 'missing'" || bad "K30 reported missing from an unreadable config: $o"
+  # K31-K35: the hooks can run while no rule does: a global rules file without the kit's rules and a project
+  # with none. The tools reminder is emptied first, so only this check can speak.
+  printf '{"items":[]}' > "$k/home/.the-agent-kit/recommended.json"; rm -f "$k/proj/AGENTS.md" "$k/proj/CLAUDE.md"
+  printf '# my own rules\nClaude-Session trace links are fine.\n' > "$k/home/.claude/CLAUDE.md"
+  o=$(kt claude "$k/proj"); has "rules are not loaded here" "$o" && has '~/.claude/CLAUDE.md' "$o" && has 'install.sh in this project' "$o" \
+    && [ "$(printf '%s\n' "$o" | wc -l | tr -d ' ')" = 1 ] \
+    && pass "K31 a global file without the kit's rules and a project without AGENTS.md: one line naming both fixes" || bad "K31 unloaded rules not reported: [$o]"
+  printf '# my own rules\n\n## Safety invariants: always on, regardless of task size\n' > "$k/home/.claude/CLAUDE.md"
+  o=$(kt claude "$k/proj"); [ -z "$o" ] && pass "K32 the kit's rules in the global file: silent" || bad "K32 spoke with the rules global: $o"
+  printf '# my own rules\n' > "$k/home/.claude/CLAUDE.md"
+  printf '# rules\n\n## Safety invariants: always on, regardless of task size\n' > "$k/proj/AGENTS.md"
+  o=$(kt claude "$k/proj"); [ -z "$o" ] && pass "K33 the kit's rules in the project's AGENTS.md: silent" || bad "K33 spoke with project rules: $o"
+  mv "$k/proj/AGENTS.md" "$k/proj/rules.md"; printf '@rules.md\n' > "$k/proj/CLAUDE.md"
+  o=$(kt claude "$k/proj"); [ -z "$o" ] && pass "K34 the kit's rules in a file CLAUDE.md imports: silent" || bad "K34 import not followed: $o"
+  rm -f "$k/proj/rules.md" "$k/proj/CLAUDE.md" "$k/home/.claude/CLAUDE.md"; printf '# mine\n' > "$k/home/.codex/AGENTS.md"
+  o=$(kt claude "$k/proj"); o2=$(kt codex "$k/proj")
+  [ -z "$o" ] && has '~/.codex/AGENTS.md' "$o2" && pass "K35 no global file is not judged; each tool checks its own global file" || bad "K35 wrong: [$o] [$o2]"
+  # K36-K38: a marked global copy from an older kit is named with both versions; a current or newer one, and
+  # an unmarked copy, are silent. Versions compare as numbers, so 0.6.10 is newer than 0.6.5.
+  rm -f "$k/home/.codex/AGENTS.md"
+  printf '<!-- AGENT-KIT:START 0.6.5 -->\nrules\n<!-- AGENT-KIT:END -->\n' > "$k/home/.the-agent-kit/AGENTS.global.md"
+  printf 'mine\n<!-- AGENT-KIT:START 0.6.3 -->\n## Safety invariants: x\n<!-- AGENT-KIT:END -->\n' > "$k/home/.claude/CLAUDE.md"
+  o=$(kt claude "$k/proj"); has 'CLAUDE.md are from 0.6.3, older than the installed kit (0.6.5)' "$o" && has 'install.sh: it asks first' "$o" \
+    && pass "K36 a marked global copy from an older kit: one line with both versions and the command" || bad "K36 stale global copy not reported: [$o]"
+  sed 's/0\.6\.3/0.6.10/' "$k/home/.claude/CLAUDE.md" > "$k/g" && mv "$k/g" "$k/home/.claude/CLAUDE.md"
+  o=$(kt claude "$k/proj"); [ -z "$o" ] && pass "K37 a marked copy as new or newer (0.6.10 against 0.6.5): silent" || bad "K37 spoke about a current copy: $o"
+  printf 'mine\n## Safety invariants: x\n' > "$k/home/.claude/CLAUDE.md"
+  o=$(kt claude "$k/proj"); [ -z "$o" ] && pass "K38 an unmarked global copy is never judged" || bad "K38 judged an unmarked copy: $o"
   rm -rf "$k"
 else
   bad "no python - kit-check.py NOT tested"
@@ -406,6 +434,11 @@ git config core.hooksPath .git/hooks
 
 d=$(sh "$KIT/install.sh" --check 2>&1)
 has 'pre-commit not installed' "$d" && pass "D1 missing hook reported" || bad "D1 missing hook NOT reported"
+has 'no AI-aware .gitignore' "$d" && pass "D1g missing AI .gitignore suggested" || bad "D1g missing AI .gitignore NOT suggested"
+printf '# >>> the-ultimate-gitignore-ai:START\n' > .gitignore
+d2=$(sh "$KIT/install.sh" --check 2>&1); rm -f .gitignore
+has 'carries the-ultimate-gitignore-ai' "$d2" && ! has 'no AI-aware .gitignore' "$d2" \
+  && pass "D1h AI .gitignore recognised, no suggestion" || bad "D1h AI .gitignore not recognised"
 
 for h in commit-msg pre-commit pre-push; do cp "$KIT/hooks/$h" ".git/hooks/$h"; chmod +x ".git/hooks/$h"; done
 d=$(sh "$KIT/install.sh" --check 2>&1)
@@ -521,6 +554,11 @@ if [ -n "$PY" ]; then
   d=$(dr)
   has 'entry "my own tool" has no kit id' "$d" && ! has 'entry "Context7 MCP (library docs)" has no kit id' "$d" \
     && pass "D14c only an id-less entry the kit does not know is called out" || bad "D14c id-less entry notes wrong: $(printf '%s' "$d" | grep -i 'kit id')"
+  # D15: check says when the kit's rules are loaded neither globally nor in the project.
+  printf '# my own rules\n' > "$g/.claude/CLAUDE.md"; d=$(dr)
+  has 'WARN: Claude Code: the kit.s rules are not loaded here' "$d" && pass "D15 check warns when the kit's rules are not loaded" || bad "D15 no unloaded-rules warning: $(printf '%s' "$d" | grep -i rules)"
+  printf '## Safety invariants: always on\n' >> "$g/.claude/CLAUDE.md"; d=$(dr)
+  has 'rules are not loaded' "$d" && bad "D15 warned although the global file carries the rules" || pass "D15 quiet once the global file carries the rules"
   rm -rf "$g" "$u"
 fi
 
@@ -828,6 +866,43 @@ else
   printf '%s' "$o" | grep -q '"decision": "deny"' \
     && pass "A3 the launcher runs the installed guard: a force push is denied" \
     || bad "A3 the launcher did not deny a force push (got: $o)"
+  # A3b-A3d: hooks.json is committed, so its one command has to work on every teammate's OS. Antigravity runs
+  # it through `sh -c` on Unix and `cmd /c` on Windows (its hooks doc); each interpreter in the || chain runs
+  # only when the one before it fails. Fakes stand in for a machine with no `py`, and for a crash.
+  agc=$($PY -c "import json,sys; print(json.load(open(sys.argv[1]))['the-agent-kit']['PreToolUse'][0]['hooks'][0]['command'])" "$hj")
+  # The fake python3 calls the real one by absolute path: by name it would find itself first on PATH and loop.
+  fb=$(mktemp -d); rpy=$($PY -c "import sys; print(sys.executable.replace(chr(92), '/'))")
+  printf '#!/bin/sh\nexec "%s" "$@"\n' "$rpy" > "$fb/python3"
+  printf '#!/bin/sh\nexit 127\n' > "$fb/py"; chmod +x "$fb/py" "$fb/python3"
+  push='{"toolCall":{"name":"run_command","args":{"CommandLine":"git push --force"}}}'
+  o=$(cd "$u/.agents" && printf '%s' "$push" | HOME="$ah" USERPROFILE="$(wp "$ah")" PATH="$fb:$PATH" sh -c "$agc" 2>/dev/null)
+  printf '%s' "$o" | grep -q '"decision": "deny"' \
+    && pass "A3b the hook command finds the next Python when py is missing: a force push is denied" \
+    || bad "A3b the hook command did not reach the guard without py (got: $o)"
+  printf '#!/bin/sh\ncat >/dev/null\nexit 1\n' > "$fb/py"
+  o=$(cd "$u/.agents" && printf '%s' "$push" | HOME="$ah" USERPROFILE="$(wp "$ah")" PATH="$fb:$PATH" sh -c "$agc" 2>/dev/null); rc=$?
+  # Antigravity's doc defines the stdout decision, not what a nonzero exit means, so a failure is refused in-band.
+  [ "$rc" -eq 0 ] && printf '%s' "$o" | grep -q '"decision": "deny"' && printf '%s' "$o" | grep -q 'guard did not run' \
+    && pass "A3c a Python that read the input and failed leaves the next one refusing the command" \
+    || bad "A3c a failed first attempt was not refused in-band (rc=$rc, got: $o)"
+  rm -rf "$fb"
+  ch=$(mktemp -d); mkdir -p "$ch/.the-agent-kit/hooks"
+  printf 'import sys\nsys.stdin.read()\nraise RuntimeError("boom")\n' > "$ch/.the-agent-kit/hooks/command-guard.py"
+  o=$(cd "$u/.agents" && printf '%s' "$push" | HOME="$ch" USERPROFILE="$(wp "$ch")" $PY agent-kit-guard.py --tool antigravity 2>/dev/null); rc=$?
+  [ "$rc" -eq 0 ] && printf '%s' "$o" | grep -q '"decision": "deny"' \
+    && pass "A3e a guard that crashes refuses the command in-band" \
+    || bad "A3e a crashing guard did not refuse the command (rc=$rc, got: $o)"
+  rm -rf "$ch"
+  if command -v cmd.exe >/dev/null 2>&1; then
+    o=$(cd "$u/.agents" && printf '%s' "$push" | HOME="$ah" USERPROFILE="$(wp "$ah")" cmd.exe //d //c "$agc" 2>/dev/null)
+    printf '%s' "$o" | grep -q '"decision": "deny"' \
+      && pass "A3d the hook command runs under cmd /c: a force push is denied" \
+      || bad "A3d the hook command failed under cmd /c (got: $o)"
+    o=$(cd "$u/.agents" && printf '%s' "$push" | HOME="$ah" USERPROFILE="$(wp "$ah")" cmd.exe //d //c "nosuchpy-xyz agent-kit-guard.py --tool antigravity || $agc" 2>/dev/null)
+    printf '%s' "$o" | grep -q '"decision": "deny"' \
+      && pass "A3f under cmd /c a missing interpreter falls through to the next: a force push is denied" \
+      || bad "A3f cmd /c did not fall through past a missing interpreter (got: $o)"
+  else pass "A3d (no cmd.exe on this platform; skipped)"; pass "A3f (no cmd.exe on this platform; skipped)"; fi
   rm -rf "$ah"
   # A4: --update-rules restores a stale launcher and glob rule, and re-adds a removed hook entry.
   printf 'stale\n' > "$u/.agents/agent-kit-guard.py"; printf 'stale\n' > "$u/.agents/rules/tests.md"
@@ -865,6 +940,16 @@ else
     && bad "A7 --check calls a hostile hooks.json wired" \
     || { printf '%s' "$o" | grep -q 'Antigravity guard.*not the kit' && pass "A7 --check rejects a hooks.json whose guard command is not the kit's" \
          || bad "A7 --check says nothing about a hostile Antigravity hook"; }
+  rm -rf "$u"
+  # A7b: cmd /c looks in the hook's folder before PATH, and Python puts the launcher's folder first on
+  # sys.path, so a committed .agents/py.bat or .agents/runpy.py would run instead of the guard.
+  u=$(mktemp -d) && (cd "$u" && git init -q && sh "$KIT/install.sh" project >/dev/null 2>&1 \
+      && printf '@exit /b 0\n' > .agents/py.bat && printf 'x = 1\n' > .agents/runpy.py)
+  o=$(cd "$u" && sh "$KIT/install.sh" --check 2>&1)
+  ! printf '%s' "$o" | grep -q 'OK:   Antigravity guard wired' && printf '%s' "$o" | grep -q 'WARN:.*py.bat' \
+    && printf '%s' "$o" | grep -q 'WARN:.*runpy.py' \
+    && pass "A7b --check names a planted interpreter or module in .agents/ and does not call the guard wired" \
+    || bad "A7b --check missed a planted .agents/py.bat or runpy.py"
   rm -rf "$u"
   # U21: global guidance includes Antigravity, but machine setup leaves its home files alone.
   g=$(mktemp -d) || exit 2
@@ -1304,6 +1389,101 @@ else
   bad "no python - install / uninstall / check NOT tested"
 fi
 
+# ---------- global rules between AGENT-KIT markers ----------
+# The global rules are a pasted copy. Wrapped in markers, an install (so an update) offers to replace what is
+# between them, with the same yes and a backup as every other change; an unmarked copy is never rewritten.
+echo "== global rules refresh =="
+if [ -n "$PY" ]; then
+  wq() { cygpath -m "$1" 2>/dev/null || printf '%s' "$1"; }
+  c=$(mktemp -d) || exit 2; C=$(wq "$c"); mkdir -p "$c/.claude" "$c/.codex" "$c/plain"
+  gi() { rc=0; o=$(cd "$c/plain" && env HOME="$c" USERPROFILE="$C" AGENT_KIT_APPLY="$1" sh "$KIT/install.sh" </dev/null 2>&1) || rc=$?; }
+  gi 1   # the machine first, so the runs below differ only in the global files
+  head -1 "$c/.the-agent-kit/AGENTS.global.md" | grep -qE '^<!-- AGENT-KIT:START [0-9]+\.[0-9]+\.[0-9]+ -->$' \
+    && tail -1 "$c/.the-agent-kit/AGENTS.global.md" | grep -qx '<!-- AGENT-KIT:END -->' && grep -q 'Safety invariants' "$c/.the-agent-kit/AGENTS.global.md" \
+    && pass "GR1 the share carries the rules to append, between markers that name the kit's release" || bad "GR1 AGENTS.global.md missing or unmarked: $(head -1 "$c/.the-agent-kit/AGENTS.global.md" 2>&1)"
+  printf 'my line above\n<!-- AGENT-KIT:START 0.0.1 -->\nold rules\n<!-- AGENT-KIT:END -->\nmy line below\n' > "$c/.claude/CLAUDE.md"
+  printf 'an unmarked pasted copy\n## Safety invariants: old\n' > "$c/.codex/AGENTS.md"
+  cp "$c/.claude/CLAUDE.md" "$c/claude.orig"; cp "$c/.codex/AGENTS.md" "$c/codex.orig"
+  gi ""
+  cmp -s "$c/.claude/CLAUDE.md" "$c/claude.orig" && has 'CLAUDE.md: replace the kit.s rules between its AGENT-KIT markers (0.0.1 to' "$o" && ! has 'codex/AGENTS.md' "$o" \
+    && pass "GR2 no yes: the marked file is listed and nothing is written" || bad "GR2 wrote without consent, or did not list it: $(printf '%s' "$o" | grep -i 'global\|AGENT-KIT')"
+  gi 1
+  { head -1 "$c/.claude/CLAUDE.md" | grep -qx 'my line above'; } && tail -1 "$c/.claude/CLAUDE.md" | grep -qx 'my line below' \
+    && grep -q 'Safety invariants' "$c/.claude/CLAUDE.md" && ! grep -q 'old rules' "$c/.claude/CLAUDE.md" \
+    && [ "$(sed -n 2p "$c/.claude/CLAUDE.md")" = "$(head -1 "$c/.the-agent-kit/AGENTS.global.md")" ] \
+    && cmp -s "$(ls "$c/.claude/"CLAUDE.md.bak-agent-kit-* 2>/dev/null | head -1)" "$c/claude.orig" \
+    && pass "GR3 with the yes: only what is between the markers is replaced, after a backup" || bad "GR3 refresh wrong (rc=$rc): $(head -3 "$c/.claude/CLAUDE.md")"
+  cmp -s "$c/.codex/AGENTS.md" "$c/codex.orig" && [ -z "$(ls "$c/.codex/" | grep bak-agent-kit)" ] \
+    && pass "GR4 an unmarked global copy is never rewritten" || bad "GR4 an unmarked copy was touched"
+  cp "$c/.claude/CLAUDE.md" "$c/claude.now"; gi 1
+  cmp -s "$c/.claude/CLAUDE.md" "$c/claude.now" && ! has 'GLOBAL RULES' "$o" \
+    && pass "GR5 a current marked copy: nothing to offer, nothing written" || bad "GR5 re-run not idempotent: $(printf '%s' "$o" | grep -A2 'GLOBAL RULES')"
+  printf 'x\n<!-- AGENT-KIT:START 0.0.1 -->\na\n<!-- AGENT-KIT:END -->\n<!-- AGENT-KIT:START 0.0.1 -->\nb\n<!-- AGENT-KIT:END -->\n' > "$c/.claude/CLAUDE.md"
+  cp "$c/.claude/CLAUDE.md" "$c/claude.twice"; gi 1
+  cmp -s "$c/.claude/CLAUDE.md" "$c/claude.twice" && has 'markers more than once' "$o" \
+    && pass "GR6 markers that appear twice: named and left as they are" || bad "GR6 a doubly marked file was rewritten or not named"
+  [ -f "$c/.the-agent-kit/docs/templates/pr-description.yml" ] \
+    && pass "GR7 the share carries the optional pull-request description template" || bad "GR7 docs/templates not copied to the share"
+  rm -rf "$c"
+fi
+
+# ---------- formatter exclusion for the kit's files ----------
+# A project formatter that rewrites .agents/ or .claude/ changes what the project record fingerprints, so the
+# next install reads the kit's files as the user's edits. After a project install the installer offers the
+# exclusion with the same yes and backup as its other changes, and check warns while a config lacks it.
+echo "== formatter exclusion =="
+if [ -n "$PY" ]; then
+  wq() { cygpath -m "$1" 2>/dev/null || printf '%s' "$1"; }
+  c=$(mktemp -d) || exit 2; C=$(wq "$c"); mkdir -p "$c/.claude" "$c/p"
+  (cd "$c/p" && git init -q && git config core.hooksPath .git/hooks) || exit 2
+  fi_() { rc=0; o=$(cd "$c/p" && env HOME="$c" USERPROFILE="$C" AGENT_KIT_APPLY="$1" sh "$KIT/install.sh" </dev/null 2>&1) || rc=$?; }
+  bj() { $PY -c "import json,sys; d=json.load(open(sys.argv[1],encoding='utf-8')); print($1)" "$(wq "$c/p/biome.json")" 2>/dev/null; }
+  fi_ 1
+  ! has 'FORMATTER' "$o" && pass "F1 no formatter config: nothing offered" || bad "F1 offered an exclusion with no formatter config"
+  printf '{\n  "$schema": "x",\n  "formatter": {\n    "indentStyle": "space"\n  }\n}\n' > "$c/p/biome.json"; cp "$c/p/biome.json" "$c/biome.orig"
+  printf '{}\n' > "$c/p/.prettierrc"
+  printf '{\n  // dprint allows comments\n  "excludes": []\n}\n' > "$c/p/dprint.json"; cp "$c/p/dprint.json" "$c/dprint.orig"
+  fi_ ""
+  cmp -s "$c/p/biome.json" "$c/biome.orig" && [ ! -e "$c/p/.prettierignore" ] \
+    && has 'biome.json: add "!\*\*/.agents", "!\*\*/.claude" to files.includes' "$o" && has 'the exclusion is listed above' "$o" \
+    && pass "F2 no terminal: the exclusion is printed and nothing is written" || bad "F2 wrote without consent, or printed no exclusion: $(printf '%s' "$o" | grep -A6 FORMATTER)"
+  has 'dprint.json is not JSON the kit can edit safely' "$o" && cmp -s "$c/p/dprint.json" "$c/dprint.orig" \
+    && pass "F3 a config with comments is never rewritten: the exclusion is printed for a hand edit" || bad "F3 dprint.json with comments mishandled"
+  has 'WARN: biome.json does not keep the formatter off' "$o" && has 'WARN: .prettierignore does not keep' "$o" \
+    && pass "F4 check warns for each config that does not exclude the kit's files" || bad "F4 check silent: $(printf '%s' "$o" | grep -i formatter)"
+  fi_ 1
+  [ "$(bj "d['files']['includes']")" = "['**', '!**/.agents', '!**/.claude']" ] && [ "$(bj "d['formatter']['indentStyle']")" = space ] \
+    && grep -qxF '    "includes": ["**", "!**/.agents", "!**/.claude"]' "$c/p/biome.json" \
+    && cmp -s "$(ls "$c/p/"biome.json.bak-agent-kit-* 2>/dev/null | head -1)" "$c/biome.orig" \
+    && pass "F5 with the yes: biome.json gains the exclusion in Biome's layout, after a backup" || bad "F5 biome.json edit wrong: $(cat "$c/p/biome.json")"
+  grep -qx '.agents/' "$c/p/.prettierignore" && grep -qx '.claude/' "$c/p/.prettierignore" \
+    && pass "F6 with the yes: .prettierignore lists the kit's folders" || bad "F6 .prettierignore not written"
+  ! has 'WARN: biome.json' "$o" && ! has 'WARN: .prettierignore' "$o" && has 'WARN: dprint.json' "$o" \
+    && pass "F7 check is quiet for an excluded config and still warns for the one left to edit by hand" || bad "F7 check wrong after the edit: $(printf '%s' "$o" | grep WARN)"
+  cp "$c/p/biome.json" "$c/biome.now"; fi_ 1
+  cmp -s "$c/p/biome.json" "$c/biome.now" && ! has '+ biome.json' "$o" \
+    && pass "F8 a config that already excludes the kit's files is left alone" || bad "F8 offered again: $(printf '%s' "$o" | grep -A4 FORMATTER)"
+  rm -rf "$c"
+fi
+
+# ---------- pull-request description template ----------
+# A squash merge takes the description as the commit message, past the commit-msg hook. The template's
+# script, run as the workflow runs it (the body in env), must fail on a session link or trailer, in any
+# case, and pass a clean description, including one that only mentions a session in prose.
+echo "== pull-request description template =="
+pr_=$(awk '/run: \|/ { p = 1; next } p' "$KIT/docs/templates/pr-description.yml" | sed 's/^          //')
+prd() { BODY=$1 sh -c "$pr_" >/dev/null 2>&1; }
+if [ -n "$pr_" ] && ! prd 'Adds X.
+
+https://claude.ai/code/session_ABC' && ! prd 'claude-SESSION: abc' && prd 'Adds X. This session found a bug.' && prd ''; then
+  pass "PR1 the description check fails on a session link or trailer and passes a clean body"
+else
+  bad "PR1 the pull-request description check is wrong"
+fi
+grep -q 'timeout-minutes:' "$KIT/docs/templates/pr-description.yml" && ! grep -q 'uses:' "$KIT/docs/templates/pr-description.yml" \
+  && grep -q 'BODY: \${{ github.event.pull_request.body }}' "$KIT/docs/templates/pr-description.yml" \
+  && pass "PR2 the template has a timeout, no third-party action, and the body only in env" || bad "PR2 template shape wrong"
+
 # ---------- recommended tools list: refreshed by --setup, never re-adds what the user dismissed ----------
 # The list is seeded once and then the user's, but a list that never learns about new upstream items goes
 # stale (the machine this was found on still named the Playwright MCP the kit had retired). --setup, which
@@ -1592,13 +1772,13 @@ else
   bad "no python - machine-wide skills NOT tested"
 fi
 
-# ---------- Antigravity session-start check: a global PreInvocation hook ----------
-# Antigravity has no SessionStart event. Its built-in docs (agy-customizations/docs/hooks.md) define a
-# PreInvocation hook, "Before the model is called", fed {"conversationId", "invocationNum", ...} and
-# answered with {"injectSteps":[{"ephemeralMessage":"..."}]}, in a hooks.json in the global customization
-# root ~/.gemini/config. --setup merges one named hook into that file, which other tools also write to:
-# every existing entry is kept, the write is atomic, and a second run changes nothing. The hook command
-# is split on whitespace with quotes ignored, so it calls a launcher beside hooks.json by bare name.
+# ---------- Antigravity session-start check: a global SessionStart hook ----------
+# Antigravity's built-in docs (agy-customizations/docs/hooks.md, agy 1.5.1) define a SessionStart hook that
+# runs once when a conversation starts, answered with {"injectSteps":[{"ephemeralMessage":"..."}]}, in a
+# hooks.json in the global customization root ~/.gemini/config. Older kits used PreInvocation, which fires
+# before every model call. --setup merges one named hook into that file, which other tools also write to:
+# every existing entry is kept, the write is atomic, and a second run changes nothing. The hook calls a
+# launcher beside hooks.json by bare name, because a quoted path with a space breaks a hook.
 echo "== Antigravity session-start check =="
 if [ -n "$PY" ]; then
   wq() { cygpath -m "$1" 2>/dev/null || printf '%s' "$1"; }
@@ -1613,13 +1793,13 @@ if [ -n "$PY" ]; then
   cmp -s "$(HJ)" "$g/orca.json" && [ ! -e "$g/.gemini/config/agent-kit-check.py" ] \
     && pass "G0 no consent: hooks.json and the config folder are untouched" || bad "G0 wrote Antigravity files without consent: $o"
   su 1
-  $PY - "$(wq "$(HJ)")" "$(wq "$g/orca.json")" <<'EOF' && pass "G1 the check is one named PreInvocation hook; every entry that was there is kept exactly" || bad "G1 hooks.json wrong: $(cat "$(HJ)")"
+  $PY - "$(wq "$(HJ)")" "$(wq "$g/orca.json")" <<'EOF' && pass "G1 the check is one named SessionStart hook; every entry that was there is kept exactly" || bad "G1 hooks.json wrong: $(cat "$(HJ)")"
 import json, re, sys
 d, o = json.load(open(sys.argv[1], encoding="utf-8")), json.load(open(sys.argv[2], encoding="utf-8"))
 assert d["orca-status"] == o["orca-status"], "existing hook changed"
 mine = d["the-agent-kit-check"]
-assert list(mine) == ["PreInvocation"], list(mine)
-h = mine["PreInvocation"][0]
+assert list(mine) == ["SessionStart"], list(mine)
+h = mine["SessionStart"][0]
 assert re.fullmatch(r"(python3?|py -3) agent-kit-check\.py --tool antigravity", h["command"]), h
 assert h["type"] == "command" and h["timeout"] == 10 and '"' not in h["command"]
 EOF
@@ -1649,23 +1829,48 @@ EOF
   # Stale = an older spelling of the kit's own command (another interpreter): the whole entry is the kit's.
   $PY - "$(wq "$(HJ)")" <<'EOF'
 import json, sys
-p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); h = d["the-agent-kit-check"]["PreInvocation"][0]
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); h = d["the-agent-kit-check"]["SessionStart"][0]
 h["command"] = ("python3 " if h["command"].startswith("py -3 ") else "py -3 ") + "agent-kit-check.py --tool antigravity"
 h["timeout"] = 99
 json.dump(d, open(p, "w", encoding="utf-8"))
 EOF
   su 1
-  ! grep -q '^stale$' "$g/.gemini/config/agent-kit-check.py" && [ "$(hk "$(HJ)" "d['the-agent-kit-check']['PreInvocation'][0]['timeout']")" = 10 ] && [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status', 'the-agent-kit-check']" ] \
+  ! grep -q '^stale$' "$g/.gemini/config/agent-kit-check.py" && [ "$(hk "$(HJ)" "d['the-agent-kit-check']['SessionStart'][0]['timeout']")" = 10 ] && [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status', 'the-agent-kit-check']" ] \
     && pass "G5 a stale launcher and a stale kit entry are brought current" || bad "G5 stale files not refreshed: $o"
   # G5b: the kit's current command with a value the user set (a longer timeout): the user's, kept.
   $PY - "$(wq "$(HJ)")" <<'EOF'
 import json, sys
-p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); d["the-agent-kit-check"]["PreInvocation"][0]["timeout"] = 99
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); d["the-agent-kit-check"]["SessionStart"][0]["timeout"] = 99
 json.dump(d, open(p, "w", encoding="utf-8"))
 EOF
   su 1
-  [ "$(hk "$(HJ)" "d['the-agent-kit-check']['PreInvocation'][0]['timeout']")" = 99 ] \
+  [ "$(hk "$(HJ)" "d['the-agent-kit-check']['SessionStart'][0]['timeout']")" = 99 ] \
     && pass "G5b a value the user set on the kit's own entry is kept" || bad "G5b user's timeout overwritten: $o"
+  # G5c: an older kit's PreInvocation entry, with the current command, is the kit's: moved to SessionStart.
+  $PY - "$(wq "$(HJ)")" <<'EOF'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); v = d["the-agent-kit-check"]
+d["the-agent-kit-check"] = {"PreInvocation": [dict(v["SessionStart"][0], timeout=10)]}
+json.dump(d, open(p, "w", encoding="utf-8"))
+EOF
+  su 1
+  [ "$(hk "$(HJ)" "sorted(d['the-agent-kit-check'])")" = "['SessionStart']" ] && [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status', 'the-agent-kit-check']" ] \
+    && pass "G5c an older kit's PreInvocation entry is moved to SessionStart" || bad "G5c the PreInvocation entry was not migrated: $(cat "$(HJ)")"
+  # G5d: a timeout the user set on that old entry moves with it, and a later run keeps it.
+  $PY - "$(wq "$(HJ)")" <<'EOF'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); v = d["the-agent-kit-check"]
+d["the-agent-kit-check"] = {"PreInvocation": [dict(v["SessionStart"][0], timeout=30)]}
+json.dump(d, open(p, "w", encoding="utf-8"))
+EOF
+  su 1; t1=$(hk "$(HJ)" "d['the-agent-kit-check']['SessionStart'][0]['timeout']"); su 1
+  [ "$t1" = 30 ] && [ "$(hk "$(HJ)" "d['the-agent-kit-check']['SessionStart'][0]['timeout']")" = 30 ] \
+    && pass "G5d a timeout set on the old entry moves to SessionStart and stays" || bad "G5d the user's timeout was lost in the move (got $t1): $(cat "$(HJ)")"
+  $PY - "$(wq "$(HJ)")" <<'EOF'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); d["the-agent-kit-check"]["SessionStart"][0]["timeout"] = 10
+json.dump(d, open(p, "w", encoding="utf-8"))
+EOF
   $PY - "$(wq "$(HJ)")" <<'EOF'
 import json, sys
 p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); d["the-agent-kit-check"] = {"PreInvocation": [{"command": "echo mine"}]}
@@ -1679,6 +1884,17 @@ EOF
   src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY=1 sh "$KIT/install.sh" --undo </dev/null 2>&1) || src=$?
   [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status']" ] && [ ! -e "$g/.gemini/config/agent-kit-check.py" ] \
     && pass "G7 --undo removes the kit's hook and launcher and keeps the other tool's hooks" || bad "G7 undo wrong: $(cat "$(HJ)")"
+  # G7b: undo also removes an older kit's PreInvocation entry.
+  printf '%s\n' "$orca" > "$(HJ)"; su 1
+  $PY - "$(wq "$(HJ)")" <<'EOF'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); v = d["the-agent-kit-check"]
+d["the-agent-kit-check"] = {"PreInvocation": v["SessionStart"]}
+json.dump(d, open(p, "w", encoding="utf-8"))
+EOF
+  src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY=1 sh "$KIT/install.sh" --undo </dev/null 2>&1) || src=$?
+  [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status']" ] \
+    && pass "G7b --undo removes an older kit's PreInvocation entry too" || bad "G7b undo left the old entry: $(cat "$(HJ)")"
   rm -rf "$g"
   # G8: a hooks.json that is not a JSON object, or is a symlink, is never rewritten or written through.
   home_; printf '{ not json' > "$(HJ)"; su 1
@@ -1711,7 +1927,7 @@ EOF
   # G11: --global prints the hook for a hand merge and writes nothing under ~/.gemini.
   g=$(mktemp -d) || exit 2; G=$(wq "$g"); mkdir -p "$g/.gemini/config"
   o=$(HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --global 2>&1)
-  has 'PreInvocation' "$o" && has 'agent-kit-check.py' "$o" && [ ! -e "$g/.gemini/config/hooks.json" ] \
+  has '{"SessionStart":' "$o" && has 'agent-kit-check.py' "$o" && [ ! -e "$g/.gemini/config/hooks.json" ] \
     && pass "G11 --global prints the Antigravity hook and writes none of it" || bad "G11 --global omits or wrote the Antigravity hook"
   rm -rf "$g"
 else

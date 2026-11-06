@@ -119,7 +119,7 @@ see ([Limits](#limits)).
    | Claude Code | `~/.claude/settings.json` | the command guard, the session-start check, and the ask and deny rules |
    | Codex | `~/.codex/hooks.json` | the command guard and the session-start check |
    | Codex | `~/.codex/config.toml` | approval, sandbox and network settings |
-   | Antigravity | `~/.gemini/config/hooks.json` | the session-start check, as a `PreInvocation` hook run through a launcher beside it (your other hooks there are kept) |
+   | Antigravity | `~/.gemini/config/hooks.json` | the session-start check, as a `SessionStart` hook run through a launcher beside it (your other hooks there are kept) |
 
    Every run takes out what the old kit put in, then puts in the new kit. An install record
    (`~/.the-agent-kit/.install-record.json`) lists each entry the kit wrote and its value, so an entry a
@@ -174,6 +174,13 @@ fingerprint of it:
 - **`AGENTS.md`** gets the kit's current rules around your `PROJECT-CONFIG` block, which is kept byte
   for byte. A file without the markers is never guessed at: it is left as it is, with a warning.
 - **`CLAUDE.md`** is written once, for you to own.
+- **Your formatter is kept off the kit's files.** When the project has `biome.json`, a `.prettierrc*` or
+  `dprint.json` that would format `.agents/` and `.claude/`, the install offers to exclude them
+  (`"!**/.agents"` and `"!**/.claude"` in Biome's `files.includes`, two lines in `.prettierignore`,
+  `"**/.agents"` and `"**/.claude"` in dprint's `excludes`), asked and backed up like its other changes.
+  A formatter that rewrites them changes what the record fingerprints, so the next install would read
+  the kit's own files as your edits. A config with comments is never rewritten; the install prints the
+  exclusion for you to add, as it does when you say no, and `check` warns until it is there.
 - **A newer kit's work is safe.** A project recorded by a newer kit than yours is left alone until you
   update the kit, so a teammate a release behind cannot undo your update. `AGENT_KIT_FORCE=1` in front
   of the command installs your kit anyway.
@@ -193,8 +200,8 @@ If you would rather set the rules up once per machine, append them to your globa
 lean per-project install:
 
 ```bash
-cat ~/.the-agent-kit/AGENTS.md >> ~/.claude/CLAUDE.md      # and ~/.codex/AGENTS.md for Codex
-mkdir -p ~/.gemini && cat ~/.the-agent-kit/AGENTS.md >> ~/.gemini/AGENTS.md  # Antigravity
+cat ~/.the-agent-kit/AGENTS.global.md >> ~/.claude/CLAUDE.md      # and ~/.codex/AGENTS.md for Codex
+mkdir -p ~/.gemini && cat ~/.the-agent-kit/AGENTS.global.md >> ~/.gemini/AGENTS.md  # Antigravity
 cd /path/to/project && ~/.the-agent-kit/install.sh --lean
 ```
 
@@ -202,9 +209,16 @@ cd /path/to/project && ~/.the-agent-kit/install.sh --lean
 from a project's own `.claude/rules/`. So global rules give you the universal floor everywhere but
 none of the depth tier. `--lean` still installs the depth tier into the project, which is why
 it is in the command above. Global rules also stay on your machine, so cloud agents, CI and
-teammates see only what is committed in the repo. And the global copy is a paste, so `update`
-does not refresh it: after an update, delete the old block from the global file and run the `cat`
-again. The depth tier in each project still updates when you run `install.sh --lean` there.
+teammates see only what is committed in the repo.
+
+**Keeping the global copy current.** `AGENTS.global.md` is the kit's rules between two markers,
+`<!-- AGENT-KIT:START x.y.z -->` and `<!-- AGENT-KIT:END -->`, where `x.y.z` is the kit release. Each
+install, and so each `update`, offers to replace what is between them in `~/.claude/CLAUDE.md`,
+`~/.codex/AGENTS.md` and `~/.gemini/AGENTS.md`, with the same yes and backup as its other changes;
+your lines around the markers stay. The session-start check tells you when a marked copy is from an
+older release. A copy pasted before the markers existed is never rewritten: delete it from the global
+file and run the `cat` above once to get a marked one. The depth tier in each project still updates
+when you run `install.sh --lean` there.
 
 Antigravity reads `~/.gemini/AGENTS.md` in every project. Its guard hook stays per project: run
 `~/.the-agent-kit/install.sh` inside each project. On the machine it touches `~/.gemini/config` only for the skills entry and the session-start check above.
@@ -269,7 +283,7 @@ behind. The session-start check below is what tells you when it has.
 
 ### Staying current without remembering to
 
-When a session starts, the kit checks three things and says nothing unless one needs you:
+When a session starts, the kit checks five things and says nothing unless one needs you:
 
 - **A newer release is on `main`.** One `git ls-remote` to GitHub, no clone and no download, at most
   once a day with a 3-second limit; the answer is cached so the rest of that day's sessions need no
@@ -277,6 +291,14 @@ When a session starts, the kit checks three things and says nothing unless one n
 - **This project's rules differ from your installed kit.** Compared locally, every session. You see one
   line telling you to run `install.sh` here. It is silent in the kit's own repo, whose rules are the
   source, and for a `--lean` stub, whose rules live globally.
+- **The kit's rules are not loaded.** The agent's global rules file (`~/.claude/CLAUDE.md`,
+  `~/.codex/AGENTS.md` or `~/.gemini/AGENTS.md`) exists but holds no copy of them, and neither does the
+  project's `AGENTS.md`, its `CLAUDE.md` or a file that `CLAUDE.md` imports. The hooks and skills still
+  run, so nothing else would show it. You see one line: run `install.sh` in the project, or append the
+  rules to the global file. A machine with no global rules file is not judged.
+- **Your global copy of the rules is from an older release.** Read from the `AGENT-KIT` markers around
+  it (see [Prefer the rules global instead?](#prefer-the-rules-global-instead)). You see one line with
+  both versions and the command that refreshes it, after asking.
 - **A recommended tool is missing** for the agent you started (Claude Code, Codex or Antigravity). The agent is
   told to say so once, in one line, with the install command for each. The list is
   `~/.the-agent-kit/recommended.json`. Each install (so each update) merges the kit's list into it by id:
@@ -292,10 +314,10 @@ It **never updates or installs anything itself**: running downloaded code at ses
 supply-chain shape the kit's rules forbid, so it only tells you what to run. It exits cleanly on every
 error, so an offline machine or a broken check never blocks a session, and when everything is current
 it prints nothing, so it costs no context. The install wires it into Claude Code and Codex as a `SessionStart`
-hook (`hooks/kit-check.py`). Antigravity has no `SessionStart` event, so there it runs as a global
-`PreInvocation` hook in `~/.gemini/config/hooks.json`: Antigravity fires that before every model call, so
-the check acts only on the first call of each conversation and answers `{}` to every other. Your other
-hooks in that file are kept. To switch it off, set `AGENT_KIT_NO_UPDATE_CHECK=1`.
+hook (`hooks/kit-check.py`), and into Antigravity as a global `SessionStart` hook in
+`~/.gemini/config/hooks.json`, which runs once when a conversation starts and not again when it is
+resumed (agy 1.5.1). An older kit wired it to `PreInvocation`, which fires before every model call; the
+next install moves that entry. Your other hooks in that file are kept. To switch it off, set `AGENT_KIT_NO_UPDATE_CHECK=1`.
 
 ### Also worth having
 
@@ -364,7 +386,7 @@ and the installer is the adapter between them:
 | Git-layer guards | yes | yes | yes |
 | Tool-layer guard | `ask`, machine-wide | `deny`, machine-wide | approves or refuses, never asks, per project (`.agents/hooks.json`) |
 | Turn-scoped git grants | yes | no (deny mode; you push) | yes, from the hook's `lastUserInput` (Antigravity 1.4.7+) |
-| Session-start update check | yes | yes | yes, on the first call of each conversation (a global `PreInvocation` hook; Antigravity has no `SessionStart` event) |
+| Session-start update check | yes | yes | yes, once per conversation (a global `SessionStart` hook) |
 | Measured | 48 cases, Sonnet | 15 cases, see [Limits](#limits) | 13 cases, small sample, see [Limits](#limits) |
 
 **The guards:** hooks at the **git layer** (reorder-proof, covering Claude Code, Codex, Antigravity, plain `git`,
@@ -517,8 +539,9 @@ decision record in [`docs/senior-engineer.md`](docs/senior-engineer.md) before u
 
 Codex has no `ask`, so where Claude prompts, Codex **denies** and you do it yourself. Antigravity gets
 the same guard as a workspace hook, with Claude's turn grants. It never asks: where Claude asks it
-refuses, and a command it has no objection to it approves (`auto_approve`), so Antigravity's own prompt
-never stalls a run. The git-layer hooks
+refuses, and a command it has no objection to it approves (`auto_approve`), which Antigravity's docs say
+skips its own prompt. Headless `agy -p` ignores that approval and refuses every command that needs a
+permission unless you pass `--dangerously-skip-permissions` (agy 1.5.1). The git-layer hooks
 run under `git` itself, so they survive flag-reordering, `--no-verify`, Codex, and MCP-driven commits.
 `command-guard.py` is the fast prompt-time catch on top.
 
@@ -533,7 +556,7 @@ Quick Start covers the usual path. One installer, four commands:
 | `install.sh --print` | By hand: copy the kit and **print** the settings snippets and the git-hooks command for you to apply. |
 | `install.sh update` | Fetch the latest kit, check it is the kit, then run its install. Needs no kit beside it, so one downloaded `install.sh` bootstraps everything. |
 | `install.sh uninstall` | Take out what the install records list: the project you run it in, then the machine, then `~/.the-agent-kit`. Asked first and checked after; a kit entry you changed is kept and named. |
-| `install.sh check` | Doctor: interpreter, guard firing, per-hook identity, settings wiring, the project's kit files against its record, the recommended and optional tools missing for each tool installed here, rules-file size, and one line on orphaned MCP processes. |
+| `install.sh check` | Doctor: interpreter, guard firing, per-hook identity, settings wiring, the project's kit files against its record, the recommended and optional tools missing for each tool installed here, whether the kit's rules are loaded at all, whether the project's formatter leaves the kit's files alone, rules-file size, and one line on orphaned MCP processes. |
 | `install.sh --tidy` | List orphaned MCP server processes left by a crashed agent. Dry run; add `--kill` to end exactly the listed trees. See [`docs/mcp-orphans.md`](docs/mcp-orphans.md). This is only the quick check for leftover MCP servers; the `/tidy` skill covers branches, worktrees, files and dev servers too. |
 
 The names before this release still work in it, as they did, and print the new name: `--setup` (the
@@ -555,8 +578,9 @@ beside it. Checked on 2026-10-31 against the docs and Claude Code 2.1.316:
 > keys into them. Pasting the whole snippet over an existing file wipes what's there.
 
 **Why two rules files.** `AGENTS.md` is the cross-tool standard (Codex, Cursor, Aider, Copilot).
-Claude Code reads `CLAUDE.md` and *not* `AGENTS.md`, so the kit follows Anthropic's documented
-pattern: `CLAUDE.md` contains `@AGENTS.md` and nothing else. One source of truth, and an edit reaches
+Claude Code reads `AGENTS.md` on its own only when no `CLAUDE.md` or `CLAUDE.local.md` exists (2.1.277
+and later), so one personal `CLAUDE.local.md` would switch the rules off. The kit follows Anthropic's
+documented pattern instead: `CLAUDE.md` contains `@AGENTS.md` and nothing else. One source of truth, and an edit reaches
 both tools at once. A symlink works too but needs Administrator or Developer Mode on Windows.
 
 **Two limits, both enforced silently.** Codex truncates past 32 KiB (`project_doc_max_bytes`) with no
@@ -602,6 +626,38 @@ agent opens auth, API, payment or migration code, and **[docs/web-checklists.md]
 for launch readiness.
 The full senior-engineer trait ledger behind these bars, with rationale and sources, is
 **[docs/senior-engineer.md](docs/senior-engineer.md)**.
+
+**Commit the kit's files, and give the repo an AI-aware `.gitignore`.** `AGENTS.md`, `.claude/` and
+`.agents/` are team config, so they belong in git; per-developer overrides (`*.local.*`) and agent session
+state do not. **[the-ultimate-gitignore-ai](https://github.com/vikichand/the-ultimate-gitignore-ai)** draws
+that line for Claude Code, Codex, Antigravity and about twenty other tools, and agrees with the kit by
+design. Add it before the first commit: a `.gitignore` never untracks a file that is already committed.
+
+```sh
+curl -o .gitignore https://raw.githubusercontent.com/vikichand/the-ultimate-gitignore-ai/main/ultimate.gitignore
+```
+
+Appending to a `.gitignore` you already have: `curl -s <same URL> >> .gitignore`.
+
+**Squash-merging? Check the pull request description too.** A squash merge builds the commit on the
+server from the pull request description, so the kit's commit-msg hook never sees it, and a session
+link left in the description lands on your main branch. Merge with an explicit body
+(`gh pr merge <N> --squash --body-file notes.md`), and to catch it in review, copy the optional workflow
+the kit ships:
+
+```sh
+mkdir -p .github/workflows && cp ~/.the-agent-kit/docs/templates/pr-description.yml .github/workflows/
+```
+
+It fails the pull request while the description holds a `claude.ai/code` link or a `*-Session:`
+trailer. It passes the description to its script through `env`, runs no third-party action, and stops
+after two minutes.
+
+The Antigravity guard entry in `.agents/hooks.json` runs on every teammate's machine, whatever OS ran the
+installer. Antigravity runs a hook through `cmd /c` on Windows and `sh -c` elsewhere, and the entry tries
+`py -3`, then `python3`, then `python`, moving to the next only when one cannot run. An entry written by a
+kit older than this one names a single Python and blocks every Antigravity command on a machine without it:
+run the installer once in that project and commit the result.
 
 ## What each guard does
 
@@ -705,14 +761,16 @@ These config choices are deliberate, because the obvious "more locked down" sett
   ([permission modes](https://code.claude.com/docs/en/permission-modes)). Codex never asks you (its
   reviewer agent decides). Antigravity's guard never asks either. Its headless `agy -p` refuses every
   command unless you pass `--dangerously-skip-permissions`, and the guard's refusals still hold under that
-  flag (checked with agy 1.4.8).
+  flag (checked with agy 1.5.1). A hook's approval does not lift that refusal, and the run still exits 0,
+  so a lead that delegates to `agy` treats an empty response as a failed slice.
 - **Codex keeps network access on.** The rules require verifying library and API behaviour against the
   version in use rather than recalling it. Switching the sandbox off the network does not make the agent safer, it
   makes it fall back on training data. Anthropic's own guidance notes that when two instructions conflict,
   the model may pick one arbitrarily, so the kit does not ship that conflict. Set it `false` when reviewing
   untrusted code and expect doc lookups to fail loudly.
-- **No hand-written env-var exclude list.** Codex already excludes secret-looking names by default. A broad
-  custom list (`*_URL`, `*KEY*`) strips `DATABASE_URL`, `VITE_API_URL`, and `KEYCLOAK_*` out of the
+- **No hand-written env-var exclude list.** Codex passes every variable to commands by default, names with
+  `KEY`, `SECRET` or `TOKEN` included (codex-cli 0.166.0), so keep real secrets out of the environment you
+  start it from. A broad custom list (`*_URL`, `*KEY*`) strips `DATABASE_URL`, `VITE_API_URL`, and `KEYCLOAK_*` out of the
   environment, so commands fail for a reason the agent cannot see, and it then invents a cause.
 
 ## Verify
@@ -781,12 +839,10 @@ the major version, so a legacy Python 2 is rejected rather than selected and the
   rule, no better with them. The duplicate-server case showed no gain there either: the baseline already does
   not hop ports. So the two glob rules ship on the strength of their Claude Code
   measurements, not an Antigravity one: Antigravity delivers a glob rule inside the tool output of the file
-  that triggered it, where a model may weigh it as untrusted content. Other limits are Antigravity's own: it
-  has no session-start event, so the update check is a `PreInvocation` hook that acts on the first call of
-  each conversation; it is built from Antigravity's documented hook contract and tested against canned
-  payloads, but not yet seen in a live conversation, and `invocationNum` is not documented to start at any
-  value, so the check keys on the conversation id alone; it splits a hook command on
-  whitespace and ignores quotes, which is why the guard and the check run through launchers beside their
+  that triggered it, where a model may weigh it as untrusted content. Other limits are Antigravity's own: the update check's
+  `SessionStart` event was seen live from a workspace `hooks.json` in a headless `agy -p` run (once per
+  conversation, not on resume), not yet from the global file or in the IDE; a quoted hook path with a space broke its hooks
+  in testing (it runs a hook through `cmd /c` or `sh -c`), which is why the guard and the check run through launchers beside their
   `hooks.json`, and that
   launcher relies on hooks running from the folder that holds `hooks.json`, verified on Windows only; and
   the guard is advisory against the agent itself, because `.agents/hooks.json` is a project file the agent

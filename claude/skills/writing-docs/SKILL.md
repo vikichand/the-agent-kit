@@ -50,7 +50,7 @@ thorough.
   stop, under 72 characters (aim for 50). Then, only when needed, a blank line and short bullets.
 - One logical change per commit, each leaving the checks passing. A fix, its test and its doc line are one
   commit, never one per file. A subject that needs a bracketed list or a second "and" is two commits.
-- For a squash merge, the pull request description becomes the commit message: write it as one.
+- For a squash merge, the pull request description becomes the commit message: write it as one, keep it free of session links, and pass an explicit body when merging (`gh pr merge --squash --body-file`).
 
 **Branches, tags and releases** (the project block's **Branches** line decides; this is the default).
 This says how; each step (merge, branch delete, tag, push, release) still runs only when the user names

@@ -4,9 +4,10 @@
 Runs once when a session starts (Claude Code and Codex both call SessionStart hooks; matcher
 `startup`). Whatever it prints becomes context for the agent, so it prints NOTHING when everything is
 current - the common case costs zero tokens - and one line per thing you can act on otherwise.
-Antigravity has no SessionStart event; with `--tool antigravity` this runs as a PreInvocation hook
-(before every model call), acts only on the first call of each conversation id, and always answers in
-the JSON that hook expects: {} to say nothing, {"injectSteps": [{"ephemeralMessage": ...}]} to speak:
+With `--tool antigravity` this runs as Antigravity's SessionStart hook (an older kit wired it to
+PreInvocation, which fires before every model call), acts only on the first call of each conversation
+id either way, and always answers in the JSON those hooks expect: {} to say nothing,
+{"injectSteps": [{"ephemeralMessage": ...}]} to speak:
 
   1. A newer release of the kit is on `main`. Checked with `git ls-remote` (no clone, no download) at
      most once a day, with a 3-second limit; the answer is cached in ~/.the-agent-kit so the other
@@ -22,6 +23,9 @@ the JSON that hook expects: {} to say nothing, {"injectSteps": [{"ephemeralMessa
      "web" only count in a project whose AGENTS.md block marks a web or user-facing platform. At most
      one reminder a day per tool, read from local files only, and a file it cannot read counts as
      "cannot tell", never as "missing".
+  4. The kit's rules are not loaded for that tool: its global rules file exists without them, and the
+     project's AGENTS.md and CLAUDE.md (with what it imports) carry none either.
+  5. The copy of the rules between AGENT-KIT markers in that global file is from an older kit release.
 
 It never updates or installs anything itself. Running downloaded code on session start, unasked, is exactly the
 supply-chain shape the kit's own rules forbid; this only says what to run. It exits 0 on every path,
@@ -186,6 +190,57 @@ def is_web_project(top):
 
 
 WHO = {"claude": "Claude Code", "codex": "Codex", "antigravity": "Antigravity"}
+GLOBAL_RULES = {"claude": "~/.claude/CLAUDE.md", "codex": "~/.codex/AGENTS.md", "antigravity": "~/.gemini/AGENTS.md"}
+RULES_MARK = "## Safety invariants"   # the first heading of the kit's rules
+
+
+def carries_rules(path, hops=4):
+    """True when the file, or a file it imports with a line-start `@path` (Claude Code's import), holds the
+    kit's rules. Hops are bounded, so an import cycle ends."""
+    text = read(path)
+    if text is None:
+        return False
+    if RULES_MARK in text:
+        return True
+    for m in re.finditer(r"(?m)^@(\S+)", text) if hops else ():
+        p = m.group(1)
+        p = os.path.expanduser(p) if p.startswith("~") else os.path.join(os.path.dirname(path), p)
+        if carries_rules(p, hops - 1):
+            return True
+    return False
+
+
+def marked_version(path):
+    """The x.y.z in a file's `<!-- AGENT-KIT:START x.y.z -->` marker, as a tuple, or None."""
+    m = re.search(r"<!-- AGENT-KIT:START (\d+)\.(\d+)\.(\d+) -->", read(path) or "")
+    return tuple(int(x) for x in m.groups()) if m else None
+
+
+def stale_global(tool):
+    """One line when the marked copy of the rules in the tool's global file is from an older kit than the
+    installed one. An unmarked copy is never judged: nothing could refresh it safely."""
+    have = marked_version(os.path.expanduser(GLOBAL_RULES.get(tool, "")))
+    kit = marked_version(os.path.join(SHARE, "AGENTS.global.md"))
+    if not have or not kit or have >= kit:
+        return None
+    return ("the-agent-kit: the kit's rules in %s are from %s, older than the installed kit (%s). To refresh "
+            "them, run ~/.the-agent-kit/install.sh: it asks first, keeps a backup and changes only what is "
+            "between the AGENT-KIT markers." % (GLOBAL_RULES[tool], ".".join(map(str, have)), ".".join(map(str, kit))))
+
+
+def rules_not_loaded(tool, top):
+    """What to say when the tool's global rules file exists without the kit's rules and the project has none
+    either: the hooks run, but no rule does. A machine with no global file at all is not judged, so a repo
+    that never took the kit stays quiet there."""
+    g = os.path.expanduser(GLOBAL_RULES.get(tool, ""))
+    if not os.path.isfile(g) or carries_rules(g):
+        return None
+    base = top or os.getcwd()
+    if any(carries_rules(os.path.join(base, f)) for f in ("AGENTS.md", "CLAUDE.md")):
+        return None
+    return ("the kit's rules are not loaded here (%s has none, and neither has this project): run "
+            "~/.the-agent-kit/install.sh in this project, or append ~/.the-agent-kit/AGENTS.global.md to %s."
+            % (GLOBAL_RULES[tool], GLOBAL_RULES[tool]))
 
 
 def recommended_items():
@@ -220,6 +275,9 @@ def doctor(top):
         if not (os.path.isdir(os.path.join(home, d)) or (tool == "claude" and os.path.isfile(os.path.join(home, ".claude.json")))):
             continue
         checked.append(WHO[tool])
+        unloaded = rules_not_loaded(tool, top)
+        if unloaded:
+            lines.append("  WARN: %s: %s" % (WHO[tool], unloaded))
         for optional in (False, True):
             for it, state, cmd in check_items(tool, top, optional):
                 label = "%s%s" % ("optional, " if optional else "", WHO[tool])
@@ -313,8 +371,9 @@ def main():
     except (ValueError, OSError):
         data = {}
     if tool == "antigravity":
-        # PreInvocation fires before EVERY model call and blocks the loop while it runs, so a conversation
-        # that has already been served is answered here, before any git or network work.
+        # SessionStart runs once per conversation, but an older kit's PreInvocation entry fires before EVERY
+        # model call until the next install moves it, so a served conversation is answered here, before any
+        # git or network work.
         if not first_invocation(data):
             print("{}")
             return
@@ -349,11 +408,17 @@ def main():
                              "replaces anything hand-edited above it; review with git diff AGENTS.md).")
 
     if tool in WHO:
+        line = rules_not_loaded(tool, top)
+        if line:
+            notes.append("the-agent-kit: tell the user in one line that " + line)
+        line = stale_global(tool)
+        if line:
+            notes.append(line)
         line = missing_tools(tool, top)
         if line:
             notes.append(line)
 
-    if tool == "antigravity":   # the documented PreInvocation output: {} to stay silent, injectSteps to speak
+    if tool == "antigravity":   # the documented hook output: {} to stay silent, injectSteps to speak
         print(json.dumps({"injectSteps": [{"ephemeralMessage": "\n".join(notes)}]} if notes else {}))
     elif notes:
         print("\n".join(notes))

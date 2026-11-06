@@ -11,6 +11,70 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-11-06
+
+### Added
+
+- `install.sh check` suggests an AI-aware `.gitignore`
+  ([the-ultimate-gitignore-ai](https://github.com/vikichand/the-ultimate-gitignore-ai)) in a git repo that
+  has none, and says so when it is present. It never writes the file.
+- The README says which kit files to commit.
+- The session-start check and `install.sh check` say when the kit's rules are not loaded at all: the
+  agent's global rules file exists without them, and the project's `AGENTS.md`, its `CLAUDE.md` and the
+  files that imports carry none either. The installer never overwrites an existing global file, so a
+  project could run the kit's hooks for weeks under an older global file that nothing flagged.
+- Global copies of the rules can now stay current. Append `~/.the-agent-kit/AGENTS.global.md`, which
+  wraps the rules in `<!-- AGENT-KIT:START x.y.z -->` and `<!-- AGENT-KIT:END -->` markers, and each
+  install or `update` offers to replace what is between them in `~/.claude/CLAUDE.md`,
+  `~/.codex/AGENTS.md` and `~/.gemini/AGENTS.md`, asked and backed up like its other changes. The
+  session-start check says when a marked copy is from an older release. A copy pasted without the
+  markers is never rewritten: replace it once with the marked file to opt in.
+- A project install offers to keep the project's formatter off the kit's files when it finds `biome.json`,
+  a `.prettierrc*` or `dprint.json`, asked and backed up like its other changes, and prints the exclusion
+  to add by hand when you say no. `install.sh check` warns while the formatter would still touch
+  `.agents/` or `.claude/`. A reformatted kit file used to read as your edit on the next install, and
+  could fail the project's own format gate.
+- An optional pull-request workflow, `docs/templates/pr-description.yml`, for projects that squash-merge.
+  It fails the pull request while the description holds a session link or a `*-Session:` trailer,
+  because a squash merge turns the description into the commit message and no commit-msg hook sees it.
+  The README says how to copy it in, and the release steps now merge with an explicit body.
+  The `writing-docs` skill says the same: keep a squash-merge description free of session links and
+  merge with an explicit body.
+
+### Changed
+
+- Antigravity's session-start check is a `SessionStart` hook, which agy 1.5.1 documents, instead of a
+  `PreInvocation` hook that ran before every model call. Run the installer once to move an older entry
+  (a timeout you set on it moves too); `--undo` removes either. `install.sh --global` prints the entry
+  under its real name, `the-agent-kit-check`: if you hand-merged the older snippet, delete its
+  `the-agent-kit` entry from `~/.gemini/config/hooks.json`, which the installer does not manage.
+- The Codex performance profile's implementer and default subagent model is `gpt-6.1-sol`, which Codex
+  now lists first ("near-Astra performance at a lower cost"). The README's Codex results were measured on
+  `gpt-6-sol` and say so.
+
+### Fixed
+
+- The Antigravity guard entry in `.agents/hooks.json` is one command for every OS. It used to name the
+  installing machine's Python, so a committed file blocked every Antigravity command for a teammate on
+  another OS. Run the installer in a project once to update an older entry; `install.sh check` flags the
+  project until you do.
+- When the Antigravity guard crashes, or every Python the entry tries fails, the command is refused with a
+  reason instead of relying on an exit code Antigravity does not document.
+- The Codex config notes said Codex strips secret-looking variables from commands by default. It does
+  not: with codex-cli 0.166.0 a variable named `*_SECRET`, `*_API_KEY` or `*_TOKEN` reaches every command,
+  so keep real secrets out of the environment you start Codex from.
+- The orchestration skill and the Codex performance profile no longer name `agents.max_depth`, which the
+  Codex config reference no longer lists.
+- The orchestration skill no longer says a headless `agy` worker waits forever on a permission prompt.
+  On agy 1.5.1 it refuses every such command at once, and a hook's approval does not lift that, so a
+  worker that runs commands needs `--dangerously-skip-permissions` (with your approval, in its own
+  worktree; the guard's denials still hold), and an empty response counts as a failed slice.
+- The docs no longer say Claude Code ignores `AGENTS.md`. Since 2.1.277 it reads `AGENTS.md` when no
+  `CLAUDE.md` or `CLAUDE.local.md` exists; the kit keeps its `@AGENTS.md` import, which a personal
+  `CLAUDE.local.md` cannot switch off.
+- `install.sh check` warns when `.agents/` holds a file that Antigravity's hook could run instead of the
+  guard: one named like a Python interpreter (`py.bat`, `python.exe`), or a stray `.py` module.
+
 ## [0.6.4] - 2026-11-04
 
 ### Changed
@@ -495,7 +559,8 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.6.4...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.6.5...develop
+[0.6.5]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.5
 [0.6.4]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.4
 [0.6.3]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.3
 [0.6.2]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.2

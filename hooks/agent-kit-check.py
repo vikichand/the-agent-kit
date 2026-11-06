@@ -6,7 +6,7 @@ import os, runpy, sys
 
 script = os.path.join(os.path.expanduser("~"), ".the-agent-kit", "hooks", "kit-check.py")
 if not os.path.isfile(script):
-    print("{}")   # a PreInvocation hook must always answer in JSON
+    print("{}")   # an Antigravity hook must always answer in JSON
     sys.exit(0)
 sys.argv = [script] + sys.argv[1:]
 runpy.run_path(script, run_name="__main__")

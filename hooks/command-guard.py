@@ -749,7 +749,9 @@ POWERSHELL = False    # set for Claude Code's PowerShell tool, where rm is Remov
 def emit(decision, reason):
     if ANTIGRAVITY:
         # Nothing waits on a person: what Claude Code would ask about is refused and left for the user, and
-        # what the guard passes is approved, so Antigravity's own prompt never stalls an unattended run.
+        # what the guard passes is auto_approve, which Antigravity's docs say skips its own prompt. Headless
+        # agy -p (1.5.1) ignores a hook's approval and refuses any command needing a permission, unless it
+        # runs with --dangerously-skip-permissions; a deny from here still holds under that flag.
         if decision == "ask":
             decision, reason = "deny", ("held for the user: " + reason + " Skip this step, finish the rest, "
                                         "and name it in your report.")

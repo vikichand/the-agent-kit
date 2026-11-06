@@ -3,7 +3,7 @@
 
 Run by install.sh inside a repo, never by an agent on its own.
 
-  project.py install|uninstall|check --root R --kit K --kit-time T --py P [--lean] [--apply]
+  project.py install|uninstall|check --root R --kit K --kit-time T [--lean] [--apply]
 
 Everything the kit writes into a project is an ENTRY in `.agents/the-agent-kit.json`, committed with the
 project, with a fingerprint of what the kit wrote. Every install is an uninstall of the old kit followed
@@ -15,9 +15,9 @@ by an install of the new one, as on the machine (setup/machine.py):
   - AGENTS.md: the text outside the PROJECT-CONFIG block is the kit's rules and is replaced; the block is
     the project's and is never touched. Without the markers the file is left as it is, and named
   - CLAUDE.md and a --lean AGENTS.md are written once, for the project to own
-  - the Antigravity guard entry in .agents/hooks.json is added, or brought current when its command is
-    not the kit's shape; any interpreter spelling of the kit's command is left as it is, so teammates
-    on different machines do not rewrite each other's file
+  - the Antigravity guard entry in .agents/hooks.json is added, or replaced by the kit's entry when it has
+    the kit's shape but differs (an older kit's one-interpreter command, a changed timeout); an entry
+    that is not the kit's is left as it is
 A project recorded by a newer kit than the one running is left alone: update the kit first. Git hooks
 (.git/hooks, per clone and never committed) stay with install.sh.
 
@@ -46,7 +46,13 @@ AG_GLOB = ("code-correctness", "tests")
 # the current kit's a record entry may name; test/shipped_history.py fails a release that forgets one.
 RETIRED_FILES = ("claude/skills/generating-reports/design.md",)   # 0.5.0 moved it to references/
 AG_HOOK_KEY = "the-agent-kit"
-AG_GUARD = re.compile(r"(python3?|py -3) agent-kit-guard\.py --tool antigravity")
+# hooks.json is committed, and Antigravity runs a hook through `sh -c` on Unix and `cmd /c` on Windows, so
+# the one command tries each interpreter in turn: `py -3` (fastest on Windows), `python3` (Unix, the Store
+# alias), `python` (conda). A later one runs only when the one before it fails to start or crashes, and
+# the launcher answers every failure with a deny on stdout, the one outcome Antigravity's hook doc defines,
+# so a crash never turns into a pass. Older kits wrote one spelling.
+AG_CMD = " || ".join(p + " agent-kit-guard.py --tool antigravity" for p in ("py -3", "python3", "python"))
+AG_GUARD = re.compile(r"(python3?|py -3) agent-kit-guard\.py --tool antigravity|" + re.escape(AG_CMD))
 
 STUB = """<!-- The universal rules live in your global ~/.claude/CLAUDE.md (and ~/.codex/AGENTS.md); both tools
      read global + project files together, so this file EXTENDS them. Keep only project-specific config
@@ -56,23 +62,39 @@ STUB = """<!-- The universal rules live in your global ~/.claude/CLAUDE.md (and 
 <!-- Run the setup prompt (~/.the-agent-kit/docs/project-setup-prompt.md) to fill this in (~15-30 lines, one screen). -->
 <!-- PROJECT-CONFIG:END -->
 """
-IMPORTER = """<!-- Claude Code reads CLAUDE.md, not AGENTS.md, so this file imports the rules instead of copying them.
+IMPORTER = """<!-- Claude Code reads AGENTS.md itself only while no CLAUDE.md or CLAUDE.local.md exists, so this file imports the rules instead of copying them.
      One source of truth, nothing to keep in sync. Put Claude-Code-only notes BELOW the import line. -->
 @AGENTS.md
 """
-# Antigravity splits a hook command on whitespace and ignores quotes, so a guard path under a home folder
-# with a space breaks the hook, and a broken hook blocks every command. Hooks run from the folder holding
-# hooks.json, so this launcher sits there, is called by bare name, and hands the call to the machine guard.
+# Antigravity runs a hook command through cmd /c or sh -c, and a quoted path with a space broke its hooks in
+# testing, so a guard path under a home folder with a space is not safe to name, and a broken hook blocks
+# every command. Hooks run from the folder holding hooks.json, so this launcher sits there, is called by
+# bare name, and hands the call to the machine guard.
 LAUNCHER = """# The Agent Kit: launcher for the command guard (see .agents/hooks.json). Kit-owned; install.sh
 # replaces it. Antigravity cannot pass a quoted path to a hook, so the guard is found from here.
-import os, runpy, sys
+import io, json, os, runpy, sys
+
+
+def refuse(why):
+    # Antigravity's hook doc defines the decision on stdout, not what a nonzero exit means, so a failure
+    # is a deny with exit 0, which also stops the hook command from trying the next Python.
+    print(json.dumps({"decision": "deny", "reason": "the-agent-kit: %s Command held; run install.sh check." % why}))
+    sys.exit(0)
+
 
 guard = os.path.join(os.path.expanduser("~"), ".the-agent-kit", "hooks", "command-guard.py")
 if not os.path.isfile(guard):
     sys.stderr.write("the-agent-kit: no guard at %s; run install.sh. Command not checked.\\n" % guard)
     sys.exit(0)
+data = sys.stdin.read()
+if not data.strip():   # an earlier Python in the hook command read the input, then failed
+    refuse("the command guard did not run (an earlier Python in the hook command failed).")
+sys.stdin = io.StringIO(data)
 sys.argv = [guard] + sys.argv[1:]
-runpy.run_path(guard, run_name="__main__")
+try:
+    runpy.run_path(guard, run_name="__main__")
+except Exception as e:   # SystemExit is not an Exception: the guard's own exits pass through
+    refuse("the command guard failed (%s: %s)." % (type(e).__name__, e))
 """
 PLACEHOLDER = ["<!-- PROJECT-CONFIG:START -->",
                "<!-- Not configured yet. Run the setup prompt (~/.the-agent-kit/docs/project-setup-prompt.md) to fill this in. -->",
@@ -187,8 +209,8 @@ def is_stub(text):
 # ---- the project -----------------------------------------------------------------------------------
 
 class Project:
-    def __init__(self, root, kit, py, lean):
-        self.root, self.kit, self.py, self.lean = root, kit, py, lean
+    def __init__(self, root, kit, lean):
+        self.root, self.kit, self.lean = root, kit, lean
         self.rules_src = next((d for d in (os.path.join(kit, "claude", "rules"), os.path.join(kit, "rules")) if os.path.isdir(d)), None)
         self.skills_src = next((d for d in (os.path.join(kit, "claude", "skills"), os.path.join(kit, "skills")) if os.path.isdir(d)), None)
         self.notes, self.warnings, self.errors = [], [], []
@@ -349,7 +371,7 @@ class Project:
 
     def ag_entry(self):
         return {"PreToolUse": [{"matcher": "run_command", "hooks": [
-            {"type": "command", "command": self.py + " agent-kit-guard.py --tool antigravity", "timeout": 15}]}]}
+            {"type": "command", "command": AG_CMD, "timeout": 15}]}]}
 
     @staticmethod
     def ag_shaped(v):
@@ -481,6 +503,10 @@ def plan(pj, action, record):
             elif not Project.ag_shaped(v):
                 pj.warnings.append("the entry named %s in %s is not the kit's; left as it is, so the Antigravity guard"
                                    " is not wired" % (AG_HOOK_KEY, rel)); continue
+            elif v != pj.ag_entry():
+                # The whole entry, not just the command: a timeout the guard cannot start inside is a hole too.
+                data[AG_HOOK_KEY] = pj.ag_entry()
+                changes.append(("~", "bring the command guard in %s to the kit's entry (Antigravity)" % rel))
             entries.append({"kind": "agentry", "path": rel, "key": AG_HOOK_KEY})
     return changes, entries
 
@@ -524,11 +550,10 @@ def main():
     ap.add_argument("--root", required=True)
     ap.add_argument("--kit", required=True)
     ap.add_argument("--kit-time", type=int, default=0, help="commit time of the kit, to refuse a project a newer kit installed")
-    ap.add_argument("--py", required=True)
     ap.add_argument("--lean", action="store_true")
     ap.add_argument("--apply", action="store_true")
     a = ap.parse_args()
-    pj = Project(os.path.abspath(a.root), os.path.abspath(a.kit), a.py, a.lean)
+    pj = Project(os.path.abspath(a.root), os.path.abspath(a.kit), a.lean)
     rec_path = pj.p(RECORD.replace(os.sep, "/"))
     record = None
     if os.path.lexists(rec_path):

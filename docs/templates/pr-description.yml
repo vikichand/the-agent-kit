@@ -1,0 +1,27 @@
+name: pr-description
+
+# Optional template from the-agent-kit. Copy it to .github/workflows/ in a project that squash-merges.
+# A squash merge builds the commit on the server from the pull request description, so the local
+# commit-msg hook that strips session links never sees it. This checks the description instead, again
+# whenever it is edited. The body reaches the script through env, never interpolated into it, and no
+# third-party action runs.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  no-session-links:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: No session link in the description
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if printf '%s' "$BODY" | grep -Eiq 'claude\.ai/code|[a-z]+-session:'; then
+            echo "The description contains a session link or a session trailer. Remove it before merging." >&2
+            exit 1
+          fi

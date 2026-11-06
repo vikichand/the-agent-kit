@@ -9,6 +9,7 @@
 # .git read-only), denies critical-risk ones, and fails closed. The tool guard still denies what
 # Claude Code would ask about. With "never", every commit failed. Checked with codex-cli 0.165.0,
 # `codex exec` included: the sandboxed commit hit .git/index.lock, the reviewer approved the retry.
+# With codex-cli 0.166.0 the same `codex exec` commit went through on the first try.
 # Valid values: on-request | never | { granular = { ... } }
 approval_policy = "on-request"
 approvals_reviewer = "auto_review"
@@ -27,9 +28,9 @@ sandbox_mode = "workspace-write"
 network_access = true
 
 # Deliberately NOT set: [shell_environment_policy].
-# Codex already excludes secret-looking variable names by default (see ignore_default_excludes in
-# the reference). A hand-written exclude list on top of that is redundant, and a broad one actively
-# breaks builds: patterns like "*_URL" or "*KEY*" strip DATABASE_URL, VITE_API_URL and KEYCLOAK_*
+# By default Codex passes every variable to commands, names with KEY, SECRET or TOKEN included
+# (ignore_default_excludes defaults to true; seen with codex-cli 0.166.0). Keep real secrets out of the
+# environment you start Codex from. Excluding by pattern breaks builds instead: patterns like "*_URL" or "*KEY*" strip DATABASE_URL, VITE_API_URL and KEYCLOAK_*
 # out of the environment, so a command fails for a reason the agent cannot see - and it then
 # invents a cause and "fixes" the wrong thing.
 # If you must exclude a specific variable, name it explicitly and use the current `filters` field.
