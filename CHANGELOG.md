@@ -21,6 +21,12 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   agent's global rules file exists without them, and the project's `AGENTS.md`, its `CLAUDE.md` and the
   files that imports carry none either. The installer never overwrites an existing global file, so a
   project could run the kit's hooks for weeks under an older global file that nothing flagged.
+- Global copies of the rules can now stay current. Append `~/.the-agent-kit/AGENTS.global.md`, which
+  wraps the rules in `<!-- AGENT-KIT:START x.y.z -->` and `<!-- AGENT-KIT:END -->` markers, and each
+  install or `update` offers to replace what is between them in `~/.claude/CLAUDE.md`,
+  `~/.codex/AGENTS.md` and `~/.gemini/AGENTS.md`, asked and backed up like its other changes. The
+  session-start check says when a marked copy is from an older release. A copy pasted without the
+  markers is never rewritten: replace it once with the marked file to opt in.
 
 ### Changed
 

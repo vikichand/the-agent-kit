@@ -193,8 +193,8 @@ If you would rather set the rules up once per machine, append them to your globa
 lean per-project install:
 
 ```bash
-cat ~/.the-agent-kit/AGENTS.md >> ~/.claude/CLAUDE.md      # and ~/.codex/AGENTS.md for Codex
-mkdir -p ~/.gemini && cat ~/.the-agent-kit/AGENTS.md >> ~/.gemini/AGENTS.md  # Antigravity
+cat ~/.the-agent-kit/AGENTS.global.md >> ~/.claude/CLAUDE.md      # and ~/.codex/AGENTS.md for Codex
+mkdir -p ~/.gemini && cat ~/.the-agent-kit/AGENTS.global.md >> ~/.gemini/AGENTS.md  # Antigravity
 cd /path/to/project && ~/.the-agent-kit/install.sh --lean
 ```
 
@@ -202,9 +202,16 @@ cd /path/to/project && ~/.the-agent-kit/install.sh --lean
 from a project's own `.claude/rules/`. So global rules give you the universal floor everywhere but
 none of the depth tier. `--lean` still installs the depth tier into the project, which is why
 it is in the command above. Global rules also stay on your machine, so cloud agents, CI and
-teammates see only what is committed in the repo. And the global copy is a paste, so `update`
-does not refresh it: after an update, delete the old block from the global file and run the `cat`
-again. The depth tier in each project still updates when you run `install.sh --lean` there.
+teammates see only what is committed in the repo.
+
+**Keeping the global copy current.** `AGENTS.global.md` is the kit's rules between two markers,
+`<!-- AGENT-KIT:START x.y.z -->` and `<!-- AGENT-KIT:END -->`, where `x.y.z` is the kit release. Each
+install, and so each `update`, offers to replace what is between them in `~/.claude/CLAUDE.md`,
+`~/.codex/AGENTS.md` and `~/.gemini/AGENTS.md`, with the same yes and backup as its other changes;
+your lines around the markers stay. The session-start check tells you when a marked copy is from an
+older release. A copy pasted before the markers existed is never rewritten: delete it from the global
+file and run the `cat` above once to get a marked one. The depth tier in each project still updates
+when you run `install.sh --lean` there.
 
 Antigravity reads `~/.gemini/AGENTS.md` in every project. Its guard hook stays per project: run
 `~/.the-agent-kit/install.sh` inside each project. On the machine it touches `~/.gemini/config` only for the skills entry and the session-start check above.
@@ -269,7 +276,7 @@ behind. The session-start check below is what tells you when it has.
 
 ### Staying current without remembering to
 
-When a session starts, the kit checks four things and says nothing unless one needs you:
+When a session starts, the kit checks five things and says nothing unless one needs you:
 
 - **A newer release is on `main`.** One `git ls-remote` to GitHub, no clone and no download, at most
   once a day with a 3-second limit; the answer is cached so the rest of that day's sessions need no
@@ -282,6 +289,9 @@ When a session starts, the kit checks four things and says nothing unless one ne
   project's `AGENTS.md`, its `CLAUDE.md` or a file that `CLAUDE.md` imports. The hooks and skills still
   run, so nothing else would show it. You see one line: run `install.sh` in the project, or append the
   rules to the global file. A machine with no global rules file is not judged.
+- **Your global copy of the rules is from an older release.** Read from the `AGENT-KIT` markers around
+  it (see [Prefer the rules global instead?](#prefer-the-rules-global-instead)). You see one line with
+  both versions and the command that refreshes it, after asking.
 - **A recommended tool is missing** for the agent you started (Claude Code, Codex or Antigravity). The agent is
   told to say so once, in one line, with the install command for each. The list is
   `~/.the-agent-kit/recommended.json`. Each install (so each update) merges the kit's list into it by id:

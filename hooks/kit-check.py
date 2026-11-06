@@ -25,6 +25,7 @@ id either way, and always answers in the JSON those hooks expect: {} to say noth
      "cannot tell", never as "missing".
   4. The kit's rules are not loaded for that tool: its global rules file exists without them, and the
      project's AGENTS.md and CLAUDE.md (with what it imports) carry none either.
+  5. The copy of the rules between AGENT-KIT markers in that global file is from an older kit release.
 
 It never updates or installs anything itself. Running downloaded code on session start, unasked, is exactly the
 supply-chain shape the kit's own rules forbid; this only says what to run. It exits 0 on every path,
@@ -209,6 +210,24 @@ def carries_rules(path, hops=4):
     return False
 
 
+def marked_version(path):
+    """The x.y.z in a file's `<!-- AGENT-KIT:START x.y.z -->` marker, as a tuple, or None."""
+    m = re.search(r"<!-- AGENT-KIT:START (\d+)\.(\d+)\.(\d+) -->", read(path) or "")
+    return tuple(int(x) for x in m.groups()) if m else None
+
+
+def stale_global(tool):
+    """One line when the marked copy of the rules in the tool's global file is from an older kit than the
+    installed one. An unmarked copy is never judged: nothing could refresh it safely."""
+    have = marked_version(os.path.expanduser(GLOBAL_RULES.get(tool, "")))
+    kit = marked_version(os.path.join(SHARE, "AGENTS.global.md"))
+    if not have or not kit or have >= kit:
+        return None
+    return ("the-agent-kit: the kit's rules in %s are from %s, older than the installed kit (%s). To refresh "
+            "them, run ~/.the-agent-kit/install.sh: it asks first, keeps a backup and changes only what is "
+            "between the AGENT-KIT markers." % (GLOBAL_RULES[tool], ".".join(map(str, have)), ".".join(map(str, kit))))
+
+
 def rules_not_loaded(tool, top):
     """What to say when the tool's global rules file exists without the kit's rules and the project has none
     either: the hooks run, but no rule does. A machine with no global file at all is not judged, so a repo
@@ -220,7 +239,7 @@ def rules_not_loaded(tool, top):
     if any(carries_rules(os.path.join(base, f)) for f in ("AGENTS.md", "CLAUDE.md")):
         return None
     return ("the kit's rules are not loaded here (%s has none, and neither has this project): run "
-            "~/.the-agent-kit/install.sh in this project, or append ~/.the-agent-kit/AGENTS.md to %s."
+            "~/.the-agent-kit/install.sh in this project, or append ~/.the-agent-kit/AGENTS.global.md to %s."
             % (GLOBAL_RULES[tool], GLOBAL_RULES[tool]))
 
 
@@ -392,6 +411,9 @@ def main():
         line = rules_not_loaded(tool, top)
         if line:
             notes.append("the-agent-kit: tell the user in one line that " + line)
+        line = stale_global(tool)
+        if line:
+            notes.append(line)
         line = missing_tools(tool, top)
         if line:
             notes.append(line)

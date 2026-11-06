@@ -404,6 +404,17 @@ EOF
   rm -f "$k/proj/rules.md" "$k/proj/CLAUDE.md" "$k/home/.claude/CLAUDE.md"; printf '# mine\n' > "$k/home/.codex/AGENTS.md"
   o=$(kt claude "$k/proj"); o2=$(kt codex "$k/proj")
   [ -z "$o" ] && has '~/.codex/AGENTS.md' "$o2" && pass "K35 no global file is not judged; each tool checks its own global file" || bad "K35 wrong: [$o] [$o2]"
+  # K36-K38: a marked global copy from an older kit is named with both versions; a current or newer one, and
+  # an unmarked copy, are silent. Versions compare as numbers, so 0.6.10 is newer than 0.6.5.
+  rm -f "$k/home/.codex/AGENTS.md"
+  printf '<!-- AGENT-KIT:START 0.6.5 -->\nrules\n<!-- AGENT-KIT:END -->\n' > "$k/home/.the-agent-kit/AGENTS.global.md"
+  printf 'mine\n<!-- AGENT-KIT:START 0.6.3 -->\n## Safety invariants: x\n<!-- AGENT-KIT:END -->\n' > "$k/home/.claude/CLAUDE.md"
+  o=$(kt claude "$k/proj"); has 'CLAUDE.md are from 0.6.3, older than the installed kit (0.6.5)' "$o" && has 'install.sh: it asks first' "$o" \
+    && pass "K36 a marked global copy from an older kit: one line with both versions and the command" || bad "K36 stale global copy not reported: [$o]"
+  sed 's/0\.6\.3/0.6.10/' "$k/home/.claude/CLAUDE.md" > "$k/g" && mv "$k/g" "$k/home/.claude/CLAUDE.md"
+  o=$(kt claude "$k/proj"); [ -z "$o" ] && pass "K37 a marked copy as new or newer (0.6.10 against 0.6.5): silent" || bad "K37 spoke about a current copy: $o"
+  printf 'mine\n## Safety invariants: x\n' > "$k/home/.claude/CLAUDE.md"
+  o=$(kt claude "$k/proj"); [ -z "$o" ] && pass "K38 an unmarked global copy is never judged" || bad "K38 judged an unmarked copy: $o"
   rm -rf "$k"
 else
   bad "no python - kit-check.py NOT tested"
@@ -1376,6 +1387,42 @@ EOF
   rm -rf "$c"
 else
   bad "no python - install / uninstall / check NOT tested"
+fi
+
+# ---------- global rules between AGENT-KIT markers ----------
+# The global rules are a pasted copy. Wrapped in markers, an install (so an update) offers to replace what is
+# between them, with the same yes and a backup as every other change; an unmarked copy is never rewritten.
+echo "== global rules refresh =="
+if [ -n "$PY" ]; then
+  wq() { cygpath -m "$1" 2>/dev/null || printf '%s' "$1"; }
+  c=$(mktemp -d) || exit 2; C=$(wq "$c"); mkdir -p "$c/.claude" "$c/.codex" "$c/plain"
+  gi() { rc=0; o=$(cd "$c/plain" && env HOME="$c" USERPROFILE="$C" AGENT_KIT_APPLY="$1" sh "$KIT/install.sh" </dev/null 2>&1) || rc=$?; }
+  gi 1   # the machine first, so the runs below differ only in the global files
+  head -1 "$c/.the-agent-kit/AGENTS.global.md" | grep -qE '^<!-- AGENT-KIT:START [0-9]+\.[0-9]+\.[0-9]+ -->$' \
+    && tail -1 "$c/.the-agent-kit/AGENTS.global.md" | grep -qx '<!-- AGENT-KIT:END -->' && grep -q 'Safety invariants' "$c/.the-agent-kit/AGENTS.global.md" \
+    && pass "G1 the share carries the rules to append, between markers that name the kit's release" || bad "G1 AGENTS.global.md missing or unmarked: $(head -1 "$c/.the-agent-kit/AGENTS.global.md" 2>&1)"
+  printf 'my line above\n<!-- AGENT-KIT:START 0.0.1 -->\nold rules\n<!-- AGENT-KIT:END -->\nmy line below\n' > "$c/.claude/CLAUDE.md"
+  printf 'an unmarked pasted copy\n## Safety invariants: old\n' > "$c/.codex/AGENTS.md"
+  cp "$c/.claude/CLAUDE.md" "$c/claude.orig"; cp "$c/.codex/AGENTS.md" "$c/codex.orig"
+  gi ""
+  cmp -s "$c/.claude/CLAUDE.md" "$c/claude.orig" && has 'CLAUDE.md: replace the kit.s rules between its AGENT-KIT markers (0.0.1 to' "$o" && ! has 'codex/AGENTS.md' "$o" \
+    && pass "G2 no yes: the marked file is listed and nothing is written" || bad "G2 wrote without consent, or did not list it: $(printf '%s' "$o" | grep -i 'global\|AGENT-KIT')"
+  gi 1
+  { head -1 "$c/.claude/CLAUDE.md" | grep -qx 'my line above'; } && tail -1 "$c/.claude/CLAUDE.md" | grep -qx 'my line below' \
+    && grep -q 'Safety invariants' "$c/.claude/CLAUDE.md" && ! grep -q 'old rules' "$c/.claude/CLAUDE.md" \
+    && [ "$(sed -n 2p "$c/.claude/CLAUDE.md")" = "$(head -1 "$c/.the-agent-kit/AGENTS.global.md")" ] \
+    && cmp -s "$(ls "$c/.claude/"CLAUDE.md.bak-agent-kit-* 2>/dev/null | head -1)" "$c/claude.orig" \
+    && pass "G3 with the yes: only what is between the markers is replaced, after a backup" || bad "G3 refresh wrong (rc=$rc): $(head -3 "$c/.claude/CLAUDE.md")"
+  cmp -s "$c/.codex/AGENTS.md" "$c/codex.orig" && [ -z "$(ls "$c/.codex/" | grep bak-agent-kit)" ] \
+    && pass "G4 an unmarked global copy is never rewritten" || bad "G4 an unmarked copy was touched"
+  cp "$c/.claude/CLAUDE.md" "$c/claude.now"; gi 1
+  cmp -s "$c/.claude/CLAUDE.md" "$c/claude.now" && ! has 'GLOBAL RULES' "$o" \
+    && pass "G5 a current marked copy: nothing to offer, nothing written" || bad "G5 re-run not idempotent: $(printf '%s' "$o" | grep -A2 'GLOBAL RULES')"
+  printf 'x\n<!-- AGENT-KIT:START 0.0.1 -->\na\n<!-- AGENT-KIT:END -->\n<!-- AGENT-KIT:START 0.0.1 -->\nb\n<!-- AGENT-KIT:END -->\n' > "$c/.claude/CLAUDE.md"
+  cp "$c/.claude/CLAUDE.md" "$c/claude.twice"; gi 1
+  cmp -s "$c/.claude/CLAUDE.md" "$c/claude.twice" && has 'markers more than once' "$o" \
+    && pass "G6 markers that appear twice: named and left as they are" || bad "G6 a doubly marked file was rewritten or not named"
+  rm -rf "$c"
 fi
 
 # ---------- recommended tools list: refreshed by --setup, never re-adds what the user dismissed ----------

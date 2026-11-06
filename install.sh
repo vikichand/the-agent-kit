@@ -335,6 +335,63 @@ os.replace(tmp, path)   # a kill mid-write must never leave the user's list half
 RECO
 }
 
+refresh_globals() {  # $1 = share  $2 = plan | apply: the kit's rules between AGENT-KIT markers in the global files
+  # plan lists each global rules file whose marked block differs from the share's AGENTS.global.md (exit 10
+  # when there is one); apply backs each up, then replaces only what is between its markers. A file without
+  # both markers, exactly once and in order, is a copy pasted by hand and is never rewritten.
+  py=$(detect_py)
+  [ -n "$py" ] || return 1
+  $py - "$(nat "$1")" "$(nat "$HOME")" "$2" <<'GLOB'
+import os, re, shutil, sys, tempfile, time
+share, home, mode = sys.argv[1:4]
+START, END = re.compile(r"<!-- AGENT-KIT:START (\S+) -->"), "<!-- AGENT-KIT:END -->"
+try:
+    with open(os.path.join(share, "AGENTS.global.md"), encoding="utf-8") as f:
+        new = f.read()
+except OSError:
+    sys.exit(0)   # a share from before the markers: nothing to refresh from
+m = START.match(new)
+if not m or not new.rstrip("\n").endswith(END):
+    sys.exit(0)
+new_ver, new = m.group(1), new.rstrip("\n")
+todo = False
+for rel in (".claude/CLAUDE.md", ".codex/AGENTS.md", ".gemini/AGENTS.md"):
+    path = os.path.join(home, *rel.split("/"))
+    if not os.path.isfile(path):
+        continue
+    if os.path.islink(path):
+        print("  ! ~/%s is a symlink: left as it is" % rel); continue
+    with open(path, encoding="utf-8", newline="") as f:
+        text = f.read()
+    starts = list(START.finditer(text))
+    if not starts:
+        continue   # unmarked: a hand-pasted copy, never rewritten
+    end = text.find(END, starts[0].end())
+    if len(starts) > 1 or end < 0 or text.count(END) > 1:
+        print("  ! ~/%s has the AGENT-KIT markers more than once, or out of order: left as it is" % rel); continue
+    end += len(END)
+    nl = "\r\n" if "\r\n" in text else "\n"
+    block = new.replace("\n", nl)
+    if text[starts[0].start():end] == block:
+        continue
+    if mode == "plan":
+        print("  + ~/%s: replace the kit's rules between its AGENT-KIT markers (%s to %s); the rest of the file stays"
+              % (rel, starts[0].group(1), new_ver))
+        todo = True; continue
+    bak, n = "%s.bak-agent-kit-%s" % (path, time.strftime("%Y%m%d-%H%M%S")), 1
+    while os.path.exists(bak):   # two runs in one second must not overwrite the first backup
+        n += 1; bak = "%s.bak-agent-kit-%s-%d" % (path, time.strftime("%Y%m%d-%H%M%S"), n)
+    shutil.copy2(path, bak)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".agent-kit.", suffix=".tmp")
+    with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
+        f.write(text[:starts[0].start()] + block + text[end:])
+    shutil.copymode(path, tmp)
+    os.replace(tmp, path)   # a kill mid-write must never leave the rules file half written
+    print("  = refreshed the kit's rules in ~/%s (backup: %s)" % (rel, os.path.basename(bak)))
+sys.exit(10 if todo else 0)
+GLOB
+}
+
 copy_share() {  # copy this kit into ~/.the-agent-kit, so the download it came from can be deleted
   share="$HOME/.the-agent-kit"
   # Every run is a clean reinstall: the kit is built whole in a staging folder, then swapped in for the
@@ -361,6 +418,11 @@ copy_share() {  # copy this kit into ~/.the-agent-kit, so the download it came f
   # the share is what --update-rules and the "prefer the rules global" append both read. A cp here put
   # this repo's branch rules into every user's global rules (Q3, found 2026-09-26 before it shipped).
   write_rules "$st/AGENTS.md"
+  # The copy people append to their global rules files, between markers, so the install can find and
+  # refresh it later (refresh_globals). The version is the latest release in the changelog: the tag is the
+  # version and there is no version file.
+  kv=$(sed -n 's/^## \[\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)\].*/\1/p' "$KIT/CHANGELOG.md" 2>/dev/null | head -1)
+  { printf '<!-- AGENT-KIT:START %s -->\n' "${kv:-unknown}"; cat "$st/AGENTS.md"; printf '<!-- AGENT-KIT:END -->\n'; } > "$st/AGENTS.global.md"
   cp "$KIT/CLAUDE.md" "$KIT/install.sh" "$st/"
   # The installer prints these as merge snippets, so the relocated copy must carry them too.
   cp "$KIT/claude/settings.json" "$st/claude/" 2>/dev/null || true
@@ -480,8 +542,9 @@ install_global() {  # copy the kit, then PRINT the settings snippets for a hand 
   say "The tool guard is NOT active until you merge the snippet(s) above - then verify:"
   say "    $share/install.sh check"
   say "Optional global rules (lets projects stay lean via --lean), review the merge first:"
-  say "    cat \"$share/AGENTS.md\" >> ~/.claude/CLAUDE.md   ;   cat \"$share/AGENTS.md\" >> ~/.codex/AGENTS.md"
-  say "    mkdir -p ~/.gemini && cat \"$share/AGENTS.md\" >> ~/.gemini/AGENTS.md"
+  say "    cat \"$share/AGENTS.global.md\" >> ~/.claude/CLAUDE.md   ;   cat \"$share/AGENTS.global.md\" >> ~/.codex/AGENTS.md"
+  say "    mkdir -p ~/.gemini && cat \"$share/AGENTS.global.md\" >> ~/.gemini/AGENTS.md"
+  say "  (the AGENT-KIT markers around it let install.sh and update refresh that copy later, after asking)"
   say "Antigravity: the guard hook stays per project; run $share/install.sh inside each project."
 }
 
@@ -531,8 +594,11 @@ setup_machine() {  # --setup: everything a machine needs, applied with the user'
   rrc=0; rplan=$(merge_recommended "$KIT/hooks/recommended.json" "$share/recommended.json" plan 2>&1) || rrc=$?
   if [ -n "$rplan" ]; then say "$rplan"; else say "  already current"; fi
   hr
+  # The kit's rules pasted into a global rules file between AGENT-KIT markers are refreshed with the same yes.
+  grc=0; gplan=$(refresh_globals "$share" plan 2>&1) || grc=$?
+  if [ -n "$gplan" ]; then say "GLOBAL RULES: the kit's rules in your global rules files (only between the AGENT-KIT markers)"; say "$gplan"; hr; fi
   say "Antigravity's command guard is still wired per project: run $share/install.sh inside each project."
-  if [ "$mrc" != 10 ] && [ "$rrc" != 10 ]; then
+  if [ "$mrc" != 10 ] && [ "$rrc" != 10 ] && [ "$grc" != 10 ]; then
     [ "$mrc" = 1 ] && { say "Fix the file named above (it could not be read safely), then run this again."; exit 1; }
     say "Already set up: your settings, git hooks and skills carry the kit."
     return 0
@@ -548,6 +614,9 @@ setup_machine() {  # --setup: everything a machine needs, applied with the user'
   fi
   if [ "$rrc" = 10 ]; then
     merge_recommended "$KIT/hooks/recommended.json" "$share/recommended.json" apply || say "  ! the recommended-tools list could not be updated"
+  fi
+  if [ "$grc" = 10 ]; then
+    refresh_globals "$share" apply || say "  ! the kit's rules in your global rules files could not be refreshed"
   fi
   # Done means verified: everything the record now lists is in place with the value the kit wrote (or
   # the user's own change), read back from the files, not assumed from the apply's exit code.
