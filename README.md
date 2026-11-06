@@ -269,7 +269,7 @@ behind. The session-start check below is what tells you when it has.
 
 ### Staying current without remembering to
 
-When a session starts, the kit checks three things and says nothing unless one needs you:
+When a session starts, the kit checks four things and says nothing unless one needs you:
 
 - **A newer release is on `main`.** One `git ls-remote` to GitHub, no clone and no download, at most
   once a day with a 3-second limit; the answer is cached so the rest of that day's sessions need no
@@ -277,6 +277,11 @@ When a session starts, the kit checks three things and says nothing unless one n
 - **This project's rules differ from your installed kit.** Compared locally, every session. You see one
   line telling you to run `install.sh` here. It is silent in the kit's own repo, whose rules are the
   source, and for a `--lean` stub, whose rules live globally.
+- **The kit's rules are not loaded.** The agent's global rules file (`~/.claude/CLAUDE.md`,
+  `~/.codex/AGENTS.md` or `~/.gemini/AGENTS.md`) exists but holds no copy of them, and neither does the
+  project's `AGENTS.md`, its `CLAUDE.md` or a file that `CLAUDE.md` imports. The hooks and skills still
+  run, so nothing else would show it. You see one line: run `install.sh` in the project, or append the
+  rules to the global file. A machine with no global rules file is not judged.
 - **A recommended tool is missing** for the agent you started (Claude Code, Codex or Antigravity). The agent is
   told to say so once, in one line, with the install command for each. The list is
   `~/.the-agent-kit/recommended.json`. Each install (so each update) merges the kit's list into it by id:
@@ -534,7 +539,7 @@ Quick Start covers the usual path. One installer, four commands:
 | `install.sh --print` | By hand: copy the kit and **print** the settings snippets and the git-hooks command for you to apply. |
 | `install.sh update` | Fetch the latest kit, check it is the kit, then run its install. Needs no kit beside it, so one downloaded `install.sh` bootstraps everything. |
 | `install.sh uninstall` | Take out what the install records list: the project you run it in, then the machine, then `~/.the-agent-kit`. Asked first and checked after; a kit entry you changed is kept and named. |
-| `install.sh check` | Doctor: interpreter, guard firing, per-hook identity, settings wiring, the project's kit files against its record, the recommended and optional tools missing for each tool installed here, rules-file size, and one line on orphaned MCP processes. |
+| `install.sh check` | Doctor: interpreter, guard firing, per-hook identity, settings wiring, the project's kit files against its record, the recommended and optional tools missing for each tool installed here, whether the kit's rules are loaded at all, rules-file size, and one line on orphaned MCP processes. |
 | `install.sh --tidy` | List orphaned MCP server processes left by a crashed agent. Dry run; add `--kill` to end exactly the listed trees. See [`docs/mcp-orphans.md`](docs/mcp-orphans.md). This is only the quick check for leftover MCP servers; the `/tidy` skill covers branches, worktrees, files and dev servers too. |
 
 The names before this release still work in it, as they did, and print the new name: `--setup` (the

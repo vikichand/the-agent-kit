@@ -17,6 +17,10 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   ([the-ultimate-gitignore-ai](https://github.com/vikichand/the-ultimate-gitignore-ai)) in a git repo that
   has none, and says so when it is present. It never writes the file.
 - The README says which kit files to commit.
+- The session-start check and `install.sh check` say when the kit's rules are not loaded at all: the
+  agent's global rules file exists without them, and the project's `AGENTS.md`, its `CLAUDE.md` and the
+  files that imports carry none either. The installer never overwrites an existing global file, so a
+  project could run the kit's hooks for weeks under an older global file that nothing flagged.
 
 ### Changed
 

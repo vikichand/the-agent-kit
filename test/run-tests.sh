@@ -387,6 +387,23 @@ EOF
   o=$(ka conv-tools2 "$k/proj"); [ "$o" = '{}' ] && pass "K29 Antigravity: Context7 present in mcp_config.json: silent" || bad "K29 spoke although Context7 is configured: $o"
   printf 'not json' > "$k/home/.gemini/config/mcp_config.json"; rm -f "$k/home/.the-agent-kit/.tools-check"
   o=$(ka conv-tools3 "$k/proj"); [ "$o" = '{}' ] && pass "K30 Antigravity: an unreadable mcp_config.json is 'cannot tell', not 'missing'" || bad "K30 reported missing from an unreadable config: $o"
+  # K31-K35: the hooks can run while no rule does: a global rules file without the kit's rules and a project
+  # with none. The tools reminder is emptied first, so only this check can speak.
+  printf '{"items":[]}' > "$k/home/.the-agent-kit/recommended.json"; rm -f "$k/proj/AGENTS.md" "$k/proj/CLAUDE.md"
+  printf '# my own rules\nClaude-Session trace links are fine.\n' > "$k/home/.claude/CLAUDE.md"
+  o=$(kt claude "$k/proj"); has "rules are not loaded here" "$o" && has '~/.claude/CLAUDE.md' "$o" && has 'install.sh in this project' "$o" \
+    && [ "$(printf '%s\n' "$o" | wc -l | tr -d ' ')" = 1 ] \
+    && pass "K31 a global file without the kit's rules and a project without AGENTS.md: one line naming both fixes" || bad "K31 unloaded rules not reported: [$o]"
+  printf '# my own rules\n\n## Safety invariants: always on, regardless of task size\n' > "$k/home/.claude/CLAUDE.md"
+  o=$(kt claude "$k/proj"); [ -z "$o" ] && pass "K32 the kit's rules in the global file: silent" || bad "K32 spoke with the rules global: $o"
+  printf '# my own rules\n' > "$k/home/.claude/CLAUDE.md"
+  printf '# rules\n\n## Safety invariants: always on, regardless of task size\n' > "$k/proj/AGENTS.md"
+  o=$(kt claude "$k/proj"); [ -z "$o" ] && pass "K33 the kit's rules in the project's AGENTS.md: silent" || bad "K33 spoke with project rules: $o"
+  mv "$k/proj/AGENTS.md" "$k/proj/rules.md"; printf '@rules.md\n' > "$k/proj/CLAUDE.md"
+  o=$(kt claude "$k/proj"); [ -z "$o" ] && pass "K34 the kit's rules in a file CLAUDE.md imports: silent" || bad "K34 import not followed: $o"
+  rm -f "$k/proj/rules.md" "$k/proj/CLAUDE.md" "$k/home/.claude/CLAUDE.md"; printf '# mine\n' > "$k/home/.codex/AGENTS.md"
+  o=$(kt claude "$k/proj"); o2=$(kt codex "$k/proj")
+  [ -z "$o" ] && has '~/.codex/AGENTS.md' "$o2" && pass "K35 no global file is not judged; each tool checks its own global file" || bad "K35 wrong: [$o] [$o2]"
   rm -rf "$k"
 else
   bad "no python - kit-check.py NOT tested"
@@ -526,6 +543,11 @@ if [ -n "$PY" ]; then
   d=$(dr)
   has 'entry "my own tool" has no kit id' "$d" && ! has 'entry "Context7 MCP (library docs)" has no kit id' "$d" \
     && pass "D14c only an id-less entry the kit does not know is called out" || bad "D14c id-less entry notes wrong: $(printf '%s' "$d" | grep -i 'kit id')"
+  # D15: check says when the kit's rules are loaded neither globally nor in the project.
+  printf '# my own rules\n' > "$g/.claude/CLAUDE.md"; d=$(dr)
+  has 'WARN: Claude Code: the kit.s rules are not loaded here' "$d" && pass "D15 check warns when the kit's rules are not loaded" || bad "D15 no unloaded-rules warning: $(printf '%s' "$d" | grep -i rules)"
+  printf '## Safety invariants: always on\n' >> "$g/.claude/CLAUDE.md"; d=$(dr)
+  has 'rules are not loaded' "$d" && bad "D15 warned although the global file carries the rules" || pass "D15 quiet once the global file carries the rules"
   rm -rf "$g" "$u"
 fi
 
