@@ -11,6 +11,12 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- A project installed with `--lean` stays recorded as lean when you later run plain `install.sh` in it,
+  which is what `install.sh update` runs and then tells you to run. Before, that run left `AGENTS.md`
+  alone but dropped it from the install record, so an uninstall would no longer remove the stub.
+
 ## [0.6.6] - 2026-11-07
 
 ### Added
