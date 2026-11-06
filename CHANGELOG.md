@@ -11,6 +11,12 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+### Added
+
+- The README says how to keep credentials away from the Codex, Antigravity and `claude -p` workers a
+  Claude Code lead starts: `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` in your Claude Code settings. It stays
+  opt-in, because an MCP server that reads an API key from its environment would lose it.
+
 ### Fixed
 
 - A worker started by another agent can no longer push or open a pull request because the lead's brief
