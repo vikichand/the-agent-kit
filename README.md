@@ -745,7 +745,9 @@ These config choices are deliberate, because the obvious "more locked down" sett
   keeps the grant for up to two hours; any other message resets it. A grant never covers force-push or `--no-verify`.
   A missed phrasing is refused, never a silent push: the agent says it is ready and you ask again. Codex
   (deny-mode) ignores grants and leaves pushing and merging to you. Antigravity reads the same request
-  from its hook's `lastUserInput`.
+  from its hook's `lastUserInput`. A session another agent started grants nothing, because its prompt
+  is that agent's brief: a worker never pushes, and the lead pushes once you have asked it to. A headless
+  `claude -p` or Agent SDK run grants nothing either, even one you start yourself.
 
 - **Running unattended.** In auto mode (`claude --permission-mode auto`) and bypass permissions mode
   (`--dangerously-skip-permissions`) alike, what still stops a run until you answer is the short list
@@ -772,13 +774,22 @@ These config choices are deliberate, because the obvious "more locked down" sett
   `KEY`, `SECRET` or `TOKEN` included (codex-cli 0.166.0), so keep real secrets out of the environment you
   start it from. A broad custom list (`*_URL`, `*KEY*`) strips `DATABASE_URL`, `VITE_API_URL`, and `KEYCLOAK_*` out of the
   environment, so commands fail for a reason the agent cannot see, and it then invents a cause.
+- **Running Codex or Antigravity workers from Claude Code? Scrub credentials there instead.** Every
+  worker CLI a Claude Code lead starts inherits the lead's environment. Add
+  `"env": {"CLAUDE_CODE_SUBPROCESS_ENV_SCRUB": "1"}` to `~/.claude/settings.json` (Claude Code 2.1.83 and
+  later) and Claude Code strips credentials, matched by name or by value, from its Bash commands, hooks
+  and stdio MCP servers, and so from every worker those start. GitHub tokens and proxy settings stay
+  ([environment variables](https://code.claude.com/docs/en/env-vars)). Checked on 2.1.318, set from the
+  shell and from the settings file: an `*_API_KEY` variable was removed and a plain one kept. The kit
+  leaves it off, because an MCP server that reads an API key from the environment it
+  inherits loses that key.
 
 ## Verify
 
 ```bash
 ./install.sh check                      # doctor: interpreter, guard firing, per-hook status, rules files
 sh test/run-tests.sh                     # git-layer hooks + doctor, end-to-end
-python3 test/command_guard_cases.py      # command-guard corpus (181 cases: guard + grants + intent + Antigravity)
+python3 test/command_guard_cases.py      # command-guard corpus (576 cases: guard + grants + intent + Antigravity)
 sh test/adherence/run.sh                 # do the SOFT rules actually fire? (costs tokens)
 ```
 

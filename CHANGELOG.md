@@ -11,6 +11,22 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-11-07
+
+### Added
+
+- The README says how to keep credentials away from the Codex, Antigravity and `claude -p` workers a
+  Claude Code lead starts: `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` in your Claude Code settings. It stays
+  opt-in, because an MCP server that reads an API key from its environment would lose it.
+
+### Fixed
+
+- A worker started by another agent can no longer push or open a pull request because the lead's brief
+  said to. The turn grant came from the session's prompt, and a worker's prompt is the lead's brief, so
+  `claude -p "... push the branch"`, or `agy -p` started from an agent's command, was allowed to push. A
+  session another agent started now grants nothing, and so does a headless `claude -p` or Agent SDK run,
+  whoever starts it: push from those yourself. Interactive terminal sessions are unchanged.
+
 ## [0.6.5] - 2026-11-06
 
 ### Added
@@ -559,7 +575,8 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.6.5...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.6.6...develop
+[0.6.6]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.6
 [0.6.5]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.5
 [0.6.4]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.4
 [0.6.3]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.3
