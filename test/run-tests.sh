@@ -1400,30 +1400,30 @@ if [ -n "$PY" ]; then
   gi 1   # the machine first, so the runs below differ only in the global files
   head -1 "$c/.the-agent-kit/AGENTS.global.md" | grep -qE '^<!-- AGENT-KIT:START [0-9]+\.[0-9]+\.[0-9]+ -->$' \
     && tail -1 "$c/.the-agent-kit/AGENTS.global.md" | grep -qx '<!-- AGENT-KIT:END -->' && grep -q 'Safety invariants' "$c/.the-agent-kit/AGENTS.global.md" \
-    && pass "G1 the share carries the rules to append, between markers that name the kit's release" || bad "G1 AGENTS.global.md missing or unmarked: $(head -1 "$c/.the-agent-kit/AGENTS.global.md" 2>&1)"
+    && pass "GR1 the share carries the rules to append, between markers that name the kit's release" || bad "GR1 AGENTS.global.md missing or unmarked: $(head -1 "$c/.the-agent-kit/AGENTS.global.md" 2>&1)"
   printf 'my line above\n<!-- AGENT-KIT:START 0.0.1 -->\nold rules\n<!-- AGENT-KIT:END -->\nmy line below\n' > "$c/.claude/CLAUDE.md"
   printf 'an unmarked pasted copy\n## Safety invariants: old\n' > "$c/.codex/AGENTS.md"
   cp "$c/.claude/CLAUDE.md" "$c/claude.orig"; cp "$c/.codex/AGENTS.md" "$c/codex.orig"
   gi ""
   cmp -s "$c/.claude/CLAUDE.md" "$c/claude.orig" && has 'CLAUDE.md: replace the kit.s rules between its AGENT-KIT markers (0.0.1 to' "$o" && ! has 'codex/AGENTS.md' "$o" \
-    && pass "G2 no yes: the marked file is listed and nothing is written" || bad "G2 wrote without consent, or did not list it: $(printf '%s' "$o" | grep -i 'global\|AGENT-KIT')"
+    && pass "GR2 no yes: the marked file is listed and nothing is written" || bad "GR2 wrote without consent, or did not list it: $(printf '%s' "$o" | grep -i 'global\|AGENT-KIT')"
   gi 1
   { head -1 "$c/.claude/CLAUDE.md" | grep -qx 'my line above'; } && tail -1 "$c/.claude/CLAUDE.md" | grep -qx 'my line below' \
     && grep -q 'Safety invariants' "$c/.claude/CLAUDE.md" && ! grep -q 'old rules' "$c/.claude/CLAUDE.md" \
     && [ "$(sed -n 2p "$c/.claude/CLAUDE.md")" = "$(head -1 "$c/.the-agent-kit/AGENTS.global.md")" ] \
     && cmp -s "$(ls "$c/.claude/"CLAUDE.md.bak-agent-kit-* 2>/dev/null | head -1)" "$c/claude.orig" \
-    && pass "G3 with the yes: only what is between the markers is replaced, after a backup" || bad "G3 refresh wrong (rc=$rc): $(head -3 "$c/.claude/CLAUDE.md")"
+    && pass "GR3 with the yes: only what is between the markers is replaced, after a backup" || bad "GR3 refresh wrong (rc=$rc): $(head -3 "$c/.claude/CLAUDE.md")"
   cmp -s "$c/.codex/AGENTS.md" "$c/codex.orig" && [ -z "$(ls "$c/.codex/" | grep bak-agent-kit)" ] \
-    && pass "G4 an unmarked global copy is never rewritten" || bad "G4 an unmarked copy was touched"
+    && pass "GR4 an unmarked global copy is never rewritten" || bad "GR4 an unmarked copy was touched"
   cp "$c/.claude/CLAUDE.md" "$c/claude.now"; gi 1
   cmp -s "$c/.claude/CLAUDE.md" "$c/claude.now" && ! has 'GLOBAL RULES' "$o" \
-    && pass "G5 a current marked copy: nothing to offer, nothing written" || bad "G5 re-run not idempotent: $(printf '%s' "$o" | grep -A2 'GLOBAL RULES')"
+    && pass "GR5 a current marked copy: nothing to offer, nothing written" || bad "GR5 re-run not idempotent: $(printf '%s' "$o" | grep -A2 'GLOBAL RULES')"
   printf 'x\n<!-- AGENT-KIT:START 0.0.1 -->\na\n<!-- AGENT-KIT:END -->\n<!-- AGENT-KIT:START 0.0.1 -->\nb\n<!-- AGENT-KIT:END -->\n' > "$c/.claude/CLAUDE.md"
   cp "$c/.claude/CLAUDE.md" "$c/claude.twice"; gi 1
   cmp -s "$c/.claude/CLAUDE.md" "$c/claude.twice" && has 'markers more than once' "$o" \
-    && pass "G6 markers that appear twice: named and left as they are" || bad "G6 a doubly marked file was rewritten or not named"
+    && pass "GR6 markers that appear twice: named and left as they are" || bad "GR6 a doubly marked file was rewritten or not named"
   [ -f "$c/.the-agent-kit/docs/templates/pr-description.yml" ] \
-    && pass "G7 the share carries the optional pull-request description template" || bad "G7 docs/templates not copied to the share"
+    && pass "GR7 the share carries the optional pull-request description template" || bad "GR7 docs/templates not copied to the share"
   rm -rf "$c"
 fi
 
