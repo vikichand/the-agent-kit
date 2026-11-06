@@ -468,6 +468,8 @@ def plan(pj, action, record):
                 pj.warnings.append("AGENTS.md: %s; left as it is" % crlf); continue
             if is_stub(text):
                 pj.notes.append("AGENTS.md is a --lean stub: the universal rules live in your global files; left as it is")
+                if rel in rec:   # a plain install (what `update` runs) keeps the --lean record, so uninstall still knows the stub
+                    entries.append(rec[rel])
                 continue
             if START not in text or END not in text:
                 pj.warnings.append("AGENTS.md has no PROJECT-CONFIG markers, so the kit cannot tell your text from its"

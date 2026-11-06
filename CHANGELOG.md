@@ -11,6 +11,14 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.6.7] - 2026-11-07
+
+### Fixed
+
+- A project installed with `--lean` stays recorded as lean when you later run plain `install.sh` in it,
+  which is what `install.sh update` runs and then tells you to run. Before, that run left `AGENTS.md`
+  alone but dropped it from the install record, so an uninstall would no longer remove the stub.
+
 ## [0.6.6] - 2026-11-07
 
 ### Added
@@ -575,7 +583,8 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.6.6...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.6.7...develop
+[0.6.7]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.7
 [0.6.6]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.6
 [0.6.5]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.5
 [0.6.4]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.4

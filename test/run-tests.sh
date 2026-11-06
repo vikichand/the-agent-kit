@@ -1313,6 +1313,14 @@ if [ -n "$PY" ]; then
   run_ "$c/lean" 1 install --lean
   [ "$rc" = 0 ] && grep -q 'universal rules live in your global' "$c/lean/AGENTS.md" && [ -f "$c/lean/.agents/the-agent-kit.json" ] \
     && pass "C4 install --lean gives the project the stub that extends the global rules" || bad "C4 --lean wrong (rc=$rc): $(printf '%s' "$o" | tail -5)"
+  # C4b: a plain install in a lean project (what `update` runs, and what it tells you to run) keeps the
+  # stub's record, so the kit still knows it wrote AGENTS.md.
+  seed_in() { $PY -c 'import json,sys; r=json.load(open(sys.argv[1])); sys.exit(0 if any(e.get("kind")=="seed" and e.get("path")=="AGENTS.md" for e in r.get("entries",r.get("files",[]))) else 1)' "$(wq "$c/lean/.agents/the-agent-kit.json")"; }
+  seed_in; s1=$?
+  run_ "$c/lean" 1
+  [ "$s1" = 0 ] && [ "$rc" = 0 ] && seed_in && grep -q 'universal rules live in your global' "$c/lean/AGENTS.md" \
+    && pass "C4b a plain install in a lean project keeps the stub and its record" \
+    || bad "C4b plain install in a lean project dropped the stub's record (before=$s1, rc=$rc)"
   run_ "$c/proj" "" check
   [ "$rc" = 0 ] && has "files in this project: current" "$o" && has "machine-wide entries: installed and current" "$o" \
     && pass "C5 check reports the machine's and the project's records current" || bad "C5 check wrong (rc=$rc): $(printf '%s' "$o" | grep -E 'WARN|FAIL|entries|files in')"
