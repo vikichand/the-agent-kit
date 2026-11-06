@@ -27,6 +27,11 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   `~/.codex/AGENTS.md` and `~/.gemini/AGENTS.md`, asked and backed up like its other changes. The
   session-start check says when a marked copy is from an older release. A copy pasted without the
   markers is never rewritten: replace it once with the marked file to opt in.
+- A project install offers to keep the project's formatter off the kit's files when it finds `biome.json`,
+  a `.prettierrc*` or `dprint.json`, asked and backed up like its other changes, and prints the exclusion
+  to add by hand when you say no. `install.sh check` warns while the formatter would still touch
+  `.agents/` or `.claude/`. A reformatted kit file used to read as your edit on the next install, and
+  could fail the project's own format gate.
 
 ### Changed
 

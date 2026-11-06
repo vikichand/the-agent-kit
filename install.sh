@@ -392,6 +392,128 @@ sys.exit(10 if todo else 0)
 GLOB
 }
 
+formatters() {  # $1 = repo root  $2 = plan | apply | check: keep the project's formatter off the kit's files
+  # A formatter that rewrites .agents/ or .claude/ changes the files the project record fingerprints, so the
+  # next install reads the kit's own files as your edits (and a project gate fails on them). plan lists the
+  # exclusion each config lacks (exit 10 when one can be added for you); apply adds it after a backup; check
+  # prints a WARN per config that lacks it. A config that is not plain JSON is never rewritten: plan and
+  # check print the exclusion to add by hand.
+  py=$(detect_py)
+  [ -n "$py" ] || return 0
+  $py - "$(nat "$1")" "$2" <<'FMT'
+import glob, json, os, re, shutil, sys, time
+root, mode = sys.argv[1], sys.argv[2]
+DIRS = (".agents", ".claude")
+
+def read(rel):
+    try:
+        with open(os.path.join(root, rel), encoding="utf-8-sig") as f:
+            return f.read()
+    except OSError:
+        return None
+
+def excluded(text, d, neg):   # a pattern naming the folder, as an exclusion
+    return re.search(r'%s(\*\*/|/)?%s(/|/\*\*)?(["\s]|$)' % (neg, re.escape(d)), text, re.M) is not None
+
+def dump(v, ind, lw, depth=0, lead=0):
+    # The layout Biome and Prettier give JSON: objects open, a list of plain values on one line when it fits.
+    pad, inner = ind * depth, ind * (depth + 1)
+    if isinstance(v, dict) and v:
+        items = ['%s%s: %s' % (inner, json.dumps(k, ensure_ascii=False),
+                               dump(x, ind, lw, depth + 1, len(inner) + len(json.dumps(k, ensure_ascii=False)) + 2))
+                 for k, x in v.items()]
+        return "{\n" + ",\n".join(items) + "\n" + pad + "}"
+    if isinstance(v, list) and v:
+        flat = "[" + ", ".join(json.dumps(x, ensure_ascii=False) for x in v) + "]"
+        if all(not isinstance(x, (dict, list)) for x in v) and lead + len(flat) + 1 <= lw:
+            return flat
+        return "[\n" + ",\n".join(inner + dump(x, ind, lw, depth + 1, len(inner)) for x in v) + "\n" + pad + "]"
+    return json.dumps(v, ensure_ascii=False)
+
+found = []   # (config, missing patterns, how to add them, edit function or None)
+if read("biome.json") is not None:
+    text = read("biome.json")
+    miss = ['!**/%s' % d for d in DIRS if not excluded(text, d, "!{1,2}")]
+    edit = None
+    try:
+        cfg = json.loads(text)
+        files = cfg.get("files", {}) if isinstance(cfg, dict) else None
+        inc = files.get("includes", ["**"]) if isinstance(files, dict) else None
+        if isinstance(inc, list) and all(isinstance(i, str) for i in inc):
+            def edit(cfg=cfg, inc=inc, miss=miss):
+                cfg.setdefault("files", {})["includes"] = inc + miss
+                return cfg, (cfg.get("formatter") or {}).get("lineWidth", 80)
+    except ValueError:
+        pass
+    if miss:
+        found.append(("biome.json", miss, "add %s to files.includes" % ", ".join('"%s"' % m for m in miss), edit))
+if glob.glob(os.path.join(root, ".prettierrc*")):
+    text = read(".prettierignore") or ""
+    miss = ['%s/' % d for d in DIRS if not re.search(r'^(\*\*/|/)?%s/?(\*\*)?\s*$' % re.escape(d), text, re.M)]
+    if miss:
+        found.append((".prettierignore", miss, "add the lines %s" % ", ".join(miss), "lines"))
+if read("dprint.json") is not None:
+    text = read("dprint.json")
+    miss = ['**/%s' % d for d in DIRS if not excluded(text, d, "")]
+    edit = None
+    try:
+        cfg = json.loads(text)
+        exc = cfg.get("excludes", []) if isinstance(cfg, dict) else None
+        if isinstance(exc, list) and all(isinstance(i, str) for i in exc):
+            def edit(cfg=cfg, exc=exc, miss=miss):
+                cfg["excludes"] = exc + miss
+                return cfg, cfg.get("lineWidth", 120)
+    except ValueError:
+        pass
+    if miss:
+        found.append(("dprint.json", miss, "add %s to excludes" % ", ".join('"%s"' % m for m in miss), edit))
+
+todo = False
+for rel, miss, how, edit in found:
+    if mode == "check":
+        print("  WARN: %s does not keep the formatter off the kit's files: %s" % (rel, how)); continue
+    if edit is None:
+        print("  ! %s is not JSON the kit can edit safely (comments?), so it is left as it is: %s yourself" % (rel, how)); continue
+    if mode == "plan":
+        print("  + %s: %s%s" % (rel, how, "" if edit == "lines" else " (the file is rewritten in the formatter's JSON layout; review with git diff)"))
+        todo = True; continue
+    path = os.path.join(root, rel)
+    if os.path.islink(path):
+        print("  ! %s is a symlink: left as it is" % rel); continue
+    bak = ""
+    if os.path.exists(path):
+        bak = "%s.bak-agent-kit-%s" % (rel, time.strftime("%Y%m%d-%H%M%S"))
+        shutil.copy2(path, os.path.join(root, bak))
+    if edit == "lines":
+        text = read(rel) or ""
+        with open(path, "a", encoding="utf-8", newline="\n") as f:
+            f.write(("" if not text or text.endswith("\n") else "\n") + "\n".join(miss) + "\n")
+    else:
+        raw = read(rel)
+        m = re.search(r"^([ \t]+)\S", raw, re.M)
+        cfg, lw = edit()
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(dump(cfg, m.group(1) if m else "\t", lw if isinstance(lw, int) else 80) + "\n")
+    print("  = %s: %s%s" % (rel, how.replace("add", "added", 1), " (your copy saved as %s)" % bak if bak else ""))
+sys.exit(10 if todo else 0)
+FMT
+}
+
+formatter_offer() {  # $1 = repo root: after a project install, offer the formatter exclusion with the same yes
+  frc=0; fplan=$(formatters "$1" plan 2>&1) || frc=$?
+  [ -n "$fplan" ] || return 0
+  hr
+  say "FORMATTER: keep this project's formatter off the kit's files (.agents/ and .claude/), or the next"
+  say "install reads the kit's reformatted files as your edits"
+  say "$fplan"
+  [ "$frc" = 10 ] || return 0
+  if confirm; then
+    formatters "$1" apply || say "  ! the formatter config could not be changed: add the exclusion above by hand"
+  else
+    say "  To add it by hand instead, the exclusion is listed above."
+  fi
+}
+
 copy_share() {  # copy this kit into ~/.the-agent-kit, so the download it came from can be deleted
   share="$HOME/.the-agent-kit"
   # Every run is a clean reinstall: the kit is built whole in a staging folder, then swapped in for the
@@ -719,6 +841,7 @@ install_all() {  # install.sh [--lean]: the machine, then the project this runs 
   elif [ -n "$root" ]; then
     say "THE KIT IN THIS PROJECT"
     if [ "${1:-}" = lean ]; then install_extension "$root" || prc=1; else install_project "$root" || prc=1; fi
+    formatter_offer "$root"
   else
     say "No project here (not inside a git repo, or it is your home folder or the kit itself): the machine only."
     say "To add the kit to a project, run $HOME/.the-agent-kit/install.sh inside it."
@@ -948,6 +1071,7 @@ doctor() {
       10) say "  WARN: the kit's files in this project are not this kit's - run: $share/install.sh here" ;;
       *) say "  WARN: the kit's files in this project could not be checked - run: $share/install.sh here, and read what it says" ;;
     esac
+    formatters "$(pwd)" check
   fi
   hd=$(git_hooks_dir "$(pwd)")
   if [ -z "$hd" ]; then

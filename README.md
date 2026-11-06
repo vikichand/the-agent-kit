@@ -174,6 +174,13 @@ fingerprint of it:
 - **`AGENTS.md`** gets the kit's current rules around your `PROJECT-CONFIG` block, which is kept byte
   for byte. A file without the markers is never guessed at: it is left as it is, with a warning.
 - **`CLAUDE.md`** is written once, for you to own.
+- **Your formatter is kept off the kit's files.** When the project has `biome.json`, a `.prettierrc*` or
+  `dprint.json` that would format `.agents/` and `.claude/`, the install offers to exclude them
+  (`"!**/.agents"` and `"!**/.claude"` in Biome's `files.includes`, two lines in `.prettierignore`,
+  `"**/.agents"` and `"**/.claude"` in dprint's `excludes`), asked and backed up like its other changes.
+  A formatter that rewrites them changes what the record fingerprints, so the next install would read
+  the kit's own files as your edits. A config with comments is never rewritten; the install prints the
+  exclusion for you to add, as it does when you say no, and `check` warns until it is there.
 - **A newer kit's work is safe.** A project recorded by a newer kit than yours is left alone until you
   update the kit, so a teammate a release behind cannot undo your update. `AGENT_KIT_FORCE=1` in front
   of the command installs your kit anyway.
@@ -549,7 +556,7 @@ Quick Start covers the usual path. One installer, four commands:
 | `install.sh --print` | By hand: copy the kit and **print** the settings snippets and the git-hooks command for you to apply. |
 | `install.sh update` | Fetch the latest kit, check it is the kit, then run its install. Needs no kit beside it, so one downloaded `install.sh` bootstraps everything. |
 | `install.sh uninstall` | Take out what the install records list: the project you run it in, then the machine, then `~/.the-agent-kit`. Asked first and checked after; a kit entry you changed is kept and named. |
-| `install.sh check` | Doctor: interpreter, guard firing, per-hook identity, settings wiring, the project's kit files against its record, the recommended and optional tools missing for each tool installed here, whether the kit's rules are loaded at all, rules-file size, and one line on orphaned MCP processes. |
+| `install.sh check` | Doctor: interpreter, guard firing, per-hook identity, settings wiring, the project's kit files against its record, the recommended and optional tools missing for each tool installed here, whether the kit's rules are loaded at all, whether the project's formatter leaves the kit's files alone, rules-file size, and one line on orphaned MCP processes. |
 | `install.sh --tidy` | List orphaned MCP server processes left by a crashed agent. Dry run; add `--kill` to end exactly the listed trees. See [`docs/mcp-orphans.md`](docs/mcp-orphans.md). This is only the quick check for leftover MCP servers; the `/tidy` skill covers branches, worktrees, files and dev servers too. |
 
 The names before this release still work in it, as they did, and print the new name: `--setup` (the

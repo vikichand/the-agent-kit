@@ -1425,6 +1425,45 @@ if [ -n "$PY" ]; then
   rm -rf "$c"
 fi
 
+# ---------- formatter exclusion for the kit's files ----------
+# A project formatter that rewrites .agents/ or .claude/ changes what the project record fingerprints, so the
+# next install reads the kit's files as the user's edits. After a project install the installer offers the
+# exclusion with the same yes and backup as its other changes, and check warns while a config lacks it.
+echo "== formatter exclusion =="
+if [ -n "$PY" ]; then
+  wq() { cygpath -m "$1" 2>/dev/null || printf '%s' "$1"; }
+  c=$(mktemp -d) || exit 2; C=$(wq "$c"); mkdir -p "$c/.claude" "$c/p"
+  (cd "$c/p" && git init -q && git config core.hooksPath .git/hooks) || exit 2
+  fi_() { rc=0; o=$(cd "$c/p" && env HOME="$c" USERPROFILE="$C" AGENT_KIT_APPLY="$1" sh "$KIT/install.sh" </dev/null 2>&1) || rc=$?; }
+  bj() { $PY -c "import json,sys; d=json.load(open(sys.argv[1],encoding='utf-8')); print($1)" "$(wq "$c/p/biome.json")" 2>/dev/null; }
+  fi_ 1
+  ! has 'FORMATTER' "$o" && pass "F1 no formatter config: nothing offered" || bad "F1 offered an exclusion with no formatter config"
+  printf '{\n  "$schema": "x",\n  "formatter": {\n    "indentStyle": "space"\n  }\n}\n' > "$c/p/biome.json"; cp "$c/p/biome.json" "$c/biome.orig"
+  printf '{}\n' > "$c/p/.prettierrc"
+  printf '{\n  // dprint allows comments\n  "excludes": []\n}\n' > "$c/p/dprint.json"; cp "$c/p/dprint.json" "$c/dprint.orig"
+  fi_ ""
+  cmp -s "$c/p/biome.json" "$c/biome.orig" && [ ! -e "$c/p/.prettierignore" ] \
+    && has 'biome.json: add "!\*\*/.agents", "!\*\*/.claude" to files.includes' "$o" && has 'the exclusion is listed above' "$o" \
+    && pass "F2 no terminal: the exclusion is printed and nothing is written" || bad "F2 wrote without consent, or printed no exclusion: $(printf '%s' "$o" | grep -A6 FORMATTER)"
+  has 'dprint.json is not JSON the kit can edit safely' "$o" && cmp -s "$c/p/dprint.json" "$c/dprint.orig" \
+    && pass "F3 a config with comments is never rewritten: the exclusion is printed for a hand edit" || bad "F3 dprint.json with comments mishandled"
+  has 'WARN: biome.json does not keep the formatter off' "$o" && has 'WARN: .prettierignore does not keep' "$o" \
+    && pass "F4 check warns for each config that does not exclude the kit's files" || bad "F4 check silent: $(printf '%s' "$o" | grep -i formatter)"
+  fi_ 1
+  [ "$(bj "d['files']['includes']")" = "['**', '!**/.agents', '!**/.claude']" ] && [ "$(bj "d['formatter']['indentStyle']")" = space ] \
+    && grep -qxF '    "includes": ["**", "!**/.agents", "!**/.claude"]' "$c/p/biome.json" \
+    && cmp -s "$(ls "$c/p/"biome.json.bak-agent-kit-* 2>/dev/null | head -1)" "$c/biome.orig" \
+    && pass "F5 with the yes: biome.json gains the exclusion in Biome's layout, after a backup" || bad "F5 biome.json edit wrong: $(cat "$c/p/biome.json")"
+  grep -qx '.agents/' "$c/p/.prettierignore" && grep -qx '.claude/' "$c/p/.prettierignore" \
+    && pass "F6 with the yes: .prettierignore lists the kit's folders" || bad "F6 .prettierignore not written"
+  ! has 'WARN: biome.json' "$o" && ! has 'WARN: .prettierignore' "$o" && has 'WARN: dprint.json' "$o" \
+    && pass "F7 check is quiet for an excluded config and still warns for the one left to edit by hand" || bad "F7 check wrong after the edit: $(printf '%s' "$o" | grep WARN)"
+  cp "$c/p/biome.json" "$c/biome.now"; fi_ 1
+  cmp -s "$c/p/biome.json" "$c/biome.now" && ! has '+ biome.json' "$o" \
+    && pass "F8 a config that already excludes the kit's files is left alone" || bad "F8 offered again: $(printf '%s' "$o" | grep -A4 FORMATTER)"
+  rm -rf "$c"
+fi
+
 # ---------- recommended tools list: refreshed by --setup, never re-adds what the user dismissed ----------
 # The list is seeded once and then the user's, but a list that never learns about new upstream items goes
 # stale (the machine this was found on still named the Playwright MCP the kit had retired). --setup, which
