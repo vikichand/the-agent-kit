@@ -11,6 +11,8 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-11-07
+
 ### Added
 
 - The README says how to keep credentials away from the Codex, Antigravity and `claude -p` workers a
@@ -573,7 +575,8 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.6.5...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.6.6...develop
+[0.6.6]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.6
 [0.6.5]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.5
 [0.6.4]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.4
 [0.6.3]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.3
