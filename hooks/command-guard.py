@@ -308,6 +308,25 @@ def is_force_push(args):
 # for. This is a convenience layer on a best-effort guard, NOT a security boundary: the temp file is
 # only as trustworthy as the machine, and the real boundary stays the git-layer hooks + branch
 # protection. Codex (--decision deny) never consults grants; its behaviour is unchanged.
+#
+# A session another agent started grants nothing: its prompt is that agent's brief, so without this a
+# lead with no push grant could start `claude -p "... push the branch"` or `agy -p` and the worker would
+# push. Claude Code marks a -p or SDK run with CLAUDE_CODE_SESSION_ATTENDED=0 and CLAUDE_CODE_ENTRYPOINT=sdk-*
+# whatever the parent passed, so a headless run grants nothing whoever starts it (seen on 2.1.318 in the
+# terminal; undocumented, and not checked in the IDE extensions, the desktop app or agent-team teammates).
+# A session started from an agent's command inherits that agent's variables.
+# ponytail: a lead that strips them first (an interpreter, a script file, a clean-environment launcher such
+# as tmux, wt or ssh, or keystrokes sent to the user's own terminal), a fake terminal (script, winpty)
+# starting an interactive session, or agy started from agy, still grants; the git-layer hooks stay behind it.
+CLAUDE_OWN = ("CLAUDE_CODE_CHILD_SESSION", "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT")   # set by Claude Code itself
+
+
+def started_by_agent(own):
+    """True when another agent started this session. `own` names the variables this tool sets itself."""
+    e = os.environ
+    if e.get("CLAUDE_CODE_SESSION_ATTENDED") == "0" or e.get("CLAUDE_CODE_ENTRYPOINT", "").startswith("sdk"):
+        return True
+    return any(e.get(v) for v in AGENT_MARKERS + CLAUDE_OWN if v not in own)
 
 _NEG = r"(?:do\s*n['o]?t|don['o]?t|do not|never|no need(?:\s+to)?|no|nothing|without|hold\s*off(?:\s+on)?|not\s+yet|wait(?:\s+to)?|skip|avoid)"
 _DET = r"(?:the|this|that|these|those|a|an|last|latest|previous|prior|earlier|first|second|next|initial|original|my|your|his|her|their|our|each|every|which|whose|another|same|broken|failing|bad|wrong|old|new)"
@@ -619,7 +638,8 @@ def split_ops(cmd):
 OVERRIDE_VAR = re.compile(r"AGENT_KIT_(?:RELEASE|ALLOW_FORCE|APPLY)$")
 # The pre-push hook refuses AGENT_KIT_ALLOW_FORCE in a shell carrying one of these; an agent that removes
 # its marker makes its push look like yours.
-MARKER_VAR = re.compile(r"(?:CLAUDE_CODE_CHILD_SESSION|CODEX_THREAD_ID|ANTIGRAVITY_CONVERSATION_ID)$")
+AGENT_MARKERS = ("CLAUDE_CODE_CHILD_SESSION", "CODEX_THREAD_ID", "ANTIGRAVITY_CONVERSATION_ID")
+MARKER_VAR = re.compile(r"(?:%s)$" % "|".join(AGENT_MARKERS))
 PS_ENV_SET = {"set-item", "si", "new-item", "ni", "set-content", "sc", "add-content", "ac"}
 PS_ENV_WRITE = {"remove-item", "ri", "del", "erase", "rm", "rd", "rmdir", "clear-item", "cli",
                 "clear-content", "clc"} | PS_ENV_SET
@@ -782,7 +802,9 @@ def capture_intent(data):
     try:
         import time
         grants, issued = detect_grants(data.get("prompt", "")), None
-        if not grants and is_continue(data.get("prompt", "")):
+        if started_by_agent(CLAUDE_OWN):
+            grants = frozenset()
+        elif not grants and is_continue(data.get("prompt", "")):
             grants, issued = load_grants(data.get("session_id") or "", with_time=True)
             if time.time() - issued > CARRY_SECONDS:   # the original time is kept, so continues never refresh it
                 grants = frozenset()
@@ -875,9 +897,11 @@ def main():
         emit(args.decision, GRANT_ASK)
     # Grants exist in Claude and Antigravity; Codex (deny) never consults them.
     if ANTIGRAVITY:
-        grants = antigravity_grants(data)
+        grants = frozenset() if started_by_agent(("ANTIGRAVITY_CONVERSATION_ID",)) else antigravity_grants(data)
+    elif args.decision == "ask" and not started_by_agent(CLAUDE_OWN):
+        grants = load_grants(data.get("session_id") or "")
     else:
-        grants = load_grants(data.get("session_id") or "") if args.decision == "ask" else frozenset()
+        grants = frozenset()
 
     # The pre-push overrides. Asked every time, never covered by a grant: a release push to a
     # release-only branch, or a forced push, is the owner's act, not something a chat request authorizes.

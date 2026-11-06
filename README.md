@@ -745,7 +745,9 @@ These config choices are deliberate, because the obvious "more locked down" sett
   keeps the grant for up to two hours; any other message resets it. A grant never covers force-push or `--no-verify`.
   A missed phrasing is refused, never a silent push: the agent says it is ready and you ask again. Codex
   (deny-mode) ignores grants and leaves pushing and merging to you. Antigravity reads the same request
-  from its hook's `lastUserInput`.
+  from its hook's `lastUserInput`. A session another agent started grants nothing, because its prompt
+  is that agent's brief: a worker never pushes, and the lead pushes once you have asked it to. A headless
+  `claude -p` or Agent SDK run grants nothing either, even one you start yourself.
 
 - **Running unattended.** In auto mode (`claude --permission-mode auto`) and bypass permissions mode
   (`--dangerously-skip-permissions`) alike, what still stops a run until you answer is the short list
@@ -778,7 +780,7 @@ These config choices are deliberate, because the obvious "more locked down" sett
 ```bash
 ./install.sh check                      # doctor: interpreter, guard firing, per-hook status, rules files
 sh test/run-tests.sh                     # git-layer hooks + doctor, end-to-end
-python3 test/command_guard_cases.py      # command-guard corpus (181 cases: guard + grants + intent + Antigravity)
+python3 test/command_guard_cases.py      # command-guard corpus (576 cases: guard + grants + intent + Antigravity)
 sh test/adherence/run.sh                 # do the SOFT rules actually fire? (costs tokens)
 ```
 

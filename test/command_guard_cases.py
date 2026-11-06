@@ -4,6 +4,16 @@ Run:  python3 command_guard_cases.py ../hooks/command-guard.py"""
 import sys, json, subprocess, os, tempfile
 
 G = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), "..", "hooks", "command-guard.py")
+# The guard reads from the environment whether another agent started this session. A suite run from an
+# agent's shell must not look like a worker; the cases that need a marker set it themselves.
+AGENT_ENV = ("CLAUDE_CODE_CHILD_SESSION", "CODEX_THREAD_ID", "ANTIGRAVITY_CONVERSATION_ID", "CLAUDECODE",
+             "CLAUDE_CODE_SESSION_ATTENDED", "CLAUDE_CODE_ENTRYPOINT")
+for _v in AGENT_ENV:
+    os.environ.pop(_v, None)
+
+
+def _env(extra):
+    return dict(os.environ, **extra) if extra else None
 
 
 def decision(cmd, flag="ask"):
@@ -18,7 +28,7 @@ def _grant_file(sid):
     return os.path.join(tempfile.gettempdir(), "agent-kit-grant-" + sid + ".json")
 
 
-def capture(prompt, sid="corpus-cap-sess"):
+def capture(prompt, sid="corpus-cap-sess", env=None):
     """Drive the REAL UserPromptSubmit path and read back what it authorized."""
     f = _grant_file(sid)
     try:
@@ -26,7 +36,8 @@ def capture(prompt, sid="corpus-cap-sess"):
     except OSError:
         pass
     subprocess.run([sys.executable, G, "--event", "userprompt"],
-                   input=json.dumps({"session_id": sid, "prompt": prompt}), capture_output=True, text=True)
+                   input=json.dumps({"session_id": sid, "prompt": prompt}), capture_output=True, text=True,
+                   env=_env(env))
     try:
         with open(f) as fh:
             return set(json.load(fh).get("authorized", []))
@@ -37,7 +48,7 @@ def capture(prompt, sid="corpus-cap-sess"):
             pass
 
 
-def decision_granted(cmd, authorized, flag="ask", sid="corpus-grant-sess"):
+def decision_granted(cmd, authorized, flag="ask", sid="corpus-grant-sess", env=None):
     """PreToolUse decision when `authorized` ops are already granted for the session."""
     f = _grant_file(sid)
     with open(f, "w") as fh:
@@ -45,7 +56,7 @@ def decision_granted(cmd, authorized, flag="ask", sid="corpus-grant-sess"):
     try:
         r = subprocess.run([sys.executable, G, "--decision", flag],
                            input=json.dumps({"session_id": sid, "tool_input": {"command": cmd}}),
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, env=_env(env))
         if not r.stdout.strip():
             return "silent"
         return json.loads(r.stdout)["hookSpecificOutput"]["permissionDecision"]
@@ -513,10 +524,10 @@ DETECTOR_CASES = [
 # {"decision"} out. Nothing waits on a person: a command the guard passes is auto_approve, what Claude
 # would ask about is denied, and a push runs only when lastUserInput asked for it. Other tools, and
 # payloads the guard cannot read, stay silent.
-def decision_antigravity(payload):
+def decision_antigravity(payload, env=None):
     r = subprocess.run([sys.executable, G, "--tool", "antigravity"],
                        input=payload if isinstance(payload, str) else json.dumps(payload),
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, env=_env(env))
     if r.returncode != 0:
         return "crash"   # a non-zero exit is an unknown quantity to the host: it must never happen
     return json.loads(r.stdout)["decision"] if r.stdout.strip() else "silent"
@@ -782,6 +793,49 @@ try:
     os.remove(_grant_file(_sid))
 except OSError:
     pass
-total = len(CASES) + 7 + len(GRANT_CASES) + len(DETECTOR_CASES) + len(ANTIGRAVITY_CASES) + len(RAW_CASES)
+# A session another agent started carries that agent's marker, and its prompt is the agent's brief, not
+# the user's words: it grants nothing, so a lead without a push grant cannot hand one to a worker. Seen
+# live: `claude -p` hooks get CLAUDE_CODE_SESSION_ATTENDED=0 and CLAUDE_CODE_ENTRYPOINT=sdk-cli (Claude
+# Code 2.1.318 sets both, whatever the parent passed); agy 1.5.1 hooks inherit the parent's markers.
+_ASKED = "Fix the parser in src/p.py, run the tests, then commit and push the branch."
+_INTERACTIVE = {"CLAUDE_CODE_CHILD_SESSION": "1", "CLAUDECODE": "1", "CLAUDE_CODE_SESSION_ATTENDED": "1",
+                "CLAUDE_CODE_ENTRYPOINT": "cli"}   # an interactive Claude Code session's Bash, seen live
+WORKER_CASES = [
+    # (who, environment, expected)
+    ("claude", {}, {"commit", "push"}),
+    ("claude", {"CLAUDE_CODE_SESSION_ATTENDED": "1", "CLAUDE_CODE_ENTRYPOINT": "cli"}, {"commit", "push"}),
+    ("claude", {"CLAUDE_CODE_CHILD_SESSION": "1"}, {"commit", "push"}),   # Claude's own tool marker
+    ("claude", {"CLAUDE_CODE_SESSION_ATTENDED": "0"}, set()),            # claude -p
+    ("claude", {"CLAUDE_CODE_ENTRYPOINT": "sdk-cli"}, set()),
+    ("claude", {"CLAUDE_CODE_ENTRYPOINT": "sdk-py"}, set()),
+    ("claude", {"CODEX_THREAD_ID": "t1"}, set()),                        # started from a Codex command
+    ("claude", {"ANTIGRAVITY_CONVERSATION_ID": "c1"}, set()),            # started from an agy command
+    ("claude", {"CODEX_THREAD_ID": ""}, {"commit", "push"}),             # an empty marker marks nothing
+    ("claude", _INTERACTIVE, {"commit", "push"}),                       # this session's own environment
+    ("pretool", {}, "allow"),
+    ("pretool", _INTERACTIVE, "allow"),
+    ("pretool", {"CLAUDE_CODE_SESSION_ATTENDED": "0"}, "deny"),         # a grant file left from before
+    ("pretool", {"CLAUDE_CODE_ENTRYPOINT": "sdk-cli"}, "deny"),
+    ("pretool", {"CODEX_THREAD_ID": "t1"}, "deny"),
+    ("agy", {}, "auto_approve"),
+    ("agy", {"ANTIGRAVITY_CONVERSATION_ID": "c1"}, "auto_approve"),     # agy's own marker
+    ("agy", {"CLAUDE_CODE_CHILD_SESSION": "1"}, "deny"),                # agy -p from a Claude command
+    ("agy", {"CODEX_THREAD_ID": "t1"}, "deny"),
+    ("agy", {"CLAUDE_CODE_SESSION_ATTENDED": "0"}, "deny"),             # its parent was claude -p
+    ("agy", _INTERACTIVE, "deny"),                                      # what agy inherits from Claude's Bash
+    ("agy", {"CLAUDECODE": "1"}, "deny"),                               # CLAUDE_CODE_CHILD_SESSION removed
+    ("agy", {"CLAUDE_CODE_ENTRYPOINT": "cli"}, "deny"),
+]
+for who, env, exp in WORKER_CASES:
+    if who == "claude":
+        got = capture(_ASKED, env=env)
+    elif who == "pretool":
+        got = decision_granted("git push", {"push"}, env=env)
+    else:
+        got = decision_antigravity(ag("git push", said=_ASKED), env=env)
+    if got != exp:
+        fails += 1
+        print(f"  FAIL: [worker {who} {env}] got {got!r} exp {exp!r}")
+total = len(CASES) + 7 + len(WORKER_CASES) + len(GRANT_CASES) + len(DETECTOR_CASES) + len(ANTIGRAVITY_CASES) + len(RAW_CASES)
 print(f"  command-guard: {total - fails}/{total} passed")
 sys.exit(1 if fails else 0)

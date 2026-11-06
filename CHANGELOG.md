@@ -11,6 +11,14 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- A worker started by another agent can no longer push or open a pull request because the lead's brief
+  said to. The turn grant came from the session's prompt, and a worker's prompt is the lead's brief, so
+  `claude -p "... push the branch"`, or `agy -p` started from an agent's command, was allowed to push. A
+  session another agent started now grants nothing, and so does a headless `claude -p` or Agent SDK run,
+  whoever starts it: push from those yourself. Interactive terminal sessions are unchanged.
+
 ## [0.6.5] - 2026-11-06
 
 ### Added

@@ -201,6 +201,11 @@ itself. `install.sh check` lists what is missing, optional items included. Off w
   through - `git push && git commit` with only `commit` granted is refused as a whole. Detection also drops
   fenced / quoted / inline-code spans first, so a git verb the user pasted from a log or a teammate mints
   nothing. Codex (deny-mode) ignores grants entirely: it commits freely and leaves pushing to the human.
+  A session another agent started grants nothing, so a lead cannot pass a push to a worker through its
+  brief. Claude Code marks a `-p` or SDK run (`CLAUDE_CODE_SESSION_ATTENDED=0`, `CLAUDE_CODE_ENTRYPOINT=sdk-*`,
+  seen on 2.1.318 and undocumented), and a session started from an agent's command inherits that agent's
+  variables (`CLAUDE_CODE_CHILD_SESSION`, `CLAUDECODE`, `CODEX_THREAD_ID`, `ANTIGRAVITY_CONVERSATION_ID`).
+  A headless run grants nothing whoever starts it.
 - **`codex/config.toml`**: `approval_policy=on-request` + `approvals_reviewer=auto_review` (what the sandbox refuses goes to Codex's reviewer agent, never to you; a commit's `.git` write needs it) · `sandbox_mode=workspace-write` · network **on**, deliberately
   (Section 5 requires verifying facts against the version in use; switching it off just sends the agent back to memory) · no hand-written env exclude
   list (Codex excludes secret names by default, and a broad one strips `DATABASE_URL` and breaks builds invisibly).
@@ -236,7 +241,7 @@ itself. `install.sh check` lists what is missing, optional items included. Off w
   second run no-ops, a non-kit repo is refused without clobbering the install, an update run from the
   *installed* copy stays clean, and `update_kit` still hands off with `exec` - without which `--global`
   overwrites the running script and the shell resumes at a stale byte offset inside the new file)
-  + `command_guard_cases.py` (181 cases: guard classification + turn-scoped grants + intent detection + the Antigravity contract).
+  + `command_guard_cases.py` (576 cases: guard classification + turn-scoped grants + intent detection + the Antigravity contract).
   **`test/adherence/`** answers the question the rest of `test/` cannot: the hooks and permission rules are
   proven, but ~34 rule families are *guidance*, and guidance degrades. Ten realistic scenarios run twice - with
   the rules present and without - graded by a separate judge that sees only the rubric and the transcript
