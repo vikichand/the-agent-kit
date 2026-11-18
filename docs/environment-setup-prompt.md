@@ -17,7 +17,7 @@ context for every session, whether it fires or not.
 |---|---|---|
 | **Core** (everyone) | Context7 MCP, gitleaks | The kit's `context7.md` rule sends library and API questions to Context7 instead of stale training data; the kit's pre-commit hook adds a gitleaks scan to its own secret patterns when gitleaks is on PATH (`winget install --id Gitleaks.Gitleaks --exact` on Windows, `brew install gitleaks` elsewhere) |
 | **Web and UI** | Playwright CLI and its skill, Chrome DevTools MCP, Impeccable, `frontend-design` | Real-browser proof of UI work (Section 5) and design quality |
-| **Optional** | Superpowers, ponytail, headroom | They work alongside the kit, but each costs context or latency, so opt in knowingly |
+| **Optional** | Superpowers, ponytail, headroom, You should know | They work alongside the kit, but each costs context or latency, so opt in knowingly |
 
 The kit's session-start check suggests the Core items and, in a project set up as a web or UI app,
 the Web and UI items, when they are missing. It reads `~/.the-agent-kit/recommended.json`, which
@@ -217,6 +217,18 @@ Install only what the profile calls for. Each needs its marketplace added first 
 
   Other caveats: its hooks run on every shell call, and `headroom learn` can write to `AGENTS.md`,
   which the kit's rules say an agent never edits.
+- **You should know** (built into Claude Code, Claude Code only): while the agent works on a longer
+  task, a side request reads the conversation and shows you a short note when it sees something
+  you would want to know. It talks to you, not to the agent, so it does not change what the agent
+  does. It adds no always-on context, but each side request spends tokens on your plan. Claude Code
+  ships it switched off; nothing needs downloading:
+
+  ```bash
+  claude plugin enable cc-plugin-you-should-know@builtin
+  ```
+
+  Check `claude plugin details cc-plugin-you-should-know` first: if your Claude Code version does
+  not list it, it is not available to you yet.
 
 > **Vendor figures are self-reported.** Treat benchmark numbers from any plugin's own suite as
 > direction, not measurement, and check your own token usage before and after.

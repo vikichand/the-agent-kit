@@ -11,6 +11,12 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+### Added
+
+- "You should know", the observer built into Claude Code, joins the optional tools. `install.sh check`
+  lists it with the one command that switches it on; it is never in the session reminder, and the kit
+  switches nothing on for you. The check now recognises a built-in plugin by its entry in your settings.
+
 ## [0.6.7] - 2026-11-07
 
 ### Fixed

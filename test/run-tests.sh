@@ -303,12 +303,22 @@ if [ -n "$PY" ]; then
   printf '{"items":[{"id":"x","name":"nocmd","when":"always","claude":{"command":"agent-kit-no-such-cmd","install":"get-nocmd"}},{"id":"y","name":"hascmd","when":"always","codex":{"command":"gitleaks","install":"get-hascmd"}}]}' > "$k/home/.the-agent-kit/recommended.json"
   o=$(kt claude "$k/proj"); o2=$(kt codex "$k/proj")
   has 'get-nocmd' "$o" && [ -z "$o2" ] && pass "K17b a command missing from PATH is named; one on PATH is silent" || bad "K17b command detection wrong: [$o] [$o2]"
-  # K18: optional items (superpowers, ponytail, headroom) are for install.sh --check, never the reminder.
+  # K17c: a plugin built into Claude Code is never in installed_plugins.json; it is present when a settings
+  # file enables it, and a settings file that cannot be read is "cannot tell", never "missing".
+  printf '{"items":[{"id":"b","name":"builtin-thing","when":"always","claude":{"plugin":"some-plugin@builtin","install":"get-builtin"}}]}' > "$k/home/.the-agent-kit/recommended.json"
+  rm -f "$k/home/.claude/settings.json"; o=$(kt claude "$k/proj")
+  printf '{"enabledPlugins":{"some-plugin@builtin":true}}' > "$k/home/.claude/settings.json"; o2=$(kt claude "$k/proj")
+  printf '{"enabledPlugins":{"some-plugin@builtin":false}}' > "$k/home/.claude/settings.json"; o3=$(kt claude "$k/proj")
+  printf 'not json' > "$k/home/.claude/settings.json"; o4=$(kt claude "$k/proj")
+  printf '{"enabledPlugins":["some-plugin@builtin"]}' > "$k/home/.claude/settings.json"; o4="$o4$(kt claude "$k/proj")"
+  rm -f "$k/home/.claude/settings.json"
+  has 'get-builtin' "$o" && [ -z "$o2" ] && has 'get-builtin' "$o3" && [ -z "$o4" ]     && pass "K17c a built-in plugin is present when settings enable it; unreadable settings stay silent" || bad "K17c built-in plugin detection wrong: [$o] [$o2] [$o3] [$o4]"
+  # K18: optional items (superpowers, ponytail, headroom, You should know) are for install.sh --check, never the reminder.
   cp "$KIT/hooks/recommended.json" "$k/home/.the-agent-kit/recommended.json"
   printf '# rules v2\n<!-- PROJECT-CONFIG:START -->\n**Platform / intent:** web - production\n<!-- PROJECT-CONFIG:END -->\n' > "$k/proj/AGENTS.md"
   mkdir -p "$k/home/.claude/plugins"; printf '{"plugins":{}}' > "$k/home/.claude/plugins/installed_plugins.json"; : > "$k/home/.codex/config.toml"
   o=$(kt claude "$k/proj"); o2=$(kt codex "$k/proj")
-  has 'Context7' "$o" && has 'Context7' "$o2" && ! has 'superpowers' "$o$o2" && ! has 'ponytail' "$o$o2" && ! has 'headroom' "$o$o2" \
+  has 'Context7' "$o" && has 'Context7' "$o2" && ! has 'superpowers' "$o$o2" && ! has 'ponytail' "$o$o2" && ! has 'headroom' "$o$o2" && ! has 'should know' "$o$o2" \
     && pass "K18 optional items are never in the session reminder" || bad "K18 an optional item was reminded: $o $o2"
   # K19: the reminder is ONE line that tells the agent to tell the user once, in one line, what is
   # missing and the command for each - not an invitation to a conversation about installing.

@@ -164,6 +164,17 @@ def installed(tool, kind, name, top):
                 names |= set(((cfg.get("projects") or {}).get(top) or {}).get("mcpServers") or {})
                 names |= set((load_json(os.path.join(top, ".mcp.json")) or {}).get("mcpServers") or {})
             return name in names
+        if kind == "plugin" and name.endswith("@builtin"):
+            # Shipped inside Claude Code, so never in installed_plugins.json: present when a settings file
+            # enables it (code.claude.com/docs/en/plugins/loading: "<name>@<marketplace>": true under enabledPlugins).
+            paths = [os.path.join(home, ".claude", "settings.json")]
+            if top:
+                paths += [os.path.join(top, ".claude", f) for f in ("settings.json", "settings.local.json")]
+            found = [load_json(p) for p in paths if os.path.exists(p)]
+            on = [s.get("enabledPlugins", {}) for s in found if isinstance(s, dict)]
+            if any(isinstance(e, dict) and e.get(name) is True for e in on):
+                return True
+            return None if len(on) < len(found) or any(not isinstance(e, dict) for e in on) else False
         if kind == "plugin":   # undocumented file: if its shape changes, say nothing rather than guess
             d = load_json(os.path.join(home, ".claude", "plugins", "installed_plugins.json"))
             return name in (d.get("plugins") or {}) if isinstance(d, dict) else None
