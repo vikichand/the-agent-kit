@@ -176,9 +176,10 @@ stray operand.
 **Session start**: `kit-check.py`, a SessionStart hook on Claude Code, Codex and Antigravity (there a global
 hook that runs once per conversation and always answers in JSON). One line when a newer release is on `main` (checked at most daily), when this project's rules
 differ from the installed kit, or when a tool on your `~/.the-agent-kit/recommended.json` is missing for the
-agent in use (at most daily; web items only in web projects; optional items never): the agent is told to tell
-you once, in one line, with the install command for each. Silent otherwise; never updates or installs anything
-itself. `install.sh check` lists what is missing, optional items included. Off with `AGENT_KIT_NO_UPDATE_CHECK=1`.
+agent in use (web items only in web projects): the agent is told to offer them as a checklist after your first
+request, install what you tick, and record what you decline so it is never offered again. Recommended tools are
+offered again weekly until you pick or decline them; optional ones are offered once. Silent otherwise; the check
+never updates or installs anything itself. `install.sh check` lists what is missing, optional items included. Off with `AGENT_KIT_NO_UPDATE_CHECK=1`.
 
 ## Wiring · installer · verification
 

@@ -299,16 +299,21 @@ When a session starts, the kit checks five things and says nothing unless one ne
 - **Your global copy of the rules is from an older release.** Read from the `AGENT-KIT` markers around
   it (see [Prefer the rules global instead?](#prefer-the-rules-global-instead)). You see one line with
   both versions and the command that refreshes it, after asking.
-- **A recommended tool is missing** for the agent you started (Claude Code, Codex or Antigravity). The agent is
-  told to say so once, in one line, with the install command for each. The list is
-  `~/.the-agent-kit/recommended.json`. Each install (so each update) merges the kit's list into it by id:
-  new items arrive and changed ones are replaced, while an entry you delete, or an id you add to its
-  `dismissed` list, never comes back. Entries without an id are yours and are never touched. The optional
-  tools (superpowers, ponytail, headroom, You should know) are never reminded; `check` lists them. By default it names Context7 and gitleaks everywhere,
-  and in a project set up as a web or UI app also Playwright, Chrome DevTools, Impeccable and
+- **A recommended tool is missing** for the agent you started (Claude Code, Codex or Antigravity). Once it
+  has dealt with your first request, the agent offers you the missing tools as a checklist (a
+  multi-select question on Claude Code, a numbered list elsewhere). It installs what you tick, showing
+  each command first, and hands you any command that needs a key. What you decline it records with
+  `kit-check.py --dismiss <id>`, and that tool is never offered again. A tool you neither tick nor
+  decline is offered again a week later. The optional tools (superpowers, ponytail, headroom, You
+  should know) are offered once, unticked, and `check` lists them afterwards. A headless
+  `claude -p` run is never asked. The list is `~/.the-agent-kit/recommended.json`. Each install (so
+  each update) merges the kit's list into it by id: new items arrive and changed ones are replaced,
+  while an entry you delete, or an id on its `dismissed` list, never comes back. Entries without an
+  id are yours and are never touched. By default it names Context7 and gitleaks everywhere, and in
+  a project set up as a web or UI app also Playwright, Chrome DevTools, Impeccable and
   `frontend-design` (the reasons are in
-  [`docs/environment-setup-prompt.md`](docs/environment-setup-prompt.md)). It reads local config
-  files only, reminds at most once a day, and the agent asks you before installing anything.
+  [`docs/environment-setup-prompt.md`](docs/environment-setup-prompt.md)). The check itself reads
+  local config files only and installs nothing.
 
 It **never updates or installs anything itself**: running downloaded code at session start, unasked, is exactly the
 supply-chain shape the kit's rules forbid, so it only tells you what to run. It exits cleanly on every

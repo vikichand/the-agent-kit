@@ -18,11 +18,12 @@ id either way, and always answers in the JSON those hooks expect: {} to say noth
 
   3. A tool the user's recommended list names is missing for the agent that started the session
      (`--tool claude|codex|antigravity`, set by the hook command). The list is ~/.the-agent-kit/recommended.json,
-     which install.sh merges the kit's list into by id: delete an entry (or list its id under
-     "dismissed") to stop a reminder. Items marked "optional" are never reminded. Items marked
-     "web" only count in a project whose AGENTS.md block marks a web or user-facing platform. At most
-     one reminder a day per tool, read from local files only, and a file it cannot read counts as
-     "cannot tell", never as "missing".
+     which install.sh merges the kit's list into by id. The agent is asked to offer them as a checklist:
+     a recommended item again a week after it was last offered, an "optional" one once. What the user
+     declines the agent records with `kit-check.py --dismiss <id>` (the "dismissed" list), and it is never
+     offered again. Items marked "web" only count in a project whose AGENTS.md block marks a web or
+     user-facing platform. Read from local files only, and a file it cannot read counts as "cannot
+     tell", never as "missing". A headless `claude -p` run is never asked.
   4. The kit's rules are not loaded for that tool: its global rules file exists without them, and the
      project's AGENTS.md and CLAUDE.md (with what it imports) carry none either.
   5. The copy of the rules between AGENT-KIT markers in that global file is from an older kit release.
@@ -40,6 +41,8 @@ REPO = os.environ.get("AGENT_KIT_REPO") or "https://github.com/vikichand/the-age
 SHARE = os.path.join(os.path.expanduser("~"), ".the-agent-kit")
 CACHE = os.path.join(SHARE, ".update-check")
 DAY = 24 * 3600
+WEEK = 7 * DAY
+ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
 MARK = "PROJECT-CONFIG:START"
 
 
@@ -254,9 +257,16 @@ def rules_not_loaded(tool, top):
             % (GLOBAL_RULES[tool], GLOBAL_RULES[tool]))
 
 
+def one_line(text, limit):
+    return " ".join(str(text).split())[:limit]
+
+
 def recommended_items():
-    items = (load_json(os.path.join(SHARE, "recommended.json")) or {}).get("items")
-    return [i for i in items if isinstance(i, dict)] if isinstance(items, list) else []
+    d = load_json(os.path.join(SHARE, "recommended.json"))
+    d = d if isinstance(d, dict) else {}
+    items, gone = d.get("items"), d.get("dismissed")
+    gone = gone if isinstance(gone, list) else []
+    return [i for i in items if isinstance(i, dict) and i.get("id") not in gone] if isinstance(items, list) else []
 
 
 def check_items(tool, top, optional):
@@ -312,26 +322,80 @@ def doctor(top):
 
 
 def missing_tools(tool, top):
-    """One line naming what the user's list recommends for this tool and is not installed."""
-    gaps = ["%s (%s)" % (it.get("name", it.get("id", "?")), cmd)
-            for it, state, cmd in check_items(tool, top, False) if state is False]
-    if not gaps:
-        return None
+    """One line asking the agent to offer what the user's list names for this tool and is not installed.
+    A recommended item is offered again a week after it was last offered; an optional one is offered
+    once. What the user declines is recorded with --dismiss and never offered again."""
+    if tool == "claude" and os.environ.get("CLAUDE_CODE_ENTRYPOINT") == "sdk-cli":
+        return None   # `claude -p` (seen on 2.1.327; undocumented): nobody is there to answer, so do not spend the offer
     marker = os.path.join(SHARE, ".tools-check")
-    seen = load_json(marker) or {}
-    today = time.strftime("%Y-%m-%d")
-    if seen.get(tool) == today:
+    seen = load_json(marker)
+    asked = seen.get("asked") if isinstance(seen, dict) else None
+    asked = asked if isinstance(asked, dict) else {}   # a marker from an older kit ({tool: date}) starts afresh
+    mine = asked.get(tool) if isinstance(asked.get(tool), dict) else {}
+    now, due = time.time(), {False: [], True: []}
+    for optional in (False, True):
+        for it, state, cmd in check_items(tool, top, optional):
+            key = str(it.get("id") or "")
+            # The agent pastes the id into a shell command and reads the rest as text: an id that is not a
+            # plain token is never offered, and names and commands are flattened to one bounded line. An
+            # entry without an id is the user's own: offered by name, and stopped by deleting it.
+            if state is not False or (key and not ID.fullmatch(key)):
+                continue
+            label = "[%s]" % key if key else "(your own entry, no id)"
+            key = key or "name:" + one_line(it.get("name", "?"), 60)
+            if key in mine:
+                try:
+                    age = now - time.mktime(time.strptime(str(mine[key]), "%Y-%m-%d"))
+                except (ValueError, OverflowError, OSError):
+                    age = WEEK
+                if optional or age < WEEK:
+                    continue
+            due[optional].append("%s %s: %s" % (one_line(it.get("name", key), 120), label, one_line(cmd, 400)))
+            mine[key] = time.strftime("%Y-%m-%d")
+    if not (due[False] or due[True]):
         return None
-    seen[tool] = today
+    asked[tool] = mine
+    tmp = marker + ".tmp%d" % os.getpid()
     try:
-        with open(marker, "w", encoding="utf-8") as f:
-            json.dump(seen, f)
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump({"asked": asked}, f)
+        os.replace(tmp, marker)
     except OSError:
-        pass
-    return ("the-agent-kit: tell the user once, in one line, that these recommended tools are not installed "
-            "for %s, with the command to install each: %s. Install nothing without their yes, and let them "
-            "run any command that needs a key. To stop a reminder, list its id under \"dismissed\" in "
-            "~/.the-agent-kit/recommended.json." % (WHO[tool], "; ".join(gaps)))
+        return None   # an offer that cannot be recorded would repeat every session
+    lists = ". ".join(filter(None, [
+        due[False] and "Recommended: " + "; ".join(due[False]),
+        due[True] and "Optional (leave unticked unless they ask): " + "; ".join(due[True])]))
+    me = '"%s" "%s"' % (sys.executable.replace("\\", "/"), os.path.abspath(__file__).replace("\\", "/"))
+    return ("the-agent-kit: once you have dealt with the user's first request, offer them these tools, which are "
+            "not installed for %s. Ask with your multi-select question tool if you have one (AskUserQuestion on "
+            "Claude Code, four options a question at most, so use more questions if needed), otherwise as a "
+            "numbered list. %s. For each tool they pick, show the command and run it, except one that needs a key "
+            "or holds a <placeholder>, which they run themselves. For the tools they decline, run once %s --dismiss "
+            "<each id in brackets> (in PowerShell put & in front) so they are not offered again. A tool they neither pick nor decline is offered "
+            "again in a week. A new MCP server, plugin or skill loads in the next session. If no user is "
+            "there to answer, skip this." % (WHO[tool], lists, me))
+
+
+def dismiss(ids):
+    """--dismiss <id>...: record in the user's list that these were declined. Nothing is deleted."""
+    path = os.path.join(SHARE, "recommended.json")
+    d = load_json(path)
+    ids = [i for i in ids if ID.fullmatch(i)]
+    if os.path.islink(path) or not isinstance(d, dict) or not isinstance(d.get("dismissed", []), list) or not ids:
+        print("the-agent-kit: nothing dismissed (no valid id, or %s cannot be read)" % path)
+        return 1
+    d["dismissed"] = list(dict.fromkeys([i for i in d.get("dismissed", []) if isinstance(i, str)] + ids))
+    tmp = path + ".tmp%d" % os.getpid()
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(d, f, indent=2)
+            f.write("\n")
+        os.replace(tmp, path)
+    except OSError as e:
+        print("the-agent-kit: could not write %s: %s" % (path, e))
+        return 1
+    print("the-agent-kit: will not offer again: %s. To undo, remove the id from \"dismissed\" in %s" % (", ".join(ids), path))
+    return 0
 
 
 def first_invocation(data):
@@ -369,6 +433,8 @@ def repo_top(cwd):
 
 
 def main():
+    if "--dismiss" in sys.argv:
+        sys.exit(dismiss(sys.argv[sys.argv.index("--dismiss") + 1:]))
     if "--doctor" in sys.argv:   # asked for by install.sh --check: local files only, nothing throttled
         print("\n".join(doctor(repo_top(os.getcwd()))))
         return
@@ -425,7 +491,10 @@ def main():
         line = stale_global(tool)
         if line:
             notes.append(line)
-        line = missing_tools(tool, top)
+        try:
+            line = missing_tools(tool, top)
+        except Exception:   # an odd list or marker must not cost the notes already gathered
+            line = None
         if line:
             notes.append(line)
 

@@ -11,6 +11,26 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-19
+
+### Changed
+
+- Missing recommended tools are now offered as a checklist you tick, instead of a one-line reminder.
+  After your first request the agent asks which to install (a multi-select question on Claude Code,
+  a numbered list on Codex and Antigravity), installs what you pick after showing each command, and
+  hands you any command that needs a key.
+- A tool you decline is recorded and never offered again: the agent runs
+  `kit-check.py --dismiss <id>`, so you no longer edit `recommended.json` by hand. A tool you neither
+  pick nor decline is offered again a week later, where before the reminder came back daily.
+- The optional tools (superpowers, ponytail, headroom, You should know) are offered once, unticked.
+  Before, only `install.sh check` listed them.
+- A headless `claude -p` run is never asked.
+
+### Fixed
+
+- An id on the `dismissed` list now stops the offer even while its entry is still in your list.
+  Before, only deleting the entry did, although the docs said either worked.
+
 ## [0.6.8] - 2026-11-18
 
 ### Added
@@ -591,7 +611,8 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.6.8...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.7.0...develop
+[0.7.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.7.0
 [0.6.8]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.8
 [0.6.7]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.7
 [0.6.6]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.6

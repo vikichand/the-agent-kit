@@ -19,11 +19,12 @@ context for every session, whether it fires or not.
 | **Web and UI** | Playwright CLI and its skill, Chrome DevTools MCP, Impeccable, `frontend-design` | Real-browser proof of UI work (Section 5) and design quality |
 | **Optional** | Superpowers, ponytail, headroom, You should know | They work alongside the kit, but each costs context or latency, so opt in knowingly |
 
-The kit's session-start check suggests the Core items and, in a project set up as a web or UI app,
-the Web and UI items, when they are missing. It reads `~/.the-agent-kit/recommended.json`, which
-`install.sh` keeps current: delete an entry (or list its id under `dismissed`) to stop it being
-suggested, or add your own with an id of your own. The Optional profile is never suggested at session
-start; `install.sh check` lists what is missing. It never installs anything.
+The kit's session-start check has the agent offer the Core items and, in a project set up as a web or
+UI app, the Web and UI items, when they are missing: as a checklist, again each week until you pick or
+decline them. The Optional profile is offered once. It reads `~/.the-agent-kit/recommended.json`,
+which `install.sh` keeps current: what you decline goes on its `dismissed` list (the agent runs
+`kit-check.py --dismiss <id>`; deleting the entry works too), and you can add your own with an id of
+your own. `install.sh check` lists what is missing. The check itself never installs anything.
 
 ---
 
