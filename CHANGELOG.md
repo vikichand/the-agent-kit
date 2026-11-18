@@ -13,7 +13,7 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ### Fixed
 
-- On Claude Code the session-start check now also runs when you resume a session. Before, it ran only
+- On Claude Code and Codex the session-start check now also runs when you resume a session. Before, it ran only
   on a brand-new one, so reopening a session after an update showed no tool offer and no update
   notice. `install.sh update` applies it to a machine that is already set up, after asking.
 

@@ -1304,8 +1304,9 @@ for b in d['hooks']['SessionStart']:
     if any('kit-check.py' in h['command'] for h in b['hooks']): b['matcher']=sys.argv[2]
 json.dump(d,open(p,'w',encoding='utf-8'))" "$(wq "$g/.claude/settings.json")" "$1"; }
   m0=$(ss_matcher); set_ss startup; su 1; m1=$(ss_matcher); set_ss clear; su 1; m2=$(ss_matcher); set_ss 'startup|resume'
-  [ "$m0" = 'startup|resume' ] && [ "$m1" = 'startup|resume' ] && [ "$m2" = clear ] \
-    && pass "M17b the session-start check runs on resume too: a fresh install has it, the old matcher widens, a chosen one is kept" || bad "M17b session-start matcher wrong: fresh=$m0 widened=$m1 chosen=$m2"
+  m3=$(jq_ "$g/.codex/hooks.json" "[b.get('matcher') for b in d['hooks']['SessionStart'] if any('kit-check.py' in h['command'] for h in b['hooks'])][0]")
+  [ "$m0" = 'startup|resume' ] && [ "$m1" = 'startup|resume' ] && [ "$m2" = clear ] && [ "$m3" = 'startup|resume' ] \
+    && pass "M17b the session-start check runs on resume too: a fresh install has it (Codex as well), the old matcher widens, a chosen one is kept" || bad "M17b session-start matcher wrong: fresh=$m0 widened=$m1 chosen=$m2 codex=$m3"
   HOME="$g" git config --global core.hooksPath .husky
   su 1
   [ "$(gh_)" = .husky ] && has 'is .husky' "$o" \
