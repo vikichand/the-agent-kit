@@ -153,6 +153,17 @@
         "mcp": "headroom",
         "install": "uv tool install \"headroom-ai[all]\" && headroom init -g"
       }
+    },
+    {
+      "id": "you-should-know",
+      "name": "You should know (Claude Code's built-in observer, notes to you during long tasks)",
+      "optional": true,
+      "since": 3,
+      "when": "always",
+      "claude": {
+        "plugin": "cc-plugin-you-should-know@builtin",
+        "install": "claude plugin enable cc-plugin-you-should-know@builtin"
+      }
     }
   ]
 }

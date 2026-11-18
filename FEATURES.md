@@ -225,7 +225,7 @@ itself. `install.sh check` lists what is missing, optional items included. Off w
   The doctor verifies each git hook **by identity**, not just presence, and prints `core.hooksPath` when a redirect is set.
 - **`docs/environment-setup-prompt.md`**: optional, agent-run recipe for a machine's MCP servers / plugins / skills
   in three profiles: Core (Context7), Web and UI (Playwright · Chrome DevTools · Impeccable · `frontend-design`),
-  and Optional (superpowers · ponytail · headroom, each with its always-on context cost and execution footprint
+  and Optional (superpowers · ponytail · headroom · You should know, each with its always-on context cost and execution footprint
   stated). Ships two drop-in rules:
   `docs/context7.md` (routes library questions to live docs - Section 5's enforcement half) and
   `docs/browser-tools.md` (picks Playwright vs DevTools by the question). The kit installs **none** of them;

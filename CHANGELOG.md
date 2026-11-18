@@ -11,6 +11,14 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.6.8] - 2026-11-18
+
+### Added
+
+- "You should know", the observer built into Claude Code, joins the optional tools. `install.sh check`
+  lists it with the one command that switches it on; it is never in the session reminder, and the kit
+  switches nothing on for you. The check now recognises a built-in plugin by its entry in your settings.
+
 ## [0.6.7] - 2026-11-07
 
 ### Fixed
@@ -583,7 +591,8 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.6.7...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.6.8...develop
+[0.6.8]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.8
 [0.6.7]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.7
 [0.6.6]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.6
 [0.6.5]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.5
