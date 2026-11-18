@@ -1537,7 +1537,7 @@ EOF
   [ "$(rj "any(i.get('id') in ('chrome-devtools','impeccable','frontend-design') for i in d['items'])")" = False ] \
     && [ "$(rj "sorted(d['dismissed'])")" = "['chrome-devtools', 'frontend-design', 'impeccable']" ] \
     && pass "R1 originals the user had deleted stay deleted (recorded as dismissed)" || bad "R1 a deleted original came back: $(rj "[i.get('id') for i in d['items']]")"
-  [ "$(rj "sorted(i['id'] for i in d['items'] if i.get('optional'))")" = "['headroom', 'ponytail', 'superpowers']" ] \
+  [ "$(rj "sorted(i['id'] for i in d['items'] if i.get('optional'))")" = "['headroom', 'ponytail', 'superpowers', 'you-should-know']" ] \
     && pass "R1 items added to the kit since are offered, flagged optional" || bad "R1 new upstream items not added"
   cp "$RL" "$g/after1.json"; su
   cmp -s "$RL" "$g/after1.json" && pass "R2 a second --setup leaves the list byte-identical" || bad "R2 re-run rewrote the list"
@@ -1575,7 +1575,7 @@ EOF
     && pass "R4 an unreadable list is left untouched and named" || bad "R4 unreadable list handled wrongly: $o"
   # R5: no list yet -> seeded from the kit, with the record the next merge needs.
   rm -f "$RL"; su
-  [ "$(rj "len(d['items'])")" = 9 ] && [ "$(rj "sorted(d['seeded']) == sorted(i['id'] for i in d['items'])")" = True ] \
+  [ "$(rj "len(d['items'])")" = 10 ] &&[ "$(rj "sorted(d['seeded']) == sorted(i['id'] for i in d['items'])")" = True ] \
     && [ "$(rj "d['dismissed']")" = "[]" ] \
     && pass "R5 a fresh machine is seeded with every item and the record of them" || bad "R5 fresh seed wrong: $(cat "$RL" 2>/dev/null | head -c 200)"
   # R5b: the kit's list may have just come off the network (--update), and its text lands in the agent's
