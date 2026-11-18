@@ -11,6 +11,8 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-19
+
 ### Changed
 
 - Missing recommended tools are now offered as a checklist you tick, instead of a one-line reminder.
@@ -609,7 +611,8 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.6.8...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.7.0...develop
+[0.7.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.7.0
 [0.6.8]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.8
 [0.6.7]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.7
 [0.6.6]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.6
