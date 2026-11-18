@@ -2,7 +2,7 @@
 """the-agent-kit session-start check: is the kit current, and are this project's rules current?
 
 Runs once when a session starts (Claude Code and Codex both call SessionStart hooks; matcher
-`startup`). Whatever it prints becomes context for the agent, so it prints NOTHING when everything is
+`startup`; on Claude Code also `resume`, so a reopened session is covered). Whatever it prints becomes context for the agent, so it prints NOTHING when everything is
 current - the common case costs zero tokens - and one line per thing you can act on otherwise.
 With `--tool antigravity` this runs as Antigravity's SessionStart hook (an older kit wired it to
 PreInvocation, which fires before every model call), acts only on the first call of each conversation

@@ -1296,6 +1296,16 @@ json.dump(d,open(p,'w',encoding='utf-8'))" "$(wq "$g/.claude/settings.json")" "$
   set_matcher 'Bash|Shell'; su 1
   [ "$(guard_matcher)" = 'Bash|Shell' ] && pass "M17 a matcher the user chose is kept" || bad "M17 user's matcher overwritten: $(guard_matcher)"
   set_matcher 'Bash|PowerShell'
+  # M17b: the session-start check also runs when a session is resumed. An install whose block still has
+  # the kit's old "startup" matcher gains it; a matcher the user chose is kept.
+  ss_matcher() { jq_ "$g/.claude/settings.json" "[b.get('matcher') for b in d['hooks']['SessionStart'] if any('kit-check.py' in h['command'] for h in b['hooks'])][0]"; }
+  set_ss() { $PY -c "import json,sys;p=sys.argv[1];d=json.load(open(p,encoding='utf-8'))
+for b in d['hooks']['SessionStart']:
+    if any('kit-check.py' in h['command'] for h in b['hooks']): b['matcher']=sys.argv[2]
+json.dump(d,open(p,'w',encoding='utf-8'))" "$(wq "$g/.claude/settings.json")" "$1"; }
+  m0=$(ss_matcher); set_ss startup; su 1; m1=$(ss_matcher); set_ss clear; su 1; m2=$(ss_matcher); set_ss 'startup|resume'
+  [ "$m0" = 'startup|resume' ] && [ "$m1" = 'startup|resume' ] && [ "$m2" = clear ] \
+    && pass "M17b the session-start check runs on resume too: a fresh install has it, the old matcher widens, a chosen one is kept" || bad "M17b session-start matcher wrong: fresh=$m0 widened=$m1 chosen=$m2"
   HOME="$g" git config --global core.hooksPath .husky
   su 1
   [ "$(gh_)" = .husky ] && has 'is .husky' "$o" \
