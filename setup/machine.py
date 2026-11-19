@@ -77,7 +77,7 @@ OLD_MATCHERS = {"Bash|PowerShell": ("Bash",), "startup|resume": ("startup",)}
 # Every settings key and config.toml key any kit has shipped. A record entry may only name one of these
 # (or one the current templates ship): the record lives in a folder an agent can write to, so it is never
 # trusted to say what else is the kit's. Add a key here when the templates gain one; keep it when they drop it.
-KIT_KEYS = ("attribution", "includeGitInstructions", "worktree")
+KIT_KEYS = ("attribution", "includeGitInstructions", "worktree", "autoCompactWindow")
 KIT_TOML = (("", "approval_policy"), ("", "approvals_reviewer"), ("", "sandbox_mode"),
             ("sandbox_workspace_write", "network_access"))
 NAME = re.compile(r"^(?!\.)[\w.-]+$")   # a skill name: never "." or "..", never hidden

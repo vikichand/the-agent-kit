@@ -11,6 +11,14 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+### Added
+
+- On Claude Code the install sets `autoCompactWindow` to 600000 tokens, so a session on a 1M-token
+  model compacts at about 60 percent of its window instead of running to the limit. It is a starting
+  point, not a vendor figure. Claude Code caps the value at the model's window, so smaller models
+  behave as before, and a value you already set is kept. Like every settings change, the install
+  shows it and asks first.
+
 ### Fixed
 
 - On Claude Code and Codex the session-start check now also runs when you resume a session. Before, it ran only

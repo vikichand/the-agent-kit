@@ -1258,11 +1258,13 @@ EOF
   su 1
   guard_field() { jq_ "$g/.claude/settings.json" "[h for b in d['hooks']['PreToolUse'] for h in b['hooks'] if 'command-guard.py' in h['command']][0].get('$1')"; }
   [ "$(jq_ "$g/.claude/settings.json" "d['includeGitInstructions']")" = False ] && [ "$(guard_field onFailure)" = block ] \
-    && pass "M16 fresh install: includeGitInstructions off, the guard fails closed" || bad "M16 template keys missing: $o"
+    && [ "$(jq_ "$g/.claude/settings.json" "d['autoCompactWindow']")" = 600000 ] \
+    && pass "M16 fresh install: includeGitInstructions off, the guard fails closed, the compaction window set" || bad "M16 template keys missing: $o"
   $PY - "$(wq "$g/.claude/settings.json")" <<'EOF'
 import json, sys
 p = sys.argv[1]; d = json.load(open(p, encoding='utf-8'))
 d['includeGitInstructions'] = True
+d['autoCompactWindow'] = 300000
 for b in d['hooks']['PreToolUse']:
     for h in b['hooks']:
         if 'command-guard.py' in h['command']: h.pop('onFailure', None); h['timeout'] = 7
@@ -1270,6 +1272,7 @@ json.dump(d, open(p, 'w', encoding='utf-8'))
 EOF
   su 1
   [ "$(jq_ "$g/.claude/settings.json" "d['includeGitInstructions']")" = True ] && [ "$(guard_field onFailure)" = block ] && [ "$(guard_field timeout)" = 7 ] \
+    && [ "$(jq_ "$g/.claude/settings.json" "d['autoCompactWindow']")" = 300000 ] \
     && pass "M16 an existing guard hook gains onFailure in place; the user's own values are kept" || bad "M16 field merge wrong: $(cat "$g/.claude/settings.json")"
   su 1; has 'already' "$o" && pass "M16 a second run is already current" || bad "M16 field merge not idempotent: $o"
   $PY - "$(wq "$g/.claude/settings.json")" <<'EOF'
