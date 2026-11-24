@@ -10,6 +10,8 @@ another agent started are workers, and their lead reports for them.
   --event tool     PostToolUse: say nothing, or emit the note as additionalContext
   --event stop     Stop, run with asyncRewake (Claude Code): when the turn ends with background work
                    still running, wait for the interval and wake the agent with the note (exit 2)
+  --event invocation   Antigravity's PreInvocation, which runs before every model call and carries the
+                   user's latest message: it does the work of both prompt and tool there
 
 AGENT_KIT_UPDATE_MINUTES sets the interval (default 8, 0 turns it off).
 """
@@ -29,7 +31,7 @@ STALE_DAYS = 7     # state files of sessions long gone are swept when a new sess
 
 AGENT_MARKERS = ("CLAUDE_CODE_CHILD_SESSION", "CODEX_THREAD_ID", "ANTIGRAVITY_CONVERSATION_ID")
 OWN = {"claude": ("CLAUDE_CODE_CHILD_SESSION", "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT"),
-       "codex": ("CODEX_THREAD_ID",)}
+       "codex": ("CODEX_THREAD_ID",), "antigravity": ("ANTIGRAVITY_CONVERSATION_ID",)}
 
 
 def interval():
@@ -140,10 +142,11 @@ def on_prompt(path, data, now):
     return 0
 
 
-def on_tool(path, data, now, wait):
+def due(path, now, wait):
+    """The update note when the interval has passed, and the clock restarted; otherwise None."""
     s = load(path)
     if not s or now - s["last"] < wait:
-        return 0
+        return None
     # Tool calls that finish together all get here. Creating the lock file is the claim: one create
     # wins, and the winner reads the state again in case an earlier winner has already reset the clock.
     lock = path + ".lock"
@@ -155,18 +158,33 @@ def on_tool(path, data, now, wait):
                 os.remove(lock)
         except OSError:
             pass
-        return 0
+        return None
     try:
         s = load(path)
         if s and now - s["last"] >= wait:
             text = note(s, now)
             s["last"] = now
             save(path, s)
-            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": text}}))
+            return text
     finally:
         os.close(fd)
         os.remove(lock)
-    return 0
+    return None
+
+
+def on_invocation(path, data, now, wait):
+    import hashlib
+    msg = hashlib.sha256(str(data.get("lastUserInput") or "").encode("utf-8", "replace")).hexdigest()[:16]
+    s = load(path)
+    if s and s.get("msg") == msg:
+        return due(path, now, wait)
+    # ponytail: the same message sent twice in a row does not restart the clock; compare the transcript's
+    # entry time as the guard's antigravity_grants() does if that ever matters.
+    on_prompt(path, {}, now)
+    s = load(path)
+    s["msg"] = msg
+    save(path, s)
+    return None
 
 
 def on_stop(path, data, wait):
@@ -198,25 +216,44 @@ def on_stop(path, data, wait):
     return 2
 
 
-def main(argv):
-    tool = argv[argv.index("--tool") + 1]
-    event = argv[argv.index("--event") + 1]
+def run(tool, event):
+    """(exit code, note for the agent or None)."""
     wait = interval()
     try:
         data = json.load(sys.stdin)
     except ValueError:
-        return 0
+        return 0, None
     if not wait or not isinstance(data, dict) or worker(tool, data):
-        return 0
-    path = state_path(str(data.get("session_id") or ""))
+        return 0, None
+    path = state_path(str(data.get("conversationId" if tool == "antigravity" else "session_id") or ""))
     if not path:
-        return 0
+        return 0, None
     if event == "prompt":
-        return on_prompt(path, data, time.time())
+        return on_prompt(path, data, time.time()), None
     if event == "tool":
-        return on_tool(path, data, time.time(), wait)
+        return 0, due(path, time.time(), wait)
+    if event == "invocation":
+        return 0, on_invocation(path, data, time.time(), wait)
     if event == "stop":
-        return on_stop(path, data, wait)
+        return on_stop(path, data, wait), None
+    return 0, None
+
+
+def main(argv):
+    tool = argv[argv.index("--tool") + 1]
+    event = argv[argv.index("--event") + 1]
+    if tool != "antigravity":
+        rc, text = run(tool, event)
+        if text:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": text}}))
+        return rc
+    out = {}
+    try:
+        text = run(tool, event)[1]
+        if text:
+            out = {"injectSteps": [{"ephemeralMessage": text}]}
+    finally:
+        print(json.dumps(out))   # an Antigravity hook must always answer in JSON, a failing one included
     return 0
 
 

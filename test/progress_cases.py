@@ -165,6 +165,35 @@ for _ in range(5):   # the race this guards against showed up in about one run i
 check("twelve tool calls finishing together give one note, not twelve, five times over",
       rounds == [(1, [])] * 5 and b.state()["gen"] >= 1, rounds)
 
+# -- Antigravity: one hook before every model call ------------------------------------------------------
+def ag(box, text, env=None, raw=None):
+    e = {"CLAUDE_CODE_ENTRYPOINT": ""}
+    e.update(env or {})
+    rc, out, err = box.run("invocation", raw or {"conversationId": "s1", "lastUserInput": text}, tool="antigravity", env=e)
+    try:
+        steps = json.loads(out).get("injectSteps") or []
+    except ValueError:
+        return rc, None
+    return rc, " ".join(str(x.get("ephemeralMessage", "")) for x in steps)
+
+
+b = Box()
+first = ag(b, "build it")
+b.age(600)
+due_now = ag(b, "build it")
+again = ag(b, "build it")
+b.age(600)
+new_msg = ag(b, "now the docs")
+check("Antigravity: the first model call stamps the clock, a later one past the interval carries the note once",
+      first == (0, "") and due_now[0] == 0 and "Estimated ETA:" in due_now[1] and again == (0, ""), (first, due_now, again))
+check("Antigravity: a new message from the user restarts the clock", new_msg == (0, ""), new_msg)
+b.age(600)
+worker_run = ag(b, "now the docs", env={"CLAUDECODE": "1"})
+garbage = ag(b, "", raw="not json")
+off = ag(b, "now the docs", env={"AGENT_KIT_UPDATE_MINUTES": "0"})
+check("Antigravity: a worker, bad input and the off switch all still answer in JSON, with no note",
+      worker_run == garbage == off == (0, ""), (worker_run, garbage, off))
+
 # -- the waiter: waking an idle lead ------------------------------------------------------------------
 b = Box()
 b.run("prompt", USER)
