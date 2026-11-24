@@ -1151,7 +1151,7 @@ for ev in d['hooks'].values():
 json.dump(d, open(p, 'w', encoding='utf-8'))
 PY
   su 1
-  [ "$(jq_ "$g/.claude/settings.json" "sum('$ng/.the-agent-kit/hooks/' in h['command'] for ev in d['hooks'].values() for b in ev for h in b['hooks'])")" = 3 ] \
+  [ "$(jq_ "$g/.claude/settings.json" "sum('$ng/.the-agent-kit/hooks/' in h['command'] for ev in d['hooks'].values() for b in ev for h in b['hooks'])")" = 6 ] \
     && pass "M4 a kit hook with a Git Bash path (/c/...) is rewritten to the native path" || bad "M4 a hook command uses a shell-only path: $(cat "$g/.claude/settings.json")"
   # The same hook spelled with backslashes (C:\x for C:/x) is the same hook: a working file is not
   # rewritten over spelling. Found on a real machine whose entries were merged by hand.
