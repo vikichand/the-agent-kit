@@ -37,7 +37,7 @@ class Box:
         shutil.copytree(os.path.join(KIT, "codex"), os.path.join(self.share, "codex"),
                         ignore=shutil.ignore_patterns("performance"))
         shutil.copytree(os.path.join(KIT, "claude", "skills"), os.path.join(self.share, "skills"))
-        for h in ("command-guard.py", "kit-check.py", "agent-kit-check.py"):
+        for h in ("command-guard.py", "kit-check.py", "agent-kit-check.py", "progress.py"):
             shutil.copy(os.path.join(KIT, "hooks", h), os.path.join(self.share, "hooks", h))
         os.makedirs(os.path.join(self.share, "git-hooks"))
         self.gitcfg = os.path.join(self.root, "gitconfig")
@@ -131,6 +131,12 @@ c = b.json(".codex", "hooks.json")
 check("install: Codex hooks and config.toml keys are in place",
       any("command-guard.py" in x for x in commands(c, "PreToolUse"))
       and toml(b.p(".codex", "config.toml")).get("approval_policy") == "on-request", b.out)
+check("install: the progress-update hooks are wired on Claude Code (prompt, tool call, wake-up) and Codex",
+      all(any("progress.py" in x for x in commands(s, ev)) for ev in ("UserPromptSubmit", "PostToolUse", "Stop"))
+      and any("command-guard.py" in x for x in commands(s, "UserPromptSubmit"))
+      and [h.get("asyncRewake") for bl in s["hooks"]["Stop"] for h in bl["hooks"]] == [True]
+      and all(any("progress.py" in x for x in commands(c, ev)) for ev in ("UserPromptSubmit", "PostToolUse"))
+      and "Stop" not in c["hooks"], json.dumps([s["hooks"], c["hooks"]]))
 check("install: git core.hooksPath points at the share's git-hooks",
       b.git("core.hooksPath").replace("\\", "/").endswith(".the-agent-kit/git-hooks"), b.git("core.hooksPath"))
 check("install: one real copy of each kit skill, a Claude link to it, and Antigravity's skills.json entry",
@@ -246,7 +252,8 @@ t = tpl_claude()
 check("uninstall removes the kit's rules, hooks and keys, and keeps the user's",
       not any(r in s.get("permissions", {}).get("deny", []) for r in t["permissions"]["deny"])
       and "Bash(user-deny *)" in s["permissions"]["deny"] and s.get("myOwnKey") is True
-      and not any("kit-check.py" in x for x in commands(s, "SessionStart")), b.out)
+      and not any("kit-check.py" in x for x in commands(s, "SessionStart"))
+      and not any("progress.py" in x for ev in s.get("hooks", {}) for x in commands(s, ev)), b.out)
 check("uninstall keeps a kit entry the user changed, and names it",
       any("command-guard.py" in x for x in commands(s, "PreToolUse")) and "command-guard.py" in b.out, b.out)
 check("uninstall removes the skill copies, links, skills.json names and Antigravity hook; the user's skill stays",

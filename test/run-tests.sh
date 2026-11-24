@@ -27,6 +27,7 @@ echo "== command-guard (tool layer) =="
 PY=""; for p in python3 python "py -3"; do [ "$(printf 'print(1)' | $p - 2>/dev/null)" = "1" ] && { PY="$p"; break; }; done
 if [ -n "$PY" ]; then
   $PY "$KIT/test/command_guard_cases.py" "$KIT/hooks/command-guard.py" || bad "command-guard corpus"
+  $PY "$KIT/test/progress_cases.py" "$KIT/hooks/progress.py" || bad "progress-update hook cases"
   $PY "$KIT/test/machine_cases.py" || bad "machine install-record cases"
   $PY "$KIT/test/project_cases.py" || bad "project install-record cases"
   $PY "$KIT/test/shipped_history.py" || bad "an entry the kit once shipped is unknown to machine.py"

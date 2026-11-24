@@ -526,7 +526,7 @@ copy_share() {  # copy this kit into ~/.the-agent-kit, so the download it came f
   # Copy the WHOLE kit, not just the hooks, so the clone you ran this from becomes disposable.
   # git-hooks/ is the core.hooksPath target (those three only); hooks/ is the full set, which is
   # what the relocated install.sh compares against in --check and copies from per project.
-  for h in command-guard.py kit-check.py agent-kit-check.py mcp-orphans.py mcp-wrap.py tidy-procs.py tidy-scan.py commit-msg pre-commit pre-push; do
+  for h in command-guard.py kit-check.py agent-kit-check.py progress.py mcp-orphans.py mcp-wrap.py tidy-procs.py tidy-scan.py commit-msg pre-commit pre-push; do
     case "$h" in mcp-*|tidy-*|agent-kit-*) [ -f "$KIT/hooks/$h" ] || continue ;; esac
     cp "$KIT/hooks/$h" "$st/hooks/$h"
   done

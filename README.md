@@ -116,8 +116,8 @@ see ([Limits](#limits)).
 
    | Tool | File | What is added |
    |---|---|---|
-   | Claude Code | `~/.claude/settings.json` | the command guard, the session-start check, and the ask and deny rules |
-   | Codex | `~/.codex/hooks.json` | the command guard and the session-start check |
+   | Claude Code | `~/.claude/settings.json` | the command guard, the session-start check, the progress-update hooks, and the ask and deny rules |
+   | Codex | `~/.codex/hooks.json` | the command guard, the session-start check and the progress-update hooks |
    | Codex | `~/.codex/config.toml` | approval, sandbox and network settings |
    | Antigravity | `~/.gemini/config/hooks.json` | the session-start check, as a `SessionStart` hook run through a launcher beside it (your other hooks there are kept) |
 
@@ -324,6 +324,30 @@ hook (`hooks/kit-check.py`), and into Antigravity as a global `SessionStart` hoo
 resumed (agy 1.5.1). An older kit wired it to `PreInvocation`, which fires before every model call; the
 next install moves that entry. Your other hooks in that file are kept. To switch it off, set `AGENT_KIT_NO_UPDATE_CHECK=1`.
 
+### Progress updates while work runs
+
+When a request runs past 8 minutes, the agent gives you a short update without being asked: what is
+done (with pass counts), what is running, what is left, and a line like
+`Estimated ETA: 53 mins | 8:20am`. It repeats every 8 minutes until the work is done.
+
+- **No timer runs in the background.** Your message stamps a small file for the session. Each time the
+  agent finishes a tool call, a hook compares the clock with that file and, once 8 minutes have
+  passed, hands the agent a note with the current time. The check takes about a tenth of a second and
+  exits.
+- **Waiting on background work (Claude Code).** If the agent ends its turn while a background command
+  or agent is still running, one short-lived waiter wakes it at the 8-minute mark, then exits. There
+  is one per session at most, it ends when you send a message, and it never outlives the interval.
+  The wake-ups stop when the agent reports that nothing is still working, or after 30 in a row.
+- **Delegated work.** Only the session you type in gives updates. Subagents, headless runs and
+  sessions another agent started are never nudged; the note tells the lead to read their output and
+  fold it into one update.
+- **Codex** gets the same updates while it is working. It has no way to wake an idle session, so a
+  Codex lead waiting on workers should check on them in short steps.
+- **Change or turn it off:** set `AGENT_KIT_UPDATE_MINUTES` (default `8`, at most `55`, `0` for off).
+
+One limit: a single long command the agent runs in the foreground gives the hook nothing to check
+until it returns, so long runs belong in the background.
+
 ### Also worth having
 
 [**the-ultimate-gitignore-ai**](https://github.com/vikichand/the-ultimate-gitignore-ai) as the
@@ -392,6 +416,7 @@ and the installer is the adapter between them:
 | Tool-layer guard | `ask`, machine-wide | `deny`, machine-wide | approves or refuses, never asks, per project (`.agents/hooks.json`) |
 | Turn-scoped git grants | yes | no (deny mode; you push) | yes, from the hook's `lastUserInput` (Antigravity 1.4.7+) |
 | Session-start update check | yes | yes | yes, once per conversation (a global `SessionStart` hook) |
+| Progress updates every 8 minutes | yes, while working and while waiting on background work | yes, while working | not yet |
 | Measured | 48 cases, Sonnet | 15 cases, see [Limits](#limits) | 13 cases, small sample, see [Limits](#limits) |
 
 **The guards:** hooks at the **git layer** (reorder-proof, covering Claude Code, Codex, Antigravity, plain `git`,

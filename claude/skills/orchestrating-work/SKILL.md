@@ -31,7 +31,9 @@ read their results when they arrive.
 
 **Keep the user posted while work runs.** Before dispatching, say in a line what is running and what
 you are doing meanwhile. While workers, background commands or long checks run, report at each point
-you regain control, and at least every ten minutes: what is done, what is left, what is running now.
+you regain control, and at least every eight minutes: what is done, what is left, what is running now,
+and an estimated finish time. Where the kit's progress hook is installed (Claude Code and Codex) it
+tells you when an update is due; read each worker's output before you write it.
 Where the tool can wake you (Claude Code: a scheduled wake-up or a Monitor on the task's output),
 arm it before you wait; Codex and Antigravity cannot, so poll in short steps rather than one long
 wait. Stopping a background task kills only its shell: check that its children are gone before you
