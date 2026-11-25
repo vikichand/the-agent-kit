@@ -173,6 +173,16 @@ stray operand.
 **MCP orphans**: `mcp-wrap.py` launches an MCP server so it dies with the agent (Job Object on Windows, process group on POSIX; verified on Windows and Linux, not macOS).
 `mcp-orphans.py` lists, and with `--kill` ends, orphaned MCP trees that match known patterns. See [`docs/mcp-orphans.md`](docs/mcp-orphans.md).
 
+**Progress updates**: `progress.py`, on Claude Code, Codex and Antigravity (there as a `PreInvocation`
+hook through the `agent-kit-progress.py` launcher). Once a request has run for 8 minutes
+(`AGENT_KIT_UPDATE_MINUTES`, `0` for off), the next finished tool call hands the agent a note with the
+current time, telling it to update the user and end with an `Estimated ETA:` line; the clock then starts
+again. Nothing runs between tool calls. On Claude Code a `Stop` hook with `asyncRewake` covers the idle
+case: when a turn ends with background work running it waits for the interval and wakes the agent, one
+waiter per session, ended by the user's next message, stopped by the agent saying "no work in progress"
+and capped at 30 wake-ups in a row. Subagents, headless runs and sessions another agent started are
+never nudged. See [Progress updates while work runs](README.md#progress-updates-while-work-runs).
+
 **Session start**: `kit-check.py`, a SessionStart hook on Claude Code, Codex and Antigravity (there a global
 hook that runs once per conversation and always answers in JSON). One line when a newer release is on `main` (checked at most daily), when this project's rules
 differ from the installed kit, or when a tool on your `~/.the-agent-kit/recommended.json` is missing for the

@@ -29,6 +29,15 @@
             "command": "__PY__ \"__AGENT_KIT__/hooks/command-guard.py\" --event userprompt"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PY__ \"__AGENT_KIT__/hooks/progress.py\" --tool claude --event prompt",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "PreToolUse": [
@@ -52,6 +61,29 @@
             "type": "command",
             "command": "__PY__ \"__AGENT_KIT__/hooks/kit-check.py\" --tool claude",
             "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PY__ \"__AGENT_KIT__/hooks/progress.py\" --tool claude --event tool",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PY__ \"__AGENT_KIT__/hooks/progress.py\" --tool claude --event stop",
+            "asyncRewake": true,
+            "timeout": 3600
           }
         ]
       }

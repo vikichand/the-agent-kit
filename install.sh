@@ -526,7 +526,7 @@ copy_share() {  # copy this kit into ~/.the-agent-kit, so the download it came f
   # Copy the WHOLE kit, not just the hooks, so the clone you ran this from becomes disposable.
   # git-hooks/ is the core.hooksPath target (those three only); hooks/ is the full set, which is
   # what the relocated install.sh compares against in --check and copies from per project.
-  for h in command-guard.py kit-check.py agent-kit-check.py mcp-orphans.py mcp-wrap.py tidy-procs.py tidy-scan.py commit-msg pre-commit pre-push; do
+  for h in command-guard.py kit-check.py agent-kit-check.py agent-kit-progress.py progress.py mcp-orphans.py mcp-wrap.py tidy-procs.py tidy-scan.py commit-msg pre-commit pre-push; do
     case "$h" in mcp-*|tidy-*|agent-kit-*) [ -f "$KIT/hooks/$h" ] || continue ;; esac
     cp "$KIT/hooks/$h" "$st/hooks/$h"
   done
@@ -658,6 +658,8 @@ install_global() {  # copy the kit, then PRINT the settings snippets for a hand 
   say "  $share/hooks/agent-kit-check.py to ~/.gemini/config/, then add this under its own name to"
   say "  ~/.gemini/config/hooks.json (keep your other hooks; replace an older \"PreInvocation\" entry of the kit's):"
   say "    \"the-agent-kit-check\": {\"SessionStart\": [{\"type\": \"command\", \"command\": \"$py agent-kit-check.py --tool antigravity\", \"timeout\": 10}]}"
+  say "  For progress updates, copy $share/hooks/agent-kit-progress.py there too and add:"
+  say "    \"the-agent-kit-progress\": {\"PreInvocation\": [{\"type\": \"command\", \"command\": \"$py agent-kit-progress.py --tool antigravity --event invocation\", \"timeout\": 10}]}"
 
   hr
   # $share, never $KIT. Under --update, $KIT is a temp clone this run deletes on its way out, so a

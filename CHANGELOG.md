@@ -11,6 +11,23 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+### Added
+
+- Progress updates on Claude Code, Codex and Antigravity. When a request runs past 8 minutes, the agent tells you
+  what is done, what is running and what is left, and ends with `Estimated ETA: <time left> | <clock
+  time>`; it repeats every 8 minutes until the work is done. No timer runs in the background: a hook
+  checks the clock after each tool call. On Claude Code, a session that is waiting on background work
+  is woken for the update as well. Only the session you type in reports, and it reads its workers'
+  output first. Set `AGENT_KIT_UPDATE_MINUTES` to change the interval, or to `0` to turn it off.
+  Codex and Antigravity report while they are working; neither can wake an idle session.
+  `install.sh update` adds the hooks after asking; in Codex, open `/hooks` once to trust them.
+
+### Fixed
+
+- On Windows, uninstall and update now remove the kit's skill links when your home folder is given by
+  its short name (such as `C:\Users\LONGNA~1`). Before, a link whose skill copy had already been
+  removed was not recognised as the kit's and was left behind.
+
 ## [0.7.1] - 2026-11-26
 
 ### Added
