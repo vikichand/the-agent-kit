@@ -343,8 +343,8 @@ done (with pass counts), what is running, what is left, and a line like
   fold it into one update.
 - **Codex and Antigravity** get the same updates while they are working. Neither can wake an idle
   session, so a lead there that is waiting on workers should check on them in short steps. On
-  Antigravity the hook runs before each model call, and was seen live from a project `hooks.json` on
-  agy 1.5.15; the machine-wide entry the install writes is not yet checked live.
+  Antigravity the hook runs before each model call, and was seen live from the machine-wide
+  `hooks.json` the install writes, on agy 1.5.17.
 - **Change or turn it off:** set `AGENT_KIT_UPDATE_MINUTES` (default `8`, at most `55`, `0` for off).
 
 One limit: a single long command the agent runs in the foreground gives the hook nothing to check
