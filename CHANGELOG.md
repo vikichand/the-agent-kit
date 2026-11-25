@@ -11,6 +11,8 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-26
+
 ### Added
 
 - On Claude Code the install sets `autoCompactWindow` to 600000 tokens, so a session on a 1M-token
@@ -625,7 +627,8 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.7.0...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.7.1...develop
+[0.7.1]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.7.1
 [0.7.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.7.0
 [0.6.8]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.8
 [0.6.7]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.7
