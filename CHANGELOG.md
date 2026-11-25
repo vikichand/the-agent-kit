@@ -22,6 +22,12 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   Codex and Antigravity report while they are working; neither can wake an idle session.
   `install.sh update` adds the hooks after asking; in Codex, open `/hooks` once to trust them.
 
+### Fixed
+
+- On Windows, uninstall and update now remove the kit's skill links when your home folder is given by
+  its short name (such as `C:\Users\LONGNA~1`). Before, a link whose skill copy had already been
+  removed was not recognised as the kit's and was left behind.
+
 ## [0.7.1] - 2026-11-26
 
 ### Added

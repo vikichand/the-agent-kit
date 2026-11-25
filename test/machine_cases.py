@@ -24,8 +24,8 @@ class Box:
     """A home with Claude Code, Codex and Antigravity folders, a share like ~/.the-agent-kit, and its own
     global git config, so nothing on the real machine is read or written."""
 
-    def __init__(self, tools=("claude", "codex", "antigravity")):
-        self.root = tempfile.mkdtemp(prefix="machine-cases-")
+    def __init__(self, tools=("claude", "codex", "antigravity"), root=None):
+        self.root = root or tempfile.mkdtemp(prefix="machine-cases-")
         self.home = os.path.join(self.root, "home")
         self.share = os.path.join(self.home, ".the-agent-kit")
         for t, d in (("claude", ".claude"), ("codex", ".codex"), ("antigravity", os.path.join(".gemini", "config"))):
@@ -275,6 +275,22 @@ left = sorted((e["kind"], e.get("script") or e.get("key")) for e in rec["entries
 check("uninstall: the record keeps only what was left (the guard hook and the key the user changed)",
       left == [("hook", "command-guard.py"), ("key", "attribution")], json.dumps(rec)[:300] if rec else "none")
 b.close()
+
+# ---- a home folder given by its short Windows name (C:\\Users\\LONGNA~1) ----------------------------
+if os.name == "nt":
+    import ctypes
+    long_root = tempfile.mkdtemp(prefix="machine cases long name ")
+    buf = ctypes.create_unicode_buffer(1024)
+    ctypes.windll.kernel32.GetShortPathNameW(long_root, buf, 1024)
+    if "~" in buf.value:                 # short names can be switched off on a volume: nothing to test then
+        b = Box(root=buf.value)
+        b.run()
+        b.run("uninstall")
+        left = [n for n in SKILLS if os.path.lexists(b.p(".claude", "skills", n))]
+        check("under a home given by its short Windows name, uninstall still removes the kit's skill links",
+              left == [], "%s\n%s" % (left, b.out))
+        b.close()
+    shutil.rmtree(long_root, ignore_errors=True)
 
 # ---- the record is never trusted to say what else is the kit's -------------------------------------
 b = Box()

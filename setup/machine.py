@@ -128,7 +128,16 @@ def is_link(p):                      # a symlink, or a Windows junction (os.path
 
 
 def points_to(link, target):
-    return norm(os.path.realpath(link)) == norm(os.path.realpath(target))
+    # Read the link itself: once its target is gone, realpath(link) hands back the stored spelling, and a
+    # junction made under a short Windows name (C:/Users/LONGNA~1) then never equals the long one.
+    try:
+        dest = os.path.join(os.path.dirname(link), os.readlink(link))
+    except (OSError, ValueError):
+        dest = link
+    dest = os.path.realpath(dest)
+    if dest.startswith("\\\\?\\") and dest[5:7] == ":\\":   # readlink's extended-length prefix survives realpath
+        dest = dest[4:]
+    return norm(dest) == norm(os.path.realpath(target))
 
 
 def make_link(link, target):
