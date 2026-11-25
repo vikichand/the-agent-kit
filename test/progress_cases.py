@@ -193,6 +193,10 @@ garbage = ag(b, "", raw="not json")
 off = ag(b, "now the docs", env={"AGENT_KIT_UPDATE_MINUTES": "0"})
 check("Antigravity: a worker, bad input and the off switch all still answer in JSON, with no note",
       worker_run == garbage == off == (0, ""), (worker_run, garbage, off))
+b = Box()
+open(os.path.join(b.tmp, ".the-agent-kit"), "w").close()   # the state folder cannot be made
+broken = ag(b, "build it")
+check("Antigravity: a hook that fails inside still exits 0 with a JSON answer", broken == (0, ""), broken)
 
 # -- the waiter: waking an idle lead ------------------------------------------------------------------
 b = Box()

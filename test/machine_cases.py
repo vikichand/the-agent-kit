@@ -37,7 +37,7 @@ class Box:
         shutil.copytree(os.path.join(KIT, "codex"), os.path.join(self.share, "codex"),
                         ignore=shutil.ignore_patterns("performance"))
         shutil.copytree(os.path.join(KIT, "claude", "skills"), os.path.join(self.share, "skills"))
-        for h in ("command-guard.py", "kit-check.py", "agent-kit-check.py", "progress.py"):
+        for h in ("command-guard.py", "kit-check.py", "agent-kit-check.py", "agent-kit-progress.py", "progress.py"):
             shutil.copy(os.path.join(KIT, "hooks", h), os.path.join(self.share, "hooks", h))
         os.makedirs(os.path.join(self.share, "git-hooks"))
         self.gitcfg = os.path.join(self.root, "gitconfig")
@@ -146,6 +146,11 @@ check("install: one real copy of each kit skill, a Claude link to it, and Antigr
 check("install: Antigravity's session-start hook and its launcher",
       "the-agent-kit-check" in b.json(".gemini", "config", "hooks.json")
       and os.path.isfile(b.p(".gemini", "config", "agent-kit-check.py")), b.out)
+ag = b.json(".gemini", "config", "hooks.json").get("the-agent-kit-progress") or {}
+check("install: Antigravity's progress-update hook runs before each model call, through its own launcher",
+      list(ag) == ["PreInvocation"] and len(ag["PreInvocation"]) == 1
+      and ag["PreInvocation"][0]["command"].endswith(" agent-kit-progress.py --tool antigravity --event invocation")
+      and os.path.isfile(b.p(".gemini", "config", "agent-kit-progress.py")), b.out)
 rec = b.record()
 check("install: the record lists what was installed", rec is not None and rec.get("version") == 1
       and len(rec.get("entries", [])) > 30, json.dumps(rec)[:300] if rec else "no record")
@@ -260,8 +265,9 @@ check("uninstall removes the skill copies, links, skills.json names and Antigrav
       not any(os.path.exists(b.p(".agents", "skills", n)) for n in SKILLS)
       and not any(os.path.lexists(b.p(".claude", "skills", n)) for n in SKILLS)
       and os.path.isfile(b.p(".agents", "skills", "mine", "SKILL.md"))
-      and "the-agent-kit-check" not in b.json(".gemini", "config", "hooks.json")
-      and not os.path.exists(b.p(".gemini", "config", "agent-kit-check.py")), b.out)
+      and not [k for k in b.json(".gemini", "config", "hooks.json") if k.startswith("the-agent-kit")]
+      and not os.path.exists(b.p(".gemini", "config", "agent-kit-check.py"))
+      and not os.path.exists(b.p(".gemini", "config", "agent-kit-progress.py")), b.out)
 check("uninstall turns git's core.hooksPath back off", b.git("core.hooksPath") == "", b.git("core.hooksPath"))
 check("uninstall removes the kit's config.toml keys", "approval_policy" not in toml(b.p(".codex", "config.toml")), b.out)
 rec = b.record()

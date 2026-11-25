@@ -173,7 +173,8 @@ stray operand.
 **MCP orphans**: `mcp-wrap.py` launches an MCP server so it dies with the agent (Job Object on Windows, process group on POSIX; verified on Windows and Linux, not macOS).
 `mcp-orphans.py` lists, and with `--kill` ends, orphaned MCP trees that match known patterns. See [`docs/mcp-orphans.md`](docs/mcp-orphans.md).
 
-**Progress updates**: `progress.py`, on Claude Code and Codex. Once a request has run for 8 minutes
+**Progress updates**: `progress.py`, on Claude Code, Codex and Antigravity (there as a `PreInvocation`
+hook through the `agent-kit-progress.py` launcher). Once a request has run for 8 minutes
 (`AGENT_KIT_UPDATE_MINUTES`, `0` for off), the next finished tool call hands the agent a note with the
 current time, telling it to update the user and end with an `Estimated ETA:` line; the clock then starts
 again. Nothing runs between tool calls. On Claude Code a `Stop` hook with `asyncRewake` covers the idle

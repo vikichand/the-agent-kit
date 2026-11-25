@@ -119,7 +119,7 @@ see ([Limits](#limits)).
    | Claude Code | `~/.claude/settings.json` | the command guard, the session-start check, the progress-update hooks, and the ask and deny rules |
    | Codex | `~/.codex/hooks.json` | the command guard, the session-start check and the progress-update hooks |
    | Codex | `~/.codex/config.toml` | approval, sandbox and network settings |
-   | Antigravity | `~/.gemini/config/hooks.json` | the session-start check, as a `SessionStart` hook run through a launcher beside it (your other hooks there are kept) |
+   | Antigravity | `~/.gemini/config/hooks.json` | the session-start check (a `SessionStart` hook) and the progress-update hook (a `PreInvocation` hook), each run through a launcher beside it (your other hooks there are kept) |
 
    Every run takes out what the old kit put in, then puts in the new kit. An install record
    (`~/.the-agent-kit/.install-record.json`) lists each entry the kit wrote and its value, so an entry a
@@ -341,8 +341,10 @@ done (with pass counts), what is running, what is left, and a line like
 - **Delegated work.** Only the session you type in gives updates. Subagents, headless runs and
   sessions another agent started are never nudged; the note tells the lead to read their output and
   fold it into one update.
-- **Codex** gets the same updates while it is working. It has no way to wake an idle session, so a
-  Codex lead waiting on workers should check on them in short steps.
+- **Codex and Antigravity** get the same updates while they are working. Neither can wake an idle
+  session, so a lead there that is waiting on workers should check on them in short steps. On
+  Antigravity the hook runs before each model call, and was seen live from a project `hooks.json` on
+  agy 1.5.15; the machine-wide entry the install writes is not yet checked live.
 - **Change or turn it off:** set `AGENT_KIT_UPDATE_MINUTES` (default `8`, at most `55`, `0` for off).
 
 One limit: a single long command the agent runs in the foreground gives the hook nothing to check
@@ -416,7 +418,7 @@ and the installer is the adapter between them:
 | Tool-layer guard | `ask`, machine-wide | `deny`, machine-wide | approves or refuses, never asks, per project (`.agents/hooks.json`) |
 | Turn-scoped git grants | yes | no (deny mode; you push) | yes, from the hook's `lastUserInput` (Antigravity 1.4.7+) |
 | Session-start update check | yes | yes | yes, once per conversation (a global `SessionStart` hook) |
-| Progress updates every 8 minutes | yes, while working and while waiting on background work | yes, while working | not yet |
+| Progress updates every 8 minutes | yes, while working and while waiting on background work | yes, while working | yes, while working |
 | Measured | 48 cases, Sonnet | 15 cases, see [Limits](#limits) | 13 cases, small sample, see [Limits](#limits) |
 
 **The guards:** hooks at the **git layer** (reorder-proof, covering Claude Code, Codex, Antigravity, plain `git`,

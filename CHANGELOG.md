@@ -13,12 +13,13 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ### Added
 
-- Progress updates on Claude Code and Codex. When a request runs past 8 minutes, the agent tells you
+- Progress updates on Claude Code, Codex and Antigravity. When a request runs past 8 minutes, the agent tells you
   what is done, what is running and what is left, and ends with `Estimated ETA: <time left> | <clock
   time>`; it repeats every 8 minutes until the work is done. No timer runs in the background: a hook
   checks the clock after each tool call. On Claude Code, a session that is waiting on background work
   is woken for the update as well. Only the session you type in reports, and it reads its workers'
   output first. Set `AGENT_KIT_UPDATE_MINUTES` to change the interval, or to `0` to turn it off.
+  Codex and Antigravity report while they are working; neither can wake an idle session.
   `install.sh update` adds the hooks after asking; in Codex, open `/hooks` once to trust them.
 
 ## [0.7.1] - 2026-11-26

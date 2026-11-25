@@ -87,8 +87,13 @@ MARK = ".the-agent-kit"            # a file inside every skill folder the kit co
 MARK_TEXT = "This folder is a copy made by the-agent-kit's install.sh; install refreshes it and uninstall removes it.\n"
 SJ_PATH = "~/.agents/skills"       # Antigravity's skills.json entry for the one real copy
 HOOK_KEY = "the-agent-kit-check"   # Antigravity's global hooks.json entry (the project one is "the-agent-kit")
-LAUNCH_SIG = b"# The Agent Kit: launcher for the session-start check"   # first line of every launcher shipped
-AG_CMD = re.compile(r"(python3?|py -3) agent-kit-check\.py --tool antigravity")
+PROGRESS_KEY = "the-agent-kit-progress"   # the progress-update hook, an entry of its own beside it
+# Each global entry's launcher, the arguments it is called with, its event, and its name in a message.
+AG_HOOKS = {HOOK_KEY: ("agent-kit-check.py", "--tool antigravity", "SessionStart", "session-start check"),
+            PROGRESS_KEY: ("agent-kit-progress.py", "--tool antigravity --event invocation", "PreInvocation",
+                           "progress-update hook")}
+LAUNCH_SIG = b"# The Agent Kit: launcher for the "   # how the first line of every launcher shipped begins
+AG_CMD = re.compile(r"(python3?|py -3) (%s)" % "|".join(re.escape(l + " " + a) for l, a, _, _ in AG_HOOKS.values()))
 
 
 # ---- small helpers ---------------------------------------------------------------------------------
@@ -289,11 +294,13 @@ class Machine:
                 out.append({"kind": "link", "path": os.path.join(self.claude_skills, n), "value": os.path.join(self.canon_root, n)})
             if os.path.isdir(self.cfg):
                 out.append({"kind": "listitem", "file": os.path.join(self.cfg, "skills.json"), "value": n})
-        launch_src = os.path.join(self.share, "hooks", "agent-kit-check.py")
-        if os.path.isdir(self.cfg) and os.path.isfile(launch_src) and os.path.isfile(os.path.join(self.share, "hooks", "kit-check.py")):
-            out.append({"kind": "file", "path": os.path.join(self.cfg, "agent-kit-check.py"), "src": launch_src, "value": file_hash(launch_src)})
-            out.append({"kind": "agentry", "file": os.path.join(self.cfg, "hooks.json"), "key": HOOK_KEY,
-                        "value": {"SessionStart": [{"type": "command", "command": self.py + " agent-kit-check.py --tool antigravity", "timeout": 10}]}})
+        for key, (launcher, args, event, _) in AG_HOOKS.items():
+            launch_src = os.path.join(self.share, "hooks", launcher)
+            script = "kit-check.py" if key == HOOK_KEY else "progress.py"
+            if os.path.isdir(self.cfg) and os.path.isfile(launch_src) and os.path.isfile(os.path.join(self.share, "hooks", script)):
+                out.append({"kind": "file", "path": os.path.join(self.cfg, launcher), "src": launch_src, "value": file_hash(launch_src)})
+                out.append({"kind": "agentry", "file": os.path.join(self.cfg, "hooks.json"), "key": key,
+                            "value": {event: [{"type": "command", "command": "%s %s %s" % (self.py, launcher, args), "timeout": 10}]}})
         return out
 
     def hook_entries(self, f, t):
@@ -711,9 +718,9 @@ class Machine:
                 return (same(e["file"], os.path.join(self.cfg, "skills.json")) and isinstance(e["value"], str)
                         and NAME.match(e["value"]) is not None)
             if k == "agentry":
-                return same(e["file"], os.path.join(self.cfg, "hooks.json")) and e["key"] == HOOK_KEY
+                return same(e["file"], os.path.join(self.cfg, "hooks.json")) and e["key"] in AG_HOOKS
             if k == "file":
-                return same(e["path"], os.path.join(self.cfg, "agent-kit-check.py"))
+                return any(same(e["path"], os.path.join(self.cfg, v[0])) for v in AG_HOOKS.values())
         except (KeyError, TypeError, ValueError):
             return False
         return False
@@ -847,7 +854,7 @@ def plan(m, action, record):
         k = e["kind"]
         if k in ("link", "listitem") and os.path.basename(e["value"]).casefold() in foreign:
             continue                     # the skill folder of that name is the user's: nothing points at it
-        if k == "agentry" and "launcher" in foreign:
+        if k == "agentry" and "launcher:" + AG_HOOKS[e["key"]][0] in foreign:
             continue                     # it would run a file that is not the kit's launcher
         cur = m.current(e)
         if cur is None:
@@ -860,12 +867,13 @@ def plan(m, action, record):
             new_entries.append(e); continue
         if cur == "not-the-kit's":
             if k == "file":
-                foreign.add("launcher")
-                m.warnings.append("%s is not the kit's launcher: left as it is, and the Antigravity session-start"
-                                  " check is not wired to it" % m.where(e))
+                name = os.path.basename(e["path"])
+                foreign.add("launcher:" + name)
+                m.warnings.append("%s is not the kit's launcher: left as it is, and the Antigravity %s is not"
+                                  " wired to it" % (m.where(e), next(v[3] for v in AG_HOOKS.values() if v[0] == name)))
             elif k == "agentry":
-                m.warnings.append("%s: the entry named %s is not the kit's: left as it is, so the session-start"
-                                  " check is not wired" % (m.where(e), e["key"]))
+                m.warnings.append("%s: the entry named %s is not the kit's: left as it is, so the %s is not"
+                                  " wired" % (m.where(e), e["key"], AG_HOOKS[e["key"]][3]))
             else:
                 m.warnings.append("%s: %s is not the kit's (a folder or link of yours): left as it is, and the"
                                   " kit's %s skill is not installed there" % (m.where(e), m.label(e), m.label(e)))

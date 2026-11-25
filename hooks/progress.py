@@ -182,8 +182,9 @@ def on_invocation(path, data, now, wait):
     # entry time as the guard's antigravity_grants() does if that ever matters.
     on_prompt(path, {}, now)
     s = load(path)
-    s["msg"] = msg
-    save(path, s)
+    if s:
+        s["msg"] = msg
+        save(path, s)
     return None
 
 
@@ -241,7 +242,7 @@ def run(tool, event):
 
 def main(argv):
     tool = argv[argv.index("--tool") + 1]
-    event = argv[argv.index("--event") + 1]
+    event = argv[argv.index("--event") + 1] if "--event" in argv else "invocation"
     if tool != "antigravity":
         rc, text = run(tool, event)
         if text:
@@ -252,8 +253,9 @@ def main(argv):
         text = run(tool, event)[1]
         if text:
             out = {"injectSteps": [{"ephemeralMessage": text}]}
-    finally:
-        print(json.dumps(out))   # an Antigravity hook must always answer in JSON, a failing one included
+    except Exception as e:   # a missed update, said on stderr, beats a hook error before every model call
+        sys.stderr.write("the-agent-kit progress hook: %s: %s\n" % (type(e).__name__, e))
+    print(json.dumps(out))   # an Antigravity hook must always answer in JSON, a failing one included
     return 0
 
 

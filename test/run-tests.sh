@@ -1899,7 +1899,7 @@ h["timeout"] = 99
 json.dump(d, open(p, "w", encoding="utf-8"))
 EOF
   su 1
-  ! grep -q '^stale$' "$g/.gemini/config/agent-kit-check.py" && [ "$(hk "$(HJ)" "d['the-agent-kit-check']['SessionStart'][0]['timeout']")" = 10 ] && [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status', 'the-agent-kit-check']" ] \
+  ! grep -q '^stale$' "$g/.gemini/config/agent-kit-check.py" && [ "$(hk "$(HJ)" "d['the-agent-kit-check']['SessionStart'][0]['timeout']")" = 10 ] && [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status', 'the-agent-kit-check', 'the-agent-kit-progress']" ] \
     && pass "G5 a stale launcher and a stale kit entry are brought current" || bad "G5 stale files not refreshed: $o"
   # G5b: the kit's current command with a value the user set (a longer timeout): the user's, kept.
   $PY - "$(wq "$(HJ)")" <<'EOF'
@@ -1918,7 +1918,7 @@ d["the-agent-kit-check"] = {"PreInvocation": [dict(v["SessionStart"][0], timeout
 json.dump(d, open(p, "w", encoding="utf-8"))
 EOF
   su 1
-  [ "$(hk "$(HJ)" "sorted(d['the-agent-kit-check'])")" = "['SessionStart']" ] && [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status', 'the-agent-kit-check']" ] \
+  [ "$(hk "$(HJ)" "sorted(d['the-agent-kit-check'])")" = "['SessionStart']" ] && [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status', 'the-agent-kit-check', 'the-agent-kit-progress']" ] \
     && pass "G5c an older kit's PreInvocation entry is moved to SessionStart" || bad "G5c the PreInvocation entry was not migrated: $(cat "$(HJ)")"
   # G5d: a timeout the user set on that old entry moves with it, and a later run keeps it.
   $PY - "$(wq "$(HJ)")" <<'EOF'
@@ -1980,7 +1980,7 @@ EOF
   rm -rf "$g" "$vic"
   # G9: no hooks.json yet -> created with just the kit's hook. No Antigravity on the machine -> nothing made.
   home_; su 1
-  [ "$(hk "$(HJ)" "sorted(d)")" = "['the-agent-kit-check']" ] && pass "G9 no hooks.json yet: created with only the kit's hook" || bad "G9 fresh hooks.json wrong: $(cat "$(HJ)" 2>/dev/null)"
+  [ "$(hk "$(HJ)" "sorted(d)")" = "['the-agent-kit-check', 'the-agent-kit-progress']" ] && pass "G9 no hooks.json yet: created with only the kit's hooks" || bad "G9 fresh hooks.json wrong: $(cat "$(HJ)" 2>/dev/null)"
   # G10: --check says whether it is wired (a missing hook is a NOTE with the fix, not a FAIL).
   d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
   has 'WARN: .*machine-wide' "$d" && bad "G10 --check complains although everything is in place" || pass "G10 --check is quiet when the Antigravity check is wired"
