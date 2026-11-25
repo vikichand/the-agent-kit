@@ -1965,9 +1965,10 @@ EOF
   [ "$(cat "$(HJ)")" = '{ not json' ] && has 'hooks.json' "$(printf '%s' "$o" | grep '!')" \
     && pass "G8 an unreadable hooks.json is left untouched and named" || bad "G8 unreadable hooks.json handled wrongly: $o"
   # G8a: a file named agent-kit-check.py that is not the kit's launcher is never overwritten or removed, and
-  # then the hook is not wired (it would call someone else's file).
+  # then the hook is not wired (it would call someone else's file). The progress hook has a launcher of
+  # its own, so it still is.
   rm -rf "$g"; home_; printf 'mine\n' > "$g/.gemini/config/agent-kit-check.py"; su 1
-  [ "$(cat "$g/.gemini/config/agent-kit-check.py")" = mine ] && [ ! -e "$(HJ)" ] && has 'launcher' "$(printf '%s' "$o" | grep '!')" \
+  [ "$(cat "$g/.gemini/config/agent-kit-check.py")" = mine ] && [ "$(hk "$(HJ)" "sorted(d)")" = "['the-agent-kit-progress']" ] && has 'launcher' "$(printf '%s' "$o" | grep '!')" \
     && pass "G8a a foreign agent-kit-check.py is left alone and the hook is not wired to it" || bad "G8a foreign launcher overwritten or wired: $o"
   src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY=1 sh "$KIT/install.sh" --undo </dev/null 2>&1) || src=$?
   [ "$(cat "$g/.gemini/config/agent-kit-check.py")" = mine ] && pass "G8a --undo does not remove a launcher that is not the kit's" || bad "G8a undo removed a foreign file"
