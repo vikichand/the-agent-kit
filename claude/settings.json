@@ -4,6 +4,7 @@
     "pr": ""
   },
   "includeGitInstructions": false,
+  "autoCompactWindow": 600000,
   "permissions": {
     "deny": [
       "Bash(git commit --no-verify:*)",
@@ -45,7 +46,7 @@
     ],
     "SessionStart": [
       {
-        "matcher": "startup",
+        "matcher": "startup|resume",
         "hooks": [
           {
             "type": "command",

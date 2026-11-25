@@ -717,7 +717,10 @@ settings by `install.sh`, or printed by `install.sh --print` for you to merge. O
 (`attribution.commit/pr:""`) and turns off Claude Code's own commit and pull-request instructions
 (`includeGitInstructions:false`), which competed with Section 7 and are where that trailer comes from (the
 setting is machine-wide: in a project without the kit's rules you lose that built-in guidance too, while the
-guard below still denies the dangerous git commands everywhere); the command guard carries
+guard below still denies the dangerous git commands everywhere); it sets `autoCompactWindow` to 600000 tokens, so
+a session on a 1M-token model compacts at about 60 percent instead of running to the limit (a starting point from
+practitioner experience, not a vendor figure; Claude Code caps it at the model's window, so smaller models are
+unchanged, and a value you set yourself is kept); the command guard carries
 `onFailure:"block"` and a 15-second timeout (Claude Code 2.1.295 or later; earlier versions ignore the
 field), so a guard that crashes, times out or cannot start blocks the command instead of letting it through
 (`check` tells you when Python is missing; fix that from your own terminal, the agent cannot). To opt out

@@ -1258,11 +1258,13 @@ EOF
   su 1
   guard_field() { jq_ "$g/.claude/settings.json" "[h for b in d['hooks']['PreToolUse'] for h in b['hooks'] if 'command-guard.py' in h['command']][0].get('$1')"; }
   [ "$(jq_ "$g/.claude/settings.json" "d['includeGitInstructions']")" = False ] && [ "$(guard_field onFailure)" = block ] \
-    && pass "M16 fresh install: includeGitInstructions off, the guard fails closed" || bad "M16 template keys missing: $o"
+    && [ "$(jq_ "$g/.claude/settings.json" "d['autoCompactWindow']")" = 600000 ] \
+    && pass "M16 fresh install: includeGitInstructions off, the guard fails closed, the compaction window set" || bad "M16 template keys missing: $o"
   $PY - "$(wq "$g/.claude/settings.json")" <<'EOF'
 import json, sys
 p = sys.argv[1]; d = json.load(open(p, encoding='utf-8'))
 d['includeGitInstructions'] = True
+d['autoCompactWindow'] = 300000
 for b in d['hooks']['PreToolUse']:
     for h in b['hooks']:
         if 'command-guard.py' in h['command']: h.pop('onFailure', None); h['timeout'] = 7
@@ -1270,6 +1272,7 @@ json.dump(d, open(p, 'w', encoding='utf-8'))
 EOF
   su 1
   [ "$(jq_ "$g/.claude/settings.json" "d['includeGitInstructions']")" = True ] && [ "$(guard_field onFailure)" = block ] && [ "$(guard_field timeout)" = 7 ] \
+    && [ "$(jq_ "$g/.claude/settings.json" "d['autoCompactWindow']")" = 300000 ] \
     && pass "M16 an existing guard hook gains onFailure in place; the user's own values are kept" || bad "M16 field merge wrong: $(cat "$g/.claude/settings.json")"
   su 1; has 'already' "$o" && pass "M16 a second run is already current" || bad "M16 field merge not idempotent: $o"
   $PY - "$(wq "$g/.claude/settings.json")" <<'EOF'
@@ -1296,6 +1299,17 @@ json.dump(d,open(p,'w',encoding='utf-8'))" "$(wq "$g/.claude/settings.json")" "$
   set_matcher 'Bash|Shell'; su 1
   [ "$(guard_matcher)" = 'Bash|Shell' ] && pass "M17 a matcher the user chose is kept" || bad "M17 user's matcher overwritten: $(guard_matcher)"
   set_matcher 'Bash|PowerShell'
+  # M17b: the session-start check also runs when a session is resumed. An install whose block still has
+  # the kit's old "startup" matcher gains it; a matcher the user chose is kept.
+  ss_matcher() { jq_ "$g/.claude/settings.json" "[b.get('matcher') for b in d['hooks']['SessionStart'] if any('kit-check.py' in h['command'] for h in b['hooks'])][0]"; }
+  set_ss() { $PY -c "import json,sys;p=sys.argv[1];d=json.load(open(p,encoding='utf-8'))
+for b in d['hooks']['SessionStart']:
+    if any('kit-check.py' in h['command'] for h in b['hooks']): b['matcher']=sys.argv[2]
+json.dump(d,open(p,'w',encoding='utf-8'))" "$(wq "$g/.claude/settings.json")" "$1"; }
+  m0=$(ss_matcher); set_ss startup; su 1; m1=$(ss_matcher); set_ss clear; su 1; m2=$(ss_matcher); set_ss 'startup|resume'
+  m3=$(jq_ "$g/.codex/hooks.json" "[b.get('matcher') for b in d['hooks']['SessionStart'] if any('kit-check.py' in h['command'] for h in b['hooks'])][0]")
+  [ "$m0" = 'startup|resume' ] && [ "$m1" = 'startup|resume' ] && [ "$m2" = clear ] && [ "$m3" = 'startup|resume' ] \
+    && pass "M17b the session-start check runs on resume too: a fresh install has it (Codex as well), the old matcher widens, a chosen one is kept" || bad "M17b session-start matcher wrong: fresh=$m0 widened=$m1 chosen=$m2 codex=$m3"
   HOME="$g" git config --global core.hooksPath .husky
   su 1
   [ "$(gh_)" = .husky ] && has 'is .husky' "$o" \
