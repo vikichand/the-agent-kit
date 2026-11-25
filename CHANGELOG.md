@@ -11,8 +11,6 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
-## [0.7.1] - 2026-11-26
-
 ### Added
 
 - Progress updates on Claude Code and Codex. When a request runs past 8 minutes, the agent tells you
@@ -22,6 +20,11 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   is woken for the update as well. Only the session you type in reports, and it reads its workers'
   output first. Set `AGENT_KIT_UPDATE_MINUTES` to change the interval, or to `0` to turn it off.
   `install.sh update` adds the hooks after asking; in Codex, open `/hooks` once to trust them.
+
+## [0.7.1] - 2026-11-26
+
+### Added
+
 - On Claude Code the install sets `autoCompactWindow` to 600000 tokens, so a session on a 1M-token
   model compacts at about 60 percent of its window instead of running to the limit. It is a starting
   point, not a vendor figure. Claude Code caps the value at the model's window, so smaller models
