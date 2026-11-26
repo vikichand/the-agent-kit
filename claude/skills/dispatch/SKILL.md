@@ -19,9 +19,12 @@ The mode lasts until `/dispatch off` or the end of the session. Everything below
 
 ## 1. When the user gives a task
 
-- **Answer it yourself** when it is a question, or a change you can finish in a few tool calls. A worker
-  for that costs more than the work.
-- **Otherwise dispatch it.** Brief the worker with the outcome contract in `orchestrating-work`
+- **Dispatch it.** That is the default for every task, easy ones included: while you do the work
+  yourself the user cannot reach you, which is what this mode exists to prevent. Several tasks in one
+  message get a worker each.
+- **The one exception** is a question you can answer, or a change of at most three tool calls in all.
+  If you have to count, dispatch.
+- **The brief.** Give the worker with the outcome contract in `orchestrating-work`
   section 2: the objective, the files it owns, the user's standing rules, the acceptance criteria, how
   to verify them, when to stop and report, and what to return. The worker knows nothing you do not
   write down.
