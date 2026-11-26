@@ -11,7 +11,7 @@ answer the user's questions yourself, and check every result before you call it 
 
 | Typed | What you do |
 |---|---|
-| `/dispatch` or `/dispatch on` | Turn the mode on. Confirm in one line, and say once that each worker starts cold on your model, so several at once use the usage limit several times as fast. |
+| `/dispatch` or `/dispatch on` | Turn the mode on. Confirm in one line, and say once that each worker starts cold on your model, so several at once use the usage limit several times as fast. On Codex and Antigravity add that nothing can wake the chat there, so you check on the workers when the user next writes. |
 | `/dispatch off` | Take no new tasks into workers. Workers already running finish and are reported as below. Say what is still running. |
 | `/dispatch status` | List every task as running, queued or done, one line each. |
 
@@ -24,14 +24,18 @@ The mode lasts until `/dispatch off` or the end of the session. Everything below
   message get a worker each.
 - **The one exception** is a question you can answer, or a change of at most three tool calls in all.
   If you have to count, dispatch.
-- **The brief.** Give the worker with the outcome contract in `orchestrating-work`
+- **The brief.** Give the worker the outcome contract in `orchestrating-work`
   section 2: the objective, the files it owns, the user's standing rules, the acceptance criteria, how
   to verify them, when to stop and report, and what to return. The worker knows nothing you do not
   write down.
 - **Same model and effort as you**, unless the user names another. On Claude Code leave `model` unset
   so the worker inherits yours, and set `run_in_background: true`.
 - **Then confirm in one line and end your turn.** Do not wait on the worker: waiting is what blocks
-  the chat.
+  the chat. A headless run that ends with your turn is the exception (`codex exec` does): it takes
+  the workers with it, so wait for them there and report their results.
+- **The worker tool.** Claude Code: the Agent tool. Codex: its spawn-agent tool. Antigravity:
+  `define_subagent`, then `invoke_subagent`. If you have no tool that starts a worker, say so and do
+  the task yourself.
 
 ## 2. Before each dispatch, compare files with what is running
 
@@ -59,5 +63,4 @@ and reports it. You carry it out yourself after checking the work, and only when
 
 Keep the task list current and include it in every progress update. On Claude Code the kit's progress
 hook wakes this chat every 8 minutes while workers run and names each one with its age. Codex and
-Antigravity cannot wake an idle chat: say so once when the mode is turned on, and check on the workers
-whenever the user next writes.
+Antigravity cannot wake an idle chat, so check on the workers whenever the user next writes.
