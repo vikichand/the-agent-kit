@@ -1782,7 +1782,7 @@ EOF
   else pass "W10d (this platform cannot create symlinks; skipped)"; fi
   rm -rf "$g" "$vic"
   home_
-  printf '{"entries":[{"path":"~/.agents/skills","include_only":["generating-reports","orchestrating-work","tidy","writing-docs"],"exclude":["x-.*"]}]}\n' > "$g/.gemini/config/skills.json"
+  printf '{"entries":[{"path":"~/.agents/skills","include_only":["generating-reports","orchestrating-work","dispatch","tidy","writing-docs"],"exclude":["x-.*"]}]}\n' > "$g/.gemini/config/skills.json"
   cp "$g/.gemini/config/skills.json" "$g/sj.before"; su 1; undo_
   cmp -s "$g/.gemini/config/skills.json" "$g/sj.before" && has 'skills.json' "$(printf '%s' "$o" | grep '!')" \
     && pass "W10e --undo keeps a skills.json entry that carries keys of the user's own, and says so" || bad "W10e undo rewrote an entry with other keys: $(cat "$g/.gemini/config/skills.json")"
