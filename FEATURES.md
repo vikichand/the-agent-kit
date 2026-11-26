@@ -88,7 +88,7 @@ only the short `description` sits in context, and the body loads when a task mat
 the same SKILL.md format, so the installer writes each skill to `.claude/skills/` for Claude Code and
 `.agents/skills/` for Codex and Antigravity, and each install keeps the two copies identical. Skills
 route to detail in `references/`, opened only when the task needs it, and the installer copies the whole
-folder. The machine install also puts the four in machine-wide, once: one real copy in `~/.agents/skills`, a
+folder. The machine install also puts the five in machine-wide, once: one real copy in `~/.agents/skills`, a
 directory link per skill in `~/.claude/skills` (a junction on Windows, no admin), and a `skills.json` entry
 for Antigravity, so `/tidy` works in projects where `install.sh` never ran.
 
@@ -104,8 +104,8 @@ for Antigravity, so `/tidy` works in projects where `install.sh` never ran.
   execute specs that are already complete. **Route by how completely a slice is specified, never by
   budget alone**, and a worker that meets ambiguity escalates instead of guessing. **Delegate only when
   expected parallel progress exceeds startup and integration cost**, name the model and effort on every
-  dispatch, and cap fan-out at two workers active and one delegation layer - workers do not spawn
-  workers. The economics are documented, not folklore: weekly limits are one shared pool that models
+  dispatch, and cap fan-out at two workers active on slices of one task (unrelated tasks on different
+  files are not bound by that number) and one delegation layer - workers do not spawn workers. The economics are documented, not folklore: weekly limits are one shared pool that models
   drain at very different rates, and Anthropic's own cost guidance says to give simple subagent tasks
   `model: haiku` - so delegation is also how a subscription stretches the week.
 
@@ -136,7 +136,12 @@ for Antigravity, so `/tidy` works in projects where `install.sh` never ran.
   command in the first screenful, every command surface as a table, shell differences named. Fires on
   documentation, README, commit-message and PR-description work; ships to both skills folders (`.claude/skills/` and `.agents/skills/`).
 
-- **`tidy`** - the one user-invoked skill (`/tidy`, Codex `$tidy`): lists leftovers (stray and duplicate dev
+- **`dispatch`** - user-invoked (`/dispatch`, `/dispatch off`, `/dispatch status`; Codex `$dispatch`): while it
+  is on, each task runs in a background worker on the lead's model and effort and the chat stays free. The
+  lead answers small things itself, runs tasks side by side only when their files differ, keeps pushes,
+  merges and releases to itself, and checks a worker's evidence before reporting it done.
+
+- **`tidy`** - user-invoked (`/tidy`, Codex `$tidy`): lists leftovers (stray and duplicate dev
   servers, merged branches, stale worktrees, Playwright output, scratch files), asks per group, and removes only
   approved ids through a scanner that never touches tracked or git-ignored files and logs each action. Idle
   servers and candidate files are never offered as "remove all". See [`docs/tidy.md`](docs/tidy.md).

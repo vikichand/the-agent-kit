@@ -131,14 +131,14 @@ see ([Limits](#limits)).
    on its own: an entry that names anything outside the kit's own places is ignored, and a deny rule
    (`Edit(~/.the-agent-kit/**)`) stops an agent's file tools from changing the kit, its guard or the
    record. A deny rule does not cover shell commands; the command guard is the layer for those.
-4. **Installs the kit's four skills once for all three tools**, so `/tidy` and the others work in every
+4. **Installs the kit's five skills once for all three tools**, so `/tidy` and the others work in every
    project, not only where `install.sh` ran:
 
    | Tool | Where | How |
    |---|---|---|
    | Codex | `~/.agents/skills/<name>` | the one real copy, marked as the kit's so a later install can refresh it |
    | Claude Code | `~/.claude/skills/<name>` | a directory link to that copy: a junction on Windows (no admin rights), a symlink elsewhere |
-   | Antigravity | `~/.gemini/config/skills.json` | an entry for `~/.agents/skills`, limited to the kit's four names |
+   | Antigravity | `~/.gemini/config/skills.json` | an entry for `~/.agents/skills`, limited to the kit's five names |
 
    It creates and removes only what it made. A folder or link of yours with the same name is left as it
    is, with a warning; a tool you do not have gets nothing. `install.sh uninstall` removes the kit's links,
@@ -337,7 +337,11 @@ done (with pass counts), what is running, what is left, and a line like
 - **Waiting on background work (Claude Code).** If the agent ends its turn while a background command
   or agent is still running, one short-lived waiter wakes it at the 8-minute mark, then exits. There
   is one per session at most, it ends when you send a message, and it never outlives the interval.
-  The wake-ups stop when the agent reports that nothing is still working, or after 30 in a row.
+  The wake-up names each task still running and how long it has run. The wake-ups stop when the agent
+  reports that nothing is still working, or after 30 in a row.
+- **Your messages restart the 8 minutes.** The clock counts from your last message, because the agent
+  has just answered you. A background task finishing, or a subagent handing back its report, does not
+  restart it, and each task's own age is kept across your messages.
 - **Delegated work.** Only the session you type in gives updates. Subagents, headless runs and
   sessions another agent started are never nudged; the note tells the lead to read their output and
   fold it into one update.
@@ -402,9 +406,10 @@ observability, audit logs.
 to, so security rules arrive on API code and accessibility rules on components, at no cost the rest of
 the time.
 
-**The task tier:** four skills that load on what you are *doing* rather than which file you opened:
+**The task tier:** five skills that load on what you are *doing* rather than which file you opened:
 splitting work across subagents, writing a plan or report a human will act on, documentation and
-commit-message prose, and a user-invoked `/tidy` cleanup.
+commit-message prose, a user-invoked `/tidy` cleanup, and a user-invoked `/dispatch` mode that runs
+each task in a background worker.
 
 **Which tool gets what.** The content is one set of markdown files; the *routing* differs per tool,
 and the installer is the adapter between them:
@@ -413,7 +418,7 @@ and the installer is the adapter between them:
 |---|---|---|---|
 | Floor (`AGENTS.md`) | via the one-line `CLAUDE.md` import | read directly | read directly |
 | Depth tier (6 rules) | `.claude/rules/`, loads by file path | 4 of 6 as `.agents/skills/`, loads by task match; the 2 path-shaped ones (`code-correctness`, `tests`) don't port and stay one-liners in the floor | the same 4 skills, plus the 2 path-shaped ones as glob rules in `.agents/rules/` |
-| Task tier (4 skills) | `.claude/skills/`, and machine-wide by link from the machine install | `.agents/skills/`, same files, and the machine-wide copy in `~/.agents/skills` | `.agents/skills/`, shared with Codex, and `skills.json` for the machine-wide copy |
+| Task tier (5 skills) | `.claude/skills/`, and machine-wide by link from the machine install | `.agents/skills/`, same files, and the machine-wide copy in `~/.agents/skills` | `.agents/skills/`, shared with Codex, and `skills.json` for the machine-wide copy |
 | Git-layer guards | yes | yes | yes |
 | Tool-layer guard | `ask`, machine-wide | `deny`, machine-wide | approves or refuses, never asks, per project (`.agents/hooks.json`) |
 | Turn-scoped git grants | yes | no (deny mode; you push) | yes, from the hook's `lastUserInput` (Antigravity 1.4.7+) |
@@ -519,7 +524,7 @@ so nothing double-loads.
 ### The task tier: skills
 
 A third trigger, for guidance keyed to *what you are doing* rather than which file you opened. Only the
-skill's one-line description sits in context; the body loads when a task matches. Four ship:
+skill's one-line description sits in context; the body loads when a task matches. Five ship:
 
 **`orchestrating-work`** fires when a task looks decomposable, or when you ask to parallelise or use
 subagents. Its spine is the rule every credible source agrees on: **reads parallelise, writes do
@@ -527,7 +532,8 @@ not**. Around it sit freezing shared contracts before fan-out, one owner per fil
 sequential integration, and an orchestrator-worker split where the lead keeps decomposition, the
 contract and the final review while workers execute already-complete specs. Delegate only when the
 expected parallel progress is worth the startup and integration cost, name the model and effort on
-every dispatch, and keep at most two workers active and one delegation layer, so workers do not spawn
+every dispatch, and keep at most two workers active on slices of one task (unrelated tasks on
+different files are not bound by that number) with one delegation layer, so workers do not spawn
 workers. It starts by picking the shape (do it, delegate a read or a slice, fan out, hand off), gives
 every worker an outcome contract with its escalation triggers, and classifies a failure before retrying it.
 
@@ -541,7 +547,17 @@ the conversation, stays markdown-only.
 the full version of Section 8's two-line prose rule and the README order: working path first, a
 runnable command in the first screenful, every command surface as a table, shell differences named.
 
-**`/tidy`** is the one skill you run yourself (`/tidy` in Claude Code, `$tidy` in Codex). It lists leftovers
+**`/dispatch`** turns dispatcher mode on for the session (`$dispatch` in Codex), and `/dispatch off`
+ends it. While it is on, each task you give runs in a background worker on the same model and effort,
+and the chat you type in stays free for questions, updates and more tasks. The agent answers small
+things itself, runs tasks side by side only when they touch different files (otherwise it queues them
+or uses a separate worktree), keeps pushes, merges and releases for itself and your say-so, and checks
+a worker's evidence before telling you a task is done. `/dispatch status` lists what is running,
+queued and done. Each worker starts cold on your model, so several at once use your usage limit
+several times as fast. On Claude Code the progress updates above wake the idle chat while workers run;
+Codex and Antigravity cannot be woken, so there the agent checks on its workers when you next write.
+
+**`/tidy`** is the other skill you run yourself (`/tidy` in Claude Code, `$tidy` in Codex). It lists leftovers
 (stray or duplicate dev-server processes, merged branches, stale worktrees, Playwright output, scratch files),
 asks group by group, and removes only what you approve, with a dry run first and a log. Details and limits:
 [`docs/tidy.md`](docs/tidy.md).

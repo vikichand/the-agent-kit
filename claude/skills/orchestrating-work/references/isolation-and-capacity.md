@@ -23,11 +23,14 @@ that needs a deterministic pipeline - use a dynamic workflow instead of more sub
 
 ## Concurrency caps
 
-At most two workers active and one delegation layer. Claude Code enforces the caps with
+At most two workers active on slices of one task, and one delegation layer. The number is about the
+cost of joining slices that share interfaces, so unrelated tasks on different files (the `dispatch`
+skill's case) are not bound by it. Claude Code enforces hard caps with
 `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` and `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`; Codex caps the count
 with `agents.max_concurrent_threads_per_session` and documents no depth limit. The kit's optional
 performance profile sets both Claude Code caps and Codex's thread cap, so on Codex the one-layer limit
-is this rule's to keep. Check the current names in each tool's docs before relying on them.
+is this rule's to keep. With the profile installed its cap of two holds for every kind of work,
+dispatcher mode included. Check the current names in each tool's docs before relying on them.
 
 ## Delegation stretches a subscription
 

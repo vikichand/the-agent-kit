@@ -21,6 +21,12 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   output first. Set `AGENT_KIT_UPDATE_MINUTES` to change the interval, or to `0` to turn it off.
   Codex and Antigravity report while they are working; neither can wake an idle session.
   `install.sh update` adds the hooks after asking; in Codex, open `/hooks` once to trust them.
+- `/dispatch` (Codex: `$dispatch`), a mode you turn on for a session. Each task you give then runs in a
+  background worker on the same model and effort, and the chat stays free for questions, updates and
+  more tasks. The agent runs tasks side by side only when they touch different files, keeps pushes,
+  merges and releases to itself, and checks a worker's result before reporting it. `/dispatch off` ends
+  it and `/dispatch status` lists the tasks. Several workers at once use your usage limit several
+  times as fast.
 
 ### Fixed
 

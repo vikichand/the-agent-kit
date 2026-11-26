@@ -25,8 +25,9 @@ and say in a line why:
 | **Hand off** | the work moves to another tool, directory or person, or outlives this session: write the handoff (section 6); otherwise keep going or compact |
 
 **Reads parallelise; writes do not.** Conflicting reads are cheap. Conflicting writes surface at
-integration time, when they are most expensive to unpick. Keep at most two workers active and one
-delegation layer: workers do not spawn workers. Dispatch them without blocking and keep working;
+integration time, when they are most expensive to unpick. For slices of one task, keep at most two workers active:
+every slice comes back to you to review and join. Unrelated tasks that touch different files are not
+bound by that number. One delegation layer either way: workers do not spawn workers. Dispatch them without blocking and keep working;
 read their results when they arrive.
 
 **Keep the user posted while work runs.** Before dispatching, say in a line what is running and what
