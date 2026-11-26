@@ -30,6 +30,15 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
   it and `/dispatch status` lists the tasks. Several workers at once use your usage limit several
   times as fast.
 
+### Changed
+
+- On Codex, a push, a new pull request or a merge now runs in the turn your own message asks for it,
+  as on Claude Code and Antigravity. Before, Codex refused every one and left them to you. The guard
+  only stops objecting, so Codex's own approval still decides, and force-push and `--no-verify` stay
+  refused. A worker, a session another agent started and any later turn get nothing (a bare "continue" keeps the request for up to two hours). `install.sh
+  update` adds the prompt hook after asking; trust it in Codex's `/hooks`, and until you do Codex
+  refuses every push as before.
+
 ### Fixed
 
 - On Windows, uninstall and update now remove the kit's skill links when your home folder is given by

@@ -40,7 +40,7 @@ Run it outside any project. It copies the kit to `~/.the-agent-kit`, turns on it
 to your Claude Code, Codex and Antigravity settings. It lists every change and asks before writing
 anything, backs your files up first, and ends by checking that everything it installed is in place.
 Then delete the downloaded `install.sh` and restart Claude Code, Codex and Antigravity.
-In Codex, run `/hooks` once and trust the kit's two hooks: Codex skips a new or changed hook until
+In Codex, run `/hooks` once and trust the kit's hooks: Codex skips a new or changed hook until
 you do, without a warning.
 
 **2. Set up each project:**
@@ -577,7 +577,7 @@ decision record in [`docs/senior-engineer.md`](docs/senior-engineer.md) before u
 |---|---|---|
 | **Rules** | `CLAUDE.md`, a one-line `@AGENTS.md` import | `AGENTS.md`, the file itself |
 | **commit** | runs without a prompt: it is local and undoable. `--no-verify` **denied** | runs |
-| **push / open or merge a PR** | runs **only when your message that turn asked for it** ("push it", "merge it to main", "cut 0.6.3"); otherwise the tool hook **refuses** and the agent reports it ready to push. Force and `--no-verify` **denied**, grant or not | tool hook **denies** (you push and merge) |
+| **push / open or merge a PR** | runs **only when your message that turn asked for it** ("push it", "merge it to main", "cut 0.6.3"); otherwise the tool hook **refuses** and the agent reports it ready to push. Force and `--no-verify` **denied**, grant or not | the same, when the kit's prompt hook is trusted in `/hooks`: asked for that turn, Codex's own approval decides; otherwise the tool hook **denies** |
 | **force / delete to `main`** | git `pre-push` blocks it | git `pre-push` (same file) |
 | **secrets in a commit** | git `pre-commit` blocks staged secrets | same file |
 | **destructive cmds** (`rm -rf` or `Remove-Item -Recurse` outside the project and temp folder, `dd`, `mkfs`, `curl\|sh`) | tool hook **asks** | tool hook **denies** |
@@ -773,7 +773,7 @@ that turn asked for it* (a one-time, turn-scoped grant, below), and denies `--no
 `core.hooksPath`, and writes to `.git/hooks`, `.git/config`, `.claude/settings.json` and `~/.the-agent-kit`.
 It ships no ask rules. On Codex it sets `approval_policy=on-request` with `approvals_reviewer=auto_review`
 and `sandbox_mode=workspace-write`: what the sandbox refuses goes to Codex's reviewer agent, never to you,
-which is what lets a commit write `.git`. `codex/hooks.json` wires the deny-mode hook.
+which is what lets a commit write `.git`. `codex/hooks.json` wires the deny-mode hook and the prompt hook that records what you asked for.
 
 These config choices are deliberate, because the obvious "more locked down" setting makes the agent worse:
 
@@ -795,7 +795,10 @@ These config choices are deliberate, because the obvious "more locked down" sett
   cannot write to) and lets exactly that operation through for that turn. A bare "continue" after a break
   keeps the grant for up to two hours; any other message resets it. A grant never covers force-push or `--no-verify`.
   A missed phrasing is refused, never a silent push: the agent says it is ready and you ask again. Codex
-  (deny-mode) ignores grants and leaves pushing and merging to you. Antigravity reads the same request
+  works the same way through its own `UserPromptSubmit` hook, with a tighter record: it is tied to the
+  turn that asked, a worker's tool call never matches it, and it sits in `~/.the-agent-kit/grants`, which
+  Codex's sandbox cannot write. There the guard only stops objecting, so Codex's own approval still
+  decides. Until you trust that hook in `/hooks`, Codex refuses every push. Antigravity reads the same request
   from its hook's `lastUserInput`. A session another agent started grants nothing, because its prompt
   is that agent's brief: a worker never pushes, and the lead pushes once you have asked it to. A headless
   `claude -p` or Agent SDK run grants nothing either, even one you start yourself.

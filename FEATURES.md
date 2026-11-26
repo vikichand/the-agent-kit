@@ -216,7 +216,7 @@ never updates or installs anything itself. `install.sh check` lists what is miss
   restrictive verdict across its segments (deny > ask > allow), so a granted op never tows an ungranted one
   through - `git push && git commit` with only `commit` granted is refused as a whole. Detection also drops
   fenced / quoted / inline-code spans first, so a git verb the user pasted from a log or a teammate mints
-  nothing. Codex (deny-mode) ignores grants entirely: it commits freely and leaves pushing to the human.
+  nothing. Codex (deny-mode) commits freely and pushes only in the turn you asked: its record is tied to the turn id, never matches a worker's tool call, and lives in `~/.the-agent-kit/grants`, outside what its sandbox can write (unless you start Codex in your home folder or add that folder as a writable root). A bare "continue" keeps it for up to two hours, as on Claude Code.
   A session another agent started grants nothing, so a lead cannot pass a push to a worker through its
   brief. Claude Code marks a `-p` or SDK run (`CLAUDE_CODE_SESSION_ATTENDED=0`, `CLAUDE_CODE_ENTRYPOINT=sdk-*`,
   seen on 2.1.318 and undocumented), and a session started from an agent's command inherits that agent's
@@ -225,7 +225,7 @@ never updates or installs anything itself. `install.sh check` lists what is miss
 - **`codex/config.toml`**: `approval_policy=on-request` + `approvals_reviewer=auto_review` (what the sandbox refuses goes to Codex's reviewer agent, never to you; a commit's `.git` write needs it) · `sandbox_mode=workspace-write` · network **on**, deliberately
   (Section 5 requires verifying facts against the version in use; switching it off just sends the agent back to memory) · no hand-written env exclude
   list (Codex excludes secret names by default, and a broad one strips `DATABASE_URL` and breaks builds invisibly).
-  **`codex/hooks.json`** wires the deny-mode hook.
+  **`codex/hooks.json`** wires the deny-mode hook and the prompt hook behind its turn grants.
 - **`install.sh`**: one installer, four commands. `install.sh` installs or reinstalls (machine-wide: copies the kit, turns on the
   git hooks and adds the kit to your Claude Code and Codex settings, asked, backed up and verified; `setup/machine.py` keeps an install record, so each run takes out what the old kit installed and the new one no longer ships, and keeps what you changed; also installs the kit's four skills once for all three tools: a real copy in `~/.agents/skills`, a directory link per skill for Claude Code, a `skills.json` entry for Antigravity; wires Antigravity's session-start check into `~/.gemini/config/hooks.json`, keeping its other hooks; then, inside a git repo, the project: full rules, depth tier, skills, Antigravity's guard and git hooks, from the project's own record `.agents/the-agent-kit.json`; `--lean` gives the project a stub that extends the global rules; `--print` prints the snippets for a hand merge) ·
   `update` (**also the installer**: a lone `install.sh` with no kit beside it bootstraps the whole thing,
