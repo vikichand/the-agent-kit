@@ -16,7 +16,6 @@ another agent started are workers, and their lead reports for them.
 AGENT_KIT_UPDATE_MINUTES sets the interval (default 8, 0 turns it off).
 """
 import json
-import math
 import os
 import re
 import sys
@@ -26,6 +25,7 @@ DEFAULT_MINUTES = 8
 MAX_MINUTES = 55   # the waiter's hook timeout is one hour; a longer wait would be killed without a word
 # A background task that never ends (a dev server) would wake the agent for ever, each wake a paid turn.
 MAX_WAKES = 30     # about four hours at the default interval
+MAX_LISTED = 12    # background tasks named in a wake-up; the task descriptions are the agent's own words
 QUIET = "no work in progress"
 STALE_DAYS = 7     # state files of sessions long gone are swept when a new session starts
 
@@ -74,14 +74,19 @@ def sweep(now):
             pass   # another session's sweep got there first
 
 
+def num(v):
+    # The state file may hold anything. A time or a count is a plain number of sane size: this turns away
+    # NaN, the infinities, and an integer too large for float arithmetic, which would raise later.
+    return type(v) in (int, float) and abs(v) < 1e12
+
+
 def load(path):
     try:
         with open(path) as f:
             s = json.load(f)
     except (OSError, ValueError):
         return None
-    ok = isinstance(s, dict) and all(type(s.get(k)) in (int, float) and math.isfinite(s[k])
-                                     for k in ("last", "start", "gen", "wakes"))
+    ok = isinstance(s, dict) and all(num(s.get(k)) for k in ("last", "start", "gen", "wakes"))
     return s if ok else None
 
 
@@ -111,8 +116,8 @@ def note(s, now, waiting=False, last=False):
     mins = max(1, int(round((now - s["start"]) / 60)))
     text = ("Progress update due (the-agent-kit). It is now %s and this request has been running for %d minute%s. "
             % (clock(now), mins, "" if mins == 1 else "s"))
-    text += ("You are waiting on background work: check the output of each background task and each agent "
-             "you delegated to, then " if waiting else
+    text += ("You are waiting on background work. Still marked as running, by label: %s. Check the output of each "
+             "background task and each agent you delegated to, then " % "; ".join(waiting) if waiting else
              "Before your next step, check the output of any background task or agent you delegated to, then ")
     text += ("give the user one short update: done (with pass counts), running now, what's left. End it with "
              "\"Estimated ETA: <time remaining, e.g. '53 mins' or '1 hour, 23 mins'> | <finish time on the "
@@ -136,7 +141,7 @@ def on_prompt(path, data, now):
     # hook like a message. It must not reset the clock or the wake count, or the cap would never bite.
     woke = s.pop("woke", 0)
     own = type(woke) in (int, float) and 0 <= now - woke < 60
-    if not own and not str(data.get("prompt") or "").lstrip().startswith("<task-notification>"):
+    if not own and not str(data.get("prompt") or "").lstrip().startswith(("<task-notification>", "<agent-message ")):
         s.update(last=now, start=now, wakes=0, quiet=False)
     save(path, s)
     return 0
@@ -197,7 +202,19 @@ def on_stop(path, data, wait):
     if QUIET in str(data.get("last_assistant_message") or "").lower():
         s["quiet"] = True
     tasks = data.get("background_tasks")
-    running = isinstance(tasks, list) and any(isinstance(t, dict) and t.get("status") == "running" for t in tasks)
+    tasks = [t for t in tasks if isinstance(t, dict) and t.get("status") == "running"] if isinstance(tasks, list) else []
+    running = bool(tasks)
+    # When each task was first seen running, kept across the user's messages: the request's own clock
+    # restarts with every message, and a lead taking new tasks still has to say how old each one is.
+    seen = s.get("tasks") if isinstance(s.get("tasks"), dict) else {}
+    # A label is the agent's own words, repeated back in the kit's voice: it must not be able to close
+    # its quotes or carry control characters.
+    names = [(str(t.get("id"))[:64],
+              " ".join("".join(c for c in str(t.get("description") or t.get("type") or "task")
+                               if c != '"' and (c.isprintable() or c.isspace())).split())[:80])
+             for t in tasks[:MAX_LISTED]]
+    first = time.time()
+    s["tasks"] = {i: seen[i] if num(seen.get(i)) else first for i, _ in names}
     save(path, s)
     if not running or s.get("quiet") or s["wakes"] >= MAX_WAKES:
         return 0
@@ -213,7 +230,11 @@ def on_stop(path, data, wait):
     s["wakes"] += 1
     s["last"] = s["woke"] = now
     save(path, s)
-    sys.stderr.write(note(s, now, waiting=True, last=s["wakes"] >= MAX_WAKES) + "\n")
+    since = s.get("tasks") if isinstance(s.get("tasks"), dict) else {}
+    listed = ["\"%s\" (%d min)" % (d, max(0, (now - since[i]) // 60) if num(since.get(i)) else 0) for i, d in names]
+    if len(tasks) > len(names):
+        listed.append("and %d more" % (len(tasks) - len(names)))
+    sys.stderr.write(note(s, now, waiting=listed, last=s["wakes"] >= MAX_WAKES) + "\n")
     return 2
 
 

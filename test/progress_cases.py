@@ -124,6 +124,12 @@ after = b.state()
 check("a task notification keeps the clock running; the user's own message resets it",
       mid["last"] == before["last"] and mid["wakes"] == 2 and mid["gen"] > before["gen"]
       and after["wakes"] == 0 and after["last"] > mid["last"], (before, mid, after))
+b.age(600, wakes=2)
+before = b.state()
+b.run("prompt", {"session_id": "s1", "prompt": '<agent-message from="af93efe36ec76e6fb">\n[Subagent hand-back] The text '
+                 "below is the final report of a subagent this session delegated to.\n  done"})
+check("a subagent handing back its report keeps the clock running too",
+      b.state()["last"] == before["last"] and b.state()["wakes"] == 2, (before, b.state()))
 
 # -- malformed and hostile input ---------------------------------------------------------------------
 b = Box()
@@ -241,6 +247,42 @@ rc, out, err = b.run("stop", RUNNING, env=FAST, timeout=20)
 rc2, out2, err2 = b.run("stop", RUNNING, env=FAST, timeout=10)
 check("the wake-ups are capped: the last one says so, and no waiter follows it",
       rc == 2 and "last automatic update" in err and rc2 == 0, (rc, err, rc2))
+
+b = Box()
+AGENTS = {"session_id": "s1", "last_assistant_message": "started", "background_tasks": [
+    {"id": "t1", "type": "subagent", "status": "running", "description": "Fix the login\nbug " + "x" * 200},
+    {"id": "t2", "type": "shell", "status": "completed", "description": "finished already"}]}
+b.run("prompt", USER)
+b.run("stop", AGENTS, env={"AGENT_KIT_UPDATE_MINUTES": "0.1"}, timeout=20)
+s = b.state(); s["tasks"]["t1"] -= 720
+with open(b.path(), "w") as f:
+    json.dump(s, f)
+b.run("prompt", USER)   # the user chats while the task runs: its age must survive the message
+AGENTS["background_tasks"].append({"id": "t3", "type": "subagent", "status": "running", "description": "Write the docs"})
+rc, out, err = b.run("stop", AGENTS, env=FAST, timeout=20)
+check("the wake-up names each task still running and how long it has run, across the user's messages",
+      rc == 2 and "Fix the login bug" in err and "(12 min)" in err and "Write the docs" in err
+      and "finished already" not in err and "x" * 100 not in err and "\n" not in err.strip(), (rc, err))
+rc, out, err = b.run("stop", dict(AGENTS, background_tasks=AGENTS["background_tasks"][2:]), env=FAST, timeout=20)
+check("a task that is gone is dropped from the list", "Fix the login" not in err and list(b.state()["tasks"]) == ["t3"], (err, b.state()))
+s = dict(b.state(), tasks="soon")
+with open(b.path(), "w") as f:
+    json.dump(s, f)
+rc, out, err = b.run("stop", dict(AGENTS, background_tasks=[{"id": ["x"], "status": "running", "description": 7}, "junk"]), env=FAST, timeout=20)
+check("oddly shaped task entries and a damaged task record do not break the wake-up", rc == 2 and "Estimated ETA:" in err, (rc, err))
+many = [{"id": "m%d" % i, "status": "running", "description": 'say "hi"\x1b[31m‮ now' if i == 0 else "task %d" % i} for i in range(14)]
+s = dict(b.state(), tasks={"m0": 10 ** 400, "m1": float("inf")})
+with open(b.path(), "w") as f:
+    json.dump(s, f)
+rc, out, err = b.run("stop", dict(AGENTS, background_tasks=many), env=FAST, timeout=20)
+check("a task's label cannot close its own quotes or carry control characters, a huge recorded time is ignored, "
+      "and tasks past the listed ones are counted",
+      rc == 2 and "say hi[31m now" in err and "\x1b" not in err and "‮" not in err and "and 2 more" in err, (rc, err))
+s = dict(b.state(), last=10 ** 400)
+with open(b.path(), "w") as f:
+    json.dump(s, f)
+rc, out, err = b.run("tool", TOOL)
+check("a state file holding a number too large to be a time is ignored, not a crash", rc == 0 and out == "" and err == "", (rc, out, err))
 
 rc, out, err = b.run("stop", RUNNING, env={"AGENT_KIT_UPDATE_MINUTES": "0"}, timeout=10)
 rc2, out2, err2 = b.run("stop", RUNNING, env=dict(FAST, CLAUDE_CODE_ENTRYPOINT="sdk-cli"), timeout=10)
