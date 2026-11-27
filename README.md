@@ -783,8 +783,9 @@ These config choices are deliberate, because the obvious "more locked down" sett
   what is safe, do it, and report. In about 3,570 sessions the owner approved 1,448 of 1,452 guard prompts,
   so 0.6.3 cut them down. What still asks: deleting outside the project or the temp folder, `dd`/`mkfs`,
   piping a download into a shell, the guard's own overrides (`AGENT_KIT_APPLY`, `AGENT_KIT_RELEASE`,
-  `AGENT_KIT_ALLOW_FORCE`). A push, pull request or merge you did not ask for is refused, not asked, so it
-  never stalls a run: the agent leaves its commits local and reports them ready. Commits, deletes inside
+  `AGENT_KIT_ALLOW_FORCE`). A push, pull request or merge you did not ask for also asks on Claude Code: one key
+  on its approval card, and you never type the command yourself. (Codex and Antigravity cannot ask, so
+  there it is refused and the agent reports its commits ready.) Commits, deletes inside
   the project, `git reset --hard`/`clean`/`branch -D`, adding a dependency, reading a secret file and
   editing `AGENTS.md` run without a prompt; the rules still tell the agent to check a package name, never
   print a secret, and never discard your uncommitted work. A deny never waits: the agent gets a "no" and
@@ -792,11 +793,22 @@ These config choices are deliberate, because the obvious "more locked down" sett
 
 - **Pushes, pull requests and merges are authorized by your request, once; commits need none.** A local
   commit is undoable and never leaves your machine, so it runs without a prompt. The agent never pushes,
-  opens a PR or merges on its own initiative. When you ask ("push it", "open a PR", "merge it to main",
-  "cut 0.6.3", which is all three), a `UserPromptSubmit` hook reads your *own* words (a hook the agent
-  cannot write to) and lets exactly that operation through for that turn. A bare "continue" after a break
-  keeps the grant for up to two hours; any other message resets it. A grant never covers force-push or `--no-verify`.
-  A missed phrasing is refused, never a silent push: the agent says it is ready and you ask again. Codex
+  opens a PR or merges on its own initiative. Four words cover the chain, each with the steps before
+  it: **"push"**, **"raise the PRs"** (push first), **"merge"** (push and pull request first) and
+  **"release"** (all of them; also "ship it", "tag it", "cut 0.6.3"). A `UserPromptSubmit` hook reads
+  your *own* words (a hook the agent cannot write to) and lets those operations through until your next
+  message. What counts and what does not:
+  - A veto reads one sentence: "Push. I don't want to keep saying push" is a push, "don't push yet" and
+    "should I push?" are not, and a later "don't push" cancels an earlier "push".
+  - Pasted text, quotations, code spans and blockquotes never grant and never veto.
+  - A bare "yes" or "go ahead" approves what the agent's last message proposed by name, and no more.
+  - A bare "continue" after a break keeps the grant for up to two hours.
+  - A turn Claude Code starts itself (a finished background task, a subagent handing back) neither
+    grants nor replaces your grant; two hours after you asked, such a turn ends it.
+  - A subagent never uses its lead's grant.
+  - A grant never covers force-push, `--no-verify` or deleting a remote branch or tag.
+
+  A missed phrasing costs one key on the approval card, never a silent push. Codex
   works the same way through its own `UserPromptSubmit` hook, with a tighter record: it is tied to the
   turn that asked, a worker's tool call never matches it, and it sits in `~/.the-agent-kit/grants`, which
   Codex's sandbox cannot write. There the guard only stops objecting, so Codex's own approval still

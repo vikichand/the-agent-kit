@@ -167,7 +167,8 @@ Honest labelling inside the skill: the contract-freeze pattern and the verify-RE
 **Tool layer**: `command-guard.py`, a PreToolUse hook (**ask** on Claude Code / **deny** on Codex /
 **auto_approve or deny, never ask** on Antigravity, with turn grants read from the hook's `lastUserInput`,
 as a per-project hook in `.agents/hooks.json` reached through a launcher, because Antigravity cannot pass
-a quoted path to a hook). An unrequested push, pull request or merge is refused on every tool, never asked.
+a quoted path to a hook). An unrequested push, pull request or merge asks on Claude Code (one key on its approval card) and is
+refused on Codex and Antigravity, which cannot ask, and in any session another agent started.
 A **best-effort prompt nudge, not a boundary.** Flags hook-disable vectors (`--no-verify`, CLI `core.hooksPath`),
 direct `.git/config` / `GIT_CONFIG_GLOBAL` writes, force/delete push, and destructive commands
 (`rm -rf`, `reset --hard`, `clean`, `branch -D`, `curl|sh`). Wrapper/case/bundle/abbreviation-aware.
@@ -214,9 +215,12 @@ never updates or installs anything itself. `install.sh check` lists what is miss
   worth naming: `gh pr create` pushes the branch itself when needed, so authorizing a PR can push without a
   separate `push` grant (it matches the flow of asking for one); and a chained command gets the single most
   restrictive verdict across its segments (deny > ask > allow), so a granted op never tows an ungranted one
-  through - `git push && git commit` with only `commit` granted is refused as a whole. Detection also drops
-  fenced / quoted / inline-code spans first, so a git verb the user pasted from a log or a teammate mints
-  nothing. Codex (deny-mode) commits freely and pushes only in the turn you asked: its record is tied to the turn id, never matches a worker's tool call, and lives in `~/.the-agent-kit/grants`, outside what its sandbox can write (unless you start Codex in your home folder or add that folder as a writable root). A bare "continue" keeps it for up to two hours, as on Claude Code.
+  through - `git push && git commit` with only `commit` granted asks as a whole. Detection also drops
+  pasted blocks (Claude Code's `<pasted_content>`), fenced / quoted / inline-code spans first, so a git verb
+  the user pasted from a log or a teammate mints nothing and vetoes nothing. The ship words are cumulative
+  ("raise the PRs" includes the push, "merge" both, "release" all three), a veto reads one sentence, a bare
+  "yes" approves what the agent's last message proposed by name, and a turn the tool starts itself (a task
+  notification, a subagent hand-back) neither grants nor replaces the user's grant. Codex (deny-mode) commits freely and pushes only in the turn you asked: its record is tied to the turn id, never matches a worker's tool call, and lives in `~/.the-agent-kit/grants`, outside what its sandbox can write (unless you start Codex in your home folder or add that folder as a writable root). A bare "continue" keeps it for up to two hours, as on Claude Code.
   A session another agent started grants nothing, so a lead cannot pass a push to a worker through its
   brief. Claude Code marks a `-p` or SDK run (`CLAUDE_CODE_SESSION_ATTENDED=0`, `CLAUDE_CODE_ENTRYPOINT=sdk-*`,
   seen on 2.1.318 and undocumented), and a session started from an agent's command inherits that agent's

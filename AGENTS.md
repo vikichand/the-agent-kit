@@ -160,10 +160,11 @@ state the bucket and the oracle in one clause and go.
   claimed, and the approaches that failed into the plan or checkpoint file, and name its path. When the
   tool compacts the conversation, keep the same things plus the modified files and the test commands. A
   task finished in one short session needs none.
-- Commits need no ask; a push, a pull request and a merge each need the user to name it ("commit and push"
-  is not permission to merge). Offer the next step. One logical change per commit: the subject
-  says what and where in under 72 characters, the body says why only when it is not obvious. When asked to
-  push or raise a PR, sync with the target branch first.
+- Commits need no ask. Shipping needs the user's word, each covering its whole step and those before it:
+  "push" (sync, then every branch with unpushed commits), "raise the PRs", "merge" (once CI is green),
+  "release" (through tag, published release and merge-back). Never hand the user a command to type. One
+  logical change per commit: the subject says what and where in under 72 characters, the body says why
+  only when it is not obvious.
 - A repeated mistake is a missing rule: propose it, don't write it. Name the one line that would have
   prevented it, for the human to accept. Never edit the rules file yourself.
 - Announce breaking changes. A changed public contract (API shape, event schema, exported signature) is

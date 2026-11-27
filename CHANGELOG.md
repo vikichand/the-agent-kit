@@ -13,6 +13,23 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ### Changed
 
+- **One word ships the whole step, and Claude Code asks where it used to refuse.** Before, a push,
+  pull request or merge your message had not named was refused and handed back for you to type. Now:
+  - Four words, each including the steps before it: "push", "raise the PRs", "merge", and "release"
+    (also "ship it", "tag it", "publish"). The rules tell the agent to do everything the word covers.
+  - Anything you did not ask for shows Claude Code's approval card: one key, no retyping. Codex and
+    Antigravity cannot ask, so they still refuse, as does a session another agent started.
+  - An explanation no longer cancels the request: "Push. I don't want to keep saying push" is a push.
+    "Don't push yet" and "should I push?" are not, and a later "don't push" still wins.
+  - "run gh pr create", a bare "merge" and a bare "release" count.
+  - "Yes" or "go ahead" approves what the agent's last message proposed by name, and nothing wider.
+  - Pasted text and quotations never grant and never veto.
+  - A background task finishing, or a subagent handing back, no longer wipes your grant, and its text
+    can no longer grant one. Two hours after you asked, such a turn ends the grant.
+  - A subagent no longer uses its lead's grant: its push shows the card.
+  - Force-push, `--no-verify` and deleting a remote branch or tag stay refused whatever you say.
+  - `AGENTS.md` Section 7 and the `writing-docs` skill now say "release" means published.
+
 - On Claude Code, the progress wake-up now says how long ago each background agent last made a tool
   call, so one that has stalled stands out without reading its output.
 
