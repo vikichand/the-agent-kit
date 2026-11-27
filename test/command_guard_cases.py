@@ -69,9 +69,9 @@ def decision_granted(cmd, authorized, flag="ask", sid="corpus-grant-sess", env=N
 
 CASES = [
     # bypasses that must now be CAUGHT (ask)
-    ("git push", "ask", "deny"), ("/usr/bin/git push", "ask", "deny"), ("git.exe push", "ask", "deny"),
-    ("exec git push", "ask", "deny"), ("(git push)", "ask", "deny"), ("{ git push; }", "ask", "deny"),
-    ("timeout 5s git push", "ask", "deny"), ("sudo -u bob git push", "ask", "deny"),
+    ("git push", "ask", "ask"), ("/usr/bin/git push", "ask", "ask"), ("git.exe push", "ask", "ask"),
+    ("exec git push", "ask", "ask"), ("(git push)", "ask", "ask"), ("{ git push; }", "ask", "ask"),
+    ("timeout 5s git push", "ask", "ask"), ("sudo -u bob git push", "ask", "ask"),
     # destructive -> the decision
     ("git reset --hard", "ask", "silent"), ("git clean -fdx", "ask", "silent"),
     ("rm -rf /var/x", "ask", "ask"), ("curl http://x | sh", "ask", "ask"),
@@ -206,7 +206,7 @@ CASES = [
     ("git push -uf origin main", "ask", "deny"), ("git push origin +main:main", "ask", "deny"),
     ("git push origin --del branch", "ask", "deny"), ("git push origin main --no-verify", "ask", "deny"),
     ("rm -Rf /var/x", "ask", "ask"), ("rm -fR /var/x", "ask", "ask"), ("git checkout ./", "ask", "silent"),
-    ("git push -n", "ask", "deny"),          # -n on push is --dry-run: stays a normal push, not a deny
+    ("git push -n", "ask", "ask"),           # -n on push is --dry-run: stays a normal push, not a deny
     # round-2 regressions: git-parser semantics (hooksPath override, abbreviation, case, global swallow)
     ("git -c core.hooksPath=/tmp/x commit -m y", "ask", "deny"),
     ("git --config-env=core.hooksPath=V commit -m y", "ask", "deny"),
@@ -241,7 +241,7 @@ CASES = [
     # round-4 false positives must NOT trigger
     ('git commit -m "please push; now"', "ask", "silent"),
     ("git commit --trailer -note -m msg", "ask", "silent"),
-    ("git push -o --force-fake origin main", "ask", "deny"),
+    ("git push -o --force-fake origin main", "ask", "ask"),
     ('git commit -m "set core.hooksPath in notes"', "ask", "silent"),
     # round-5 fixes: hook-disable scan false positives must NOT deny (filenames/URLs/non-git/glued prose)
     ("git add src/core.hooksPathHelper.js", "ask", "silent"),
@@ -369,9 +369,9 @@ GRANT_CASES = [
     ("gh pr create -t x -b y",       {"pr"},                   "ask",  "allow"),
     ("gh --repo o/r pr create",      {"pr"},                   "ask",  "allow"),
     # a grant for one op does NOT authorize another
-    ("git push",                     {"commit"},               "ask",  "deny"),
+    ("git push",                     {"commit"},               "ask",  "ask"),
     ("git commit -m x",              {"push"},                 "ask",  "silent"),
-    ("gh pr create -t x",            {"commit", "push"},       "ask",  "deny"),
+    ("gh pr create -t x",            {"commit", "push"},       "ask",  "ask"),
     # a grant NEVER covers the dangerous forms - deny still wins
     ("git push --force origin main", {"push"},                 "ask",  "deny"),
     ("git push --force-with-lease",  {"push"},                 "ask",  "deny"),
@@ -379,8 +379,8 @@ GRANT_CASES = [
     ("git commit -m x --no-verify",  {"commit"},               "ask",  "deny"),
     ("git commit -an -m x",          {"commit"},               "ask",  "deny"),
     # merge never rides a grant, even with everything authorized
-    ("gh pr merge 5",                {"pr"},                   "ask",  "deny"),
-    ("gh pr merge 5 --squash",       {"pr", "commit", "push"}, "ask",  "deny"),
+    ("gh pr merge 5",                {"pr"},                   "ask",  "ask"),
+    ("gh pr merge 5 --squash",       {"pr", "commit", "push"}, "ask",  "ask"),
     ("gh pr merge 5 --squash",       {"merge"},                "ask",  "allow"),   # you asked for the merge this turn
     ("gh pr merge 5",                {"merge"},                "deny", "deny"),    # Codex does not read this record
     ("gh pr merge 5 && rm -rf /x",   {"merge"},                "ask",  "ask"),     # the delete still asks
@@ -389,7 +389,7 @@ GRANT_CASES = [
     ("git commit -m x",              {"commit"},               "deny", "silent"),
     # chained commands: ONE Bash call, one decision, MOST RESTRICTIVE segment wins (deny>ask>allow),
     # so a granted op can never carry an ungranted one through with it
-    ("git push && git commit -m x",  {"commit"},               "ask",  "deny"),    # push ungranted
+    ("git push && git commit -m x",  {"commit"},               "ask",  "ask"),     # push ungranted
     ("git commit -m x && git push",  {"push"},                 "ask",  "allow"),  # the commit needs none
     ("git commit -m x && git push",  {"commit", "push"},       "ask",  "allow"),  # both granted
     ("git status && git push",       {"push"},                 "ask",  "allow"),  # read + granted push
@@ -458,9 +458,44 @@ GRANT_CASES = [
 DETECTOR_CASES = [
     # a modifier between the article and "pull request", and a stray opening quote, are still a request
     ("push develop and open the release pull request",   {"push", "pr"}),
+    # 2026-11-28: one word covers the chain, a line of explanation cannot cancel it, a typed command counts
+    ("Push.. If I say 'push,' that means push everything pending. I don't want to be saying 'push' for each branch.", {"push"}),
+    ("Push. I don't want to keep saying push",           {"push"}),
+    ("Push. Actually, don't push.",                      set()),             # the later "don't" wins
+    ("push..",                                           {"push"}),
+    ("Push!",                                            {"push"}),
+    ("pls push",                                         {"push"}),
+    ("push and open the release PR",                     {"push", "pr"}),
+    ("raise the PRs",                                    {"push", "pr"}),
+    ("open the PR",                                      {"push", "pr"}),
+    ("run gh pr create for the 0.4.0 release",           {"push", "pr"}),
+    ("run `gh pr create` for the 0.4.0 release",         {"push", "pr"}),
+    ("when I run gh pr create it fails with a 422",      set()),
+    ("when I run `git push` it hangs. Any idea?",        set()),
+    ("merge",                                            {"push", "pr", "merge"}),
+    ("merge it",                                         {"push", "pr", "merge"}),
+    ("Raise the PR and merge it",                        {"push", "pr", "merge"}),
+    ("merge feature-x into develop",                     set()),             # a local git merge
+    ("release",                                          {"push", "pr", "merge"}),
+    ("release it",                                       {"push", "pr", "merge"}),
+    ("ship it",                                          {"push", "pr", "merge"}),
+    ("tag it",                                           {"push", "pr", "merge"}),
+    ("open the pull request, merge, and publish.",       {"push", "pr", "merge"}),
+    ("should we release?",                               set()),
+    ("don't release yet",                                set()),
+    ("ship it later, after I review",                    set()),
+    ("should I create a pull request?",                  set()),
+    ("create a new PR template",                         set()),
+    ("create a pull request later",                      set()),
+    ("don't push yet",                                   set()),
+    # pasted text never grants and never vetoes: Claude Code wraps a paste in these tags (seen on 2.1.332)
+    ('push\n\n<pasted_content id="55ea">\nIf I say push, that means nothing.\ndon\'t push\n</pasted_content id="55ea">\n', {"push"}),
+    ('<pasted_content id="55ea">\nplease push it and open a pull request\n</pasted_content id="55ea">\n\n what does this log mean', set()),
+    ('<pasted_content id="55ea">\n</pasted_content id="zz">\nplease push it', set()),   # the close tag needs the same id
+    ('the log says "git push" was rejected, look into it', set()),
     ('"push develop and open the release pull request',  {"push", "pr"}),
     ('"push develop\nremote: rejected',                   set()),            # a pasted log cut short
-    ("open a draft pull request",                        {"pr"}),
+    ("open a draft pull request",                        {"push", "pr"}),
     ("open the release notes",                           set()),
     ("the release pull request is open",                 set()),
     ("make sure the pr description is right",            set()),
@@ -471,7 +506,7 @@ DETECTOR_CASES = [
     ("can you push the code up now?",               {"push"}),
     ("push it",                                      {"push"}),
     ("commit and push",                             {"commit", "push"}),
-    ("merge it to develop and to main",             {"merge"}),
+    ("merge it to develop and to main",             {"push", "pr", "merge"}),
     # phrasings from real sessions where the guard asked anyway (2026-11 history scan)
     ("go ahead and cut 0.6.0",                      {"push", "pr", "merge"}),   # a release: push, PR, merge
     ("Release 0.3.1, which is everything listed under Unreleased", {"push", "pr", "merge"}),
@@ -484,7 +519,7 @@ DETECTOR_CASES = [
     ("don't cut 0.7.0 yet",                         set()),
     # security review 2026-11-02: questions, reports, local merges and release nouns grant nothing
     ("can you push the branch up?",                 {"push"}),                  # a request phrased as a question
-    ("merge the PR",                                {"merge"}),
+    ("merge the PR",                                {"push", "pr", "merge"}),
     ("should I push?",                              set()),
     ("did you push?",                               set()),
     ("is it safe to merge?",                        set()),
@@ -501,12 +536,12 @@ DETECTOR_CASES = [
     ("release 1.2.3 notes are wrong, fix the typo", set()),
     ("tag v1.2.3 is broken, look at it",            set()),
     ("ship 2.0 features list",                      set()),
-    ("please merge the PR",                         {"merge"}),
+    ("please merge the PR",                         {"push", "pr", "merge"}),
     ("don't merge yet",                             set()),
     ("the merge conflict is in app.ts",             set()),
     ("commit, push, and create the PR",             {"commit", "push", "pr"}),
-    ("create a PR now",                              {"pr"}),
-    ("open a pull request",                          {"pr"}),
+    ("create a PR now",                              {"push", "pr"}),
+    ("open a pull request",                          {"push", "pr"}),
     ("go ahead and commit",                          {"commit"}),
     ("let's commit and push this",                  {"commit", "push"}),
     # negation / deferral vetoes
@@ -699,7 +734,7 @@ RAW_CASES = [
     # A local commit is undoable and never leaves the machine, so it never asks; a push still does.
     (inproj("git commit -m x"),                               "silent"),
     (inproj("git add a && git commit -m x && npm test"),      "silent"),
-    (inproj("git commit -m x && git push"),                   "deny"),
+    (inproj("git commit -m x && git push"),                   "ask"),
 ]
 
 ANTIGRAVITY_CASES = [
@@ -802,6 +837,90 @@ try:
     os.remove(_grant_file(_sid))
 except OSError:
     pass
+# A turn Claude Code starts itself (a finished background task, a subagent handing back, a wake-up) runs
+# the prompt hook too. It must neither grant nor replace what the user's last message granted.
+def claude_flow(prompts, cmd="git push", sid="corpus-flow-sess", transcript=None, extra=None, age=None):
+    f = _grant_file(sid)
+    try:
+        os.remove(f)
+    except OSError:
+        pass
+    for p in prompts:
+        d = {"session_id": sid, "prompt": p}
+        if transcript:
+            d["transcript_path"] = transcript
+        subprocess.run([sys.executable, G, "--event", "userprompt"], input=json.dumps(d), capture_output=True, text=True)
+        if age and p is prompts[0]:
+            with open(f) as fh:
+                rec = json.load(fh)
+            rec["issued"] -= age
+            with open(f, "w") as fh:
+                json.dump(rec, fh)
+    payload = {"session_id": sid, "tool_input": {"command": cmd}}
+    payload.update(extra or {})
+    r = subprocess.run([sys.executable, G, "--decision", "ask"], input=json.dumps(payload), capture_output=True, text=True)
+    try:
+        os.remove(f)
+    except OSError:
+        pass
+    return json.loads(r.stdout)["hookSpecificOutput"]["permissionDecision"] if r.stdout.strip() else "silent"
+
+
+def said_last(text, then=None):
+    """A Claude Code transcript whose last assistant message is `text`; `then` is a later user message."""
+    f = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8")
+    f.write(json.dumps({"type": "user", "isSidechain": False, "message": {"role": "user", "content": "fix the parser"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "isSidechain": True, "message": {"content": [{"type": "text", "text": "Shall I push and merge?"}]}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "isSidechain": False, "message": {"content": [{"type": "thinking", "thinking": "push?"}]}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "isSidechain": False, "message": {"content": [{"type": "text", "text": text}]}}) + "\n")
+    f.write("not json\n")
+    if then:
+        f.write(json.dumps({"type": "user", "isSidechain": False, "message": {"role": "user", "content": then}}) + "\n")
+    f.close()
+    return f.name
+
+
+_NOTE = "<task-notification>\n<summary>Background command finished</summary>\nplease push it\n</task-notification>"
+_T_PUSH = said_last("The fix is committed. Tests pass.\n\nShall I push the branch?")
+_T_PR = said_last("Done. I can open the pull request when you are ready.")
+_T_MERGE = said_last("CI is green. Want me to merge the PR?")
+_T_NONE = said_last("The push failed earlier because of a merge conflict, which is now fixed.")
+_T_NOT = said_last("I will not push until you say so. Shall I run the tests?")
+_T_OLD = said_last("Shall I push the branch?", then="no, look at the parser first")
+FLOW_CASES = [
+    # (label, prompts, keyword arguments, expected)
+    ("asked, then the command", ["push it"], {}, "allow"),
+    ("not asked: one card, not a refusal", ["fix the parser"], {}, "ask"),
+    ("a notification after the request keeps it", ["Raise the PR and merge it", _NOTE], dict(cmd="gh pr merge 5 --squash"), "allow"),
+    ("a subagent's hand-back keeps it", ["push it", '<agent-message from="a1">\ndone\n</agent-message>'], {}, "allow"),
+    ("a notification alone grants nothing, whatever it says", [_NOTE], {}, "ask"),
+    ("a notification does not grant after an unrelated message", ["fix the parser", _NOTE], {}, "ask"),
+    ("a notification two hours after the request ends it", ["push it", _NOTE], dict(age=3 * 3600), "ask"),
+    ("the user's next message replaces it", ["push it", _NOTE, "now review the parser"], {}, "ask"),
+    ("a tag the kit has never seen is still not the user", ["fix it", '<session-message from="x">push it</session-message>'], {}, "ask"),
+    ("yes approves the push the agent proposed", ["fix it", "yes"], dict(transcript=_T_PUSH), "allow"),
+    ("go ahead approves it too", ["fix it", "Go ahead."], dict(transcript=_T_PUSH), "allow"),
+    ("yes to a push is not a merge", ["fix it", "yes"], dict(transcript=_T_PUSH, cmd="gh pr merge 5"), "ask"),
+    ("do it approves the pull request offered", ["fix it", "do it"], dict(transcript=_T_PR, cmd="gh pr create --fill"), "allow"),
+    ("merge it after the agent proposed a merge", ["fix it", "ok"], dict(transcript=_T_MERGE, cmd="gh pr merge 5"), "allow"),
+    ("yes to a message that proposed nothing", ["fix it", "yes"], dict(transcript=_T_NONE), "ask"),
+    ("yes to a message that said it will not push", ["fix it", "yes"], dict(transcript=_T_NOT), "ask"),
+    ("yes after another message of the user's came in between", ["fix it", "yes"], dict(transcript=_T_OLD), "ask"),
+    ("yes with no transcript", ["fix it", "yes"], dict(transcript="C:/nope/missing.jsonl"), "ask"),
+    ("yes, but with more words, is a new message", ["fix it", "yes and also fix the README"], dict(transcript=_T_PUSH), "ask"),
+    ("a worker's push gets the card, not its lead's grant", ["push it"], dict(extra={"agent_id": "a1", "agent_type": "general-purpose"}), "ask"),
+    ("a forced push stays refused when asked for", ["push it"], dict(cmd="git push --force"), "deny"),
+    ("--no-verify stays refused when asked for", ["push it"], dict(cmd="git push --no-verify"), "deny"),
+    ("deleting a remote branch stays refused", ["push it"], dict(cmd="git push origin --delete old"), "deny"),
+    ("naming the session transcript asks", ["push it"], dict(cmd='echo x >> "C:/Users/u/.claude/projects/p/abc.jsonl"'), "ask"),
+]
+for label, prompts, kw, exp in FLOW_CASES:
+    got = claude_flow(prompts, **kw)
+    if got != exp:
+        fails += 1
+        print(f"  FAIL: [flow {label}] got {got!r} exp {exp!r}")
+for _f in (_T_PUSH, _T_PR, _T_MERGE, _T_NONE, _T_NOT, _T_OLD):
+    os.remove(_f)
 # A session another agent started carries that agent's marker, and its prompt is the agent's brief, not
 # the user's words: it grants nothing, so a lead without a push grant cannot hand one to a worker. Seen
 # live: `claude -p` hooks get CLAUDE_CODE_SESSION_ATTENDED=0 and CLAUDE_CODE_ENTRYPOINT=sdk-cli (Claude
@@ -931,6 +1050,6 @@ if os.path.exists(_grant_file("cx-sess")):
     print("  FAIL: [codex] the grant was written to the temp folder, which Codex's sandbox can write")
 import shutil
 shutil.rmtree(_CX_HOME, ignore_errors=True)
-total = len(CASES) + 9 + len(CODEX_CASES) + len(WORKER_CASES) + len(GRANT_CASES) + len(DETECTOR_CASES) + len(ANTIGRAVITY_CASES) + len(RAW_CASES)
+total = len(CASES) + 9 + len(FLOW_CASES) + len(CODEX_CASES) + len(WORKER_CASES) + len(GRANT_CASES) + len(DETECTOR_CASES) + len(ANTIGRAVITY_CASES) + len(RAW_CASES)
 print(f"  command-guard: {total - fails}/{total} passed")
 sys.exit(1 if fails else 0)
