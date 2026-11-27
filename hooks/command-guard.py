@@ -456,8 +456,10 @@ def _strip_pasted(s):
 
 def detect_grants(prompt):
     text = _strip_pasted(prompt or "").lower().strip()
-    if text[:1] in ("'", '"') and text.count(text[0]) == 1:
-        text = text[1:]   # a stray opening quote is a typo; a closed quotation stays, and reads as data
+    if text[:1] in ("'", '"') and text.count(text[0]) == 1 and "\n" not in text and len(text) <= 200:
+        # A stray opening quote on a short one-line message is a typo. A closed quotation stays and reads
+        # as data, and so does anything long or multi-line, which is more likely a pasted log cut short.
+        text = text[1:]
     text = " " + text + " "
     g = set()
     if _asked(text, r"commit"):

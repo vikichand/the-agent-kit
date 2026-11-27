@@ -459,6 +459,7 @@ DETECTOR_CASES = [
     # a modifier between the article and "pull request", and a stray opening quote, are still a request
     ("push develop and open the release pull request",   {"push", "pr"}),
     ('"push develop and open the release pull request',  {"push", "pr"}),
+    ('"push develop\nremote: rejected',                   set()),            # a pasted log cut short
     ("open a draft pull request",                        {"pr"}),
     ("open the release notes",                           set()),
     ("the release pull request is open",                 set()),
