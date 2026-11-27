@@ -432,7 +432,9 @@ def _vetoed(s, kw):
         return True                                                                      # "check whether we need to push"
     if re.search(r"\b(?:he|she|they|someone|somebody|a\s+teammate|the\s+client)\s+(?:asked|told|wants?|wanted|said)\b", s):
         return True                                                                      # someone else's request
-    if re.search(r"\b" + _NEG + r"\s+(?:\w+\s+){0,3}?" + kw, s):                                  # "don't push", "hold off on pushing"
+    if re.search(r"\b(?:" + _NEG + r"|not|nobody|no\s+one)\s+(?:\w+\s+){0,3}?" + kw, s):       # "don't push", "hold off on pushing"
+        return True
+    if re.search(kw + r"\s+(?:is|are|was|isn'?t|aren'?t)\b", s):                         # "push is not wanted": a statement
         return True
     if re.search(kw + r"\s+(?:\w+\s+){0,3}?(?:later|yet|tomorrow|afterwards?|once|after|when)\b", s):
         return True                                                                      # "push it later"
@@ -911,9 +913,11 @@ def is_continue(prompt):
 # A turn the tool starts itself reaches the prompt hook like a message: a finished background task, a
 # subagent handing back, a Stop hook's wake-up (seen on Claude Code 2.1.332 as <task-notification> and
 # <agent-message from=...>). Those words are not the user's, so such a turn neither grants nor replaces
-# what the user's last message granted. Any prompt that opens with a tag is read this way, which also
-# covers a message from another session, whatever tag it carries.
-_SYSTEM_TURN = re.compile(r"<[a-z][a-z0-9_-]*[\s>]")
+# what the user's last message granted. Only those two tags are read this way. Any other prompt that
+# opens with a tag grants nothing and ends the grant: it may be another session's message or the user's
+# own ("<b>stop</b> don't push"), and a wrong guess costs one click on the card.
+_SYSTEM_TURN = re.compile(r"<(?:task-notification|agent-message)[\s>]")
+_TAG_OPEN = re.compile(r"<[a-z][a-z0-9_-]*[\s>]")
 _CONFIRM = re.compile(r"(?:(?:yes|yep|yeah|yup|ok(?:ay)?|sure|cool|great|right|fine|please|pls|thanks|approved?|confirmed?|"
                       r"lgtm|sounds\s+good|go\s+ahead|go\s+for\s+it|do\s+it|do\s+that|do\s+so|proceed|make\s+it\s+so)"
                       r"[\s,.!]*)+")
@@ -948,19 +952,24 @@ def proposed_grants(path, prompt):
                     break
         if not said or not said.strip():
             return frozenset()
+        # Only the agent's last question counts (its last sentence when it asked none), and only an act
+        # that directly follows the offer: "Want me to push and open the pull request?". A sentence that
+        # mentions a word ("Did the push fail?", "Want me to explain the merge?") offers nothing.
+        qs = [q.strip() for q in re.split(r"(?<=[.!?:])\s+|\n+", _strip_pasted(said).lower()) if q.strip()]
+        q = ([x for x in qs if x.endswith("?")] or qs or [""])[-1]
+        m = re.search(r"\b(?:(?:shall|should|can|could|may)\s+i|want\s+me\s+to|like\s+me\s+to|i\s+can|i\s+could|ready\s+to)\s+(.*)", q)
         g = set()
-        offer = r"\b(?:shall|should|can|could|may)\s+i\b|\bwant\s+me\s+to\b|\blike\s+me\s+to\b|\bi\s+can\b|\bi\s+could\b|\bready\s+to\b|\bsay\b"
-        for q in re.split(r"(?<=[.!?:])\s+|\n+", _strip_pasted(said).lower()):
-            if not (q.rstrip().endswith("?") or re.search(offer, q)) or re.search(r"\b(?:not|never|won'?t|don'?t|can'?t|cannot|without|no)\b", q):
-                continue
-            if re.search(r"\bpush\b", q):
-                g.add("push")
-            if re.search(r"\b(?:open|create|raise)\w*\s+(?:\w+\s+){0,2}?" + _PR_NOUN + r"\b", q):
-                g.add("pr")
-            if re.search(r"\bmerge\b", q) and not re.search(r"\bmerge\s+\S+\s+(?:back\s+)?into\b|\blocal", q):
-                g.add("merge")
-            if re.search(r"\b(?:release|publish|ship)\b(?!\s+(?:notes?|branch|build|pull|pr)\b)", q):
-                g |= {"push", "pr", "merge"}
+        if m and not re.search(r"\b(?:not|never|won'?t|don'?t|can'?t|cannot|without|no|later|after|once|when(?!\s+you)|before|tomorrow)\b", q):
+            for c in re.split(r",|;|\band\b|\bthen\b", m.group(1)):
+                c = re.sub(r"^(?:\s*(?:go\s+ahead|now|also|just|please))*\s*", "", c)
+                if re.match(r"push\b", c):
+                    g.add("push")
+                elif re.match(r"(?:open|create|raise)\s+(?:\w+\s+){0,2}?" + _PR_NOUN + r"\b", c):
+                    g.add("pr")
+                elif re.match(r"merge\b", c) and not re.search(r"\bmerge\s+\S+\s+(?:back\s+)?into\b|\blocal|\bconflict", c):
+                    g.add("merge")
+                elif re.match(r"(?:release|publish|ship)\b(?!\s+(?:notes?|branch|build|pull|pr)\b)", c):
+                    g |= {"push", "pr", "merge"}
         return frozenset(g)
     except Exception:
         return frozenset()
@@ -982,7 +991,8 @@ def capture_intent(data):
                 save_grants(session, frozenset())
             sys.exit(0)
         grants, issued = detect_grants(prompt), None
-        if started_by_agent(() if CODEX else CLAUDE_OWN) or (CODEX and not (turn and isinstance(turn, str))):
+        if (started_by_agent(() if CODEX else CLAUDE_OWN) or (CODEX and not (turn and isinstance(turn, str)))
+                or (not CODEX and _TAG_OPEN.match(_strip_pasted(prompt).lstrip()))):
             grants = frozenset()
         elif not grants:
             if is_continue(text):

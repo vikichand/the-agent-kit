@@ -456,6 +456,12 @@ GRANT_CASES = [
 # The UserPromptSubmit intent read: conservative, per-operation, negation-aware, and it must never
 # grant on a noun ("the commit") or a reference ("the push failed"). A miss just costs a prompt.
 DETECTOR_CASES = [
+    # a refusal whose "not" comes after the word, or is a plain "not", is still a refusal
+    ("push is something I never want you to do",          set()),
+    ("I would prefer that you not push",                  set()),
+    ("push is not wanted",                                set()),
+    ("I'd rather not merge today",                        set()),
+    ("nobody should push",                                set()),
     # a modifier between the article and "pull request", and a stray opening quote, are still a request
     ("push develop and open the release pull request",   {"push", "pr"}),
     # 2026-11-28: one word covers the chain, a line of explanation cannot cancel it, a typed command counts
@@ -887,6 +893,19 @@ _T_MERGE = said_last("CI is green. Want me to merge the PR?")
 _T_NONE = said_last("The push failed earlier because of a merge conflict, which is now fixed.")
 _T_NOT = said_last("I will not push until you say so. Shall I run the tests?")
 _T_OLD = said_last("Shall I push the branch?", then="no, look at the parser first")
+# A "yes" answers the agent's last question. A sentence that only mentions a ship word offers nothing.
+_T_MENTIONS = [said_last(t) for t in (
+    "Did the push fail earlier?",
+    "Does the merge conflict look right to you?",
+    "Why did the release pipeline break?",
+    "Want me to show you the publish step?",
+    "Should I explain how to merge conflicts?",
+    "I can push this. Lots of detail follows here. Should I delete the temp files?",
+    "Do you want me to refactor the module? I can push after that.",
+    "I can push this later if you want.",
+)]
+_T_CHAIN = said_last("All green. Want me to push, open the pull request and merge it?")
+_T_REL = said_last("Everything is ready. Shall I release it?")
 FLOW_CASES = [
     # (label, prompts, keyword arguments, expected)
     ("asked, then the command", ["push it"], {}, "allow"),
@@ -908,6 +927,9 @@ FLOW_CASES = [
     ("yes after another message of the user's came in between", ["fix it", "yes"], dict(transcript=_T_OLD), "ask"),
     ("yes with no transcript", ["fix it", "yes"], dict(transcript="C:/nope/missing.jsonl"), "ask"),
     ("yes, but with more words, is a new message", ["fix it", "yes and also fix the README"], dict(transcript=_T_PUSH), "ask"),
+    ("yes to an offer of three acts approves the last of them", ["fix it", "yes"], dict(transcript=_T_CHAIN, cmd="gh pr merge 5"), "allow"),
+    ("yes to an offered release covers the merge", ["fix it", "yes"], dict(transcript=_T_REL, cmd="gh pr merge 5"), "allow"),
+    ("the user's own message that opens with a tag ends the grant", ["push it", "<b>stop</b> don't push"], {}, "ask"),
     ("a worker's push gets the card, not its lead's grant", ["push it"], dict(extra={"agent_id": "a1", "agent_type": "general-purpose"}), "ask"),
     ("a forced push stays refused when asked for", ["push it"], dict(cmd="git push --force"), "deny"),
     ("--no-verify stays refused when asked for", ["push it"], dict(cmd="git push --no-verify"), "deny"),
@@ -919,7 +941,14 @@ for label, prompts, kw, exp in FLOW_CASES:
     if got != exp:
         fails += 1
         print(f"  FAIL: [flow {label}] got {got!r} exp {exp!r}")
-for _f in (_T_PUSH, _T_PR, _T_MERGE, _T_NONE, _T_NOT, _T_OLD):
+for _t in _T_MENTIONS:
+    for _cmd in ("git push", "gh pr merge 5"):
+        got = claude_flow(["fix it", "yes"], transcript=_t, cmd=_cmd)
+        if got != "ask":
+            fails += 1
+            with open(_t, encoding="utf-8") as fh:
+                print(f"  FAIL: [flow yes to a mention] got {got!r} exp 'ask' | {_cmd} | {fh.read().splitlines()[3][-90:]}")
+for _f in [_T_PUSH, _T_PR, _T_MERGE, _T_NONE, _T_NOT, _T_OLD, _T_CHAIN, _T_REL] + _T_MENTIONS:
     os.remove(_f)
 # A session another agent started carries that agent's marker, and its prompt is the agent's brief, not
 # the user's words: it grants nothing, so a lead without a push grant cannot hand one to a worker. Seen
@@ -1050,6 +1079,6 @@ if os.path.exists(_grant_file("cx-sess")):
     print("  FAIL: [codex] the grant was written to the temp folder, which Codex's sandbox can write")
 import shutil
 shutil.rmtree(_CX_HOME, ignore_errors=True)
-total = len(CASES) + 9 + len(FLOW_CASES) + len(CODEX_CASES) + len(WORKER_CASES) + len(GRANT_CASES) + len(DETECTOR_CASES) + len(ANTIGRAVITY_CASES) + len(RAW_CASES)
+total = len(CASES) + 9 + len(FLOW_CASES) + 2 * len(_T_MENTIONS) + len(CODEX_CASES) + len(WORKER_CASES) + len(GRANT_CASES) + len(DETECTOR_CASES) + len(ANTIGRAVITY_CASES) + len(RAW_CASES)
 print(f"  command-guard: {total - fails}/{total} passed")
 sys.exit(1 if fails else 0)
