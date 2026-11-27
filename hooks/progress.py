@@ -63,6 +63,26 @@ def state_path(session):
     return os.path.join(state_dir(), sid + ".json") if sid else None
 
 
+def beat_path(path, agent):
+    aid = re.sub(r"[^A-Za-z0-9_-]", "", str(agent))[:64]
+    return path[:-5] + ".w-" + aid if aid else None
+
+
+def beat(path, agent):
+    """A worker's tool call: touch a file beside its lead's state, so the wake-up can say when each worker
+    was last active. Seen on Claude Code 2.1.330: a subagent's calls carry the lead's session id, and its
+    agent id is the id of its entry in the Stop hook's background_tasks. One file per worker, no shared
+    record, because workers finish tool calls at the same moment."""
+    p = beat_path(path, agent)
+    if not p or not os.path.isfile(path):   # only for a lead this hook already tracks
+        return
+    try:
+        with open(p, "w"):
+            pass
+    except OSError:
+        pass   # a missed mark costs one "last tool call" figure, never an error on the worker's call
+
+
 def sweep(now):
     d = state_dir()
     for n in os.listdir(d):
@@ -199,11 +219,14 @@ def on_stop(path, data, wait):
         return 0
     s["gen"] += 1
     mine = s["gen"]
-    if QUIET in str(data.get("last_assistant_message") or "").lower():
-        s["quiet"] = True
     tasks = data.get("background_tasks")
     tasks = [t for t in tasks if isinstance(t, dict) and t.get("status") == "running"] if isinstance(tasks, list) else []
     running = bool(tasks)
+    # A running worker is work by definition, so the phrase is believed only when none is left: a small
+    # model has said it while its background work was still going, which silenced every later update.
+    busy = any(t.get("type") == "subagent" for t in tasks)
+    if QUIET in str(data.get("last_assistant_message") or "").lower() and not busy:
+        s["quiet"] = True
     # When each task was first seen running, kept across the user's messages: the request's own clock
     # restarts with every message, and a lead taking new tasks still has to say how old each one is.
     seen = s.get("tasks") if isinstance(s.get("tasks"), dict) else {}
@@ -216,7 +239,7 @@ def on_stop(path, data, wait):
     first = time.time()
     s["tasks"] = {i: seen[i] if num(seen.get(i)) else first for i, _ in names}
     save(path, s)
-    if not running or s.get("quiet") or s["wakes"] >= MAX_WAKES:
+    if not running or (s.get("quiet") and not busy) or s["wakes"] >= MAX_WAKES:
         return 0
     give_up = time.monotonic() + wait + 60   # a clock set backwards must not hold the waiter for its full timeout
     while True:
@@ -231,7 +254,14 @@ def on_stop(path, data, wait):
     s["last"] = s["woke"] = now
     save(path, s)
     since = s.get("tasks") if isinstance(s.get("tasks"), dict) else {}
-    listed = ["\"%s\" (%d min)" % (d, max(0, (now - since[i]) // 60) if num(since.get(i)) else 0) for i, d in names]
+    listed = []
+    for i, d in names:
+        age = "%d min" % (max(0, (now - since[i]) // 60) if num(since.get(i)) else 0)
+        try:
+            age += ", last tool call %d min ago" % max(0, (now - os.path.getmtime(beat_path(path, i))) // 60)
+        except (OSError, TypeError):
+            pass   # not a worker, or it has made no tool call yet
+        listed.append("\"%s\" (%s)" % (d, age))
     if len(tasks) > len(names):
         listed.append("and %d more" % (len(tasks) - len(names)))
     sys.stderr.write(note(s, now, waiting=listed, last=s["wakes"] >= MAX_WAKES) + "\n")
@@ -245,10 +275,12 @@ def run(tool, event):
         data = json.load(sys.stdin)
     except ValueError:
         return 0, None
-    if not wait or not isinstance(data, dict) or worker(tool, data):
+    if not wait or not isinstance(data, dict):
         return 0, None
     path = state_path(str(data.get("conversationId" if tool == "antigravity" else "session_id") or ""))
-    if not path:
+    if path and tool == "claude" and event == "tool" and data.get("agent_id"):
+        beat(path, data["agent_id"])
+    if not path or worker(tool, data):
         return 0, None
     if event == "prompt":
         return on_prompt(path, data, time.time()), None

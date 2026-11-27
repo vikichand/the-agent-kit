@@ -337,8 +337,10 @@ done (with pass counts), what is running, what is left, and a line like
 - **Waiting on background work (Claude Code).** If the agent ends its turn while a background command
   or agent is still running, one short-lived waiter wakes it at the 8-minute mark, then exits. There
   is one per session at most, it ends when you send a message, and it never outlives the interval.
-  The wake-up names each task still running and how long it has run. The wake-ups stop when the agent
-  reports that nothing is still working, or after 30 in a row.
+  The wake-up names each task still running and how long it has run, and for a background agent how
+  long ago it last made a tool call, so a stalled one stands out. The wake-ups stop when the agent
+  reports that nothing is still working (not believed while a background agent is running), or after
+  30 in a row.
 - **Your messages restart the 8 minutes.** The clock counts from your last message, because the agent
   has just answered you. A background task finishing, or a subagent handing back its report, does not
   restart it, and each task's own age is kept across your messages.

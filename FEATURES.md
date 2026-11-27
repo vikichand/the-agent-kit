@@ -184,7 +184,7 @@ hook through the `agent-kit-progress.py` launcher). Once a request has run for 8
 current time, telling it to update the user and end with an `Estimated ETA:` line; the clock then starts
 again. Nothing runs between tool calls. On Claude Code a `Stop` hook with `asyncRewake` covers the idle
 case: when a turn ends with background work running it waits for the interval and wakes the agent, one
-waiter per session, ended by the user's next message, stopped by the agent saying "no work in progress"
+waiter per session, ended by the user's next message, stopped by the agent saying "no work in progress" (ignored while a subagent runs)
 and capped at 30 wake-ups in a row. Subagents, headless runs and sessions another agent started are
 never nudged. See [Progress updates while work runs](README.md#progress-updates-while-work-runs).
 

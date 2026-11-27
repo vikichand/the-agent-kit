@@ -11,7 +11,16 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+### Changed
+
+- On Claude Code, the progress wake-up now says how long ago each background agent last made a tool
+  call, so one that has stalled stands out without reading its output.
+
 ### Fixed
+
+- On Claude Code, the progress wake-ups no longer stop when the agent says "no work in progress"
+  while a background agent is still running. A small model had said it by mistake, which silenced
+  every later update for that request.
 
 - The push guard now reads "open the release pull request" (also "draft" or "new") as asking for the
   pull request, and a message that starts with a stray opening quote as your own request. Before, both
