@@ -11,6 +11,8 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-28
+
 ### Changed
 
 - **One word ships the whole step, and Claude Code asks where it used to refuse.** Before, a push,
@@ -693,7 +695,8 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.8.0...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.9.0...develop
+[0.9.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.9.0
 [0.8.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.8.0
 [0.7.1]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.7.1
 [0.7.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.7.0
