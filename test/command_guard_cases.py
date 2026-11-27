@@ -854,7 +854,7 @@ _CX_HOME = tempfile.mkdtemp(prefix="agent-kit-cx-")
 
 
 def codex_flow(prompt, cmd, turn="turn-1", tool_turn="turn-1", prompt_env=None, tool_env=None, extra=None,
-               sid="cx-sess", then=None):
+               sid="cx-sess", then=None, tool_sid=None):
     """The real path: the prompt hook, then the tool hook. `then` is a second prompt in a new turn."""
     home = {"HOME": _CX_HOME, "USERPROFILE": _CX_HOME}
     if prompt is not None:
@@ -862,7 +862,7 @@ def codex_flow(prompt, cmd, turn="turn-1", tool_turn="turn-1", prompt_env=None, 
             subprocess.run([sys.executable, G, "--tool", "codex", "--event", "userprompt"],
                            input=json.dumps({"session_id": sid, "turn_id": t, "prompt": said}),
                            capture_output=True, text=True, env=_env(dict(home, **(prompt_env or {}))))
-    payload = {"session_id": sid, "turn_id": tool_turn, "tool_name": "Bash", "tool_input": {"command": cmd}}
+    payload = {"session_id": tool_sid or sid, "turn_id": tool_turn, "tool_name": "Bash", "tool_input": {"command": cmd}}
     payload.update(extra or {})
     r = subprocess.run([sys.executable, G, "--decision", "deny"], input=json.dumps(payload),
                        capture_output=True, text=True, env=_env(dict(home, **(tool_env or {}))))
@@ -903,6 +903,8 @@ CODEX_CASES = [
                                 cmd="echo x > ~/.the-agent-kit/grants/agent-kit-grant-cx-q.json"), "deny"),
     ("copying into the record's folder", dict(prompt=_PUSH, sid="cx-u",
                                               cmd="cp a.json ~/.the-agent-kit/grants/"), "deny"),
+    ("another session whose id cleans to the same name", dict(prompt=_PUSH, cmd="git push", sid="../../x",
+                                                              tool_sid="....x"), "deny"),
     ("a pasted command is not a request", dict(prompt="The log says `git push` failed. Why?", cmd="git push",
                                                sid="cx-r"), "deny"),
     ("continue keeps it", dict(prompt=_PUSH, then="continue", cmd="git push", tool_turn="turn-2", sid="cx-s"),

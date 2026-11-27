@@ -351,6 +351,9 @@ CODEX = False   # set in main() for Codex: its grants live elsewhere and are bou
 
 def _grant_path(session):
     sid = re.sub(r"[^A-Za-z0-9_-]", "", session or "")[:64] or "nosession"
+    if session and sid != session:   # cleaning or cutting changed it: two such ids must not share a file
+        import hashlib
+        sid = sid[:48] + "-" + hashlib.sha256(session.encode("utf-8", "replace")).hexdigest()[:12]
     if CODEX:
         return os.path.join(os.path.expanduser("~"), ".the-agent-kit", "grants", "agent-kit-grant-" + sid + ".json")
     import tempfile  # here, not at the top: it costs 12 ms on every guarded call and only grants need it
