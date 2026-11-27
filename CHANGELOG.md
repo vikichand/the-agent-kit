@@ -11,6 +11,12 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- The push guard now reads "open the release pull request" (also "draft" or "new") as asking for the
+  pull request, and a message that starts with a stray opening quote as your own request. Before, both
+  were held.
+
 ## [0.8.0] - 2026-11-27
 
 ### Added

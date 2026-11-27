@@ -437,7 +437,7 @@ def _asked_pr(text):
     noun = r"(?:pull[\s-]*requests?|prs?|mrs?|merge[\s-]*requests?)"
     if re.search(_NEG + r"\s+(?:\w+\s+){0,4}?" + noun + r"\b", text):
         return False
-    return bool(re.search(r"\b" + verb + r"\s+(?:a\s+|an\s+|the\s+)?" + noun + r"\b", text))
+    return bool(re.search(r"\b" + verb + r"\s+(?:a\s+|an\s+|the\s+)?(?:(?:release|draft|new)\s+)?" + noun + r"\b", text))
 
 
 def _strip_pasted(s):
@@ -452,7 +452,10 @@ def _strip_pasted(s):
 
 
 def detect_grants(prompt):
-    text = " " + _strip_pasted(prompt or "").lower().strip() + " "
+    text = _strip_pasted(prompt or "").lower().strip()
+    if text[:1] in ("'", '"') and text.count(text[0]) == 1:
+        text = text[1:]   # a stray opening quote is a typo; a closed quotation stays, and reads as data
+    text = " " + text + " "
     g = set()
     if _asked(text, r"commit"):
         g.add("commit")

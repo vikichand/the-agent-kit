@@ -456,6 +456,14 @@ GRANT_CASES = [
 # The UserPromptSubmit intent read: conservative, per-operation, negation-aware, and it must never
 # grant on a noun ("the commit") or a reference ("the push failed"). A miss just costs a prompt.
 DETECTOR_CASES = [
+    # a modifier between the article and "pull request", and a stray opening quote, are still a request
+    ("push develop and open the release pull request",   {"push", "pr"}),
+    ('"push develop and open the release pull request',  {"push", "pr"}),
+    ("open a draft pull request",                        {"pr"}),
+    ("open the release notes",                           set()),
+    ("the release pull request is open",                 set()),
+    ("make sure the pr description is right",            set()),
+    ('"push develop" is what the log says. Why did it fail?', set()),   # a balanced quotation is data
     ("commit this",                                 {"commit"}),
     ("okay can you commit this now?",               {"commit"}),
     ("now push the branch",                         {"push"}),
