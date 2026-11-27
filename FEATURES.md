@@ -88,7 +88,7 @@ only the short `description` sits in context, and the body loads when a task mat
 the same SKILL.md format, so the installer writes each skill to `.claude/skills/` for Claude Code and
 `.agents/skills/` for Codex and Antigravity, and each install keeps the two copies identical. Skills
 route to detail in `references/`, opened only when the task needs it, and the installer copies the whole
-folder. The machine install also puts the four in machine-wide, once: one real copy in `~/.agents/skills`, a
+folder. The machine install also puts the five in machine-wide, once: one real copy in `~/.agents/skills`, a
 directory link per skill in `~/.claude/skills` (a junction on Windows, no admin), and a `skills.json` entry
 for Antigravity, so `/tidy` works in projects where `install.sh` never ran.
 
@@ -104,8 +104,8 @@ for Antigravity, so `/tidy` works in projects where `install.sh` never ran.
   execute specs that are already complete. **Route by how completely a slice is specified, never by
   budget alone**, and a worker that meets ambiguity escalates instead of guessing. **Delegate only when
   expected parallel progress exceeds startup and integration cost**, name the model and effort on every
-  dispatch, and cap fan-out at two workers active and one delegation layer - workers do not spawn
-  workers. The economics are documented, not folklore: weekly limits are one shared pool that models
+  dispatch, and cap fan-out at two workers active on slices of one task (unrelated tasks on different
+  files are not bound by that number) and one delegation layer - workers do not spawn workers. The economics are documented, not folklore: weekly limits are one shared pool that models
   drain at very different rates, and Anthropic's own cost guidance says to give simple subagent tasks
   `model: haiku` - so delegation is also how a subscription stretches the week.
 
@@ -136,7 +136,12 @@ for Antigravity, so `/tidy` works in projects where `install.sh` never ran.
   command in the first screenful, every command surface as a table, shell differences named. Fires on
   documentation, README, commit-message and PR-description work; ships to both skills folders (`.claude/skills/` and `.agents/skills/`).
 
-- **`tidy`** - the one user-invoked skill (`/tidy`, Codex `$tidy`): lists leftovers (stray and duplicate dev
+- **`dispatch`** - user-invoked (`/dispatch`, `/dispatch off`, `/dispatch status`; Codex `$dispatch`): while it
+  is on, each task runs in a background worker on the lead's model and effort and the chat stays free. The
+  lead answers small things itself, runs tasks side by side only when their files differ, keeps pushes,
+  merges and releases to itself, and checks a worker's evidence before reporting it done.
+
+- **`tidy`** - user-invoked (`/tidy`, Codex `$tidy`): lists leftovers (stray and duplicate dev
   servers, merged branches, stale worktrees, Playwright output, scratch files), asks per group, and removes only
   approved ids through a scanner that never touches tracked or git-ignored files and logs each action. Idle
   servers and candidate files are never offered as "remove all". See [`docs/tidy.md`](docs/tidy.md).
@@ -173,6 +178,16 @@ stray operand.
 **MCP orphans**: `mcp-wrap.py` launches an MCP server so it dies with the agent (Job Object on Windows, process group on POSIX; verified on Windows and Linux, not macOS).
 `mcp-orphans.py` lists, and with `--kill` ends, orphaned MCP trees that match known patterns. See [`docs/mcp-orphans.md`](docs/mcp-orphans.md).
 
+**Progress updates**: `progress.py`, on Claude Code, Codex and Antigravity (there as a `PreInvocation`
+hook through the `agent-kit-progress.py` launcher). Once a request has run for 8 minutes
+(`AGENT_KIT_UPDATE_MINUTES`, `0` for off), the next finished tool call hands the agent a note with the
+current time, telling it to update the user and end with an `Estimated ETA:` line; the clock then starts
+again. Nothing runs between tool calls. On Claude Code a `Stop` hook with `asyncRewake` covers the idle
+case: when a turn ends with background work running it waits for the interval and wakes the agent, one
+waiter per session, ended by the user's next message, stopped by the agent saying "no work in progress"
+and capped at 30 wake-ups in a row. Subagents, headless runs and sessions another agent started are
+never nudged. See [Progress updates while work runs](README.md#progress-updates-while-work-runs).
+
 **Session start**: `kit-check.py`, a SessionStart hook on Claude Code, Codex and Antigravity (there a global
 hook that runs once per conversation and always answers in JSON). One line when a newer release is on `main` (checked at most daily), when this project's rules
 differ from the installed kit, or when a tool on your `~/.the-agent-kit/recommended.json` is missing for the
@@ -201,7 +216,7 @@ never updates or installs anything itself. `install.sh check` lists what is miss
   restrictive verdict across its segments (deny > ask > allow), so a granted op never tows an ungranted one
   through - `git push && git commit` with only `commit` granted is refused as a whole. Detection also drops
   fenced / quoted / inline-code spans first, so a git verb the user pasted from a log or a teammate mints
-  nothing. Codex (deny-mode) ignores grants entirely: it commits freely and leaves pushing to the human.
+  nothing. Codex (deny-mode) commits freely and pushes only in the turn you asked: its record is tied to the turn id, never matches a worker's tool call, and lives in `~/.the-agent-kit/grants`, outside what its sandbox can write (unless you start Codex in your home folder or add that folder as a writable root). A bare "continue" keeps it for up to two hours, as on Claude Code.
   A session another agent started grants nothing, so a lead cannot pass a push to a worker through its
   brief. Claude Code marks a `-p` or SDK run (`CLAUDE_CODE_SESSION_ATTENDED=0`, `CLAUDE_CODE_ENTRYPOINT=sdk-*`,
   seen on 2.1.318 and undocumented), and a session started from an agent's command inherits that agent's
@@ -210,7 +225,7 @@ never updates or installs anything itself. `install.sh check` lists what is miss
 - **`codex/config.toml`**: `approval_policy=on-request` + `approvals_reviewer=auto_review` (what the sandbox refuses goes to Codex's reviewer agent, never to you; a commit's `.git` write needs it) · `sandbox_mode=workspace-write` · network **on**, deliberately
   (Section 5 requires verifying facts against the version in use; switching it off just sends the agent back to memory) · no hand-written env exclude
   list (Codex excludes secret names by default, and a broad one strips `DATABASE_URL` and breaks builds invisibly).
-  **`codex/hooks.json`** wires the deny-mode hook.
+  **`codex/hooks.json`** wires the deny-mode hook and the prompt hook behind its turn grants.
 - **`install.sh`**: one installer, four commands. `install.sh` installs or reinstalls (machine-wide: copies the kit, turns on the
   git hooks and adds the kit to your Claude Code and Codex settings, asked, backed up and verified; `setup/machine.py` keeps an install record, so each run takes out what the old kit installed and the new one no longer ships, and keeps what you changed; also installs the kit's four skills once for all three tools: a real copy in `~/.agents/skills`, a directory link per skill for Claude Code, a `skills.json` entry for Antigravity; wires Antigravity's session-start check into `~/.gemini/config/hooks.json`, keeping its other hooks; then, inside a git repo, the project: full rules, depth tier, skills, Antigravity's guard and git hooks, from the project's own record `.agents/the-agent-kit.json`; `--lean` gives the project a stub that extends the global rules; `--print` prints the snippets for a hand merge) ·
   `update` (**also the installer**: a lone `install.sh` with no kit beside it bootstraps the whole thing,

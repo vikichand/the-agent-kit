@@ -25,13 +25,16 @@ and say in a line why:
 | **Hand off** | the work moves to another tool, directory or person, or outlives this session: write the handoff (section 6); otherwise keep going or compact |
 
 **Reads parallelise; writes do not.** Conflicting reads are cheap. Conflicting writes surface at
-integration time, when they are most expensive to unpick. Keep at most two workers active and one
-delegation layer: workers do not spawn workers. Dispatch them without blocking and keep working;
+integration time, when they are most expensive to unpick. For slices of one task, keep at most two workers active:
+every slice comes back to you to review and join. Unrelated tasks that touch different files are not
+bound by that number. One delegation layer either way: workers do not spawn workers. Dispatch them without blocking and keep working;
 read their results when they arrive.
 
 **Keep the user posted while work runs.** Before dispatching, say in a line what is running and what
 you are doing meanwhile. While workers, background commands or long checks run, report at each point
-you regain control, and at least every ten minutes: what is done, what is left, what is running now.
+you regain control, and at least every eight minutes: what is done, what is left, what is running now,
+and an estimated finish time. Where the kit's progress hook is installed (Claude Code, Codex and Antigravity) it
+tells you when an update is due; read each worker's output before you write it.
 Where the tool can wake you (Claude Code: a scheduled wake-up or a Monitor on the task's output),
 arm it before you wait; Codex and Antigravity cannot, so poll in short steps rather than one long
 wait. Stopping a background task kills only its shell: check that its children are gone before you

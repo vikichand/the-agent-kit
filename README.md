@@ -40,7 +40,7 @@ Run it outside any project. It copies the kit to `~/.the-agent-kit`, turns on it
 to your Claude Code, Codex and Antigravity settings. It lists every change and asks before writing
 anything, backs your files up first, and ends by checking that everything it installed is in place.
 Then delete the downloaded `install.sh` and restart Claude Code, Codex and Antigravity.
-In Codex, run `/hooks` once and trust the kit's two hooks: Codex skips a new or changed hook until
+In Codex, run `/hooks` once and trust the kit's hooks: Codex skips a new or changed hook until
 you do, without a warning.
 
 **2. Set up each project:**
@@ -116,10 +116,10 @@ see ([Limits](#limits)).
 
    | Tool | File | What is added |
    |---|---|---|
-   | Claude Code | `~/.claude/settings.json` | the command guard, the session-start check, and the ask and deny rules |
-   | Codex | `~/.codex/hooks.json` | the command guard and the session-start check |
+   | Claude Code | `~/.claude/settings.json` | the command guard, the session-start check, the progress-update hooks, and the ask and deny rules |
+   | Codex | `~/.codex/hooks.json` | the command guard, the session-start check and the progress-update hooks |
    | Codex | `~/.codex/config.toml` | approval, sandbox and network settings |
-   | Antigravity | `~/.gemini/config/hooks.json` | the session-start check, as a `SessionStart` hook run through a launcher beside it (your other hooks there are kept) |
+   | Antigravity | `~/.gemini/config/hooks.json` | the session-start check (a `SessionStart` hook) and the progress-update hook (a `PreInvocation` hook), each run through a launcher beside it (your other hooks there are kept) |
 
    Every run takes out what the old kit put in, then puts in the new kit. An install record
    (`~/.the-agent-kit/.install-record.json`) lists each entry the kit wrote and its value, so an entry a
@@ -131,14 +131,14 @@ see ([Limits](#limits)).
    on its own: an entry that names anything outside the kit's own places is ignored, and a deny rule
    (`Edit(~/.the-agent-kit/**)`) stops an agent's file tools from changing the kit, its guard or the
    record. A deny rule does not cover shell commands; the command guard is the layer for those.
-4. **Installs the kit's four skills once for all three tools**, so `/tidy` and the others work in every
+4. **Installs the kit's five skills once for all three tools**, so `/tidy` and the others work in every
    project, not only where `install.sh` ran:
 
    | Tool | Where | How |
    |---|---|---|
    | Codex | `~/.agents/skills/<name>` | the one real copy, marked as the kit's so a later install can refresh it |
    | Claude Code | `~/.claude/skills/<name>` | a directory link to that copy: a junction on Windows (no admin rights), a symlink elsewhere |
-   | Antigravity | `~/.gemini/config/skills.json` | an entry for `~/.agents/skills`, limited to the kit's four names |
+   | Antigravity | `~/.gemini/config/skills.json` | an entry for `~/.agents/skills`, limited to the kit's five names |
 
    It creates and removes only what it made. A folder or link of yours with the same name is left as it
    is, with a warning; a tool you do not have gets nothing. `install.sh uninstall` removes the kit's links,
@@ -324,6 +324,36 @@ hook (`hooks/kit-check.py`), and into Antigravity as a global `SessionStart` hoo
 resumed (agy 1.5.1). An older kit wired it to `PreInvocation`, which fires before every model call; the
 next install moves that entry. Your other hooks in that file are kept. To switch it off, set `AGENT_KIT_NO_UPDATE_CHECK=1`.
 
+### Progress updates while work runs
+
+When a request runs past 8 minutes, the agent gives you a short update without being asked: what is
+done (with pass counts), what is running, what is left, and a line like
+`Estimated ETA: 53 mins | 8:20am`. It repeats every 8 minutes until the work is done.
+
+- **No timer runs in the background.** Your message stamps a small file for the session. Each time the
+  agent finishes a tool call, a hook compares the clock with that file and, once 8 minutes have
+  passed, hands the agent a note with the current time. The check takes about a tenth of a second and
+  exits.
+- **Waiting on background work (Claude Code).** If the agent ends its turn while a background command
+  or agent is still running, one short-lived waiter wakes it at the 8-minute mark, then exits. There
+  is one per session at most, it ends when you send a message, and it never outlives the interval.
+  The wake-up names each task still running and how long it has run. The wake-ups stop when the agent
+  reports that nothing is still working, or after 30 in a row.
+- **Your messages restart the 8 minutes.** The clock counts from your last message, because the agent
+  has just answered you. A background task finishing, or a subagent handing back its report, does not
+  restart it, and each task's own age is kept across your messages.
+- **Delegated work.** Only the session you type in gives updates. Subagents, headless runs and
+  sessions another agent started are never nudged; the note tells the lead to read their output and
+  fold it into one update.
+- **Codex and Antigravity** get the same updates while they are working. Neither can wake an idle
+  session, so a lead there that is waiting on workers should check on them in short steps. On
+  Antigravity the hook runs before each model call, and was seen live from the machine-wide
+  `hooks.json` the install writes, on agy 1.5.17.
+- **Change or turn it off:** set `AGENT_KIT_UPDATE_MINUTES` (default `8`, at most `55`, `0` for off).
+
+One limit: a single long command the agent runs in the foreground gives the hook nothing to check
+until it returns, so long runs belong in the background.
+
 ### Also worth having
 
 [**the-ultimate-gitignore-ai**](https://github.com/vikichand/the-ultimate-gitignore-ai) as the
@@ -376,9 +406,10 @@ observability, audit logs.
 to, so security rules arrive on API code and accessibility rules on components, at no cost the rest of
 the time.
 
-**The task tier:** four skills that load on what you are *doing* rather than which file you opened:
+**The task tier:** five skills that load on what you are *doing* rather than which file you opened:
 splitting work across subagents, writing a plan or report a human will act on, documentation and
-commit-message prose, and a user-invoked `/tidy` cleanup.
+commit-message prose, a user-invoked `/tidy` cleanup, and a user-invoked `/dispatch` mode that runs
+each task in a background worker.
 
 **Which tool gets what.** The content is one set of markdown files; the *routing* differs per tool,
 and the installer is the adapter between them:
@@ -387,11 +418,12 @@ and the installer is the adapter between them:
 |---|---|---|---|
 | Floor (`AGENTS.md`) | via the one-line `CLAUDE.md` import | read directly | read directly |
 | Depth tier (6 rules) | `.claude/rules/`, loads by file path | 4 of 6 as `.agents/skills/`, loads by task match; the 2 path-shaped ones (`code-correctness`, `tests`) don't port and stay one-liners in the floor | the same 4 skills, plus the 2 path-shaped ones as glob rules in `.agents/rules/` |
-| Task tier (4 skills) | `.claude/skills/`, and machine-wide by link from the machine install | `.agents/skills/`, same files, and the machine-wide copy in `~/.agents/skills` | `.agents/skills/`, shared with Codex, and `skills.json` for the machine-wide copy |
+| Task tier (5 skills) | `.claude/skills/`, and machine-wide by link from the machine install | `.agents/skills/`, same files, and the machine-wide copy in `~/.agents/skills` | `.agents/skills/`, shared with Codex, and `skills.json` for the machine-wide copy |
 | Git-layer guards | yes | yes | yes |
 | Tool-layer guard | `ask`, machine-wide | `deny`, machine-wide | approves or refuses, never asks, per project (`.agents/hooks.json`) |
 | Turn-scoped git grants | yes | no (deny mode; you push) | yes, from the hook's `lastUserInput` (Antigravity 1.4.7+) |
 | Session-start update check | yes | yes | yes, once per conversation (a global `SessionStart` hook) |
+| Progress updates every 8 minutes | yes, while working and while waiting on background work | yes, while working | yes, while working |
 | Measured | 48 cases, Sonnet | 15 cases, see [Limits](#limits) | 13 cases, small sample, see [Limits](#limits) |
 
 **The guards:** hooks at the **git layer** (reorder-proof, covering Claude Code, Codex, Antigravity, plain `git`,
@@ -492,7 +524,7 @@ so nothing double-loads.
 ### The task tier: skills
 
 A third trigger, for guidance keyed to *what you are doing* rather than which file you opened. Only the
-skill's one-line description sits in context; the body loads when a task matches. Four ship:
+skill's one-line description sits in context; the body loads when a task matches. Five ship:
 
 **`orchestrating-work`** fires when a task looks decomposable, or when you ask to parallelise or use
 subagents. Its spine is the rule every credible source agrees on: **reads parallelise, writes do
@@ -500,7 +532,8 @@ not**. Around it sit freezing shared contracts before fan-out, one owner per fil
 sequential integration, and an orchestrator-worker split where the lead keeps decomposition, the
 contract and the final review while workers execute already-complete specs. Delegate only when the
 expected parallel progress is worth the startup and integration cost, name the model and effort on
-every dispatch, and keep at most two workers active and one delegation layer, so workers do not spawn
+every dispatch, and keep at most two workers active on slices of one task (unrelated tasks on
+different files are not bound by that number) with one delegation layer, so workers do not spawn
 workers. It starts by picking the shape (do it, delegate a read or a slice, fan out, hand off), gives
 every worker an outcome contract with its escalation triggers, and classifies a failure before retrying it.
 
@@ -514,7 +547,17 @@ the conversation, stays markdown-only.
 the full version of Section 8's two-line prose rule and the README order: working path first, a
 runnable command in the first screenful, every command surface as a table, shell differences named.
 
-**`/tidy`** is the one skill you run yourself (`/tidy` in Claude Code, `$tidy` in Codex). It lists leftovers
+**`/dispatch`** turns dispatcher mode on for the session (`$dispatch` in Codex), and `/dispatch off`
+ends it. While it is on, each task you give runs in a background worker on the same model and effort,
+and the chat you type in stays free for questions, updates and more tasks. The agent answers small
+things itself, runs tasks side by side only when they touch different files (otherwise it queues them
+or uses a separate worktree), keeps pushes, merges and releases for itself and your say-so, and checks
+a worker's evidence before telling you a task is done. `/dispatch status` lists what is running,
+queued and done. Each worker starts cold on your model, so several at once use your usage limit
+several times as fast. On Claude Code the progress updates above wake the idle chat while workers run;
+Codex and Antigravity cannot be woken, so there the agent checks on its workers when you next write.
+
+**`/tidy`** is the other skill you run yourself (`/tidy` in Claude Code, `$tidy` in Codex). It lists leftovers
 (stray or duplicate dev-server processes, merged branches, stale worktrees, Playwright output, scratch files),
 asks group by group, and removes only what you approve, with a dry run first and a log. Details and limits:
 [`docs/tidy.md`](docs/tidy.md).
@@ -534,7 +577,7 @@ decision record in [`docs/senior-engineer.md`](docs/senior-engineer.md) before u
 |---|---|---|
 | **Rules** | `CLAUDE.md`, a one-line `@AGENTS.md` import | `AGENTS.md`, the file itself |
 | **commit** | runs without a prompt: it is local and undoable. `--no-verify` **denied** | runs |
-| **push / open or merge a PR** | runs **only when your message that turn asked for it** ("push it", "merge it to main", "cut 0.6.3"); otherwise the tool hook **refuses** and the agent reports it ready to push. Force and `--no-verify` **denied**, grant or not | tool hook **denies** (you push and merge) |
+| **push / open or merge a PR** | runs **only when your message that turn asked for it** ("push it", "merge it to main", "cut 0.6.3"); otherwise the tool hook **refuses** and the agent reports it ready to push. Force and `--no-verify` **denied**, grant or not | the same, when the kit's prompt hook is trusted in `/hooks`: asked for that turn, Codex's own approval decides; otherwise the tool hook **denies** |
 | **force / delete to `main`** | git `pre-push` blocks it | git `pre-push` (same file) |
 | **secrets in a commit** | git `pre-commit` blocks staged secrets | same file |
 | **destructive cmds** (`rm -rf` or `Remove-Item -Recurse` outside the project and temp folder, `dd`, `mkfs`, `curl\|sh`) | tool hook **asks** | tool hook **denies** |
@@ -730,7 +773,7 @@ that turn asked for it* (a one-time, turn-scoped grant, below), and denies `--no
 `core.hooksPath`, and writes to `.git/hooks`, `.git/config`, `.claude/settings.json` and `~/.the-agent-kit`.
 It ships no ask rules. On Codex it sets `approval_policy=on-request` with `approvals_reviewer=auto_review`
 and `sandbox_mode=workspace-write`: what the sandbox refuses goes to Codex's reviewer agent, never to you,
-which is what lets a commit write `.git`. `codex/hooks.json` wires the deny-mode hook.
+which is what lets a commit write `.git`. `codex/hooks.json` wires the deny-mode hook and the prompt hook that records what you asked for.
 
 These config choices are deliberate, because the obvious "more locked down" setting makes the agent worse:
 
@@ -752,7 +795,10 @@ These config choices are deliberate, because the obvious "more locked down" sett
   cannot write to) and lets exactly that operation through for that turn. A bare "continue" after a break
   keeps the grant for up to two hours; any other message resets it. A grant never covers force-push or `--no-verify`.
   A missed phrasing is refused, never a silent push: the agent says it is ready and you ask again. Codex
-  (deny-mode) ignores grants and leaves pushing and merging to you. Antigravity reads the same request
+  works the same way through its own `UserPromptSubmit` hook, with a tighter record: it is tied to the
+  turn that asked, a worker's tool call never matches it, and it sits in `~/.the-agent-kit/grants`, which
+  Codex's sandbox cannot write. There the guard only stops objecting, so Codex's own approval still
+  decides. Until you trust that hook in `/hooks`, Codex refuses every push. Antigravity reads the same request
   from its hook's `lastUserInput`. A session another agent started grants nothing, because its prompt
   is that agent's brief: a worker never pushes, and the lead pushes once you have asked it to. A headless
   `claude -p` or Agent SDK run grants nothing either, even one you start yourself.

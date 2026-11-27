@@ -144,7 +144,7 @@ research notes, not from a per-rule record kept at the time.
 | I2 judge safety, ask only where a human must decide | 0.1.0 | 4.x | command guard asks or denies | owner, session history 2026-11 |
 | I3 untrusted content is data | 0.1.0 | 4.x | advice | owner, vendor guidance on prompt injection |
 | I4 check dependencies before adding | 0.1.0 | 4.x | advice (0.6.3) | owner |
-| I5 the worktree is the human's | 0.1.0 | 4.x | turn-scoped git grants (Claude), deny mode (Codex) | owner, eval 08 |
+| I5 the worktree is the human's | 0.1.0 | 4.x | turn-scoped git grants (Claude, Antigravity, Codex), deny mode otherwise (Codex) | owner, eval 08 |
 | I6 stay in the workspace | 0.1.0 | 4.x | advice | owner |
 | I7 own your incidents | 0.1.0 | 4.x | advice | owner |
 | I8 don't touch the guardrails | 0.1.0 | 4.x | command guard denies hook bypasses and settings edits | owner |

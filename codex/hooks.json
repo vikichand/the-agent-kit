@@ -23,6 +23,37 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PY__ \"__AGENT_KIT__/hooks/command-guard.py\" --tool codex --event userprompt",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PY__ \"__AGENT_KIT__/hooks/progress.py\" --tool codex --event prompt",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PY__ \"__AGENT_KIT__/hooks/progress.py\" --tool codex --event tool",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }

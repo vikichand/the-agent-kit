@@ -11,6 +11,40 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-27
+
+### Added
+
+- Progress updates on Claude Code, Codex and Antigravity. When a request runs past 8 minutes, the agent tells you
+  what is done, what is running and what is left, and ends with `Estimated ETA: <time left> | <clock
+  time>`; it repeats every 8 minutes until the work is done. No timer runs in the background: a hook
+  checks the clock after each tool call. On Claude Code, a session that is waiting on background work
+  is woken for the update as well, and told which background tasks are still running. Only the session you type in reports, and it reads its workers'
+  output first. Set `AGENT_KIT_UPDATE_MINUTES` to change the interval, or to `0` to turn it off.
+  Codex and Antigravity report while they are working; neither can wake an idle session.
+  `install.sh update` adds the hooks after asking; in Codex, open `/hooks` once to trust them.
+- `/dispatch` (Codex: `$dispatch`), a mode you turn on for a session. Each task you give then runs in a
+  background worker on the same model and effort, and the chat stays free for questions, updates and
+  more tasks. The agent runs tasks side by side only when they touch different files, keeps pushes,
+  merges and releases to itself, and checks a worker's result before reporting it. `/dispatch off` ends
+  it and `/dispatch status` lists the tasks. Several workers at once use your usage limit several
+  times as fast.
+
+### Changed
+
+- On Codex, a push, a new pull request or a merge now runs in the turn your own message asks for it,
+  as on Claude Code and Antigravity. Before, Codex refused every one and left them to you. The guard
+  only stops objecting, so Codex's own approval still decides, and force-push and `--no-verify` stay
+  refused. A worker, a session another agent started and any later turn get nothing (a bare "continue" keeps the request for up to two hours). `install.sh
+  update` adds the prompt hook after asking; trust it in Codex's `/hooks`, and until you do Codex
+  refuses every push as before.
+
+### Fixed
+
+- On Windows, uninstall and update now remove the kit's skill links when your home folder is given by
+  its short name (such as `C:\Users\LONGNA~1`). Before, a link whose skill copy had already been
+  removed was not recognised as the kit's and was left behind.
+
 ## [0.7.1] - 2026-11-26
 
 ### Added
@@ -627,7 +661,8 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.7.1...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.8.0...develop
+[0.8.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.8.0
 [0.7.1]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.7.1
 [0.7.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.7.0
 [0.6.8]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.6.8

@@ -359,7 +359,7 @@ CASES = [
 
 # Turn-scoped grants: a git-write runs without a prompt ONLY when the user's message authorized that
 # exact operation this turn. A grant never covers force/--no-verify/merge, never one op for another,
-# and Codex (deny) ignores grants entirely.
+# and Codex (deny) never reads this temp-folder record (its own is CODEX_CASES, below).
 GRANT_CASES = [
     # (command, authorized-ops, flag, expected)
     ("git commit -m x",              {"commit"},               "ask",  "silent"),  # a commit needs no grant
@@ -382,9 +382,9 @@ GRANT_CASES = [
     ("gh pr merge 5",                {"pr"},                   "ask",  "deny"),
     ("gh pr merge 5 --squash",       {"pr", "commit", "push"}, "ask",  "deny"),
     ("gh pr merge 5 --squash",       {"merge"},                "ask",  "allow"),   # you asked for the merge this turn
-    ("gh pr merge 5",                {"merge"},                "deny", "deny"),    # Codex has no grants
+    ("gh pr merge 5",                {"merge"},                "deny", "deny"),    # Codex does not read this record
     ("gh pr merge 5 && rm -rf /x",   {"merge"},                "ask",  "ask"),     # the delete still asks
-    # Codex (deny-mode) ignores grants entirely: push denies, commit stays silent
+    # Codex (deny-mode) ignores this record entirely: push denies, commit stays silent
     ("git push",                     {"push"},                 "deny", "deny"),
     ("git commit -m x",              {"commit"},               "deny", "silent"),
     # chained commands: ONE Bash call, one decision, MOST RESTRICTIVE segment wins (deny>ask>allow),
@@ -836,6 +836,90 @@ for who, env, exp in WORKER_CASES:
     if got != exp:
         fails += 1
         print(f"  FAIL: [worker {who} {env}] got {got!r} exp {exp!r}")
-total = len(CASES) + 7 + len(WORKER_CASES) + len(GRANT_CASES) + len(DETECTOR_CASES) + len(ANTIGRAVITY_CASES) + len(RAW_CASES)
+# Codex turn grants. Codex's prompt hook gives the user's message and a turn id, and every tool call
+# carries the same turn id, so a push runs only in the turn whose message asked for it. Seen live on
+# codex-cli 0.172.0: a worker's start fires no prompt hook and its tool calls carry the lead's session
+# id with another turn id and an agent_id; a hook inherits the variables of the shell that started
+# Codex and gets no CODEX_THREAD_ID of its own. The record is kept in the home folder, which Codex's
+# sandbox cannot write (it can write the temp folder).
+_CX_HOME = tempfile.mkdtemp(prefix="agent-kit-cx-")
+
+
+def codex_flow(prompt, cmd, turn="turn-1", tool_turn="turn-1", prompt_env=None, tool_env=None, extra=None,
+               sid="cx-sess", then=None):
+    """The real path: the prompt hook, then the tool hook. `then` is a second prompt in a new turn."""
+    home = {"HOME": _CX_HOME, "USERPROFILE": _CX_HOME}
+    if prompt is not None:
+        for said, t in [(prompt, turn)] + ([(then, tool_turn)] if then else []):
+            subprocess.run([sys.executable, G, "--tool", "codex", "--event", "userprompt"],
+                           input=json.dumps({"session_id": sid, "turn_id": t, "prompt": said}),
+                           capture_output=True, text=True, env=_env(dict(home, **(prompt_env or {}))))
+    payload = {"session_id": sid, "turn_id": tool_turn, "tool_name": "Bash", "tool_input": {"command": cmd}}
+    payload.update(extra or {})
+    r = subprocess.run([sys.executable, G, "--decision", "deny"], input=json.dumps(payload),
+                       capture_output=True, text=True, env=_env(dict(home, **(tool_env or {}))))
+    if r.returncode != 0:
+        return "crash"
+    return json.loads(r.stdout)["hookSpecificOutput"]["permissionDecision"] if r.stdout.strip() else "silent"
+
+
+_PUSH = "Fix the parser, then commit and push the branch."
+CODEX_CASES = [
+    # (label, keyword arguments, expected). "silent" leaves the command to Codex's own approval.
+    ("asked this turn", dict(prompt=_PUSH, cmd="git push"), "silent"),
+    ("asked, with a status first", dict(prompt=_PUSH, cmd="git status && git push origin develop"), "silent"),
+    ("not asked", dict(prompt="Fix the parser and commit.", cmd="git push", sid="cx-a"), "deny"),
+    ("no prompt hook ran", dict(prompt=None, cmd="git push", sid="cx-b"), "deny"),
+    ("a later turn", dict(prompt=_PUSH, cmd="git push", tool_turn="turn-2", sid="cx-c"), "deny"),
+    ("no turn id", dict(prompt=_PUSH, cmd="git push", turn="", tool_turn="", sid="cx-d"), "deny"),
+    ("a worker in the same session", dict(prompt=_PUSH, cmd="git push", tool_turn="turn-9", sid="cx-e",
+                                          extra={"agent_id": "a1", "agent_type": "worker"}), "deny"),
+    ("a worker, even with the turn id", dict(prompt=_PUSH, cmd="git push", sid="cx-f",
+                                             extra={"agent_id": "a1"}), "deny"),
+    ("started from a Claude command", dict(prompt=_PUSH, cmd="git push", sid="cx-g",
+                                           prompt_env={"CLAUDE_CODE_CHILD_SESSION": "1"}), "deny"),
+    ("started from a Codex command", dict(prompt=_PUSH, cmd="git push", sid="cx-h",
+                                          prompt_env={"CODEX_THREAD_ID": "t1"}), "deny"),
+    ("a marker at the tool call", dict(prompt=_PUSH, cmd="git push", sid="cx-i",
+                                       tool_env={"ANTIGRAVITY_CONVERSATION_ID": "c1"}), "deny"),
+    ("a forced push", dict(prompt=_PUSH, cmd="git push --force", sid="cx-j"), "deny"),
+    ("skipping the hooks", dict(prompt=_PUSH, cmd="git push --no-verify", sid="cx-k"), "deny"),
+    ("the release override", dict(prompt=_PUSH, cmd="AGENT_KIT_RELEASE=1 git push origin main", sid="cx-l"), "deny"),
+    ("a pull request not asked for", dict(prompt=_PUSH, cmd="gh pr create --fill", sid="cx-m"), "deny"),
+    ("a pull request asked for", dict(prompt="Open a pull request for this branch.", cmd="gh pr create --fill",
+                                      sid="cx-n"), "silent"),
+    ("a merge not asked for", dict(prompt="Open a pull request for this branch.", cmd="gh pr merge 5 --squash",
+                                   sid="cx-o"), "deny"),
+    ("a delete beside the push", dict(prompt=_PUSH, cmd="git push && rm -rf /x", sid="cx-p"), "deny"),
+    ("writing the record", dict(prompt=_PUSH, sid="cx-q",
+                                cmd="echo x > ~/.the-agent-kit/grants/agent-kit-grant-cx-q.json"), "deny"),
+    ("copying into the record's folder", dict(prompt=_PUSH, sid="cx-u",
+                                              cmd="cp a.json ~/.the-agent-kit/grants/"), "deny"),
+    ("a pasted command is not a request", dict(prompt="The log says `git push` failed. Why?", cmd="git push",
+                                               sid="cx-r"), "deny"),
+    ("continue keeps it", dict(prompt=_PUSH, then="continue", cmd="git push", tool_turn="turn-2", sid="cx-s"),
+     "silent"),
+    ("a new request drops it", dict(prompt=_PUSH, then="Now fix the README.", cmd="git push", tool_turn="turn-2",
+                                    sid="cx-t"), "deny"),
+]
+for label, kw, exp in CODEX_CASES:
+    got = codex_flow(**kw)
+    if got != exp:
+        fails += 1
+        print(f"  FAIL: [codex {label}] got {got!r} exp {exp!r}")
+# An old entry the sweep cannot remove (here a folder) must not cost the user the push they asked for.
+_old = os.path.join(_CX_HOME, ".the-agent-kit", "grants", "agent-kit-grant-old")
+os.makedirs(_old, exist_ok=True)
+os.utime(_old, (0, 0))
+if codex_flow(_PUSH, "git push", sid="cx-v") != "silent":
+    fails += 1
+    print("  FAIL: [codex] a failed sweep of old records dropped this turn's grant")
+# The temp-folder record is Claude's: Codex never reads it, so a file written there grants nothing.
+if os.path.exists(_grant_file("cx-sess")):
+    fails += 1
+    print("  FAIL: [codex] the grant was written to the temp folder, which Codex's sandbox can write")
+import shutil
+shutil.rmtree(_CX_HOME, ignore_errors=True)
+total = len(CASES) + 9 + len(CODEX_CASES) + len(WORKER_CASES) + len(GRANT_CASES) + len(DETECTOR_CASES) + len(ANTIGRAVITY_CASES) + len(RAW_CASES)
 print(f"  command-guard: {total - fails}/{total} passed")
 sys.exit(1 if fails else 0)

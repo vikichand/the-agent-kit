@@ -49,10 +49,13 @@ _HOLD     = (" was not requested in the user's message this turn, so it is held.
              "user will ask for it after reviewing.")
 PUSH_OK   = "git push: authorized by your request this turn."
 PUSH_HOLD = "git push" + _HOLD
-PUSH_DENY = "git push is guarded on this tool: run it yourself. Pushing is left to you."
+PUSH_DENY = ("git push runs on Codex only in the turn the user's own message asks for it, with the kit's prompt "
+             "hook trusted in /hooks. Keep the work committed locally, finish the task, and end your report "
+             "with what is ready; the user will ask for it or run it.")
 GRANT_OK  = "%s: authorized by your request this turn."
 PR_HOLD   = "%s" + _HOLD
-PR_DENY   = "opening or merging a pull request is guarded on this tool: run it yourself, like a push."
+PR_DENY   = ("opening or merging a pull request runs on Codex only in the turn the user's own message asks for "
+             "it, like a push. Finish the task and report what is ready.")
 HOOKSPATH_DENY = "core.hooksPath is being set - that points git's hooks elsewhere and disables the guards. Blocked."
 NOVERIFY_DENY  = "`--no-verify` skips the git guard hooks (secret scan, attribution, push guard). Blocked."
 FORCE_DENY     = "force/delete push is blocked - it rewrites or removes remote history. Use the pre-push override only if truly intended."
@@ -307,7 +310,18 @@ def is_force_push(args):
 # phrasing costs one extra prompt; it can never silently authorize something you did not plainly ask
 # for. This is a convenience layer on a best-effort guard, NOT a security boundary: the temp file is
 # only as trustworthy as the machine, and the real boundary stays the git-layer hooks + branch
-# protection. Codex (--decision deny) never consults grants; its behaviour is unchanged.
+# protection.
+#
+# Codex (--decision deny) has no prompt to fall back on, so its record is tighter: it is bound to the turn id
+# that the prompt hook and every tool call of that turn share, a tool call carrying an agent_id (a worker,
+# which shares the lead's session id) gets nothing, and the file sits in the home folder, which Codex's
+# sandbox cannot write (it can write the temp folder; hooks run outside the sandbox) unless Codex is started
+# in or above that folder or given it as a writable root. A bare "continue" moves the record to the new
+# turn for up to two hours, as on Claude Code. A granted push is
+# left to Codex's own approval, never approved from here. Seen live on codex-cli 0.172.0: a worker's start
+# fires no prompt hook; a hook inherits the variables of the shell that started Codex and gets no
+# CODEX_THREAD_ID of its own, so any agent marker in a hook's environment means an agent started the session.
+# A user's own `codex exec "... push"` from a plain terminal does grant: that prompt is the user's.
 #
 # A session another agent started grants nothing: its prompt is that agent's brief, so without this a
 # lead with no push grant could start `claude -p "... push the branch"` or `agy -p` and the worker would
@@ -332,9 +346,14 @@ _NEG = r"(?:do\s*n['o]?t|don['o]?t|do not|never|no need(?:\s+to)?|no|nothing|wit
 _DET = r"(?:the|this|that|these|those|a|an|last|latest|previous|prior|earlier|first|second|next|initial|original|my|your|his|her|their|our|each|every|which|whose|another|same|broken|failing|bad|wrong|old|new)"
 
 
+CODEX = False   # set in main() for Codex: its grants live elsewhere and are bound to a turn
+
+
 def _grant_path(session):
-    import tempfile  # here, not at the top: it costs 12 ms on every guarded call and only grants need it
     sid = re.sub(r"[^A-Za-z0-9_-]", "", session or "")[:64] or "nosession"
+    if CODEX:
+        return os.path.join(os.path.expanduser("~"), ".the-agent-kit", "grants", "agent-kit-grant-" + sid + ".json")
+    import tempfile  # here, not at the top: it costs 12 ms on every guarded call and only grants need it
     return os.path.join(tempfile.gettempdir(), "agent-kit-grant-" + sid + ".json")
 
 
@@ -350,19 +369,31 @@ def load_grants(session, with_time=False):
         return (frozenset(), 0.0) if with_time else frozenset()
 
 
-def save_grants(session, grants, issued=None):
+def save_grants(session, grants, issued=None, turn=None):
     if not session:
         return
     try:
         import time
+        if CODEX:
+            os.makedirs(os.path.dirname(_grant_path(session)), exist_ok=True)
         with open(_grant_path(session), "w") as f:
-            json.dump({"authorized": sorted(grants), "issued": issued or time.time()}, f)
+            json.dump({"authorized": sorted(grants), "issued": issued or time.time(), "turn": turn}, f)
     except Exception:
         # A write that fails must not leave the previous turn's grant live: no record means no grant.
         try:
             os.remove(_grant_path(session))
         except Exception:
             pass
+        return
+    if CODEX:   # one small file per session: drop those a week old. A failure here costs nothing.
+        d = os.path.dirname(_grant_path(session))
+        for name in os.listdir(d):
+            try:
+                old = os.path.join(d, name)
+                if name.startswith("agent-kit-grant-") and time.time() - os.path.getmtime(old) > 7 * 86400:
+                    os.remove(old)
+            except Exception:
+                pass
 
 
 def _asked(text, v):
@@ -532,7 +563,8 @@ def classify(tokens, decision, grants=frozenset()):
                 return "deny", NOVERIFY_DENY
             if decision == "ask":                       # Claude: silent only if you asked this turn
                 return ("allow", PUSH_OK) if "push" in grants else ("deny", PUSH_HOLD)
-            return "deny", PUSH_DENY                     # Codex: no grants and no ask, so pushing is yours
+            # Codex cannot ask. Asked for this turn: say nothing, so Codex's own approval decides.
+            return None if "push" in grants else ("deny", PUSH_DENY)
         if sub == "commit":
             if is_no_verify(flags_only(args, COMMIT_VALUE_FLAGS)) or short_has(flags_only(args, COMMIT_VALUE_FLAGS), "n"):
                 return "deny", NOVERIFY_DENY
@@ -549,8 +581,8 @@ def classify(tokens, decision, grants=frozenset()):
             act = ops[k + 1].lower()
             if ops[k].lower() == "pr" and act in ("create", "merge"):
                 grant = "pr" if act == "create" else "merge"
-                if decision == "deny":                   # Codex: no grants and no ask
-                    return "deny", PR_DENY
+                if decision == "deny":                   # Codex: silent when asked this turn, as for a push
+                    return None if grant in grants else ("deny", PR_DENY)
                 return ("allow", GRANT_OK % ("gh pr " + act)) if grant in grants else ("deny", PR_HOLD % ("gh pr " + act))
         return None
 
@@ -802,16 +834,30 @@ def capture_intent(data):
     try:
         import time
         grants, issued = detect_grants(data.get("prompt", "")), None
-        if started_by_agent(CLAUDE_OWN):
+        turn = data.get("turn_id") if CODEX else None
+        if started_by_agent(() if CODEX else CLAUDE_OWN) or (CODEX and not (turn and isinstance(turn, str))):
             grants = frozenset()
         elif not grants and is_continue(data.get("prompt", "")):
             grants, issued = load_grants(data.get("session_id") or "", with_time=True)
             if time.time() - issued > CARRY_SECONDS:   # the original time is kept, so continues never refresh it
                 grants = frozenset()
     except Exception:
-        grants, issued = frozenset(), None   # a crash must fail towards "nothing authorized", never keep the last grant
-    save_grants(data.get("session_id") or "", grants, issued)
+        grants, issued, turn = frozenset(), None, None   # a crash must fail towards "nothing authorized", never keep the last grant
+    save_grants(data.get("session_id") or "", grants, issued, turn)
     sys.exit(0)
+
+
+def codex_grants(data):
+    """Codex: what the user's message asked for, only for a tool call of that same turn by the lead itself."""
+    try:
+        turn, session = data.get("turn_id"), data.get("session_id")
+        if not (turn and isinstance(turn, str) and session) or data.get("agent_id") or started_by_agent(()):
+            return frozenset()
+        with open(_grant_path(session), "r") as f:
+            d = json.load(f)
+        return frozenset(d.get("authorized", [])) if d.get("turn") == turn else frozenset()
+    except Exception:
+        return frozenset()   # no record, or an unreadable one: nothing authorized
 
 
 def antigravity_grants(data):
@@ -860,6 +906,8 @@ def main():
         sys.exit(0)
     if not isinstance(data, dict):
         sys.exit(0)
+    global CODEX
+    CODEX = args.tool == "codex" or (args.decision == "deny" and args.tool != "antigravity")
     if args.event == "userprompt":
         capture_intent(data)
         return
@@ -893,11 +941,13 @@ def main():
     # The grant file is written by the prompt hook. A command that names it could forge a grant. This
     # raises the bar for an accident only: the agent's shell can write any file this hook can.
     # Antigravity's transcript is the same kind of source for a carried grant.
-    if re.search(r"agent-kit-grant|transcript(?:_full)?\.jsonl|antigravity-cli[/\\]+brain", cmd, re.I):
+    if re.search(r"agent-kit-grant|\.the-agent-kit[/\\]+grants|transcript(?:_full)?\.jsonl|antigravity-cli[/\\]+brain", cmd, re.I):
         emit(args.decision, GRANT_ASK)
-    # Grants exist in Claude and Antigravity; Codex (deny) never consults them.
+    # Each tool reads its own record: Claude's prompt hook, Antigravity's lastUserInput, Codex's turn.
     if ANTIGRAVITY:
         grants = frozenset() if started_by_agent(("ANTIGRAVITY_CONVERSATION_ID",)) else antigravity_grants(data)
+    elif CODEX:
+        grants = codex_grants(data)
     elif args.decision == "ask" and not started_by_agent(CLAUDE_OWN):
         grants = load_grants(data.get("session_id") or "")
     else:

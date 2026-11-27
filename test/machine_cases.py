@@ -24,8 +24,8 @@ class Box:
     """A home with Claude Code, Codex and Antigravity folders, a share like ~/.the-agent-kit, and its own
     global git config, so nothing on the real machine is read or written."""
 
-    def __init__(self, tools=("claude", "codex", "antigravity")):
-        self.root = tempfile.mkdtemp(prefix="machine-cases-")
+    def __init__(self, tools=("claude", "codex", "antigravity"), root=None):
+        self.root = root or tempfile.mkdtemp(prefix="machine-cases-")
         self.home = os.path.join(self.root, "home")
         self.share = os.path.join(self.home, ".the-agent-kit")
         for t, d in (("claude", ".claude"), ("codex", ".codex"), ("antigravity", os.path.join(".gemini", "config"))):
@@ -37,7 +37,7 @@ class Box:
         shutil.copytree(os.path.join(KIT, "codex"), os.path.join(self.share, "codex"),
                         ignore=shutil.ignore_patterns("performance"))
         shutil.copytree(os.path.join(KIT, "claude", "skills"), os.path.join(self.share, "skills"))
-        for h in ("command-guard.py", "kit-check.py", "agent-kit-check.py"):
+        for h in ("command-guard.py", "kit-check.py", "agent-kit-check.py", "agent-kit-progress.py", "progress.py"):
             shutil.copy(os.path.join(KIT, "hooks", h), os.path.join(self.share, "hooks", h))
         os.makedirs(os.path.join(self.share, "git-hooks"))
         self.gitcfg = os.path.join(self.root, "gitconfig")
@@ -131,6 +131,12 @@ c = b.json(".codex", "hooks.json")
 check("install: Codex hooks and config.toml keys are in place",
       any("command-guard.py" in x for x in commands(c, "PreToolUse"))
       and toml(b.p(".codex", "config.toml")).get("approval_policy") == "on-request", b.out)
+check("install: the progress-update hooks are wired on Claude Code (prompt, tool call, wake-up) and Codex",
+      all(any("progress.py" in x for x in commands(s, ev)) for ev in ("UserPromptSubmit", "PostToolUse", "Stop"))
+      and any("command-guard.py" in x for x in commands(s, "UserPromptSubmit"))
+      and [h.get("asyncRewake") for bl in s["hooks"]["Stop"] for h in bl["hooks"]] == [True]
+      and all(any("progress.py" in x for x in commands(c, ev)) for ev in ("UserPromptSubmit", "PostToolUse"))
+      and "Stop" not in c["hooks"], json.dumps([s["hooks"], c["hooks"]]))
 check("install: git core.hooksPath points at the share's git-hooks",
       b.git("core.hooksPath").replace("\\", "/").endswith(".the-agent-kit/git-hooks"), b.git("core.hooksPath"))
 check("install: one real copy of each kit skill, a Claude link to it, and Antigravity's skills.json entry",
@@ -140,6 +146,11 @@ check("install: one real copy of each kit skill, a Claude link to it, and Antigr
 check("install: Antigravity's session-start hook and its launcher",
       "the-agent-kit-check" in b.json(".gemini", "config", "hooks.json")
       and os.path.isfile(b.p(".gemini", "config", "agent-kit-check.py")), b.out)
+ag = b.json(".gemini", "config", "hooks.json").get("the-agent-kit-progress") or {}
+check("install: Antigravity's progress-update hook runs before each model call, through its own launcher",
+      list(ag) == ["PreInvocation"] and len(ag["PreInvocation"]) == 1
+      and ag["PreInvocation"][0]["command"].endswith(" agent-kit-progress.py --tool antigravity --event invocation")
+      and os.path.isfile(b.p(".gemini", "config", "agent-kit-progress.py")), b.out)
 rec = b.record()
 check("install: the record lists what was installed", rec is not None and rec.get("version") == 1
       and len(rec.get("entries", [])) > 30, json.dumps(rec)[:300] if rec else "no record")
@@ -246,15 +257,17 @@ t = tpl_claude()
 check("uninstall removes the kit's rules, hooks and keys, and keeps the user's",
       not any(r in s.get("permissions", {}).get("deny", []) for r in t["permissions"]["deny"])
       and "Bash(user-deny *)" in s["permissions"]["deny"] and s.get("myOwnKey") is True
-      and not any("kit-check.py" in x for x in commands(s, "SessionStart")), b.out)
+      and not any("kit-check.py" in x for x in commands(s, "SessionStart"))
+      and not any("progress.py" in x for ev in s.get("hooks", {}) for x in commands(s, ev)), b.out)
 check("uninstall keeps a kit entry the user changed, and names it",
       any("command-guard.py" in x for x in commands(s, "PreToolUse")) and "command-guard.py" in b.out, b.out)
 check("uninstall removes the skill copies, links, skills.json names and Antigravity hook; the user's skill stays",
       not any(os.path.exists(b.p(".agents", "skills", n)) for n in SKILLS)
       and not any(os.path.lexists(b.p(".claude", "skills", n)) for n in SKILLS)
       and os.path.isfile(b.p(".agents", "skills", "mine", "SKILL.md"))
-      and "the-agent-kit-check" not in b.json(".gemini", "config", "hooks.json")
-      and not os.path.exists(b.p(".gemini", "config", "agent-kit-check.py")), b.out)
+      and not [k for k in b.json(".gemini", "config", "hooks.json") if k.startswith("the-agent-kit")]
+      and not os.path.exists(b.p(".gemini", "config", "agent-kit-check.py"))
+      and not os.path.exists(b.p(".gemini", "config", "agent-kit-progress.py")), b.out)
 check("uninstall turns git's core.hooksPath back off", b.git("core.hooksPath") == "", b.git("core.hooksPath"))
 check("uninstall removes the kit's config.toml keys", "approval_policy" not in toml(b.p(".codex", "config.toml")), b.out)
 rec = b.record()
@@ -262,6 +275,22 @@ left = sorted((e["kind"], e.get("script") or e.get("key")) for e in rec["entries
 check("uninstall: the record keeps only what was left (the guard hook and the key the user changed)",
       left == [("hook", "command-guard.py"), ("key", "attribution")], json.dumps(rec)[:300] if rec else "none")
 b.close()
+
+# ---- a home folder given by its short Windows name (C:\\Users\\LONGNA~1) ----------------------------
+if os.name == "nt":
+    import ctypes
+    long_root = tempfile.mkdtemp(prefix="machine cases long name ")
+    buf = ctypes.create_unicode_buffer(1024)
+    ctypes.windll.kernel32.GetShortPathNameW(long_root, buf, 1024)
+    if "~" in buf.value:                 # short names can be switched off on a volume: nothing to test then
+        b = Box(root=buf.value)
+        b.run()
+        b.run("uninstall")
+        left = [n for n in SKILLS if os.path.lexists(b.p(".claude", "skills", n))]
+        check("under a home given by its short Windows name, uninstall still removes the kit's skill links",
+              left == [], "%s\n%s" % (left, b.out))
+        b.close()
+    shutil.rmtree(long_root, ignore_errors=True)
 
 # ---- the record is never trusted to say what else is the kit's -------------------------------------
 b = Box()

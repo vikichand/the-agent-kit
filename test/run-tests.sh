@@ -27,6 +27,7 @@ echo "== command-guard (tool layer) =="
 PY=""; for p in python3 python "py -3"; do [ "$(printf 'print(1)' | $p - 2>/dev/null)" = "1" ] && { PY="$p"; break; }; done
 if [ -n "$PY" ]; then
   $PY "$KIT/test/command_guard_cases.py" "$KIT/hooks/command-guard.py" || bad "command-guard corpus"
+  $PY "$KIT/test/progress_cases.py" "$KIT/hooks/progress.py" || bad "progress-update hook cases"
   $PY "$KIT/test/machine_cases.py" || bad "machine install-record cases"
   $PY "$KIT/test/project_cases.py" || bad "project install-record cases"
   $PY "$KIT/test/shipped_history.py" || bad "an entry the kit once shipped is unknown to machine.py"
@@ -849,12 +850,12 @@ else
   # as .agents/skills - and NOT the two path-shaped rules, which have no honest task trigger.
   u=$(mktemp -d) && (cd "$u" && git init -q && sh "$KIT/install.sh" project >/dev/null 2>&1)
   m=""
-  for s in generating-reports orchestrating-work writing-docs tidy web-security data-layer frontend-quality ci-cd; do
+  for s in generating-reports orchestrating-work writing-docs tidy dispatch web-security data-layer frontend-quality ci-cd; do
     [ -f "$u/.agents/skills/$s/SKILL.md" ] || m="$m $s"
   done
   x=""
   for s in code-correctness tests; do [ -e "$u/.agents/skills/$s" ] && x="$x $s"; done
-  [ -z "$m" ] && [ -z "$x" ] && pass "U13 fresh install ships 8 Codex skills and withholds the 2 path-shaped rules" \
+  [ -z "$m" ] && [ -z "$x" ] && pass "U13 fresh install ships 9 Codex skills and withholds the 2 path-shaped rules" \
     || bad "U13 Codex skills wrong - missing:[$m] wrongly ported:[$x]"
   # U14: a generated skill is the rule with its frontmatter swapped - name + description present,
   # `paths:` gone, body byte-identical to the rule's body. Anything else is a fork, not an adapter.
@@ -1150,7 +1151,7 @@ for ev in d['hooks'].values():
 json.dump(d, open(p, 'w', encoding='utf-8'))
 PY
   su 1
-  [ "$(jq_ "$g/.claude/settings.json" "sum('$ng/.the-agent-kit/hooks/' in h['command'] for ev in d['hooks'].values() for b in ev for h in b['hooks'])")" = 3 ] \
+  [ "$(jq_ "$g/.claude/settings.json" "sum('$ng/.the-agent-kit/hooks/' in h['command'] for ev in d['hooks'].values() for b in ev for h in b['hooks'])")" = 6 ] \
     && pass "M4 a kit hook with a Git Bash path (/c/...) is rewritten to the native path" || bad "M4 a hook command uses a shell-only path: $(cat "$g/.claude/settings.json")"
   # The same hook spelled with backslashes (C:\x for C:/x) is the same hook: a working file is not
   # rewritten over spelling. Found on a real machine whose entries were merged by hand.
@@ -1645,7 +1646,7 @@ else
 fi
 
 # ---------- machine-wide skills: one real copy, linked into the other tools ----------
-# The kit's four skills are installed once per machine: a real copy in ~/.agents/skills (Codex reads it),
+# The kit's skills are installed once per machine: a real copy in ~/.agents/skills (Codex reads it),
 # one directory link per skill in ~/.claude/skills (a junction on Windows, which needs no admin; a symlink
 # elsewhere), and a skills.json entry for Antigravity. The installer creates and removes only what it
 # owns: a folder of the user's with the same name is left alone and reported. Everything runs in a temp HOME.
@@ -1781,7 +1782,7 @@ EOF
   else pass "W10d (this platform cannot create symlinks; skipped)"; fi
   rm -rf "$g" "$vic"
   home_
-  printf '{"entries":[{"path":"~/.agents/skills","include_only":["generating-reports","orchestrating-work","tidy","writing-docs"],"exclude":["x-.*"]}]}\n' > "$g/.gemini/config/skills.json"
+  printf '{"entries":[{"path":"~/.agents/skills","include_only":["generating-reports","orchestrating-work","dispatch","tidy","writing-docs"],"exclude":["x-.*"]}]}\n' > "$g/.gemini/config/skills.json"
   cp "$g/.gemini/config/skills.json" "$g/sj.before"; su 1; undo_
   cmp -s "$g/.gemini/config/skills.json" "$g/sj.before" && has 'skills.json' "$(printf '%s' "$o" | grep '!')" \
     && pass "W10e --undo keeps a skills.json entry that carries keys of the user's own, and says so" || bad "W10e undo rewrote an entry with other keys: $(cat "$g/.gemini/config/skills.json")"
@@ -1898,7 +1899,7 @@ h["timeout"] = 99
 json.dump(d, open(p, "w", encoding="utf-8"))
 EOF
   su 1
-  ! grep -q '^stale$' "$g/.gemini/config/agent-kit-check.py" && [ "$(hk "$(HJ)" "d['the-agent-kit-check']['SessionStart'][0]['timeout']")" = 10 ] && [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status', 'the-agent-kit-check']" ] \
+  ! grep -q '^stale$' "$g/.gemini/config/agent-kit-check.py" && [ "$(hk "$(HJ)" "d['the-agent-kit-check']['SessionStart'][0]['timeout']")" = 10 ] && [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status', 'the-agent-kit-check', 'the-agent-kit-progress']" ] \
     && pass "G5 a stale launcher and a stale kit entry are brought current" || bad "G5 stale files not refreshed: $o"
   # G5b: the kit's current command with a value the user set (a longer timeout): the user's, kept.
   $PY - "$(wq "$(HJ)")" <<'EOF'
@@ -1917,7 +1918,7 @@ d["the-agent-kit-check"] = {"PreInvocation": [dict(v["SessionStart"][0], timeout
 json.dump(d, open(p, "w", encoding="utf-8"))
 EOF
   su 1
-  [ "$(hk "$(HJ)" "sorted(d['the-agent-kit-check'])")" = "['SessionStart']" ] && [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status', 'the-agent-kit-check']" ] \
+  [ "$(hk "$(HJ)" "sorted(d['the-agent-kit-check'])")" = "['SessionStart']" ] && [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status', 'the-agent-kit-check', 'the-agent-kit-progress']" ] \
     && pass "G5c an older kit's PreInvocation entry is moved to SessionStart" || bad "G5c the PreInvocation entry was not migrated: $(cat "$(HJ)")"
   # G5d: a timeout the user set on that old entry moves with it, and a later run keeps it.
   $PY - "$(wq "$(HJ)")" <<'EOF'
@@ -1964,9 +1965,10 @@ EOF
   [ "$(cat "$(HJ)")" = '{ not json' ] && has 'hooks.json' "$(printf '%s' "$o" | grep '!')" \
     && pass "G8 an unreadable hooks.json is left untouched and named" || bad "G8 unreadable hooks.json handled wrongly: $o"
   # G8a: a file named agent-kit-check.py that is not the kit's launcher is never overwritten or removed, and
-  # then the hook is not wired (it would call someone else's file).
+  # then the hook is not wired (it would call someone else's file). The progress hook has a launcher of
+  # its own, so it still is.
   rm -rf "$g"; home_; printf 'mine\n' > "$g/.gemini/config/agent-kit-check.py"; su 1
-  [ "$(cat "$g/.gemini/config/agent-kit-check.py")" = mine ] && [ ! -e "$(HJ)" ] && has 'launcher' "$(printf '%s' "$o" | grep '!')" \
+  [ "$(cat "$g/.gemini/config/agent-kit-check.py")" = mine ] && [ "$(hk "$(HJ)" "sorted(d)")" = "['the-agent-kit-progress']" ] && has 'launcher' "$(printf '%s' "$o" | grep '!')" \
     && pass "G8a a foreign agent-kit-check.py is left alone and the hook is not wired to it" || bad "G8a foreign launcher overwritten or wired: $o"
   src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY=1 sh "$KIT/install.sh" --undo </dev/null 2>&1) || src=$?
   [ "$(cat "$g/.gemini/config/agent-kit-check.py")" = mine ] && pass "G8a --undo does not remove a launcher that is not the kit's" || bad "G8a undo removed a foreign file"
@@ -1979,7 +1981,7 @@ EOF
   rm -rf "$g" "$vic"
   # G9: no hooks.json yet -> created with just the kit's hook. No Antigravity on the machine -> nothing made.
   home_; su 1
-  [ "$(hk "$(HJ)" "sorted(d)")" = "['the-agent-kit-check']" ] && pass "G9 no hooks.json yet: created with only the kit's hook" || bad "G9 fresh hooks.json wrong: $(cat "$(HJ)" 2>/dev/null)"
+  [ "$(hk "$(HJ)" "sorted(d)")" = "['the-agent-kit-check', 'the-agent-kit-progress']" ] && pass "G9 no hooks.json yet: created with only the kit's hooks" || bad "G9 fresh hooks.json wrong: $(cat "$(HJ)" 2>/dev/null)"
   # G10: --check says whether it is wired (a missing hook is a NOTE with the fix, not a FAIL).
   d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
   has 'WARN: .*machine-wide' "$d" && bad "G10 --check complains although everything is in place" || pass "G10 --check is quiet when the Antigravity check is wired"
