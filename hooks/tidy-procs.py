@@ -284,7 +284,7 @@ def scan(procs, now, patterns, min_age_s, idle_s, self_pid, net, cpu_probe, init
     if elsewhere:
         notes.append(f"{len(elsewhere)} orphaned MCP trees elsewhere on this machine "
                      f"({sum(t['mb'] for t in elsewhere):.0f} MB), not listed: run "
-                     "~/.the-agent-kit/install.sh --tidy to review them")
+                     "~/.the-agent-kit/install.sh tidy to review them")
     if unreadable:
         notes.append(f"{unreadable} processes with an unreadable working folder were skipped")
 

@@ -23,7 +23,7 @@ A normal exit does not reproduce it.
   never an ancestor of the reaper itself. It is a dry run by default. `--kill` ends exactly what was listed,
   children first, re-checking each process before it acts. `AGENT_KIT_MCP_PATTERNS` adds comma separated
   patterns; `AGENT_KIT_MCP_PATTERNS_ONLY=1` uses only those.
-- **`install.sh --tidy [--kill] [--min-age-minutes N] [--json]`** runs the reaper. It is only the quick check for
+- **`install.sh tidy [--kill] [--min-age-minutes N] [--json]`** runs the reaper. It is only the quick check for
   leftover MCP servers. The [`/tidy` skill](tidy.md) is the full cleanup: it also covers duplicate and idle dev
   servers, merged branches, stale worktrees and leftover files, and asks you group by group.
 - **`install.sh check`** prints one line: `OK` (no orphans), `WARN` (count and size), or `NOTE` (unavailable).
@@ -61,8 +61,8 @@ Do not kill every `node` process. In a real incident that ended other open agent
 servers. List first:
 
 ```sh
-sh install.sh --tidy              # lists orphaned trees, changes nothing
-sh install.sh --tidy --kill       # ends exactly that list
+sh install.sh tidy                # lists orphaned trees, changes nothing
+sh install.sh tidy --kill         # ends exactly that list
 ```
 
 The reaper only touches trees whose parent is dead and whose command line matches an MCP pattern. Read the list

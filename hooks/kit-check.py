@@ -13,8 +13,8 @@ id either way, and always answers in the JSON those hooks expect: {} to say noth
      most once a day, with a 3-second limit; the answer is cached in ~/.the-agent-kit so the other
      sessions that day need no network at all.
   2. This project's rules (AGENTS.md above the PROJECT-CONFIG block) differ from the installed kit's.
-     `install.sh update` refreshes the project it runs in and the machine, so without this every other repo
-     keeps the rules it was given until someone runs `install.sh` inside it.
+     `install.sh update` brings every project in ~/.the-agent-kit/.projects current, and this check adds
+     the project a session starts in to that list when it holds the kit (.agents/the-agent-kit.json).
 
   3. A tool the user's recommended list names is missing for the agent that started the session
      (`--tool claude|codex|antigravity`, set by the hook command). The list is ~/.the-agent-kit/recommended.json,
@@ -288,7 +288,7 @@ def check_items(tool, top, optional):
 
 
 def doctor(top):
-    """What `install.sh --check` prints about the recommended list: every tool installed on this machine,
+    """What `install.sh check` prints about the recommended list: every tool installed on this machine,
     its missing recommended and optional items, and entries that are not the kit's."""
     home = os.path.expanduser("~")
     lines, checked = [], []
@@ -432,10 +432,26 @@ def repo_top(cwd):
         return ""
 
 
+def register(top):
+    """Add a project that holds the kit to the list `install.sh update` works through, so a project
+    installed before the list existed lists itself. update checks every line again before using it."""
+    if not os.path.isfile(os.path.join(top, ".agents", "the-agent-kit.json")):
+        return
+    path, line = os.path.join(SHARE, ".projects"), top.replace("\\", "/")
+    if any(ord(c) < 32 or ord(c) == 127 for c in line):   # one path, one line: a folder name cannot add a second
+        return
+    try:
+        if line not in (read(path) or "").split("\n"):
+            with open(path, "a", encoding="utf-8", newline="\n") as f:   # appended, never rewritten: sessions start side by side
+                f.write(line + "\n")
+    except OSError:
+        pass
+
+
 def main():
     if "--dismiss" in sys.argv:
         sys.exit(dismiss(sys.argv[sys.argv.index("--dismiss") + 1:]))
-    if "--doctor" in sys.argv:   # asked for by install.sh --check: local files only, nothing throttled
+    if "--doctor" in sys.argv:   # asked for by install.sh check: local files only, nothing throttled
         print("\n".join(doctor(repo_top(os.getcwd()))))
         return
     tool = sys.argv[sys.argv.index("--tool") + 1] if "--tool" in sys.argv[:-1] else None
@@ -470,6 +486,8 @@ def main():
     if top:
         is_kit_repo = os.path.isfile(os.path.join(top, "hooks", "kit-check.py")) and \
             os.path.isfile(os.path.join(top, "install.sh"))
+        if not is_kit_repo:
+            register(top)
         project = read(os.path.join(top, "AGENTS.md"))
         share = read(os.path.join(SHARE, "AGENTS.md"))
         # Skip: the kit's own repo (its rules are the source, so "update" would overwrite new work with

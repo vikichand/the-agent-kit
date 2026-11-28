@@ -7,16 +7,17 @@
 #                             CLAUDE.md that imports it, path rules, skills, git hooks). Ends with check
 #   ./install.sh --lean       the same, but the project gets a project-config stub that extends your global rules
 #   ./install.sh --print      machine-wide, by hand: copy the kit and PRINT the snippets to merge yourself
-#   ./install.sh update       pull the latest kit from GitHub, then install it as above
+#   ./install.sh update       pull the latest kit from GitHub, install it as above, then bring every project
+#                             that holds the kit to it (listed in ~/.the-agent-kit/.projects; asked once)
 #   ./install.sh uninstall    take out what the kit installed in this project and on this machine (asked
 #                             first, verified after), then the kit's own folder
 #   ./install.sh check        doctor: what is installed, and that the guard actually fires
-#   ./install.sh --tidy       list orphaned MCP trees; add --kill to terminate them
+#   ./install.sh tidy         list orphaned MCP trees; add --kill to terminate them
 # Every install and update first removes what the old kit put in and this one no longer ships, from the
-# install records (setup/machine.py, setup/project.py). The old names (--setup, --update, --update-rules,
-# --undo, --extension, --global, --check) still work for one release, as they did, and print the new one.
+# install records (setup/machine.py, setup/project.py).
 # `install.sh project` is the project half on its own (the test suite uses it).
-# cli: install update uninstall check  (update_kit looks for this line in the installer it downloads)
+# cli: install update uninstall check  (kits 0.6.0 to 0.9.0 look for this line in the installer their update
+# downloads and, when it is missing, hand over with --setup, which is gone: keep the line as it is)
 #
 # Safe by design: never overwrites an existing CLAUDE.md or git hook, or an AGENTS.md's PROJECT-CONFIG
 # block (the rules around it are the kit's). In your tool settings it
@@ -28,7 +29,7 @@ set -eu
 
 KIT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 MODE="${1:-}"
-# Where --update pulls from. Overridable so a fork (or the test suite) can point elsewhere.
+# Where update pulls from. Overridable so a fork (or the test suite) can point elsewhere.
 KIT_REPO="${AGENT_KIT_REPO:-https://github.com/vikichand/the-agent-kit.git}"
 
 say() { printf '%s\n' "$*"; }
@@ -101,7 +102,7 @@ write_rules() {  # $1 = target AGENTS.md - the kit's rules with an EMPTY project
   # Never `cp` AGENTS.md: this repo fills its OWN PROJECT-CONFIG block (branches, gates, careful
   # zones), and copying it verbatim would ship the kit's project config into every project that
   # installs it. The rules above the markers are the floor; what sits between them belongs to the
-  # project. --update-rules already swaps the kit's block for the target's, so only a fresh install
+  # project. A later install already swaps the kit's block for the target's, so only a fresh install
   # needed fixing.
   awk '
     /PROJECT-CONFIG:START/ { skip = 1
@@ -259,7 +260,7 @@ project_root() {  # the repo the project half works on: the git repo this runs i
 }
 
 merge_recommended() {  # $1 = the kit's list  $2 = the user's list (~/.the-agent-kit/recommended.json)  $3 = plan | apply (default)
-  # plan only describes the change (exit 10 when there is one): --setup shows it and writes after consent.
+  # plan only describes the change (exit 10 when there is one): install shows it and writes after consent.
   # Items are matched by id. New upstream items are added and changed ones replaced; an item the user
   # removed (it was offered before, so it is in `seeded`) or dismissed never comes back; entries without
   # an id are the user's own and are never touched. A list from before ids existed is matched by name,
@@ -318,7 +319,7 @@ new = {"_about": up.get("_about", cur.get("_about")), "items": items, "seeded": 
 new.update({k: v for k, v in cur.items() if k not in new})
 if not fresh and json.dumps(new, sort_keys=True) == json.dumps(cur, sort_keys=True):
     sys.exit(0)
-if mode == "plan" and not fresh:   # the list comes off the network on --update: show it, write only after a yes
+if mode == "plan" and not fresh:   # the list comes off the network on update: show it, write only after a yes
     bits = [("add", added), ("update", updated), ("retire", dropped)]
     print("  + recommended tools: " + ("; ".join("%s %s" % (k, ", ".join(v)) for k, v in bits if v)
           if any(v for _, v in bits) else "bring the list up to date") + " (items you removed or dismissed stay gone)")
@@ -525,19 +526,19 @@ copy_share() {  # copy this kit into ~/.the-agent-kit, so the download it came f
   rm -rf "$st"; mkdir -p "$st/hooks" "$st/git-hooks" "$st/docs" "$st/claude" "$st/codex" "$st/setup"
   # Copy the WHOLE kit, not just the hooks, so the clone you ran this from becomes disposable.
   # git-hooks/ is the core.hooksPath target (those three only); hooks/ is the full set, which is
-  # what the relocated install.sh compares against in --check and copies from per project.
+  # what the relocated install.sh compares against in check and copies from per project.
   for h in command-guard.py kit-check.py agent-kit-check.py agent-kit-progress.py progress.py mcp-orphans.py mcp-wrap.py tidy-procs.py tidy-scan.py commit-msg pre-commit pre-push; do
     case "$h" in mcp-*|tidy-*|agent-kit-*) [ -f "$KIT/hooks/$h" ] || continue ;; esac
     cp "$KIT/hooks/$h" "$st/hooks/$h"
   done
   for h in commit-msg pre-commit pre-push; do cp "$KIT/hooks/$h" "$st/git-hooks/$h"; done
   # The recommended-tools list is the user's once seeded. hooks/recommended.json beside it is the kit's
-  # pristine copy, which --setup merges in by id (merge_recommended): a declined item stays declined.
+  # pristine copy, which install merges in by id (merge_recommended): a declined item stays declined.
   cp "$KIT/hooks/recommended.json" "$st/hooks/recommended.json" 2>/dev/null || true
   [ -f "$share/recommended.json" ] || merge_recommended "$KIT/hooks/recommended.json" "$share/recommended.json" \
     || cp "$KIT/hooks/recommended.json" "$share/recommended.json" 2>/dev/null || true
   # AGENTS.md goes through write_rules, never cp: this repo's file carries its OWN project block, and
-  # the share is what --update-rules and the "prefer the rules global" append both read. A cp here put
+  # the share is what a project install and the "prefer the rules global" append both read. A cp here put
   # this repo's branch rules into every user's global rules (Q3, found 2026-09-26 before it shipped).
   write_rules "$st/AGENTS.md"
   # The copy people append to their global rules files, between markers, so the install can find and
@@ -562,12 +563,12 @@ copy_share() {  # copy this kit into ~/.the-agent-kit, so the download it came f
   mkdir -p "$st/rules"
   cp "$KIT/claude/rules/"*.md "$st/rules/" 2>/dev/null || cp "$KIT/rules/"*.md "$st/rules/" 2>/dev/null || true
   # Replace the share's skills wholesale. `cp -r src dest` with dest already present copies INTO it,
-  # which on the second --update left a nested skills/skills/ and a stale top level: projects updated
+  # which on the second update left a nested skills/skills/ and a stale top level: projects updated
   # from that copy silently missed every skill added after the first install (observed 2026-09-18).
   mkdir -p "$st/skills"
   if [ -d "$KIT/claude/skills" ]; then cp -r "$KIT/claude/skills/." "$st/skills/" 2>/dev/null || true
   elif [ -d "$KIT/skills" ]; then cp -r "$KIT/skills/." "$st/skills/" 2>/dev/null || true; fi
-  # The optional performance profile ships in the share too, so the README's paths exist after --update.
+  # The optional performance profile ships in the share too, so the README's paths exist after update.
   for pd in claude/performance codex/performance; do
     [ -d "$KIT/$pd" ] && mkdir -p "$st/$pd" && cp -r "$KIT/$pd/." "$st/$pd/" 2>/dev/null
   done
@@ -595,7 +596,7 @@ copy_share() {  # copy this kit into ~/.the-agent-kit, so the download it came f
     fi
   done
   rm -rf "$st" 2>/dev/null || true
-  # Stamp the source commit so --update can tell "already current" from "a month behind", and show
+  # Stamp the source commit so update can tell "already current" from "a month behind", and show
   # you what actually changed. Absent (or "unknown") when installed from a non-git copy - not fatal.
   ver=$( (cd "$KIT" && git rev-parse --short HEAD 2>/dev/null) || true )
   printf '%s\n' "${ver:-unknown}" > "$share/.kit-version"
@@ -604,10 +605,10 @@ copy_share() {  # copy this kit into ~/.the-agent-kit, so the download it came f
   say "  -> $share is now self-contained: the clone you ran this from can be deleted."
 }
 
-install_global() {  # copy the kit, then PRINT the settings snippets for a hand merge (--setup applies them)
+install_global() {  # copy the kit, then PRINT the settings snippets for a hand merge (install applies them)
   share="$HOME/.the-agent-kit"
-  # Running the installed copy's own --global would copy every file onto itself and die under
-  # set -e ("are the same file"). Refreshing the share is --update's job.
+  # Running the installed copy's own --print would copy every file onto itself and die under
+  # set -e ("are the same file"). Refreshing the share is update's job.
   if [ "$KIT" = "$share" ]; then
     say "This IS the installed copy - nothing to copy onto itself. To refresh it from GitHub:"
     say "    $share/install.sh update"
@@ -662,7 +663,7 @@ install_global() {  # copy the kit, then PRINT the settings snippets for a hand 
   say "    \"the-agent-kit-progress\": {\"PreInvocation\": [{\"type\": \"command\", \"command\": \"$py agent-kit-progress.py --tool antigravity --event invocation\", \"timeout\": 10}]}"
 
   hr
-  # $share, never $KIT. Under --update, $KIT is a temp clone this run deletes on its way out, so a
+  # $share, never $KIT. Under update, $KIT is a temp clone this run deletes on its way out, so a
   # command printed with that path is already broken by the time anyone reads it. $share is where
   # the kit actually lives afterwards.
   say "The tool guard is NOT active until you merge the snippet(s) above - then verify:"
@@ -703,7 +704,7 @@ confirm() {  # consent to write the user's settings: a terminal answer, or AGENT
 
 
 
-setup_machine() {  # --setup: everything a machine needs, applied with the user's consent, then verified
+setup_machine() {  # the machine half of install: everything a machine needs, applied with the user's consent, then verified
   share="$HOME/.the-agent-kit"
   [ "$KIT" = "$share" ] || copy_share
   py=$(detect_py)
@@ -714,7 +715,7 @@ setup_machine() {  # --setup: everything a machine needs, applied with the user'
   mrc=0; plan=$(machine install "$share" "$py" 2>&1) || mrc=$?
   if [ -n "$plan" ]; then say "$plan"; else say "  already current"; fi
   hr
-  # The kit's list may have just come off the network (--update), and its text ends up in the agent's
+  # The kit's list may have just come off the network (update), and its text ends up in the agent's
   # context, so it is shown first and merged only after the same yes as the settings.
   say "RECOMMENDED TOOLS - the list the session-start check reminds from (~/.the-agent-kit/recommended.json)"
   rrc=0; rplan=$(merge_recommended "$KIT/hooks/recommended.json" "$share/recommended.json" plan 2>&1) || rrc=$?
@@ -730,6 +731,7 @@ setup_machine() {  # --setup: everything a machine needs, applied with the user'
     return 0
   fi
   confirm || { DECLINED=1; return 0; }   # install_all leaves the project alone after a no
+  ASKED=1                                # update_projects was listed above this question: it does not ask again
   arc=0
   if [ "$mrc" = 10 ]; then
     # Bound to the plan shown above: if anything changed since the yes, machine.py applies nothing.
@@ -767,30 +769,6 @@ setup_machine() {  # --setup: everything a machine needs, applied with the user'
   return 0
 }
 
-uninstall_machine() {  # --undo: take out everything the install record lists, with consent, then verify
-  share="$HOME/.the-agent-kit"
-  py=$(detect_py)
-  [ -n "$py" ] || { say "  ! no working Python 3 found - uninstalling needs it."; exit 2; }
-  [ -f "$share/setup/machine.py" ] || { say "  ! $share/setup/machine.py is missing - nothing to uninstall with. Run install.sh first."; exit 2; }
-  say "UNINSTALL - everything the kit installed on this machine comes out; what you changed yourself stays"
-  urc=0; uplan=$(machine uninstall "$share" "$py" 2>&1) || urc=$?
-  if [ -n "$uplan" ]; then say "$uplan"; else say "  nothing of the kit's is installed here"; fi
-  [ "$urc" = 10 ] || { [ "$urc" = 1 ] && exit 1; return 0; }
-  confirm || return 0
-  pf=$(mktemp) && printf '%s\n' "$uplan" > "$pf"
-  arc=0; aout=$(AGENT_KIT_APPLY=1 machine uninstall "$share" "$py" --apply --expect "$(nat "$pf")" 2>&1) || arc=$?
-  rm -f "$pf"
-  printf '%s\n' "$aout" | grep -E '^  (!|=|Backups)' || true
-  vrc=0; vout=$(machine uninstall "$share" "$py" 2>&1) || vrc=$?
-  if [ "$vrc" = 10 ]; then
-    say "  ! the uninstall did not finish; still in place:"; say "$vout"; exit 1
-  fi
-  say "Verified: nothing the kit installed is left on this machine, apart from anything named above as yours."
-  say "Your settings files keep backups beside them as *.bak-agent-kit-<time>."
-  [ "$arc" = 0 ] || exit 1
-  return 0
-}
-
 update_kit() {  # refresh ~/.the-agent-kit from GitHub, so the clone stays disposable
   share="$HOME/.the-agent-kit"
   command -v git >/dev/null 2>&1 || { say "  ! git not found - cannot update. Install git, or re-clone by hand."; exit 2; }
@@ -809,7 +787,12 @@ update_kit() {  # refresh ~/.the-agent-kit from GitHub, so the clone stays dispo
   done
   new=$( (cd "$tmp/kit" && git rev-parse --short HEAD 2>/dev/null) || printf 'unknown' )
   if [ "$old" = "$new" ] && [ "$old" != "unknown" ]; then
-    rm -rf "$tmp"; say "  = already at $new - nothing to update."; return 0
+    rm -rf "$tmp"; say "  = already at $new - nothing to update."
+    # A listed project can still be behind (on another branch that day, or listed since): the installed
+    # kit brings those current. exec, because that installer may be this very file (see below).
+    [ -s "$share/.projects" ] && [ -f "$share/install.sh" ] || return 0
+    AGENT_KIT_UPDATE=1; export AGENT_KIT_UPDATE
+    exec sh "$share/install.sh" install
   fi
   say "  $old -> $new"
   # Shallow clones may not reach `old`, so this is best-effort context, never a gate.
@@ -819,26 +802,89 @@ update_kit() {  # refresh ~/.the-agent-kit from GitHub, so the clone stays dispo
   # not know to copy. It is code from the network, which is why the identity check above runs first.
   #
   # exec, and nothing after it, is load-bearing. You are usually running $share/install.sh, which
-  # --global is about to overwrite - and sh reads a script lazily by byte offset, so a shell that
+  # the install is about to overwrite - and sh reads a script lazily by byte offset, so a shell that
   # kept going here would resume at a stale offset inside the NEW file and execute whatever fragment
   # of a line landed there ("sac: command not found", observed). exec replaces this process, so not
   # one more byte is read from the file being replaced. Keep the tail below inside the handoff.
-  # A kit from before the four commands knows only --setup (machine only), so it is asked for that; so is
-  # one run by the old --update, which did the machine only.
-  m=--setup; [ "${1:-}" = --setup ] || ! grep -q '^# cli: install update uninstall check' "$tmp/kit/install.sh" || m=install
+  # AGENT_KIT_UPDATE tells the downloaded installer to go on to every listed project (update_projects).
+  AGENT_KIT_UPDATE=1; export AGENT_KIT_UPDATE
   exec sh -c '
-    sh "$1/install.sh" "$4" || exit $?   # your yes (a terminal, or AGENT_KIT_APPLY=1) carries over: one run, nothing left pending
+    sh "$1/install.sh" install || exit $?   # your yes (a terminal, or AGENT_KIT_APPLY=1) carries over: one run, nothing left pending
     rm -rf "$2"
     rm -f "$3/.update-check"   # cached before this update, it would call an older main "newer" until tomorrow
-    printf "%s\n" "------------------------------------------------------------"
-    printf "%s\n" "The kit in ~/.the-agent-kit is current. In each of your other projects, run:"
-    printf "%s\n" "    ~/.the-agent-kit/install.sh     # brings the project to the new kit, your PROJECT-CONFIG kept"
-  ' _ "$tmp/kit" "$tmp" "$share" "$m"
+  ' _ "$tmp/kit" "$tmp" "$share"
+}
+
+register_project() {  # $1 = repo root: add it to the list update works through, once
+  [ -d "$HOME/.the-agent-kit" ] || return 0
+  rp=$(nat "$1")
+  grep -Fxq -- "$rp" "$HOME/.the-agent-kit/.projects" 2>/dev/null || printf '%s\n' "$rp" >> "$HOME/.the-agent-kit/.projects"
+}
+
+holds_kit() {  # $1 = a line of the project list -> true when it names a project the kit is installed in
+  # The list is a plain file that the session-start check also adds to, so a line is never trusted to be a
+  # project: it must be an absolute path, the top of a git repo, holding the kit's own record. Never the
+  # home folder or the share, and never the kit's checkout, told by its files ($KIT is a temp clone here).
+  case "$1" in
+    /*) : ;;
+    [A-Za-z]:[\\/]*) command -v cygpath >/dev/null 2>&1 || return 1 ;;   # a drive path only where there are drives
+    *) return 1 ;;
+  esac
+  [ -f "$1/.agents/the-agent-kit.json" ] && [ ! -L "$1/.agents/the-agent-kit.json" ] || return 1
+  { [ -f "$1/install.sh" ] && [ -f "$1/hooks/kit-check.py" ]; } && return 1
+  ht=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null) && same_dir "$ht" "$1" || return 1
+  for x in "$HOME" "$HOME/.the-agent-kit" "$KIT"; do
+    same_dir "$1" "$x" && return 1
+  done
+  return 0
+}
+
+list_projects() {  # $1 = the project this run does itself, or empty: name every other listed project
+  # Shown before the one question of the run (setup_machine's, or update_projects' own), so the yes covers it.
+  PLIST="$HOME/.the-agent-kit/.projects"; PKEEP=""; PTODO=""; PGONE=""
+  [ -s "$PLIST" ] || return 0
+  PKEEP=$(mktemp) && PTODO=$(mktemp) || { PKEEP=""; return 0; }
+  while IFS= read -r lp || [ -n "$lp" ]; do
+    lp=${lp%"$(printf '\r')"}
+    case "$lp" in ""|*[[:cntrl:]]*) continue ;; esac   # never printed, never a path; gone at the rewrite
+    if holds_kit "$lp"; then
+      lp=$(nat "$lp")
+      grep -Fxq -- "$lp" "$PKEEP" && continue
+      printf '%s\n' "$lp" >> "$PKEEP"
+      { [ -n "$1" ] && same_dir "$lp" "$1"; } || printf '%s\n' "$lp" >> "$PTODO"
+    else
+      PGONE="$PGONE
+    $lp"
+    fi
+  done < "$PLIST"
+  [ -s "$PTODO" ] || [ -n "$PGONE" ] || return 0
+  hr; say "YOUR OTHER PROJECTS THAT HOLD THE KIT ($PLIST)"
+  [ ! -s "$PTODO" ] || { say "  To bring to this kit, each project block kept:"; sed 's/^/    /' "$PTODO"; }
+  [ -z "$PGONE" ] || say "  To drop from the list (moved, deleted, or the kit is no longer installed there):$PGONE"
+}
+
+update_projects() {  # after the yes: the list loses its dead lines, then each listed project is installed
+  uprc=0
+  if [ -n "$PKEEP" ] && { [ -s "$PTODO" ] || [ -n "$PGONE" ]; } && { [ "${ASKED:-}" = 1 ] || confirm; }; then
+    cat "$PKEEP" > "$PLIST"
+    [ -z "$PGONE" ] || { hr; say "Dropped from the list:$PGONE"; }
+    while IFS= read -r lp; do
+      hr; say "PROJECT $lp"
+      # A subshell: the install functions set this run's own variables and can exit, and one project that
+      # fails must not stop the rest.
+      ( if grep -q 'universal rules live in your global' "$lp/AGENTS.md" 2>/dev/null; then install_extension "$lp"
+        else install_project "$lp"; fi ) </dev/null \
+        || { uprc=1; say "  ! $lp was not brought current (named above): run install.sh inside it to see why"; }
+    done < "$PTODO"
+  fi
+  [ -z "$PKEEP" ] || rm -f "$PKEEP" "$PTODO"
+  [ "$uprc" = 0 ]
 }
 
 install_all() {  # install.sh [--lean]: the machine, then the project this runs in, then check
-  setup_machine
   root=$(project_root)
+  PKEEP=""; [ "${AGENT_KIT_UPDATE:-}" != 1 ] || list_projects "$root"
+  setup_machine
   prc=0
   hr
   if [ -n "$root" ] && [ "${DECLINED:-}" = 1 ]; then
@@ -846,11 +892,15 @@ install_all() {  # install.sh [--lean]: the machine, then the project this runs 
   elif [ -n "$root" ]; then
     say "THE KIT IN THIS PROJECT"
     if [ "${1:-}" = lean ]; then install_extension "$root" || prc=1; else install_project "$root" || prc=1; fi
+    [ "$prc" != 0 ] || register_project "$root"
     formatter_offer "$root"
   else
     say "No project here (not inside a git repo, or it is your home folder or the kit itself): the machine only."
     say "To add the kit to a project, run $HOME/.the-agent-kit/install.sh inside it."
   fi
+  # update goes on to every other listed project. Not after a no above: nothing was agreed to.
+  if [ -n "$PKEEP" ] && [ "${DECLINED:-}" = 1 ]; then rm -f "$PKEEP" "$PTODO"
+  elif [ -n "$PKEEP" ]; then update_projects || prc=1; fi
   # Done means checked: the same doctor as install.sh check, run where the project is.
   drc=0; ( [ -z "$root" ] || cd "$root"; doctor ) || drc=$?
   [ "$prc" = 0 ] && [ "$drc" = 0 ] || exit 1
@@ -971,37 +1021,6 @@ uninstall_all() {  # install.sh uninstall: this project's kit files, the machine
   ' _ "$share"
 }
 
-alias_of() {  # $1 = old name, $2 = new: an old name still works this release, and says what replaces it
-  say "Note: '$1' is now '$2' and goes in the next release; it runs as before this time." >&2
-}
-
-
-update_rules() {  # refresh the universal rules in this repo's AGENTS.md, preserving its PROJECT-CONFIG block
-  root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-  tgt="$root/AGENTS.md"
-  if [ ! -e "$tgt" ]; then
-    say "  ! no AGENTS.md in $root - nothing to update. Run './install.sh' to install the rules first."
-    exit 2
-  fi
-  # An --extension stub carries no universal rules on purpose - they live in the global files.
-  if grep -q 'universal rules live in your global' "$tgt" 2>/dev/null; then
-    say "  = this AGENTS.md is a --lean stub: the universal rules live in your GLOBAL files"
-    say "    (~/.claude/CLAUDE.md / ~/.codex/AGENTS.md) - update those; this file only holds project config."
-    exit 0
-  fi
-  # Fail closed without both markers: there is no way to tell project config from rules, so replace nothing.
-  if ! grep -q 'PROJECT-CONFIG:START' "$tgt" 2>/dev/null || ! grep -q 'PROJECT-CONFIG:END' "$tgt" 2>/dev/null; then
-    say "  ! $tgt has no PROJECT-CONFIG markers - refusing to guess which part is yours."
-    say "    Add the markers (see the kit's AGENTS.md) or update the file by hand."
-    exit 2
-  fi
-  # project.py brings the WHOLE kit current, not just this file: a project set up before the depth tier
-  # existed has no .claude/rules, and updating only AGENTS.md would leave it silently missing every
-  # path-scoped rule while reporting success.
-  prc=0; project install "$root" --apply || prc=$?
-  [ "$prc" = 0 ] || exit 1
-}
-
 doctor() {
   dfail=0
   hr; say "the-agent-kit check (doctor)"
@@ -1084,7 +1103,7 @@ doctor() {
   else
     hp=$(git config core.hooksPath 2>/dev/null || true)
     if [ -n "$hp" ]; then
-      say "  NOTE: core.hooksPath=$hp - git runs hooks from THERE, not .git/hooks (kit --global, Husky, lefthook?)."
+      say "  NOTE: core.hooksPath=$hp - git runs hooks from THERE, not .git/hooks (the kit's install, Husky, lefthook?)."
     fi
     # Existence is not enough: another tool's hook in that slot means OUR guard is not running.
     # Three distinguishable states, reported separately so you know how strong the evidence is:
@@ -1150,7 +1169,7 @@ doctor() {
       say "  WARN: PROJECT-CONFIG is still the empty placeholder. Without it the agent GUESSES this project's"
       say "        build / test / lint commands. Fill it via ~/.the-agent-kit/docs/project-setup-prompt.md - biggest win."
     elif grep -q 'PROJECT-CONFIG:START' AGENTS.md 2>/dev/null && ! grep -q '^\*\*Branches:\*\*' AGENTS.md 2>/dev/null; then
-      # A block filled before 2026-09-26 has no branch model, and --update-rules keeps the block byte for
+      # A block filled before 2026-09-26 has no branch model, and an install keeps the block byte for
       # byte, so without this the gap is invisible: the agent guesses which branch takes work.
       say "  WARN: this project's block has no **Branches:** line, so the agent guesses which branch takes work"
       say "        and whether one is release-only. Re-run ~/.the-agent-kit/docs/project-setup-prompt.md to add it."
@@ -1226,7 +1245,7 @@ if not isinstance(trees, list):
     sys.exit(1)
 count = sum(len(t["pids"]) for t in trees)
 mb = sum(t["mb"] for t in trees)
-print("  WARN: %d orphaned MCP processes (%.1f MB) - run: install.sh --tidy (add --kill after reading the list)" % (count, mb) if trees else "  OK:   no orphaned MCP processes")
+print("  WARN: %d orphaned MCP processes (%.1f MB) - run: install.sh tidy (add --kill after reading the list)" % (count, mb) if trees else "  OK:   no orphaned MCP processes")
 ' 2>/dev/null) || orphan_line=""
   fi
   say "${orphan_line:-  NOTE: orphan check unavailable}"
@@ -1240,25 +1259,17 @@ print("  WARN: %d orphaned MCP processes (%.1f MB) - run: install.sh --tidy (add
 # this line runs when sourced that way.
 if [ "${AGENT_KIT_LIB:-0}" = 1 ]; then return 0 2>/dev/null || exit 0; fi
 
-USAGE="Usage: ./install.sh [install [--lean | --print] | update | uninstall | check | --tidy [--kill] [reaper options]]"
+USAGE="Usage: ./install.sh [install [--lean | --print] | update | uninstall | check | tidy [--kill] [reaper options]]"
 [ "$MODE" = install ] && MODE=${2:-install}
 case "$MODE" in
   ""|install)                   install_all ;;
-  --lean|lean)                  install_all lean ;;
+  --lean)                       install_all lean ;;
   --print)                      install_global ;;
   update)                       update_kit ;;
   uninstall)                    uninstall_all ;;
-  check|doctor)                 doctor ;;
-  project|--project)            install_project || exit 1 ;;
-  # The old names, as they were (alias_of says what replaces each).
-  --setup|setup)                alias_of --setup install; setup_machine ;;
-  --global|global)              alias_of --global "install --print"; install_global ;;
-  --extension|extension)        alias_of --extension "install --lean"; install_extension || exit 1 ;;
-  --update)                     alias_of --update update; update_kit --setup ;;
-  --update-rules|update-rules)  alias_of --update-rules "install (inside the project)"; update_rules ;;
-  --undo|undo)                  alias_of --undo uninstall; uninstall_machine ;;
-  --check)                      alias_of --check check; doctor ;;
-  --tidy|tidy)
+  check)                        doctor ;;
+  project)                      install_project || exit 1 ;;
+  tidy)
     shift
     py=$(detect_py)
     [ -n "$py" ] || { say "Python 3 unavailable - cannot run orphan check"; exit 1; }

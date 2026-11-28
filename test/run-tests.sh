@@ -1,6 +1,6 @@
 #!/bin/sh
 # the-agent-kit test suite - exercises all four hooks in throwaway repos, the command-guard corpus,
-# and the installer's doctor (--check).
+# and the installer's doctor (check).
 # set -u plus explicit setup guards: a failed mktemp / git init aborts (exit 2) rather than printing
 # misleading PASS lines on empty output. Exits non-zero if any assertion fails.
 set -u
@@ -44,7 +44,7 @@ fi
 echo "== commit-msg (attribution) =="
 w=$(mktemp -d) || exit 2; cd "$w" || exit 2
 git init -q -b main || exit 2; git config user.email t@e.com; git config user.name T
-# Pin the hooks dir: a machine with the kit's own --global install has a GLOBAL core.hooksPath, and
+# Pin the hooks dir: a machine with the kit's own install has a GLOBAL core.hooksPath, and
 # without this the throwaway repo runs the INSTALLED hook, not the one under test - so a change to
 # hooks/ passes or fails on someone's machine state (found 2026-09-21, when a new strip rule "failed").
 git config core.hooksPath .git/hooks
@@ -94,7 +94,7 @@ cd "$KIT"; rm -rf "$w"
 echo "== pre-commit (secret scan) =="
 w=$(mktemp -d) || exit 2; cd "$w" || exit 2
 git init -q -b main || exit 2; git config user.email t@e.com; git config user.name T
-# Pin the hooks dir: a machine with the kit's own --global install has a GLOBAL core.hooksPath, and
+# Pin the hooks dir: a machine with the kit's own install has a GLOBAL core.hooksPath, and
 # without this the throwaway repo runs the INSTALLED hook, not the one under test - so a change to
 # hooks/ passes or fails on someone's machine state (found 2026-09-21, when a new strip rule "failed").
 git config core.hooksPath .git/hooks
@@ -186,7 +186,7 @@ cd "$KIT"; rm -rf "$w"
 echo "== pre-push (force / delete / non-ff) =="
 w=$(mktemp -d) || exit 2; cd "$w" || exit 2
 git init -q -b main || exit 2; git config user.email t@e.com; git config user.name T
-# Pin the hooks dir: a machine with the kit's own --global install has a GLOBAL core.hooksPath, and
+# Pin the hooks dir: a machine with the kit's own install has a GLOBAL core.hooksPath, and
 # without this the throwaway repo runs the INSTALLED hook, not the one under test - so a change to
 # hooks/ passes or fails on someone's machine state (found 2026-09-21, when a new strip rule "failed").
 git config core.hooksPath .git/hooks
@@ -267,7 +267,7 @@ if [ -n "$PY" ]; then
   printf '# rules v2\n<!-- PROJECT-CONFIG:START -->\nmine\n<!-- PROJECT-CONFIG:END -->\n' > "$k/proj/AGENTS.md"
   o=$(kc "$k/proj"); [ -z "$o" ] && pass "K7 project rules current (own block differs): silent" || bad "K7 spoke about a current project: $o"
   printf '<!-- The universal rules live in your global files -->\n<!-- PROJECT-CONFIG:START -->\n<!-- PROJECT-CONFIG:END -->\n' > "$k/proj/AGENTS.md"
-  o=$(kc "$k/proj"); [ -z "$o" ] && pass "K8 --extension stub: silent" || bad "K8 nagged an extension stub"
+  o=$(kc "$k/proj"); [ -z "$o" ] && pass "K8 --lean stub: silent" || bad "K8 nagged an extension stub"
   o=$(kc "$KIT"); has 'differ from your installed kit' "$o" && bad "K9 told the kit's own repo to overwrite its rules" || pass "K9 the kit's own repo is never told to overwrite its rules"
   # K10-K17: recommended tools. Only what is missing from the user's copy of recommended.json, for the
   # tool that started the session; web items only in a web project; a recommended one at most weekly, an optional one once; silent when
@@ -462,40 +462,40 @@ else
   bad "no python - kit-check.py NOT tested"
 fi
 
-# ---------- install.sh --check (doctor) ----------
+# ---------- install.sh check (doctor) ----------
 # The doctor must report what is ACTUALLY live. Existence of a file in the hook slot is not enough:
 # another tool's hook there (Husky, lefthook, pre-commit) means OUR guard is not running.
-echo "== install.sh --check (doctor) =="
+echo "== install.sh check (doctor) =="
 w=$(mktemp -d) || exit 2; cd "$w" || exit 2
 git init -q -b main || exit 2
 # Pin this throwaway repo's hooks dir. Without it the suite inherits the machine's GLOBAL hooks
-# redirect - which is exactly what the kit's own --global install sets up - and D1-D3 would then
+# redirect - which is exactly what the kit's own install sets up - and D1-D3 would then
 # inspect the developer's real hooks directory instead of this repo, passing or failing on someone's
 # machine configuration rather than on the code. D4 below re-points it on purpose.
 git config core.hooksPath .git/hooks
 
-d=$(sh "$KIT/install.sh" --check 2>&1)
+d=$(sh "$KIT/install.sh" check 2>&1)
 has 'pre-commit not installed' "$d" && pass "D1 missing hook reported" || bad "D1 missing hook NOT reported"
 has 'no AI-aware .gitignore' "$d" && pass "D1g missing AI .gitignore suggested" || bad "D1g missing AI .gitignore NOT suggested"
 printf '# >>> the-ultimate-gitignore-ai:START\n' > .gitignore
-d2=$(sh "$KIT/install.sh" --check 2>&1); rm -f .gitignore
+d2=$(sh "$KIT/install.sh" check 2>&1); rm -f .gitignore
 has 'carries the-ultimate-gitignore-ai' "$d2" && ! has 'no AI-aware .gitignore' "$d2" \
   && pass "D1h AI .gitignore recognised, no suggestion" || bad "D1h AI .gitignore not recognised"
 
 for h in commit-msg pre-commit pre-push; do cp "$KIT/hooks/$h" ".git/hooks/$h"; chmod +x ".git/hooks/$h"; done
-d=$(sh "$KIT/install.sh" --check 2>&1)
+d=$(sh "$KIT/install.sh" check 2>&1)
 n=$(printf '%s\n' "$d" | grep -c 'live in')
 [ "$n" -eq 3 ] && pass "D2 all three kit hooks reported live" || bad "D2 expected 3 live hooks, got $n"
 
 printf '#!/bin/sh\necho some other tool\n' > .git/hooks/pre-commit; chmod +x .git/hooks/pre-commit
-d=$(sh "$KIT/install.sh" --check 2>&1)
+d=$(sh "$KIT/install.sh" check 2>&1)
 has "is NOT the kit" "$d" && pass "D3 foreign hook flagged INACTIVE" || bad "D3 foreign hook passed as OK (false green)"
 # The exit code is the API scripts and CI actually read. FAIL text over exit 0 is false confidence.
-if sh "$KIT/install.sh" --check >/dev/null 2>&1; then bad "D3b doctor exited 0 despite a FAIL"; else pass "D3b doctor exit code reflects FAIL"; fi
+if sh "$KIT/install.sh" check >/dev/null 2>&1; then bad "D3b doctor exited 0 despite a FAIL"; else pass "D3b doctor exit code reflects FAIL"; fi
 
 mkdir -p .other-hooks; git config core.hooksPath .other-hooks
 cp "$KIT/hooks/pre-commit" .other-hooks/pre-commit; chmod +x .other-hooks/pre-commit
-d=$(sh "$KIT/install.sh" --check 2>&1)
+d=$(sh "$KIT/install.sh" check 2>&1)
 has 'core.hooksPath=' "$d" && pass "D4 hooksPath redirect reported" || bad "D4 hooksPath redirect NOT reported"
 # Reporting the redirect is not enough: the doctor must actually LOOK there. The kit hook planted in
 # .other-hooks is the one it should find, and .git/hooks must no longer be what it reads.
@@ -504,51 +504,51 @@ printf '%s\n' "$d" | grep -q 'live in.*\.other-hooks' \
   || bad  "D4b doctor did NOT follow the redirect - it is checking the wrong directory"
 
 # A Husky/lefthook shim that CALLS the kit's hook is a working setup, not a failure. The kit's own
-# README recommends exactly this, so flagging it FAIL would make --check lie about a documented recipe.
+# README recommends exactly this, so flagging it FAIL would make check lie about a documented recipe.
 printf '#!/bin/sh\nsh "$HOME/.the-agent-kit/git-hooks/pre-push" "$@" || exit 1\n' > .other-hooks/pre-push
 chmod +x .other-hooks/pre-push
-d=$(sh "$KIT/install.sh" --check 2>&1)
+d=$(sh "$KIT/install.sh" check 2>&1)
 has 'calls the kit' "$d" && pass "D8 delegating shim recognised, not flagged" || bad "D8 documented Husky shim wrongly flagged INACTIVE"
 
 # Rules-file wiring: a CLAUDE.md that does NOT import AGENTS.md means two copies that drift apart.
 printf 'rules\n' > AGENTS.md; printf 'a second copy of the rules\n' > CLAUDE.md
-d=$(sh "$KIT/install.sh" --check 2>&1)
+d=$(sh "$KIT/install.sh" check 2>&1)
 has 'does not import AGENTS.md' "$d" && pass "D5 un-imported CLAUDE.md warned" || bad "D5 drift risk NOT warned"
 printf '@AGENTS.md\n' > CLAUDE.md
-d=$(sh "$KIT/install.sh" --check 2>&1)
+d=$(sh "$KIT/install.sh" check 2>&1)
 has 'one source of truth' "$d" && pass "D6 import wiring confirmed" || bad "D6 correct import NOT confirmed"
 # Codex silently truncates AGENTS.md past 32 KiB, so oversize must be loud here.
 dd if=/dev/zero bs=1024 count=40 2>/dev/null | tr '\0' 'x' > AGENTS.md
-d=$(sh "$KIT/install.sh" --check 2>&1)
+d=$(sh "$KIT/install.sh" check 2>&1)
 has 'SILENTLY truncates' "$d" && pass "D7 oversize AGENTS.md flagged" || bad "D7 Codex truncation NOT flagged"
 
 # The real rules file: an unfilled PROJECT-CONFIG means the agent guesses this project's commands,
 # which is the kit's single largest hallucination surface. It must be called out, not left silent.
 kit_rules AGENTS.md; printf '@AGENTS.md\n' > CLAUDE.md
-d=$(sh "$KIT/install.sh" --check 2>&1)
+d=$(sh "$KIT/install.sh" check 2>&1)
 has 'PROJECT-CONFIG is still the empty placeholder' "$d" \
   && pass "D9 unfilled PROJECT-CONFIG warned" || bad "D9 unfilled PROJECT-CONFIG NOT warned"
 has 'effective lines' "$d" && pass "D10 effective line count reported" || bad "D10 effective line count NOT reported"
 # D10b: the count must include the PROJECT-CONFIG block. The markers are one-line comments, and a
 # naive comment strip opened a range at START and closed it at END, hiding the project's config from
 # the budget. Insert a known number of lines in the block and assert the count moves by that much.
-c0=$(sh "$KIT/install.sh" --check 2>&1 | sed -n 's/.*AGENTS.md \([0-9][0-9]*\) effective lines.*/\1/p')
+c0=$(sh "$KIT/install.sh" check 2>&1 | sed -n 's/.*AGENTS.md \([0-9][0-9]*\) effective lines.*/\1/p')
 awk '/PROJECT-CONFIG:START/ { print; print "x1"; print "x2"; print "x3"; next } { print }' AGENTS.md > A3 && mv A3 AGENTS.md
-c1=$(sh "$KIT/install.sh" --check 2>&1 | sed -n 's/.*AGENTS.md \([0-9][0-9]*\) effective lines.*/\1/p')
+c1=$(sh "$KIT/install.sh" check 2>&1 | sed -n 's/.*AGENTS.md \([0-9][0-9]*\) effective lines.*/\1/p')
 [ -n "$c0" ] && [ "$c1" = "$((c0 + 3))" ] \
   && pass "D10b project-block lines are counted against the budget ($c0 -> $c1)" \
   || bad "D10b project-block lines are NOT counted ($c0 -> $c1, expected $((c0 + 3)))"
 
 # False-positive control: once it IS filled, the warning must go silent.
 sed 's/Not configured yet\..*fill this in\./Build: make all  Test: make test  Lint: make lint/' AGENTS.md > A2 && mv A2 AGENTS.md
-d=$(sh "$KIT/install.sh" --check 2>&1)
+d=$(sh "$KIT/install.sh" check 2>&1)
 has 'PROJECT-CONFIG is still the empty placeholder' "$d" \
   && bad "D11 filled PROJECT-CONFIG still warned (false positive)" || pass "D11 filled PROJECT-CONFIG is silent"
 # D12: a block filled without a Branches line (every install before 2026-09-26) is flagged; with one, silent.
 has 'no \*\*Branches:\*\* line' "$d" && pass "D12 filled block without Branches warned" || bad "D12 missing Branches line NOT warned"
 awk '{ print } /PROJECT-CONFIG:START/ { print "**Branches:** work on `main`; none is release-only." }' AGENTS.md > A2 && mv A2 AGENTS.md
 grep -q '^\*\*Branches:\*\*' AGENTS.md || bad "D12b setup: the Branches line was not inserted"
-d=$(sh "$KIT/install.sh" --check 2>&1)
+d=$(sh "$KIT/install.sh" check 2>&1)
 has 'no \*\*Branches:\*\* line' "$d" && bad "D12b Branches warning still shown (false positive)" || pass "D12b block with a Branches line is silent"
 cd "$KIT"; rm -rf "$w"
 
@@ -556,7 +556,7 @@ cd "$KIT"; rm -rf "$w"
 if [ -n "$PY" ]; then
   g=$(mktemp -d) || exit 2; u=$(mktemp -d) || exit 2
   G=$(cygpath -m "$g" 2>/dev/null || printf '%s' "$g")
-  dr() { (cd "$u" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1); }
+  dr() { (cd "$u" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" check 2>&1); }
   git init -q "$u"; git -C "$u" config core.hooksPath .git/hooks
   mkdir -p "$u/.claude/skills/tidy" "$g/.the-agent-kit/hooks"; : > "$u/.claude/skills/tidy/SKILL.md"
   d=$(dr)
@@ -577,21 +577,21 @@ fi
 if [ -n "$PY" ]; then
   g=$(mktemp -d) || exit 2; u=$(mktemp -d) || exit 2
   G=$(cygpath -m "$g" 2>/dev/null || printf '%s' "$g")
-  dr() { (cd "$u" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1); }
+  dr() { (cd "$u" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" check 2>&1); }
   git init -q "$u"; git -C "$u" config core.hooksPath .git/hooks
   mkdir -p "$g/.the-agent-kit/hooks"
   cp "$KIT/hooks/recommended.json" "$g/.the-agent-kit/recommended.json"; cp "$KIT/hooks/kit-check.py" "$g/.the-agent-kit/hooks/kit-check.py"
   mkdir -p "$g/.claude" "$g/.gemini/config"; printf '{"mcpServers":{}}' > "$g/.claude.json"; printf 'not json' > "$g/.gemini/config/mcp_config.json"
   d=$(dr)
   has 'Claude Code is missing Context7' "$d" && has 'optional.*Claude Code.*superpowers' "$d" && has 'claude mcp add' "$d" \
-    && pass "D14 --check lists the missing recommended and optional tools, with their commands" || bad "D14 gaps not listed: $(printf '%s' "$d" | grep -i 'missing\|cannot')"
+    && pass "D14 check lists the missing recommended and optional tools, with their commands" || bad "D14 gaps not listed: $(printf '%s' "$d" | grep -i 'missing\|cannot')"
   has 'Antigravity is missing Context7' "$d" && bad "D14 an unreadable Antigravity config was reported as missing" \
     || { has 'cannot tell.*Antigravity' "$d" && pass "D14 an unreadable config is 'cannot tell', not 'missing'" || bad "D14 unreadable config not mentioned: $(printf '%s' "$d" | grep -i antigravity)"; }
   has 'Codex is missing' "$d" && bad "D14 reported Codex although it is not installed here" || pass "D14 a tool that is not on this machine is not checked"
   : > "$g/.gemini/config/mcp_config.json"; d=$(dr)
   has 'Antigravity is missing Context7' "$d" && has 'agy mcp add' "$d" \
     && pass "D14 an empty Antigravity MCP file is a readable, empty config: Context7 is missing" || bad "D14 empty Antigravity config misjudged: $(printf '%s' "$d" | grep -i antigravity)"
-  # D14c: an entry without a kit id is named only when the kit does not know it; one it knows by name is merged by --setup.
+  # D14c: an entry without a kit id is named only when the kit does not know it; one it knows by name is merged by install.
   printf '{"items":[{"name":"Context7 MCP (library docs)","when":"always","claude":{"mcp":"context7","install":"x"}},{"name":"my own tool","when":"always","claude":{"mcp":"mine","install":"y"}}]}' > "$g/.the-agent-kit/recommended.json"
   d=$(dr)
   has 'entry "my own tool" has no kit id' "$d" && ! has 'entry "Context7 MCP (library docs)" has no kit id' "$d" \
@@ -604,8 +604,8 @@ if [ -n "$PY" ]; then
   rm -rf "$g" "$u"
 fi
 
-# ---------- install.sh --update-rules ----------
-echo "== install.sh --update-rules =="
+# ---------- install.sh install ----------
+echo "== a project install over older or hand-edited rules =="
 w=$(mktemp -d) || exit 2; cd "$w" || exit 2
 git init -q -b main || exit 2
 # U1: stale rules + a FILLED block -> rules refreshed, the block survives byte-for-byte
@@ -614,21 +614,22 @@ kit_rules A0
 sed 's/Not configured yet\..*fill this in\./Build: make all  Test: make test/' AGENTS.md > A2 && mv A2 AGENTS.md
 grep -q 'Build: make all' AGENTS.md || bad "U1 setup: the placeholder sed did not fire"
 grep -q 'STALE-RULES-MARKER' AGENTS.md || bad "U1 setup: the stale marker was not inserted"
-sh "$KIT/install.sh" --update-rules >/dev/null 2>&1 || bad "U1 --update-rules exited non-zero"
+sh "$KIT/install.sh" project >/dev/null 2>&1 || bad "U1 install exited non-zero"
 grep -q 'STALE-RULES-MARKER' AGENTS.md && bad "U1 stale rules NOT replaced" || pass "U1 stale rules replaced with the kit's"
 grep -q 'Build: make all' AGENTS.md && pass "U1 filled PROJECT-CONFIG preserved" || bad "U1 filled PROJECT-CONFIG LOST"
-# U2: no markers -> refuse and change nothing (fail-closed: can't tell project config from rules)
+# U2: no markers -> the file is left as it is and the run says why (can't tell project config from rules)
 printf 'my own rules, no markers\n' > AGENTS.md
-if sh "$KIT/install.sh" --update-rules >/dev/null 2>&1; then bad "U2 marker-less file was updated"; else pass "U2 marker-less file refused (fail-closed)"; fi
+d=$(sh "$KIT/install.sh" project 2>&1)
+has 'no PROJECT-CONFIG markers' "$d" && pass "U2 marker-less file refused, and the run says why" || bad "U2 marker-less file not named: $d"
 grep -q 'my own rules' AGENTS.md && pass "U2 marker-less file untouched" || bad "U2 file MODIFIED despite refusal"
-# U3: an --extension stub holds no universal rules; updating must redirect to the global files, not inject them
-rm -f AGENTS.md CLAUDE.md; sh "$KIT/install.sh" --extension >/dev/null 2>&1
-d=$(sh "$KIT/install.sh" --update-rules 2>&1)
+# U3: a --lean stub holds no universal rules; updating must redirect to the global files, not inject them
+rm -f AGENTS.md CLAUDE.md; AGENT_KIT_LIB=1 sh -c '. "$0"; install_extension' "$KIT/install.sh" >/dev/null 2>&1
+d=$(sh "$KIT/install.sh" project 2>&1)
 has 'GLOBAL' "$d" && pass "U3 extension stub redirected to global rules" || bad "U3 extension stub not recognised"
 grep -q 'universal rules live in your global' AGENTS.md && pass "U3 stub untouched" || bad "U3 stub was REWRITTEN"
 # U4: already-current file -> explicit no-op, no rewrite
 rm -f AGENTS.md; cp "$KIT/AGENTS.md" AGENTS.md
-d=$(sh "$KIT/install.sh" --update-rules 2>&1)
+d=$(sh "$KIT/install.sh" project 2>&1)
 has 'already carries the current rules' "$d" && pass "U4 current rules detected, no rewrite" || bad "U4 no-op not detected"
 cd "$KIT"; rm -rf "$w"
 
@@ -654,9 +655,9 @@ c2=$(ls .claude/rules/*.md 2>/dev/null | wc -l | tr -d ' ')
 [ "$c2" = "$n" ] && pass "R3 re-install does not duplicate rules" || bad "R3 rule count changed to $c2"
 cd "$KIT"; rm -rf "$w"
 w=$(mktemp -d) || exit 2; cd "$w" || exit 2; git init -q
-sh "$KIT/install.sh" --extension >/dev/null 2>&1
+AGENT_KIT_LIB=1 sh -c '. "$0"; install_extension' "$KIT/install.sh" >/dev/null 2>&1
 c3=$(ls .claude/rules/*.md 2>/dev/null | wc -l | tr -d ' ')
-[ "$c3" = "$n" ] && pass "R4 --extension deploys the rules too" || bad "R4 --extension deployed $c3 of $n"
+[ "$c3" = "$n" ] && pass "R4 --lean deploys the rules too" || bad "R4 --lean deployed $c3 of $n"
 cd "$KIT"; rm -rf "$w"   # S2 below reassigns $w; without this the R4 sandbox leaks, one per run
 # S1-S3: skills are the TASK-shaped tier. Same silent-failure risk as rules - if one does not
 # install, nothing says so, because a skill is meant to be quiet until a task matches it.
@@ -679,7 +680,7 @@ sc2=$(ls -d .claude/skills/*/ 2>/dev/null | wc -l | tr -d ' ')
 [ "$sc2" = "$sn" ] && pass "S3 re-install does not duplicate skills" || bad "S3 skill count changed to $sc2"
 # S4: a skill is its whole folder. A SKILL.md routing to a references/ file that never shipped fails
 # silently, so every kit file, nested ones included, must land in both tools' copies, and
-# --update-rules must restore a stale one.
+# install must restore a stale one.
 miss=""
 for f in $(cd "$KIT/claude/skills" && find . -type f | sed 's|^\./||'); do
   for t in .claude/skills .agents/skills; do [ -f "$t/$f" ] || miss="$miss $t/$f"; done
@@ -688,7 +689,7 @@ nf=$(find "$KIT/claude/skills" -mindepth 3 -type f | head -1)
 if [ -n "$nf" ]; then
   rel=${nf#"$KIT/claude/skills/"}; printf 'stale\n' > ".claude/skills/$rel"
   printf 'pre-0.5.0 copy\n' > .claude/skills/generating-reports/design.md
-  sh "$KIT/install.sh" --update-rules >/dev/null 2>&1
+  sh "$KIT/install.sh" project >/dev/null 2>&1
   cmp -s "$nf" ".claude/skills/$rel" || miss="$miss (stale .claude/skills/$rel not refreshed)"
   [ -e .claude/skills/generating-reports/design.md ] && miss="$miss (pre-0.5.0 design.md not removed)"
 fi
@@ -703,16 +704,16 @@ w=$(mktemp -d) || exit 2; cd "$w" || exit 2; git init -q
 # hand-copied AGENTS.md). A repo with no AGENTS.md at all is a different case the doctor covers above.
 cp "$KIT/AGENTS.md" AGENTS.md; printf '@AGENTS.md
 ' > CLAUDE.md
-d=$(sh "$KIT/install.sh" --check 2>&1)
+d=$(sh "$KIT/install.sh" check 2>&1)
 has 'deep conditional rules are not installed' "$d"   && pass "R5 doctor reports a missing depth tier" || bad "R5 missing rules NOT reported"
 rm -f AGENTS.md CLAUDE.md
 sh "$KIT/install.sh" project >/dev/null 2>&1
-d=$(sh "$KIT/install.sh" --check 2>&1)
+d=$(sh "$KIT/install.sh" check 2>&1)
 has 'path-scoped rules in .claude/rules' "$d"   && pass "R6 doctor confirms installed rules" || bad "R6 installed rules NOT confirmed"
 # A rule with no paths: frontmatter loads on EVERY turn - the opposite of the intent. Must be flagged.
 printf 'no frontmatter here
 ' > .claude/rules/broken.md
-d=$(sh "$KIT/install.sh" --check 2>&1)
+d=$(sh "$KIT/install.sh" check 2>&1)
 has "lack 'paths:' frontmatter" "$d"   && pass "R7 doctor flags a rule that would load always-on" || bad "R7 frontmatter-less rule NOT flagged"
 cd "$KIT"; rm -rf "$w"
 
@@ -740,12 +741,12 @@ done
 [ -z "$broad" ] && pass "R8 no rule claims a catch-all glob that would load it into unrelated projects" \
                  || bad "R8 over-broad glob in:$broad"
 
-# ---------- install.sh --update ----------
+# ---------- install.sh update ----------
 # Runs against a LOCAL clone source with a fake HOME: no network, and the real ~/.the-agent-kit
 # is never touched. AGENT_KIT_REPO is the same override a fork would use.
-echo "== install.sh --update =="
+echo "== install.sh update =="
 w=$(mktemp -d) || exit 2; cd "$w" || exit 2
-# The source repo is built from the WORKING TREE, not from $KIT's HEAD: --update deliberately runs
+# The source repo is built from the WORKING TREE, not from $KIT's HEAD: update deliberately runs
 # the installer it just downloaded, so cloning the last commit would test yesterday's code and go
 # green on a change that is still broken here.
 mkdir -p "$w/src" || exit 2
@@ -754,34 +755,34 @@ head=$( (cd "$w/src" && git init -q -b main && git add -A \
         && git -c user.email=t@e.com -c user.name=T commit -qm "working tree" \
         && git rev-parse --short HEAD) 2>/dev/null || printf '' )
 if [ -z "$head" ]; then
-  echo "SKIP: could not build a source repo - --update not exercised"
+  echo "SKIP: could not build a source repo - update not exercised"
 else
   # Update is one step: with no yes it lists the settings changes and writes nothing; with the yes
   # (AGENT_KIT_APPLY=1, or a terminal) it applies them in the same run, so nothing is left pending.
   mkdir -p "$w/.claude" "$w/.the-agent-kit"
   printf '{"checked": 9999999999, "latest": "0000000"}\n' > "$w/.the-agent-kit/.update-check"
-  d=$(HOME="$w" AGENT_KIT_APPLY= AGENT_KIT_REPO="$w/src" sh "$KIT/install.sh" --update </dev/null 2>&1) || bad "U5 --update exited non-zero"
+  d=$(HOME="$w" AGENT_KIT_APPLY= AGENT_KIT_REPO="$w/src" sh "$KIT/install.sh" update </dev/null 2>&1) || bad "U5 update exited non-zero"
   [ ! -e "$w/.claude/settings.json" ] && has 'settings.json' "$d" \
     && pass "U5 update with no yes lists the settings changes and writes nothing" || bad "U5 update wrote settings without consent"
   printf 'old\n' > "$w/.the-agent-kit/.kit-version"
   printf '{"checked": 9999999999, "latest": "0000000"}\n' > "$w/.the-agent-kit/.update-check"
-  d=$(HOME="$w" USERPROFILE="$(cygpath -m "$w" 2>/dev/null || printf '%s' "$w")" AGENT_KIT_APPLY=1 AGENT_KIT_REPO="$w/src" sh "$KIT/install.sh" --update </dev/null 2>&1) || bad "U5 --update exited non-zero"
+  d=$(HOME="$w" USERPROFILE="$(cygpath -m "$w" 2>/dev/null || printf '%s' "$w")" AGENT_KIT_APPLY=1 AGENT_KIT_REPO="$w/src" sh "$KIT/install.sh" update </dev/null 2>&1) || bad "U5 update exited non-zero"
   c=$(HOME="$w" USERPROFILE="$(cygpath -m "$w" 2>/dev/null || printf '%s' "$w")" sh "$w/.the-agent-kit/install.sh" check </dev/null 2>&1)
   grep -q 'command-guard.py' "$w/.claude/settings.json" 2>/dev/null && has 'installed and current' "$c" \
     && pass "U5 update with the yes applies the settings in the same run" || bad "U5 update left the settings pending: $(printf '%s' "$d" | grep -E 'WARN|pending' | head -3)"
-  [ -f "$w/.the-agent-kit/AGENTS.md" ] && pass "U5 --update populated a fresh ~/.the-agent-kit" || bad "U5 kit not installed"
+  [ -f "$w/.the-agent-kit/AGENTS.md" ] && pass "U5 update populated a fresh ~/.the-agent-kit" || bad "U5 kit not installed"
   [ "$(cat "$w/.the-agent-kit/.kit-version" 2>/dev/null)" = "$head" ] \
     && pass "U5 version stamped from the source commit" || bad "U5 .kit-version wrong or missing"
   # A same-day cached answer from before the update would name an older main as "newer" until tomorrow.
-  [ ! -e "$w/.the-agent-kit/.update-check" ] && pass "U5 --update drops the cached release answer" \
-    || bad "U5 stale .update-check survived --update"
+  [ ! -e "$w/.the-agent-kit/.update-check" ] && pass "U5 update drops the cached release answer" \
+    || bad "U5 stale .update-check survived update"
   # Second run must detect it is current and do nothing.
-  d=$(HOME="$w" AGENT_KIT_REPO="$w/src" sh "$KIT/install.sh" --update 2>&1)
-  has 'already at' "$d" && pass "U6 second --update is a no-op" || bad "U6 no-op NOT detected"
+  d=$(HOME="$w" AGENT_KIT_REPO="$w/src" sh "$KIT/install.sh" update 2>&1)
+  has 'already at' "$d" && pass "U6 second update is a no-op" || bad "U6 no-op NOT detected"
   # U6b: update (the new name) run inside a project brings that project to the downloaded kit too.
   # The machine is made current first, with consent: update with no yes applies nothing, and a project
   # is left alone while the machine's changes wait for a yes.
-  HOME="$w" USERPROFILE="$(cygpath -m "$w" 2>/dev/null || printf '%s' "$w")" AGENT_KIT_APPLY=1 sh "$KIT/install.sh" --setup </dev/null >/dev/null 2>&1
+  HOME="$w" USERPROFILE="$(cygpath -m "$w" 2>/dev/null || printf '%s' "$w")" AGENT_KIT_APPLY=1 AGENT_KIT_LIB=1 sh -c '. "$0"; setup_machine' "$KIT/install.sh" </dev/null >/dev/null 2>&1
   mkdir -p "$w/p" && (cd "$w/p" && git init -q) && printf 'old\n' > "$w/.the-agent-kit/.kit-version"
   d=$(cd "$w/p" && HOME="$w" AGENT_KIT_REPO="$w/src" sh "$KIT/install.sh" update </dev/null 2>&1)
   [ -f "$w/p/.agents/the-agent-kit.json" ] && grep -q 'PROJECT-CONFIG:START' "$w/p/AGENTS.md" && has 'check (doctor)' "$d" \
@@ -790,14 +791,14 @@ else
   # A repo that is not the kit must be refused BEFORE anything is overwritten.
   mkdir -p "$w/impostor" && (cd "$w/impostor" && git init -q -b main && printf 'hi\n' > README.md \
     && git add README.md && git -c core.autocrlf=false -c user.email=t@e.com -c user.name=T commit -qm x 2>/dev/null) || exit 2
-  if d=$(HOME="$w" AGENT_KIT_REPO="$w/impostor" sh "$KIT/install.sh" --update 2>&1); then
+  if d=$(HOME="$w" AGENT_KIT_REPO="$w/impostor" sh "$KIT/install.sh" update 2>&1); then
     bad "U7 non-kit repo was accepted"
   else
     has 'not the kit' "$d" && pass "U7 non-kit repo refused" || bad "U7 refused for the wrong reason -> [$d]"
   fi
   [ "$(cat "$w/.the-agent-kit/.kit-version" 2>/dev/null)" = "$head" ] \
     && pass "U7 existing install left intact after refusal" || bad "U7 install was CLOBBERED by a bad source"
-  # U8 is the real-world path: updating by running the INSTALLED copy, which --global then overwrites.
+  # U8 is the real-world path: updating by running the INSTALLED copy, which --print then overwrites.
   # sh reads a script lazily by byte offset, so a shell that keeps going resumes inside the replaced
   # file and executes fragments of it - hit live as "sac: command not found", with the version
   # silently failing to advance. The fix is the exec handoff in update_kit.
@@ -814,29 +815,29 @@ else
   head2=$( (cd "$w/src" && git -c core.autocrlf=false add -A \
            && git -c core.autocrlf=false -c user.email=t@e.com -c user.name=T \
               commit -qm "second, shifted offsets" 2>/dev/null && git rev-parse --short HEAD) || printf '' )
-  d=$(HOME="$w" AGENT_KIT_REPO="$w/src" sh "$w/.the-agent-kit/install.sh" --update 2>&1)
+  d=$(HOME="$w" AGENT_KIT_REPO="$w/src" sh "$w/.the-agent-kit/install.sh" update 2>&1)
   has 'command not found' "$d" && bad "U8 self-overwrite corrupted the running script -> [$(printf '%s' "$d" | grep -i 'command not found')]" \
     || pass "U8 updating from the installed copy runs clean"
   [ -n "$head2" ] && [ "$(cat "$w/.the-agent-kit/.kit-version" 2>/dev/null)" = "$head2" ] \
     && pass "U8 update landed when run from the installed copy" || bad "U8 version did NOT advance"
   # U10: upgrading an OLD project must bring the WHOLE kit, not just AGENTS.md. A project created
-  # before the depth tier existed has no .claude/rules; if --update-rules refreshes the text and
+  # before the depth tier existed has no .claude/rules; if install refreshes the text and
   # silently skips the rules, the upgrade path quietly under-delivers and reports success.
   u=$(mktemp -d) && (cd "$u" && git init -q && cp "$KIT/AGENTS.md" . && printf '@AGENTS.md
-' > CLAUDE.md       && sh "$KIT/install.sh" --update-rules >/dev/null 2>&1)
+' > CLAUDE.md       && sh "$KIT/install.sh" project >/dev/null 2>&1)
   rc=$(ls "$u"/.claude/rules/*.md 2>/dev/null | wc -l | tr -d ' ')
   kc=$(ls "$KIT"/claude/rules/*.md 2>/dev/null | wc -l | tr -d ' ')
-  [ "$rc" = "$kc" ] && pass "U10 --update-rules also deploys the depth tier ($rc rules)"     || bad "U10 upgrade left the depth tier missing: $rc of $kc rules"
+  [ "$rc" = "$kc" ] && pass "U10 install also deploys the depth tier ($rc rules)"     || bad "U10 upgrade left the depth tier missing: $rc of $kc rules"
   rm -rf "$u"
   # U11: a kit-owned rule that drifted (older version, or a hand edit to a kit-named file) must be
   # brought current by an update - otherwise a security fix never reaches installed projects.
   u=$(mktemp -d) && (cd "$u" && git init -q && cp "$KIT/AGENTS.md" . && printf '@AGENTS.md\n' > CLAUDE.md \
       && mkdir -p .claude/rules && printf 'stale old content\n' > .claude/rules/web-security.md \
-      && sh "$KIT/install.sh" --update-rules >/dev/null 2>&1)
+      && sh "$KIT/install.sh" project >/dev/null 2>&1)
   cmp -s "$KIT/claude/rules/web-security.md" "$u/.claude/rules/web-security.md" \
-    && pass "U11 stale kit-owned rule refreshed by --update-rules" || bad "U11 stale kit rule NOT refreshed"
+    && pass "U11 stale kit-owned rule refreshed by install" || bad "U11 stale kit rule NOT refreshed"
   rm -rf "$u"
-  # U12: every command the installer TELLS a human to run must still work after it exits. --update
+  # U12: every command the installer TELLS a human to run must still work after it exits. update
   # clones to a temp dir and deletes it on the way out, so anything printed with that path is broken
   # by the time it is read. This caught exactly that: `cat "$KIT/AGENTS.md" >> ~/.claude/CLAUDE.md`
   # pointed at the throwaway clone. Assert that no path the output names has vanished.
@@ -867,15 +868,15 @@ else
     && pass "U14 generated Codex skill = rule body + skill frontmatter, no paths:" \
     || bad "U14 generated Codex skill drifts from its rule (frontmatter or body)"
   rm -rf "$u"
-  # U15: --update-rules brings an old project's Codex tier up too - deploys it when absent, and
+  # U15: install brings an old project's Codex tier up too - deploys it when absent, and
   # regenerates a generated skill whose text drifted from the rule it came from.
   u=$(mktemp -d) && (cd "$u" && git init -q && cp "$KIT/AGENTS.md" . && printf '@AGENTS.md\n' > CLAUDE.md \
       && mkdir -p .agents/skills/data-layer && printf 'stale old content\n' > .agents/skills/data-layer/SKILL.md \
-      && sh "$KIT/install.sh" --update-rules >/dev/null 2>&1)
+      && sh "$KIT/install.sh" project >/dev/null 2>&1)
   [ -f "$u/.agents/skills/web-security/SKILL.md" ] && ! grep -q 'stale old content' "$u/.agents/skills/data-layer/SKILL.md" \
     && grep -q '^name: data-layer' "$u/.agents/skills/data-layer/SKILL.md" \
-    && pass "U15 --update-rules deploys and refreshes the Codex skills" \
-    || bad "U15 --update-rules left the Codex skills missing or stale"
+    && pass "U15 install deploys and refreshes the Codex skills" \
+    || bad "U15 install left the Codex skills missing or stale"
   rm -rf "$u"
   # A1-A4: Antigravity. It already reads AGENTS.md and the .agents/skills Codex gets; the kit adds the
   # two path-shaped rules as glob rules and the guard as a workspace PreToolUse hook. Antigravity splits
@@ -946,20 +947,20 @@ else
       || bad "A3f cmd /c did not fall through past a missing interpreter (got: $o)"
   else pass "A3d (no cmd.exe on this platform; skipped)"; pass "A3f (no cmd.exe on this platform; skipped)"; fi
   rm -rf "$ah"
-  # A4: --update-rules restores a stale launcher and glob rule, and re-adds a removed hook entry.
+  # A4: install restores a stale launcher and glob rule, and re-adds a removed hook entry.
   printf 'stale\n' > "$u/.agents/agent-kit-guard.py"; printf 'stale\n' > "$u/.agents/rules/tests.md"
   printf '{"mine":{"Stop":[{"command":"echo bye"}]}}\n' > "$u/.agents/hooks.json"
-  (cd "$u" && sh "$KIT/install.sh" --update-rules >/dev/null 2>&1)
+  (cd "$u" && sh "$KIT/install.sh" project >/dev/null 2>&1)
   ! grep -q '^stale$' "$u/.agents/agent-kit-guard.py" && ! grep -q '^stale$' "$u/.agents/rules/tests.md" \
     && grep -q '"the-agent-kit"' "$u/.agents/hooks.json" && grep -q '"mine"' "$u/.agents/hooks.json" \
-    && pass "A4 --update-rules refreshes the Antigravity launcher, rules and hook entry" \
-    || bad "A4 --update-rules left the Antigravity files stale or missing"
-  # A5: --check reports the Antigravity side - the guard answering in its contract, and the hook wired.
-  o=$(cd "$u" && sh "$KIT/install.sh" --check 2>&1)
+    && pass "A4 install refreshes the Antigravity launcher, rules and hook entry" \
+    || bad "A4 install left the Antigravity files stale or missing"
+  # A5: check reports the Antigravity side - the guard answering in its contract, and the hook wired.
+  o=$(cd "$u" && sh "$KIT/install.sh" check 2>&1)
   printf '%s' "$o" | grep -q 'OK:   command-guard answers Antigravity' \
     && printf '%s' "$o" | grep -q 'OK:   Antigravity guard wired' \
-    && pass "A5 --check reports the Antigravity guard and its wiring" \
-    || bad "A5 --check says nothing (or the wrong thing) about Antigravity"
+    && pass "A5 check reports the Antigravity guard and its wiring" \
+    || bad "A5 check says nothing (or the wrong thing) about Antigravity"
   rm -rf "$u"
   # A6-A8: the Antigravity files are written into a project the user may not control. A planted symlink
   # must never turn the kit's write into a write somewhere else, a hostile hooks.json must not pass the
@@ -968,7 +969,7 @@ else
   (cd "$u" && git init -q && mkdir -p .agents/rules && MSYS=winsymlinks:nativestrict ln -s "$vic/victim.json" .agents/hooks.json \
       && MSYS=winsymlinks:nativestrict ln -s "$vic/newfile" .agents/rules/tests.md.refresh.tmp 2>/dev/null \
       && MSYS=winsymlinks:nativestrict ln -s "$vic/launcher" .agents/agent-kit-guard.py 2>/dev/null \
-      && sh "$KIT/install.sh" project >/dev/null 2>&1; sh "$KIT/install.sh" --update-rules >/dev/null 2>&1)
+      && sh "$KIT/install.sh" project >/dev/null 2>&1; sh "$KIT/install.sh" project >/dev/null 2>&1)
   if [ -L "$u/.agents/hooks.json" ]; then
     [ "$(cat "$vic/victim.json")" = '{"keep":"me"}' ] && [ ! -e "$vic/newfile" ] && [ ! -e "$vic/launcher" ] \
       && pass "A6 symlinks in .agents/ are never written through" \
@@ -977,40 +978,40 @@ else
   rm -rf "$u" "$vic"
   u=$(mktemp -d) && (cd "$u" && git init -q && mkdir -p .agents && printf '{"the-agent-kit":{"PreToolUse":[{"matcher":"run_command","hooks":[{"command":"echo hostile"}]}]}}\n' > .agents/hooks.json \
       && printf 'x\n' > .agents/agent-kit-guard.py && printf '# rules\n' > AGENTS.md)
-  o=$(cd "$u" && sh "$KIT/install.sh" --check 2>&1)
+  o=$(cd "$u" && sh "$KIT/install.sh" check 2>&1)
   printf '%s' "$o" | grep -q 'OK:   Antigravity guard wired' \
-    && bad "A7 --check calls a hostile hooks.json wired" \
-    || { printf '%s' "$o" | grep -q 'Antigravity guard.*not the kit' && pass "A7 --check rejects a hooks.json whose guard command is not the kit's" \
-         || bad "A7 --check says nothing about a hostile Antigravity hook"; }
+    && bad "A7 check calls a hostile hooks.json wired" \
+    || { printf '%s' "$o" | grep -q 'Antigravity guard.*not the kit' && pass "A7 check rejects a hooks.json whose guard command is not the kit's" \
+         || bad "A7 check says nothing about a hostile Antigravity hook"; }
   rm -rf "$u"
   # A7b: cmd /c looks in the hook's folder before PATH, and Python puts the launcher's folder first on
   # sys.path, so a committed .agents/py.bat or .agents/runpy.py would run instead of the guard.
   u=$(mktemp -d) && (cd "$u" && git init -q && sh "$KIT/install.sh" project >/dev/null 2>&1 \
       && printf '@exit /b 0\n' > .agents/py.bat && printf 'x = 1\n' > .agents/runpy.py)
-  o=$(cd "$u" && sh "$KIT/install.sh" --check 2>&1)
+  o=$(cd "$u" && sh "$KIT/install.sh" check 2>&1)
   ! printf '%s' "$o" | grep -q 'OK:   Antigravity guard wired' && printf '%s' "$o" | grep -q 'WARN:.*py.bat' \
     && printf '%s' "$o" | grep -q 'WARN:.*runpy.py' \
-    && pass "A7b --check names a planted interpreter or module in .agents/ and does not call the guard wired" \
-    || bad "A7b --check missed a planted .agents/py.bat or runpy.py"
+    && pass "A7b check names a planted interpreter or module in .agents/ and does not call the guard wired" \
+    || bad "A7b check missed a planted .agents/py.bat or runpy.py"
   rm -rf "$u"
   # U21: global guidance includes Antigravity, but machine setup leaves its home files alone.
   g=$(mktemp -d) || exit 2
-  o=$(HOME="$g" sh "$KIT/install.sh" --global 2>&1)
+  o=$(HOME="$g" sh "$KIT/install.sh" --print 2>&1)
   has '~/.gemini/AGENTS.md' "$o" \
-    && pass "U21 --global names Antigravity's global rules file" \
-    || bad "U21 --global omits Antigravity's global rules file"
+    && pass "U21 --print names Antigravity's global rules file" \
+    || bad "U21 --print omits Antigravity's global rules file"
   has 'mklink /J' "$o" && has 'skills.json' "$o" && [ ! -e "$g/.agents" ] && [ ! -e "$g/.gemini" ] \
-    && pass "U21b --global prints how to install the kit's skills once for all three tools, and writes none of it" \
-    || bad "U21b --global omits the machine-wide skills steps, or wrote them"
-  o=$(HOME="$g" AGENT_KIT_APPLY= sh "$KIT/install.sh" --setup </dev/null 2>&1)
+    && pass "U21b --print prints how to install the kit's skills once for all three tools, and writes none of it" \
+    || bad "U21b --print omits the machine-wide skills steps, or wrote them"
+  o=$(HOME="$g" AGENT_KIT_APPLY= AGENT_KIT_LIB=1 sh -c '. "$0"; setup_machine' "$KIT/install.sh" </dev/null 2>&1)
   has "Antigravity's command guard is still wired per project" "$o" && [ ! -e "$g/.gemini" ] \
-    && pass "U21 --setup says the Antigravity guard stays per project and, without consent or a ~/.gemini, writes nothing there" \
-    || bad "U21 --setup omits Antigravity's per-project guard scope or writes ~/.gemini"
+    && pass "U21 install says the Antigravity guard stays per project and, without consent or a ~/.gemini, writes nothing there" \
+    || bad "U21 install omits Antigravity's per-project guard scope or writes ~/.gemini"
   rm -rf "$g"
   # U18: the machine-wide share must hold the rules with an EMPTY block too. The README tells users who
   # prefer global rules to append the share's AGENTS.md to ~/.claude/CLAUDE.md, so a leak here would put
   # this repo's branch rules into every project they own.
-  g=$(mktemp -d) && HOME="$g" sh "$KIT/install.sh" --global >/dev/null 2>&1
+  g=$(mktemp -d) && HOME="$g" sh "$KIT/install.sh" --print >/dev/null 2>&1
   if grep -q 'fill this in' "$g/.the-agent-kit/AGENTS.md" 2>/dev/null && ! grep -q 'the-agent-kit (rules and guardrails' "$g/.the-agent-kit/AGENTS.md" 2>/dev/null; then
     pass "U18 the machine-wide share gets an empty PROJECT-CONFIG, not the kit's own"
   else bad "U18 the machine-wide share inherited the kit repo's PROJECT-CONFIG"; fi
@@ -1019,7 +1020,7 @@ else
   for n in lessons.md my-skills-and-plugins.md enhancements.md todo.md; do
     [ -f "$KIT/docs/$n" ] || { : > "$KIT/docs/$n"; made="$made $n"; }
   done
-  HOME="$g" sh "$KIT/install.sh" --global >/dev/null 2>&1
+  HOME="$g" sh "$KIT/install.sh" --print >/dev/null 2>&1
   leaked=""
   for n in lessons.md my-skills-and-plugins.md enhancements.md todo.md; do
     [ -e "$g/.the-agent-kit/docs/$n" ] && leaked="$leaked $n"
@@ -1031,11 +1032,11 @@ else
   # U20: the recommended-tools list is seeded once, then it is the user's: a reinstall keeps their edits.
   if [ -f "$g/.the-agent-kit/recommended.json" ]; then
     printf '{"items":[]}' > "$g/.the-agent-kit/recommended.json"
-    HOME="$g" sh "$KIT/install.sh" --global >/dev/null 2>&1
+    HOME="$g" sh "$KIT/install.sh" --print >/dev/null 2>&1
     grep -q '"items":\[\]' "$g/.the-agent-kit/recommended.json" \
       && pass "U20 recommended.json seeded once; a reinstall keeps the user's edits" \
       || bad  "U20 a reinstall overwrote the user's recommended.json"
-  else bad "U20 --global did not seed recommended.json"; fi
+  else bad "U20 --print did not seed recommended.json"; fi
   rm -rf "$g"
   # U17: a fresh project install must get an EMPTY project block, never the kit repo's own config.
   # The kit's AGENTS.md is both this repo's rules file and the template shipped to projects; `cp`
@@ -1045,21 +1046,21 @@ else
     pass "U17 fresh install gets an empty PROJECT-CONFIG, not the kit's own"
   else bad "U17 fresh install inherited the kit repo's PROJECT-CONFIG"; fi
   rm -rf "$u"
-  # U16: --global run twice must leave ONE flat skills tree in the share. `cp -r src dest` with dest
+  # U16: --print run twice must leave ONE flat skills tree in the share. `cp -r src dest` with dest
   # present copies INTO it, so the second run nested skills/skills/ and left the top level stale -
   # every skill added after the first install was silently missing from projects updated afterwards
   # (observed on a real machine 2026-09-18). The optional performance profile must ship too.
-  g=$(mktemp -d) && HOME="$g" sh "$KIT/install.sh" --global >/dev/null 2>&1 && HOME="$g" sh "$KIT/install.sh" --global >/dev/null 2>&1
+  g=$(mktemp -d) && HOME="$g" sh "$KIT/install.sh" --print >/dev/null 2>&1 && HOME="$g" sh "$KIT/install.sh" --print >/dev/null 2>&1
   want=$(ls -d "$KIT"/claude/skills/*/ | wc -l | tr -d ' '); got=$(ls -d "$g"/.the-agent-kit/skills/*/ 2>/dev/null | wc -l | tr -d ' ')
   [ ! -d "$g/.the-agent-kit/skills/skills" ] && [ "$got" = "$want" ] && [ -f "$g/.the-agent-kit/claude/performance/settings.json" ] \
-    && pass "U16 --global twice keeps one flat skills tree ($got skills) and ships the performance profile" \
-    || bad "U16 --global left a nested or stale skills tree ($got of $want, nested=$([ -d "$g/.the-agent-kit/skills/skills" ] && echo yes || echo no))"
+    && pass "U16 --print twice keeps one flat skills tree ($got skills) and ships the performance profile" \
+    || bad "U16 --print left a nested or stale skills tree ($got of $want, nested=$([ -d "$g/.the-agent-kit/skills/skills" ] && echo yes || echo no))"
   # U16b: every run is a clean reinstall. A file the kit no longer ships goes, at any depth; the
   # user's own state (recommended.json, its backups, the dot-files) stays, and no staging folder is left.
   s="$g/.the-agent-kit"
   mkdir -p "$s/retired-dir"; : > "$s/retired-dir/x"; : > "$s/rules/retired-rule.md"; : > "$s/hooks/retired-hook.py"; : > "$s/retired.md"
   printf '{"items":[],"dismissed":["mine"]}' > "$s/recommended.json"; : > "$s/recommended.json.bak-agent-kit-1"; : > "$s/.tools-check"
-  HOME="$g" sh "$KIT/install.sh" --global >/dev/null 2>&1
+  HOME="$g" sh "$KIT/install.sh" --print >/dev/null 2>&1
   [ ! -e "$s/retired-dir" ] && [ ! -e "$s/rules/retired-rule.md" ] && [ ! -e "$s/hooks/retired-hook.py" ] && [ ! -e "$s/retired.md" ] \
     && grep -q '"mine"' "$s/recommended.json" && [ -e "$s/recommended.json.bak-agent-kit-1" ] && [ -e "$s/.tools-check" ] \
     && [ ! -e "$s/.incoming" ] && ! ls -d "$s"/.old-* >/dev/null 2>&1 && [ -f "$s/hooks/command-guard.py" ] && [ -f "$s/git-hooks/pre-commit" ] && [ -f "$s/install.sh" ] \
@@ -1067,11 +1068,11 @@ else
     || bad "U16b stale kit files kept or user state lost: $(ls -a "$s" | tr '\n' ' ')"
   rm -rf "$g"
   # U9: the structural guard U8 cannot be. update_kit must END by exec-ing the downloaded installer -
-  # exec replaces the process, so not one more byte is read from the file --global is overwriting.
+  # exec replaces the process, so not one more byte is read from the file --print is overwriting.
   # Any refactor that turns this back into a plain call reintroduces the corruption, silently.
   awk '/^update_kit\(\)/,/^}/' "$KIT/install.sh" | grep -q '^ *exec sh -c' \
     && pass "U9 update_kit hands off with exec (self-overwrite guard)" \
-    || bad  "U9 update_kit no longer execs - it will read the file --global just overwrote"
+    || bad  "U9 update_kit no longer execs - it will read the file --print just overwrote"
 fi
 cd "$KIT"; rm -rf "$w"
 
@@ -1082,11 +1083,11 @@ if [ -n "$PY" ]; then
     # The Python fixture records only processes it starts. Cleanup runs even on failure.
     trap '$PY "$KIT/test/mcp_orphans_cases.py" --cleanup "$orphan_tmp"; rm -rf "$orphan_tmp"' 0
     trap 'exit 1' 1 2 15
-    HOME="$orphan_tmp" sh "$KIT/install.sh" --tidy --json > "$orphan_tmp/tidy.json" || exit 1
+    HOME="$orphan_tmp" sh "$KIT/install.sh" tidy --json > "$orphan_tmp/tidy.json" || exit 1
     $PY -c 'import json,sys; assert isinstance(json.load(open(sys.argv[1])), list)' "$orphan_tmp/tidy.json" || exit 1
-    HOME="$orphan_tmp" sh "$KIT/install.sh" --check > "$orphan_tmp/doctor.txt" 2>&1 || exit 1
+    HOME="$orphan_tmp" sh "$KIT/install.sh" check > "$orphan_tmp/doctor.txt" 2>&1 || exit 1
     grep -Eq 'OK:   no orphaned MCP processes|WARN: [0-9]+ orphaned MCP processes' "$orphan_tmp/doctor.txt" || exit 1
-    echo "PASS: MCP --tidy dispatches JSON dry run; --check reports orphans"
+    echo "PASS: MCP tidy dispatches JSON dry run; check reports orphans"
     case "$(uname -s)" in
       MINGW*|MSYS*|CYGWIN*) $PY "$KIT/test/mcp_orphans_cases.py" --live "$orphan_tmp" || exit 1 ;;
       *) echo "PASS: MCP Windows orphan lifecycle (non-Windows; skipped)" ;;
@@ -1094,17 +1095,17 @@ if [ -n "$PY" ]; then
   ) || bad "MCP installer or Windows orphan lifecycle"
 fi
 
-# ---------- install.sh --setup (one-command machine setup) ----------
+# ---------- install.sh install (one-command machine setup) ----------
 # The installer, run by the user, merges the kit into their settings. It only ever ADDS (plus updating
 # the kit's own older entries in place and removing rules it retired), backs up first, refuses a malformed file, and writes nothing
 # without consent: a terminal answer, or AGENT_KIT_APPLY=1, which the tool guard asks about.
-echo "== install.sh --setup =="
+echo "== the machine half (settings, hooks, skills) =="
 if [ -n "$PY" ]; then
   g=$(mktemp -d) || exit 2
   wq() { cygpath -m "$1" 2>/dev/null || printf '%s' "$1"; }
   G=$(wq "$g")
   su() {  # $1 = AGENT_KIT_APPLY value ("" = no consent) -> output in $o, exit code in $src
-    src=0; o=$(HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY="$1" sh "$KIT/install.sh" --setup </dev/null 2>&1) || src=$?
+    src=0; o=$(HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY="$1" AGENT_KIT_LIB=1 sh -c '. "$0"; setup_machine' "$KIT/install.sh" </dev/null 2>&1) || src=$?
   }
   jq_() { $PY -c "import json,sys; d=json.load(open(sys.argv[1],encoding='utf-8')); print($2)" "$(wq "$1")" 2>/dev/null; }
   gh_() { HOME="$g" git config --global --get core.hooksPath 2>/dev/null; }
@@ -1224,7 +1225,7 @@ EOF
     && [ "$(jq_ "$g/.claude/settings.json" "sum('kit-check.py' in h['command'] for b in d['hooks']['SessionStart'] for h in b['hooks'])")" = 1 ] \
     && pass "M12 a shared block keeps the user's matcher; the old kit hook moves out, not duplicated" || bad "M12 shared block mutated: $o"
   # Claude Code ignores Write(...) rules and warns on each one ("Edit rules cover all file-editing tools").
-  # The kit shipped two; --setup retires exactly those, with the usual consent and backup.
+  # The kit shipped two; install retires exactly those, with the usual consent and backup.
   grep -q 'Write(' "$KIT/claude/settings.json" && bad "M13 the template still ships a Write(...) rule" \
     || pass "M13 the template ships no Write(...) rule (Edit rules cover every file-editing tool)"
   printf '{"permissions":{"ask":["Bash(foo *)"]}}' > "$g/.claude/settings.json"
@@ -1236,19 +1237,19 @@ ask += [r for r in ("Write(**/AGENTS.md)", "Write(**/CLAUDE.md)", "Write(**/mine
 d['permissions']['deny'].append("Write(**/CLAUDE.md)")   # the kit only shipped them in ask: a deny is the user's
 json.dump(d, open(p, 'w', encoding='utf-8'))
 EOF
-  d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
-  has 'WARN: .*machine-wide.*- run: .*install.sh' "$d" && pass "M13 --check flags the kit's retired Write rules" || bad "M13 --check silent about retired rules: $(printf '%s' "$d" | grep -i setting)"
+  d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" check 2>&1)
+  has 'WARN: .*machine-wide.*- run: .*install.sh' "$d" && pass "M13 check flags the kit's retired Write rules" || bad "M13 check silent about retired rules: $(printf '%s' "$d" | grep -i setting)"
   rm -f "$g/.claude/"settings.json.bak-agent-kit-*
   su 1
   [ "$(jq_ "$g/.claude/settings.json" "[r for r in d['permissions']['ask'] if r.startswith('Write(')]")" = "['Write(**/mine.md)']" ] \
     && [ "$(jq_ "$g/.claude/settings.json" "'Bash(foo *)' in d['permissions']['ask']")" = True ] \
     && [ "$(jq_ "$g/.claude/settings.json" "'Write(**/CLAUDE.md)' in d['permissions']['deny']")" = True ] \
     && ls "$g/.claude/"settings.json.bak-agent-kit-* >/dev/null 2>&1 \
-    && pass "M13 --setup removes the kit's two Write rules, keeps the user's, backs up first" || bad "M13 retired rules not handled: $o"
+    && pass "M13 install removes the kit's two Write rules, keeps the user's, backs up first" || bad "M13 retired rules not handled: $o"
   # The tool-runner and install ask rules prompted on everyday commands (npx vitest, npm ci) with no time
   # limit in every mode, which stalled unattended runs. The guard asks on adding a dependency instead.
   [ "$(jq_ "$g/.claude/settings.json" "[r for r in d['permissions']['ask'] if r.startswith('Bash(')]")" = "['Bash(foo *)']" ] \
-    && pass "M13 --setup removes the retired npx and install asks, keeps the user's own Bash rule" || bad "M13 noisy ask rules kept: $(jq_ "$g/.claude/settings.json" "d['permissions']['ask']")"
+    && pass "M13 install removes the retired npx and install asks, keeps the user's own Bash rule" || bad "M13 noisy ask rules kept: $(jq_ "$g/.claude/settings.json" "d['permissions']['ask']")"
   su 1
   has 'already' "$o" && pass "M13 a second run is already current" || bad "M13 retiring is not idempotent: $o"
   # M16: the template turns off Claude Code's own commit and pull-request instructions (AGENTS.md Section 7
@@ -1316,23 +1317,24 @@ json.dump(d,open(p,'w',encoding='utf-8'))" "$(wq "$g/.claude/settings.json")" "$
   [ "$(gh_)" = .husky ] && has 'is .husky' "$o" \
     && pass "M8 git hooks owned by another tool are left alone, and it says so" || bad "M8 foreign core.hooksPath changed: [$(gh_)]"
   # check covers everything the kit installs, git's core.hooksPath included, so it stays set here.
-  d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
-  has "machine-wide entries: installed and current" "$d" && ! has 'WARN: .*machine-wide' "$d" && pass "M9 --check confirms the kit's entries are installed" || bad "M9 --check misreports current settings: $(printf '%s' "$d" | grep -i -E "entries|setting")"
+  d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" check 2>&1)
+  has "machine-wide entries: installed and current" "$d" && ! has 'WARN: .*machine-wide' "$d" && pass "M9 check confirms the kit's entries are installed" || bad "M9 check misreports current settings: $(printf '%s' "$d" | grep -i -E "entries|setting")"
   printf '{}' > "$g/.claude/settings.json"
-  d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
-  has 'WARN: .*machine-wide.*- run: .*install.sh' "$d" && pass "M9 --check warns when the settings are missing the kit" || bad "M9 --check silent about missing settings"
+  d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" check 2>&1)
+  has 'WARN: .*machine-wide.*- run: .*install.sh' "$d" && pass "M9 check warns when the settings are missing the kit" || bad "M9 check silent about missing settings"
   rm -rf "$g"
 else
-  bad "no python - install.sh --setup NOT tested"
+  bad "no python - install.sh install NOT tested"
 fi
-# update runs the downloaded installer: `install` when it knows the four commands, --setup when it is older
-# (or under the old --update, which did the machine only).
+# update runs the downloaded installer's `install`, and tells it to go on to the listed projects. Kits
+# 0.6.0 to 0.9.0 read the `# cli:` line in the installer they download and hand over with --setup, which no
+# longer exists, when it is missing: without the line their update would stop at "Unknown mode".
 uk=$(awk '/^update_kit\(\)/,/^}/' "$KIT/install.sh")
-printf '%s' "$uk" | grep -qF 'sh "$1/install.sh" "$4"' \
-  && printf '%s' "$uk" | grep -qF "m=--setup; [ \"\${1:-}\" = --setup ] || ! grep -q '^# cli: install update uninstall check'" \
+printf '%s' "$uk" | grep -qF 'sh "$1/install.sh" install' \
+  && printf '%s' "$uk" | grep -qF 'AGENT_KIT_UPDATE=1; export AGENT_KIT_UPDATE' \
   && grep -q '^# cli: install update uninstall check' "$KIT/install.sh" \
-  && pass "M10 update hands over to the downloaded installer's install (--setup for an older kit), so updates re-apply settings" \
-  || bad "M10 update does not hand over to install / --setup"
+  && pass "M10 update hands over to the downloaded installer's install, and the line older kits look for is still there" \
+  || bad "M10 update does not hand over to install, or the cli line older kits read is gone"
 
 # ---------- the four commands: install, update, uninstall, check ----------
 # install = the machine, then the project it runs in, then check; uninstall = the project, the machine and
@@ -1384,9 +1386,6 @@ if [ -n "$PY" ]; then
   has "files in this project are not this kit's - run: .*install.sh here" "$o" && pass "C5b check names a kit file that is no longer the kit's, and what to run" \
     || bad "C5b check silent about a changed kit file: $(printf '%s' "$o" | grep -E 'WARN|files in')"
   cp "$KIT/claude/rules/tests.md" "$c/proj/.claude/rules/tests.md"
-  run_ "$c/plain" "" --setup; r1=$o; run_ "$c/proj" "" --update-rules; r2=$o; r2c=$rc
-  has "'--setup' is now 'install'" "$r1" && has "'--update-rules' is now 'install (inside the project)'" "$r2" && [ "$r2c" = 0 ] \
-    && pass "C6 an old name still runs, and says what replaces it" || bad "C6 alias note missing: $(printf '%s\n%s' "$r1" "$r2" | grep -i note)"
   run_ "$c/proj" "" uninstall
   [ -d "$c/.the-agent-kit" ] && [ -f "$c/proj/AGENTS.md" ] && guard_in && has 'AGENT_KIT_APPLY' "$o" \
     && pass "C7 uninstall without consent changes nothing, and says how to go ahead" || bad "C7 uninstall acted without consent: $o"
@@ -1451,6 +1450,95 @@ EOF
   rm -rf "$c"
 else
   bad "no python - install / uninstall / check NOT tested"
+fi
+
+# ---------- one update for every project ----------
+# ~/.the-agent-kit/.projects lists the projects that hold the kit: install adds the one it runs in, the
+# session-start check adds the one it starts in. update does the machine, then every listed project, after
+# one yes. The list is a file anyone can write, so each line is checked before it is used as a path.
+echo "== update for every listed project =="
+if [ -n "$PY" ]; then
+  wq() { cygpath -m "$1" 2>/dev/null || printf '%s' "$1"; }
+  c=$(mktemp -d) || exit 2; C=$(wq "$c"); mkdir -p "$c/.claude" "$c/plain" "$c/p1" "$c/p2" "$c/lean" "$c/bare" "$c/src"
+  L="$c/.the-agent-kit/.projects"
+  run_() {  # $1 = folder, $2 = AGENT_KIT_APPLY ("" = no consent), then the arguments -> $o, $rc
+    d_=$1; a_=$2; shift 2
+    rc=0; o=$(cd "$d_" && env HOME="$c" USERPROFILE="$C" AGENT_KIT_APPLY="$a_" AGENT_KIT_REPO="$c/src" sh "$KIT/install.sh" "$@" </dev/null 2>&1) || rc=$?
+  }
+  listed() { grep -Fxq -- "$(wq "$(cd "$1" && git rev-parse --show-toplevel)")" "$L" 2>/dev/null; }
+  stale() {  # $1 = project: old rules above a filled project block
+    { head -1 "$1/AGENTS.md"; echo "STALE-RULES-MARKER"; tail -n +2 "$1/AGENTS.md"; } > "$1/A2" \
+      && sed 's/Not configured yet\..*fill this in\./Build: make all/' "$1/A2" > "$1/AGENTS.md" && rm -f "$1/A2"
+  }
+  for p in p1 p2 lean bare; do (cd "$c/$p" && git init -q) || exit 2; done
+  run_ "$c/p1" 1; run_ "$c/p2" 1; run_ "$c/lean" 1 install --lean
+  listed "$c/p1" && listed "$c/p2" && listed "$c/lean" && [ "$(grep -c . "$L")" = 3 ] \
+    && pass "P1 install adds the project it runs in to the list, once" || bad "P1 project list wrong: $(cat "$L" 2>&1)"
+  run_ "$c/p1" 1
+  [ "$(grep -c . "$L")" = 3 ] && pass "P1b a second install does not list the project twice" || bad "P1b duplicate entry: $(cat "$L")"
+  # P2: the session-start check lists the project it starts in when that project holds the kit, and only then.
+  kc_() { printf '{"cwd":"%s","source":"startup"}' "$(wq "$1")" | HOME="$C" USERPROFILE="$C" AGENT_KIT_REPO="$C/nowhere" $PY "$KIT/hooks/kit-check.py" 2>/dev/null; }
+  : > "$L"; kc_ "$c/p1" >/dev/null; kc_ "$c/p1" >/dev/null; kc_ "$c/bare" >/dev/null; kc_ "$KIT" >/dev/null
+  listed "$c/p1" && [ "$(grep -c . "$L")" = 1 ] \
+    && pass "P2 the session-start check lists a project that holds the kit, once; never one without it, never the kit's own repo" \
+    || bad "P2 session-start registration wrong: $(cat "$L")"
+  # The source update downloads: the working tree, as in the update section above.
+  (cd "$KIT" && cp -r .gitattributes install.sh AGENTS.md CLAUDE.md hooks docs claude codex setup "$c/src/") || exit 2
+  (cd "$c/src" && git init -q -b main && git add -A && git -c user.email=t@e.com -c user.name=T commit -qm "working tree") >/dev/null 2>&1 || exit 2
+  # A copy of the kit's checkout that holds a record, as this repo does: it must never be updated from the list.
+  mkdir "$c/kc" && (cd "$KIT" && cp -r install.sh AGENTS.md hooks "$c/kc/") && (cd "$c/kc" && git init -q) \
+    && mkdir -p "$c/kc/.agents" && cp "$c/p1/.agents/the-agent-kit.json" "$c/kc/.agents/" || exit 2
+  cp "$c/kc/AGENTS.md" "$c/kc.before"
+  printf '%s\n' "$C/p1" "$C/p2" "$C/lean" "$C/gone" "$C/bare" "$C/kc" "relative/path" "" "$C/p1" > "$L"
+  printf '%s[2J
+' "$C/p2" >> "$L"   # a control character in a line: never printed, never used
+  stale "$c/p1"; stale "$c/p2"; cp "$c/lean/AGENTS.md" "$c/lean.before"; ls -A "$c/lean" > "$c/lean.ls"
+  grep -q STALE-RULES-MARKER "$c/p1/AGENTS.md" && grep -q 'Build: make all' "$c/p2/AGENTS.md" || bad "P3 setup: the projects were not made stale"
+  # P3: no terminal and no AGENT_KIT_APPLY: the projects are named and nothing in them changes.
+  printf 'old\n' > "$c/.the-agent-kit/.kit-version"; run_ "$c/plain" "" update
+  grep -q STALE-RULES-MARKER "$c/p1/AGENTS.md" && grep -q STALE-RULES-MARKER "$c/p2/AGENTS.md" && has "$C/p1" "$o" && has "$C/p2" "$o" \
+    && pass "P3 update without your yes names the listed projects and changes none of them" \
+    || bad "P3 update touched a project without consent, or did not name it (rc=$rc): $(printf '%s' "$o" | tail -6)"
+  printf 'old\n' > "$c/.the-agent-kit/.kit-version"; run_ "$c/plain" 1 update
+  ok=1; for p in p1 p2; do
+    grep -q STALE-RULES-MARKER "$c/$p/AGENTS.md" && ok=0; grep -q 'Build: make all' "$c/$p/AGENTS.md" || ok=0
+  done
+  [ "$ok" = 1 ] && [ "$rc" = 0 ] && pass "P4 update brings every listed project to the new kit and keeps each project block" \
+    || bad "P4 update left a listed project stale or lost its block (rc=$rc): $(printf '%s' "$o" | tail -8)"
+  cmp -s "$c/lean/AGENTS.md" "$c/lean.before" && [ "$(ls -A "$c/lean")" = "$(cat "$c/lean.ls")" ] \
+    && pass "P5 a lean project stays lean: its stub is untouched and nothing new appears beside it" \
+    || bad "P5 a lean project changed: $(ls -A "$c/lean" | tr '\n' ' ')"
+  has "$C/gone" "$(printf '%s' "$o" | grep -A6 'Dropped from the list')" && ! grep -Fxq -- "$C/gone" "$L" \
+    && pass "P6 a project that moved or was deleted is dropped from the list and named" \
+    || bad "P6 a missing project was not dropped and named: $(cat "$L")"
+  [ ! -e "$c/bare/AGENTS.md" ] && [ ! -e "$c/bare/.agents" ] && cmp -s "$c/kc/AGENTS.md" "$c/kc.before" && [ ! -e "$c/plain/relative" ]     && ! printf '%s' "$o" | grep -q "$(printf '')" \
+    && [ "$(sort "$L")" = "$(printf '%s\n' "$C/lean" "$C/p1" "$C/p2")" ] \
+    && pass "P7 a line that is not a project holding the kit (no record, the kit's own checkout, a relative path, a blank, a repeat, a control character) is dropped and nothing is written there" \
+    || bad "P7 a bad list line was used or kept: $(cat "$L" | tr '\n' ' '); bare: $(ls -A "$c/bare" | tr '\n' ' ')"
+  # P8: the kit is already current, and a listed project is behind: update still brings it current.
+  stale "$c/p1"; run_ "$c/plain" 1 update
+  has 'already at' "$o" && ! grep -q STALE-RULES-MARKER "$c/p1/AGENTS.md" \
+    && pass "P8 update with the kit already current still brings a listed project current" \
+    || bad "P8 a stale project was left alone because the kit was current: $(printf '%s' "$o" | tail -5)"
+  # P8b: one listed project that cannot be updated (its record is from a newer kit) is named, the rest
+  # are still brought current, and the run exits non-zero.
+  stale "$c/p1"; stale "$c/p2"
+  $PY -c 'import json,sys,time; p=sys.argv[1]; d=json.load(open(p,encoding="utf-8")); d["kit_time"]=int(time.time())-5; json.dump(d,open(p,"w",encoding="utf-8"))' "$(wq "$c/p2/.agents/the-agent-kit.json")"
+  run_ "$c/plain" 1 update
+  [ "$rc" != 0 ] && ! grep -q STALE-RULES-MARKER "$c/p1/AGENTS.md" && grep -q STALE-RULES-MARKER "$c/p2/AGENTS.md" \
+    && has "$C/p2 was not brought current" "$o" \
+    && pass "P8b a listed project that cannot be updated is named and the others are still brought current" \
+    || bad "P8b one failing project stopped the rest, or was not named (rc=$rc): $(printf '%s' "$o" | grep -i 'not brought\|newer kit')"
+  # P9: the eight old names are gone: each is an unknown command, exit 2, with the usage line.
+  left=""
+  for n in --setup --global --extension --update --update-rules --undo --check --project setup global extension update-rules undo; do
+    run_ "$c/plain" "" "$n"
+    [ "$rc" = 2 ] && has '^Usage: ' "$o" || left="$left $n(rc=$rc)"
+  done
+  [ -z "$left" ] && pass "P9 the old command names are refused: exit 2 and the usage line" || bad "P9 an old name still runs:$left"
+  rm -rf "$c"
+else
+  bad "no python - update for every project NOT tested"
 fi
 
 # ---------- global rules between AGENT-KIT markers ----------
@@ -1548,17 +1636,17 @@ grep -q 'timeout-minutes:' "$KIT/docs/templates/pr-description.yml" && ! grep -q
   && grep -q 'BODY: \${{ github.event.pull_request.body }}' "$KIT/docs/templates/pr-description.yml" \
   && pass "PR2 the template has a timeout, no third-party action, and the body only in env" || bad "PR2 template shape wrong"
 
-# ---------- recommended tools list: refreshed by --setup, never re-adds what the user dismissed ----------
+# ---------- recommended tools list: refreshed by install, never re-adds what the user dismissed ----------
 # The list is seeded once and then the user's, but a list that never learns about new upstream items goes
-# stale (the machine this was found on still named the Playwright MCP the kit had retired). --setup, which
-# --update runs, merges upstream items by id: new ones in, changed ones replaced, and an item the user
+# stale (the machine this was found on still named the Playwright MCP the kit had retired). install, which
+# update runs, merges upstream items by id: new ones in, changed ones replaced, and an item the user
 # removed or dismissed stays gone. Entries without an id are the user's own and are never touched.
 echo "== recommended tools refresh =="
 if [ -n "$PY" ]; then
   g=$(mktemp -d) || exit 2
   wq() { cygpath -m "$1" 2>/dev/null || printf '%s' "$1"; }
   G=$(wq "$g")
-  su() { src=0; o=$(HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY=1 sh "$KIT/install.sh" --setup </dev/null 2>&1) || src=$?; }
+  su() { src=0; o=$(HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY=1 AGENT_KIT_LIB=1 sh -c '. "$0"; setup_machine' "$KIT/install.sh" </dev/null 2>&1) || src=$?; }
   rj() { $PY -c "import json,sys; d=json.load(open(sys.argv[1],encoding='utf-8')); print($1)" "$G/.the-agent-kit/recommended.json" 2>/dev/null; }
   RL="$g/.the-agent-kit/recommended.json"
   mkdir -p "$g/.the-agent-kit"
@@ -1586,7 +1674,7 @@ EOF
   [ "$(rj "sorted(i['id'] for i in d['items'] if i.get('optional'))")" = "['headroom', 'ponytail', 'superpowers', 'you-should-know']" ] \
     && pass "R1 items added to the kit since are offered, flagged optional" || bad "R1 new upstream items not added"
   cp "$RL" "$g/after1.json"; su
-  cmp -s "$RL" "$g/after1.json" && pass "R2 a second --setup leaves the list byte-identical" || bad "R2 re-run rewrote the list"
+  cmp -s "$RL" "$g/after1.json" && pass "R2 a second install leaves the list byte-identical" || bad "R2 re-run rewrote the list"
   # R3: from here the list carries its own record of what was offered. A removed item is dismissed,
   # an explicitly dismissed one never returns, and an item the list never saw is added.
   $PY - "$G/.the-agent-kit/recommended.json" <<'EOF'
@@ -1624,13 +1712,13 @@ EOF
   [ "$(rj "len(d['items'])")" = 10 ] &&[ "$(rj "sorted(d['seeded']) == sorted(i['id'] for i in d['items'])")" = True ] \
     && [ "$(rj "d['dismissed']")" = "[]" ] \
     && pass "R5 a fresh machine is seeded with every item and the record of them" || bad "R5 fresh seed wrong: $(cat "$RL" 2>/dev/null | head -c 200)"
-  # R5b: the kit's list may have just come off the network (--update), and its text lands in the agent's
+  # R5b: the kit's list may have just come off the network (update), and its text lands in the agent's
   # context, so without a yes the merge is only described: the user's list stays byte-identical.
   cat > "$RL" <<'EOF'
 {"items":[{"name":"Context7 MCP (library docs)","when":"always","claude":{"mcp":"context7","install":"old command"}}]}
 EOF
   cp "$RL" "$g/before.json"
-  src=0; o=$(HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY= sh "$KIT/install.sh" --setup </dev/null 2>&1) || src=$?
+  src=0; o=$(HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY= AGENT_KIT_LIB=1 sh -c '. "$0"; setup_machine' "$KIT/install.sh" </dev/null 2>&1) || src=$?
   cmp -s "$RL" "$g/before.json" && has 'recommended tools:.*update Context7' "$o" && has 'AGENT_KIT_APPLY' "$o" \
     && pass "R5b without consent the merge is listed, not applied: the list is byte-identical" || bad "R5b the list changed (or the change was not listed) without consent: $o"
   # R6: a kit list with no usable items (a bad download) retires nothing from the user's list.
@@ -1657,9 +1745,9 @@ if [ -n "$PY" ]; then
   nsk=$(ls "$KIT/claude/skills" | wc -l | tr -d ' ')
   home_() { g=$(mktemp -d) || exit 2; G=$(wq "$g"); mkdir -p "$g/.claude" "$g/.gemini/config"; }
   su() {  # $1 = AGENT_KIT_APPLY ("" = no consent), $2 = link kind override ("" = platform default)
-    src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY="$1" AGENT_KIT_LINK_KIND="${2:-}" sh "$KIT/install.sh" --setup </dev/null 2>&1) || src=$?; }
+    src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY="$1" AGENT_KIT_LINK_KIND="${2:-}" AGENT_KIT_LIB=1 sh -c '. "$0"; setup_machine' "$KIT/install.sh" </dev/null 2>&1) || src=$?; }
   # Uninstall changes the user's settings too now, so it takes the same consent as install.
-  undo_() { src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY=1 sh "$KIT/install.sh" --undo </dev/null 2>&1) || src=$?; }
+  undo_() { src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY=1 sh "$KIT/install.sh" uninstall </dev/null 2>&1) || src=$?; }
   lnk() {  # $1 = path -> "link ok" when it is a symlink or junction resolving to the same-named folder in ~/.agents/skills
     $PY - "$(wq "$1")" <<'EOF'
 import os, sys
@@ -1686,17 +1774,17 @@ EOF
     && pass "W3 skills.json points Antigravity at ~/.agents/skills, limited to the kit's skills" || bad "W3 skills.json wrong: $(cat "$g/.gemini/config/skills.json" 2>/dev/null)"
   cp "$g/.gemini/config/skills.json" "$g/sj.before"; before=$(ls -R "$g/.agents" "$g/.claude" "$g/.gemini" | md5sum); su 1
   [ "$(ls -R "$g/.agents" "$g/.claude" "$g/.gemini" | md5sum)" = "$before" ] && cmp -s "$g/.gemini/config/skills.json" "$g/sj.before" \
-    && pass "W4 a second --setup changes nothing (no new file, backup or rewrite)" || bad "W4 re-run not idempotent: $o"
+    && pass "W4 a second install changes nothing (no new file, backup or rewrite)" || bad "W4 re-run not idempotent: $o"
   # W5: the canonical copy is kit-owned: a drifted file is restored, and a link keeps working through it.
   printf 'drifted\n' > "$g/.agents/skills/tidy/SKILL.md"; su 1
   cmp -s "$g/.agents/skills/tidy/SKILL.md" "$KIT/claude/skills/tidy/SKILL.md" && [ "$(lnk "$g/.claude/skills/tidy")" = "link ok" ] \
     && pass "W5 a drifted kit copy is refreshed and its link still resolves" || bad "W5 drifted copy not refreshed: $o"
   # W5b: a skill the kit installed (it is in the install record) and a later kit no longer ships goes on
-  # --setup: its copy, its ~/.claude/skills link and its skills.json name. A skill of the user's (no kit
+  # install: its copy, its ~/.claude/skills link and its skills.json name. A skill of the user's (no kit
   # mark) stays, and so does a copy the user made of a kit skill: it carries the mark but is not in the
   # record, and the record, not the mark, says what the kit installed.
   cp -r "$g/.agents/skills/tidy" "$g/.agents/skills/old-kit-skill"; cp -r "$g/.agents/skills/tidy" "$g/.agents/skills/my-renamed"
-  printf "This folder is a copy made by the-agent-kit's install.sh; --setup refreshes it and --undo removes it.\nskill: old-kit-skill\n" > "$g/.agents/skills/old-kit-skill/.the-agent-kit"
+  printf "This folder is a copy made by the-agent-kit's install.sh; install refreshes it and uninstall removes it.\nskill: old-kit-skill\n" > "$g/.agents/skills/old-kit-skill/.the-agent-kit"
   mkdir -p "$g/.agents/skills/mine-unmarked"; printf 'x\n' > "$g/.agents/skills/mine-unmarked/SKILL.md"
   $PY - "$(wq "$g")" <<'EOF'
 import json, os, subprocess, sys
@@ -1732,7 +1820,7 @@ EOF
   m=""; for n in $SK; do [ -e "$g/.claude/skills/$n" ] || [ -L "$g/.claude/skills/$n" ] || [ -e "$g/.agents/skills/$n" ] && m="$m $n"; done
   [ -z "$m" ] && [ -f "$g/.agents/skills/mine/SKILL.md" ] && [ -f "$g/.claude/skills/theirs/SKILL.md" ] \
     && [ "$(sj_ "$g/.gemini/config/skills.json" "[e['path'] for e in d['entries']]")" = "['~/my-skills']" ] \
-    && pass "W6 --undo removes the kit's links, copies and skills.json entry, and leaves the user's own skills and entries" || bad "W6 undo wrong (left:$m): $o"
+    && pass "W6 uninstall removes the kit's links, copies and skills.json entry, and leaves the user's own skills and entries" || bad "W6 undo wrong (left:$m): $o"
   rm -rf "$g"
   # W7-W9: what the installer does not own it does not touch, and it says so.
   home_
@@ -1757,7 +1845,7 @@ EOF
   undo_
   [ -d "$g/elsewhere" ] && [ "$(lnk "$g/.claude/skills/orchestrating-work")" = "link elsewhere" ] && [ "$(cat "$g/.claude/skills/tidy/SKILL.md")" = mine ] \
     && [ "$(cat "$g/.agents/skills/writing-docs/SKILL.md")" = mine ] \
-    && pass "W9b --undo leaves a foreign link, a foreign folder and the foreign target untouched" || bad "W9b undo removed something it does not own: $o"
+    && pass "W9b uninstall leaves a foreign link, a foreign folder and the foreign target untouched" || bad "W9b undo removed something it does not own: $o"
   rm -rf "$g"
   # W10: an existing skills.json keeps every entry; the kit's entry is added, or extended when the user
   # already has one for ~/.agents/skills; one that exposes the whole folder already covers the kit.
@@ -1785,15 +1873,15 @@ EOF
   printf '{"entries":[{"path":"~/.agents/skills","include_only":["generating-reports","orchestrating-work","dispatch","tidy","writing-docs"],"exclude":["x-.*"]}]}\n' > "$g/.gemini/config/skills.json"
   cp "$g/.gemini/config/skills.json" "$g/sj.before"; su 1; undo_
   cmp -s "$g/.gemini/config/skills.json" "$g/sj.before" && has 'skills.json' "$(printf '%s' "$o" | grep '!')" \
-    && pass "W10e --undo keeps a skills.json entry that carries keys of the user's own, and says so" || bad "W10e undo rewrote an entry with other keys: $(cat "$g/.gemini/config/skills.json")"
+    && pass "W10e uninstall keeps a skills.json entry that carries keys of the user's own, and says so" || bad "W10e undo rewrote an entry with other keys: $(cat "$g/.gemini/config/skills.json")"
   rm -rf "$g"
-  # W10f: a skills.json entry naming a skill whose folder is the USER'S (no kit marker) is theirs: --undo keeps both.
+  # W10f: a skills.json entry naming a skill whose folder is the USER'S (no kit marker) is theirs: uninstall keeps both.
   home_
   mkdir -p "$g/.agents/skills/tidy"; printf 'mine\n' > "$g/.agents/skills/tidy/SKILL.md"
   printf '{"entries":[{"path":"~/.agents/skills","include_only":["tidy"]}]}\n' > "$g/.gemini/config/skills.json"
   cp "$g/.gemini/config/skills.json" "$g/sj.before"; undo_
   cmp -s "$g/.gemini/config/skills.json" "$g/sj.before" && [ "$(cat "$g/.agents/skills/tidy/SKILL.md")" = mine ] \
-    && pass "W10f --undo leaves a user-owned skill and the skills.json entry that lists it" || bad "W10f undo removed a user-owned skill's entry: $(cat "$g/.gemini/config/skills.json")"
+    && pass "W10f uninstall leaves a user-owned skill and the skills.json entry that lists it" || bad "W10f undo removed a user-owned skill's entry: $(cat "$g/.gemini/config/skills.json")"
   rm -rf "$g"
   # W10g: a leftover ~/.agents/skills/<n>.agent-kit-new the kit cannot vouch for is never deleted: that skill is skipped, with a warning.
   home_
@@ -1818,7 +1906,7 @@ EOF
       && pass "W12 the symlink path makes real symlinks that resolve to the one copy" || bad "W12 AGENT_KIT_LINK_KIND=symlink did not make a symlink"
     undo_
     [ ! -e "$g/.claude/skills/tidy" ] && [ ! -L "$g/.claude/skills/tidy" ] && [ ! -e "$g/.agents/skills/tidy" ] \
-      && pass "W12b --undo removes symlinks it made" || bad "W12b symlink not removed: $o"
+      && pass "W12b uninstall removes symlinks it made" || bad "W12b symlink not removed: $o"
   else
     case "$o" in *WARN*|*'!'*) pass "W12 (this platform may not create symlinks; the failure was reported, not hidden)" ;; *) bad "W12 symlink creation failed silently: $o" ;; esac
   fi
@@ -1827,10 +1915,10 @@ EOF
   # install record), and is quiet once setup has run.
   home_
   mkdir -p "$g/.the-agent-kit"; cp -r "$KIT/claude/skills" "$g/.the-agent-kit/skills"
-  d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
-  has 'predates the install record.*install.sh update' "$d" && pass "W13 --check notes the machine-wide install is missing or old" || bad "W13 --check silent about a missing machine-wide install: $(printf '%s' "$d" | grep -i -E 'entries|record')"
-  su 1; d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
-  has "machine-wide entries: installed and current" "$d" && pass "W13 --check is quiet once they are in place" || bad "W13 --check still notes it after setup: $(printf '%s' "$d" | grep -i -E 'entries|record')"
+  d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" check 2>&1)
+  has 'predates the install record.*install.sh update' "$d" && pass "W13 check notes the machine-wide install is missing or old" || bad "W13 check silent about a missing machine-wide install: $(printf '%s' "$d" | grep -i -E 'entries|record')"
+  su 1; d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" check 2>&1)
+  has "machine-wide entries: installed and current" "$d" && pass "W13 check is quiet once they are in place" || bad "W13 check still notes it after setup: $(printf '%s' "$d" | grep -i -E 'entries|record')"
   rm -rf "$g"
 else
   bad "no python - machine-wide skills NOT tested"
@@ -1840,14 +1928,14 @@ fi
 # Antigravity's built-in docs (agy-customizations/docs/hooks.md, agy 1.5.1) define a SessionStart hook that
 # runs once when a conversation starts, answered with {"injectSteps":[{"ephemeralMessage":"..."}]}, in a
 # hooks.json in the global customization root ~/.gemini/config. Older kits used PreInvocation, which fires
-# before every model call. --setup merges one named hook into that file, which other tools also write to:
+# before every model call. install merges one named hook into that file, which other tools also write to:
 # every existing entry is kept, the write is atomic, and a second run changes nothing. The hook calls a
 # launcher beside hooks.json by bare name, because a quoted path with a space breaks a hook.
 echo "== Antigravity session-start check =="
 if [ -n "$PY" ]; then
   wq() { cygpath -m "$1" 2>/dev/null || printf '%s' "$1"; }
   home_() { g=$(mktemp -d) || exit 2; G=$(wq "$g"); mkdir -p "$g/.gemini/config"; }
-  su() { src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY="$1" sh "$KIT/install.sh" --setup </dev/null 2>&1) || src=$?; }
+  su() { src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY="$1" AGENT_KIT_LIB=1 sh -c '. "$0"; setup_machine' "$KIT/install.sh" </dev/null 2>&1) || src=$?; }
   hk() { $PY -c "import json,sys; d=json.load(open(sys.argv[1],encoding='utf-8')); print($2)" "$(wq "$1")" 2>/dev/null; }
   HJ() { printf '%s' "$g/.gemini/config/hooks.json"; }
   orca='{"orca-status":{"PreInvocation":[{"type":"command","command":"C:/x/orca.exe -a b","timeout":10}],"Stop":[{"type":"command","command":"echo bye"}],"PreToolUse":[{"matcher":"*","hooks":[{"type":"command","command":"orca pre"}]}]}}'
@@ -1877,7 +1965,7 @@ EOF
     && pass "G2b skills.json and hooks.json each hold their own data when one run writes both" || bad "G2b files crossed: $(cat "$g/.gemini/config/skills.json")"
   before=$(ls -a "$g/.gemini/config" | md5sum); cp "$(HJ)" "$g/h.before"; su 1
   [ "$(ls -a "$g/.gemini/config" | md5sum)" = "$before" ] && cmp -s "$(HJ)" "$g/h.before" \
-    && pass "G3 a second --setup changes nothing" || bad "G3 re-run not idempotent: $o"
+    && pass "G3 a second install changes nothing" || bad "G3 re-run not idempotent: $o"
   # G4: the launcher answers in Antigravity's contract from the folder hooks.json is in, and says {} without a kit.
   ah=$(mktemp -d); AH=$(wq "$ah"); mkdir -p "$ah/.the-agent-kit/hooks"; cp "$KIT/hooks/kit-check.py" "$ah/.the-agent-kit/hooks/"; printf 'abc1234\n' > "$ah/.the-agent-kit/.kit-version"
   git init -q -b main "$ah/src" && ( cd "$ah/src" && git -c user.email=t@e.com -c user.name=T commit -q --allow-empty -m r1 )
@@ -1945,9 +2033,9 @@ EOF
     && pass "G6 an entry named the-agent-kit that is not the kit's is left alone, with a warning" || bad "G6 foreign entry replaced or not reported: $o"
   # G7: undo takes the kit's hook and launcher and nothing else.
   printf '%s\n' "$orca" > "$(HJ)"; su 1
-  src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY=1 sh "$KIT/install.sh" --undo </dev/null 2>&1) || src=$?
+  src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY=1 sh "$KIT/install.sh" uninstall </dev/null 2>&1) || src=$?
   [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status']" ] && [ ! -e "$g/.gemini/config/agent-kit-check.py" ] \
-    && pass "G7 --undo removes the kit's hook and launcher and keeps the other tool's hooks" || bad "G7 undo wrong: $(cat "$(HJ)")"
+    && pass "G7 uninstall removes the kit's hook and launcher and keeps the other tool's hooks" || bad "G7 undo wrong: $(cat "$(HJ)")"
   # G7b: undo also removes an older kit's PreInvocation entry.
   printf '%s\n' "$orca" > "$(HJ)"; su 1
   $PY - "$(wq "$(HJ)")" <<'EOF'
@@ -1956,9 +2044,9 @@ p = sys.argv[1]; d = json.load(open(p, encoding="utf-8")); v = d["the-agent-kit-
 d["the-agent-kit-check"] = {"PreInvocation": v["SessionStart"]}
 json.dump(d, open(p, "w", encoding="utf-8"))
 EOF
-  src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY=1 sh "$KIT/install.sh" --undo </dev/null 2>&1) || src=$?
+  src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY=1 sh "$KIT/install.sh" uninstall </dev/null 2>&1) || src=$?
   [ "$(hk "$(HJ)" "sorted(d)")" = "['orca-status']" ] \
-    && pass "G7b --undo removes an older kit's PreInvocation entry too" || bad "G7b undo left the old entry: $(cat "$(HJ)")"
+    && pass "G7b uninstall removes an older kit's PreInvocation entry too" || bad "G7b undo left the old entry: $(cat "$(HJ)")"
   rm -rf "$g"
   # G8: a hooks.json that is not a JSON object, or is a symlink, is never rewritten or written through.
   home_; printf '{ not json' > "$(HJ)"; su 1
@@ -1970,8 +2058,8 @@ EOF
   rm -rf "$g"; home_; printf 'mine\n' > "$g/.gemini/config/agent-kit-check.py"; su 1
   [ "$(cat "$g/.gemini/config/agent-kit-check.py")" = mine ] && [ "$(hk "$(HJ)" "sorted(d)")" = "['the-agent-kit-progress']" ] && has 'launcher' "$(printf '%s' "$o" | grep '!')" \
     && pass "G8a a foreign agent-kit-check.py is left alone and the hook is not wired to it" || bad "G8a foreign launcher overwritten or wired: $o"
-  src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY=1 sh "$KIT/install.sh" --undo </dev/null 2>&1) || src=$?
-  [ "$(cat "$g/.gemini/config/agent-kit-check.py")" = mine ] && pass "G8a --undo does not remove a launcher that is not the kit's" || bad "G8a undo removed a foreign file"
+  src=0; o=$(env HOME="$g" USERPROFILE="$G" AGENT_KIT_APPLY=1 sh "$KIT/install.sh" uninstall </dev/null 2>&1) || src=$?
+  [ "$(cat "$g/.gemini/config/agent-kit-check.py")" = mine ] && pass "G8a uninstall does not remove a launcher that is not the kit's" || bad "G8a undo removed a foreign file"
   rm -rf "$g"; home_; vic=$(mktemp -d); printf '{"keep":"me"}\n' > "$vic/victim.json"
   if MSYS=winsymlinks:nativestrict ln -s "$vic/victim.json" "$(HJ)" 2>/dev/null && [ -L "$(HJ)" ]; then
     su 1
@@ -1982,18 +2070,18 @@ EOF
   # G9: no hooks.json yet -> created with just the kit's hook. No Antigravity on the machine -> nothing made.
   home_; su 1
   [ "$(hk "$(HJ)" "sorted(d)")" = "['the-agent-kit-check', 'the-agent-kit-progress']" ] && pass "G9 no hooks.json yet: created with only the kit's hooks" || bad "G9 fresh hooks.json wrong: $(cat "$(HJ)" 2>/dev/null)"
-  # G10: --check says whether it is wired (a missing hook is a NOTE with the fix, not a FAIL).
-  d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
-  has 'WARN: .*machine-wide' "$d" && bad "G10 --check complains although everything is in place" || pass "G10 --check is quiet when the Antigravity check is wired"
+  # G10: check says whether it is wired (a missing hook is a NOTE with the fix, not a FAIL).
+  d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" check 2>&1)
+  has 'WARN: .*machine-wide' "$d" && bad "G10 check complains although everything is in place" || pass "G10 check is quiet when the Antigravity check is wired"
   printf '{}\n' > "$(HJ)"
-  d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --check 2>&1)
-  has 'machine-wide entries.*gemini.*install.sh' "$d" && pass "G10b --check notes the Antigravity check is not wired and what to run" || bad "G10b --check silent about an unwired Antigravity check"
+  d=$(cd "$g" && HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" check 2>&1)
+  has 'machine-wide entries.*gemini.*install.sh' "$d" && pass "G10b check notes the Antigravity check is not wired and what to run" || bad "G10b check silent about an unwired Antigravity check"
   rm -rf "$g"
-  # G11: --global prints the hook for a hand merge and writes nothing under ~/.gemini.
+  # G11: --print prints the hook for a hand merge and writes nothing under ~/.gemini.
   g=$(mktemp -d) || exit 2; G=$(wq "$g"); mkdir -p "$g/.gemini/config"
-  o=$(HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --global 2>&1)
+  o=$(HOME="$g" USERPROFILE="$G" sh "$KIT/install.sh" --print 2>&1)
   has '{"SessionStart":' "$o" && has 'agent-kit-check.py' "$o" && [ ! -e "$g/.gemini/config/hooks.json" ] \
-    && pass "G11 --global prints the Antigravity hook and writes none of it" || bad "G11 --global omits or wrote the Antigravity hook"
+    && pass "G11 --print prints the Antigravity hook and writes none of it" || bad "G11 --print omits or wrote the Antigravity hook"
   rm -rf "$g"
 else
   bad "no python - the Antigravity session-start check NOT tested"

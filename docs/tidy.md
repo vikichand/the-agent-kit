@@ -44,7 +44,7 @@ folder that can be read decides alone; an absolute path in the command line insi
 folder cannot be read. The scanner reads another process's working folder through the Windows
 process block, `/proc/<pid>/cwd` on Linux and `lsof` on macOS. A folder it cannot read, with no such path, means
 the process is not listed (a note counts them), and an orphaned MCP tree working somewhere else becomes one note that points to
-`~/.the-agent-kit/install.sh --tidy`. Editors and agent CLIs are never listed; the agent CLIs are recognised by
+`~/.the-agent-kit/install.sh tidy`. Editors and agent CLIs are never listed; the agent CLIs are recognised by
 the script they run, because on Windows `claude`, `codex` and every dev server are all `node.exe`. A scope is
 refused when it is the home folder, a folder that holds it (`C:\Users`, `/home`), a filesystem root or a system folder
 (the Windows folder, Program Files, `/usr/bin`, `/usr/lib` and similar; `/usr/src/app` is allowed). Outside a
