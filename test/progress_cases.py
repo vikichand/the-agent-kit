@@ -284,6 +284,30 @@ with open(b.path(), "w") as f:
 rc, out, err = b.run("tool", TOOL)
 check("a state file holding a number too large to be a time is ignored, not a crash", rc == 0 and out == "" and err == "", (rc, out, err))
 
+# -- workers: when each last made a tool call -----------------------------------------------------------
+b = Box()
+WORK = {"session_id": "s1", "last_assistant_message": "started", "background_tasks": [
+    {"id": "w1", "type": "subagent", "status": "running", "description": "Fix the parser"},
+    {"id": "w2", "type": "subagent", "status": "running", "description": "Write the docs"}]}
+rc, out, err = b.run("tool", dict(TOOL, agent_id="w1"))
+check("a worker's tool call leaves nothing behind when its lead is not tracked",
+      rc == 0 and out == "" and err == "" and not os.path.exists(os.path.join(b.tmp, ".the-agent-kit")), (rc, out, err))
+b.run("prompt", USER)
+rc, out, err = b.run("tool", dict(TOOL, agent_id="w1"))
+rc2, out2, err2 = b.run("tool", dict(TOOL, agent_id="../../w9"))
+beat = os.path.join(b.tmp, ".the-agent-kit", "progress", "s1.w-w1")
+inside = sorted(os.listdir(os.path.dirname(beat)))
+check("a worker's tool call is recorded beside its lead's state, and its id cannot name a path outside",
+      (rc, out, err, rc2, out2, err2) == (0, "", "", 0, "", "") and inside == ["s1.json", "s1.w-w1", "s1.w-w9"]
+      and sorted(os.listdir(os.path.join(b.tmp, ".the-agent-kit"))) == ["progress"], (inside, err, err2))
+os.utime(beat, (time.time() - 300, time.time() - 300))
+rc, out, err = b.run("stop", WORK, env=FAST, timeout=20)
+check("the wake-up says when each worker last made a tool call, and nothing for one never seen",
+      rc == 2 and '"Fix the parser" (0 min, last tool call 5 min ago)' in err and '"Write the docs" (0 min)' in err, (rc, err))
+b.run("prompt", USER)
+rc, out, err = b.run("stop", dict(WORK, last_assistant_message="No work in progress."), env=FAST, timeout=20)
+check("\"no work in progress\" is not believed while a worker is still running", rc == 2, (rc, err))
+
 rc, out, err = b.run("stop", RUNNING, env={"AGENT_KIT_UPDATE_MINUTES": "0"}, timeout=10)
 rc2, out2, err2 = b.run("stop", RUNNING, env=dict(FAST, CLAUDE_CODE_ENTRYPOINT="sdk-cli"), timeout=10)
 check("turned off, or in a headless run, no waiter starts", (rc, rc2) == (0, 0), (rc, rc2))

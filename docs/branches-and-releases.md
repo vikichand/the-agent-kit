@@ -109,8 +109,8 @@ history other people may have pulled.
 
 **Hotfixes:** no separate branch. Fix on `develop`, then cut a patch release the same way.
 
-**Who decides:** an agent may prepare a release (steps 1 to 3) when asked, but the owner merges the
-pull request and publishes the release.
+**Who decides:** the owner. When the owner says "release", an agent carries out every step, the merge
+and the published release included. Asked only to prepare one, it does steps 1 to 3 and stops.
 
 ## Release notes
 

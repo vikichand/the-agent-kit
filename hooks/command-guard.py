@@ -40,13 +40,18 @@ WRAPPER_VALUE = {
     "time": {"-f", "-o", "--format", "--output"},
     "exec": {"-a"},
 }
-# One-time, turn-scoped grants (Claude ask-mode only). See capture_intent() / load_grants(). A push, a new
-# pull request and a merge reach other people, so each runs only in the turn you asked for it. Without
-# that request it is refused, never asked: a prompt waits with no time limit and would stall an unattended
-# run, while a refusal lets the agent finish and leave the work committed for the user to review.
+# Grants from the user's own message (Claude ask-mode only). See capture_intent() / load_grants(). A push, a
+# new pull request and a merge reach other people, so each runs without a prompt only when the user asked
+# for it. Without that request Claude Code asks: its approval card is one key, and the user never has to
+# type the command (owner decision 2026-11-28; before, it was refused and handed back). A session nobody
+# is watching cannot answer a card, so one that another agent started is still refused: the refusal lets
+# it finish and leave the work committed.
 _HOLD     = (" was not requested in the user's message this turn, so it is held. Keep the work committed "
              "locally, finish the task, and end your report with what is ready (branch and commits); the "
              "user will ask for it after reviewing.")
+_ASK      = (" was not asked for in your last message. Approve to run it now. To skip this card next time, "
+             "say the word first: push, raise the PRs, merge or release (each includes the steps before it).")
+HOLD = False   # set in main(): nobody can answer a card in this session, so refuse instead of asking
 PUSH_OK   = "git push: authorized by your request this turn."
 PUSH_HOLD = "git push" + _HOLD
 PUSH_DENY = ("git push runs on Codex only in the turn the user's own message asks for it, with the kit's prompt "
@@ -298,16 +303,20 @@ def is_force_push(args):
 # Turn-scoped git-write authorization (Claude Code, ask-mode only).
 #
 # The user's own words are the ONLY source of a grant. A UserPromptSubmit hook (which the agent
-# cannot write to) reads each message and records which of commit / push / pr the user asked for,
-# keyed to the session id. The PreToolUse guard then lets exactly those operations through with no
-# prompt, for that turn only. Every new user message OVERWRITES the record, so a grant never
-# survives into a later turn: the agent can never push or open a PR on its own initiative, only in
-# the same turn you asked, or by approving the normal prompt (which is it asking you). A local commit
-# needs no grant: it is undoable and never leaves the machine, so it runs without a prompt.
+# cannot write to) reads each message and records which of commit / push / pr / merge the user asked
+# for, keyed to the session id. The PreToolUse guard then lets exactly those operations through with
+# no prompt. Every new message of the user's OVERWRITES the record, so a grant lasts until they next
+# write and no longer: the agent can never push or open a PR on its own initiative, only after you
+# asked, or by your approving the card (which is it asking you). A turn the tool starts itself (a task
+# notification, a subagent handing back) is not your message and leaves the record alone. A local
+# commit needs no grant: it is undoable and never leaves the machine, so it runs without a prompt.
+#
+# Four words cover the chain, each with the steps before it: push; raise the PRs; merge; release.
+# A bare "yes" or "go ahead" approves what the agent's last message proposed by name, and no more.
 #
 # Detection is deliberately CONSERVATIVE and fails toward the prompt: it grants only on a clear
-# request and vetoes on any nearby negation or noun usage ("the commit", "the push logs"). A missed
-# phrasing costs one extra prompt; it can never silently authorize something you did not plainly ask
+# request and vetoes on a negation or noun usage in the same sentence ("the commit", "the push logs"). A
+# missed phrasing costs one click on the card; it can never silently authorize something you did not plainly ask
 # for. This is a convenience layer on a best-effort guard, NOT a security boundary: the temp file is
 # only as trustworthy as the machine, and the real boundary stays the git-layer hooks + branch
 # protection.
@@ -351,6 +360,9 @@ CODEX = False   # set in main() for Codex: its grants live elsewhere and are bou
 
 def _grant_path(session):
     sid = re.sub(r"[^A-Za-z0-9_-]", "", session or "")[:64] or "nosession"
+    if session and sid != session:   # cleaning or cutting changed it: two such ids must not share a file
+        import hashlib
+        sid = sid[:48] + "-" + hashlib.sha256(session.encode("utf-8", "replace")).hexdigest()[:12]
     if CODEX:
         return os.path.join(os.path.expanduser("~"), ".the-agent-kit", "grants", "agent-kit-grant-" + sid + ".json")
     import tempfile  # here, not at the top: it costs 12 ms on every guarded call and only grants need it
@@ -396,89 +408,156 @@ def save_grants(session, grants, issued=None, turn=None):
                 pass
 
 
-def _asked(text, v):
-    """True only when `text` reads as a request to run verb `v` (commit|push), unvetoed."""
-    vg = v + r"(?:e?s|ed|ing)?"
-    # A question is not a request ("should I push?", "push is blocked, why?"), except "can you push it?".
-    text = " ".join(q for q in re.split(r"(?<=[.!?])\s+", text)
-                    if not q.rstrip().endswith("?") or re.match(r"\s*(?:(?:ok(?:ay)?|so|and|then|also|please)\W+)*"
-                                                              r"(?:can|could|would|will)\s+you\b", q))
-    if re.search(r"\b(?:whether|if)\b[^.!?]*?\b" + vg + r"\b", text):
-        return False                                                                     # "check whether we need to push"
-    if re.search(r"\b(?:he|she|they|someone|somebody|a\s+teammate|the\s+client)\s+(?:asked|told|wants?|wanted|said)\b", text):
-        return False                                                                     # someone else's request
-    if re.search(_NEG + r"\s+(?:\w+\s+){0,3}?" + vg + r"\b", text):                       # "don't push", "hold off on pushing"
-        return False
-    if re.search(r"\b" + vg + r"\b\s+(?:\w+\s+){0,3}?(?:later|yet|tomorrow|afterwards?|once|after|when)\b", text):
-        return False                                                                     # "push it later"
-    if re.search(r"(?:later|eventually|afterwards?)\s+(?:\S+\s+){0,4}?" + vg + r"\b", text):
-        return False                                                                     # "later we'll push"
-    reqs = [                                                                             # verb right after an action cue
-        r"(?:can|could|would|will)\s+you\s+(?:please\s+|now\s+|then\s+|also\s+)?" + vg + r"\b",
-        r"(?:^|[.!?]\s+|\bplease\b|\bnow\b|\bthen\b|\balso\b|\band\b|\bfirst\b|go\s+ahead\s+and)\s*" + v + r"\b",
-        r"let'?s\s+" + vg + r"\b",
-    ]
-    if any(re.search(p, text) for p in reqs):
+# Where an order starts: "run gh pr create", "please run git push". Not "when I run git push it fails".
+_IMP = (r"(?:^|[.!?]\s+|\bplease\b|\bpls\b|\bnow\b|\bthen\b|\balso\b|\band\b|\bfirst\b|\bjust\b|go\s+ahead\s+and|"
+        r"(?:can|could|would|will)\s+you)\s*")
+
+
+def _requests(text):
+    """The message as sentences, without its questions. A question is not a request ("should I push?",
+    "push is blocked, why?"), except "can you push it?". Each veto below reads one sentence, so a line of
+    explanation after the request ("Push. I don't want to keep saying push") cannot cancel it."""
+    out = []
+    for q in re.split(r"(?<=[.!?])\s+|\n+", text):
+        q = q.strip()
+        if q and (not q.endswith("?") or re.match(r"(?:(?:ok(?:ay)?|so|and|then|also|please|pls)\W+)*"
+                                                  r"(?:can|could|would|will)\s+you\b", q)):
+            out.append(" " + q + " ")
+    return out
+
+
+def _vetoed(s, kw):
+    """True when sentence `s` mentions `kw` (a regex) without asking for it now."""
+    if re.search(r"\b(?:whether|if)\b[^.!?]*?\b" + kw, s):
+        return True                                                                      # "check whether we need to push"
+    if re.search(r"\b(?:he|she|they|someone|somebody|a\s+teammate|the\s+client)\s+(?:asked|told|wants?|wanted|said)\b", s):
+        return True                                                                      # someone else's request
+    if re.search(r"\b(?:" + _NEG + r"|not|nobody|no\s+one)\s+(?:\w+\s+){0,3}?" + kw, s):       # "don't push", "hold off on pushing"
         return True
-    if re.search(r"\b(?:what|which|why|how\s+much|how\s+many|when|where)\b[^.!?]*?\b" + vg + r"\b", text):
-        return False                                                                     # "what are we pushing up"
-    vn = v + r"(?:e?s|ing)?"                                                             # no -ed: "I merged it" reports
-    obj = re.search(r"\b" + vn + r"\s+(?:it|this|that|these|those|the|my|all|everything|now|up|origin|them|both|any)\b", text)
-    ser = re.search(r"\b" + vn + r"\b\s*(?:,|;|\.|!|\?|/|\band\b|\bthen\b|$)", text)       # "commit, push, and ..."
-    if re.search(r"\b(?:do|make)\s+(?:a|the)\s+(?:\w+\s+)?(?:git\s+)?" + v + r"\b", text):
-        return True                                                                      # "do the final push"
-    if obj or ser:
-        return not re.search(_DET + r"\s+" + v + r"\b", text)                            # reject noun usage "the commit"
-    return False
+    if re.search(kw + r"\s+(?:is|are|was|isn'?t|aren'?t)\b", s):                         # "push is not wanted": a statement
+        return True
+    if re.search(kw + r"\s+(?:\w+\s+){0,3}?(?:later|yet|tomorrow|afterwards?|once|after|when)\b", s):
+        return True                                                                      # "push it later"
+    return bool(re.search(r"(?:later|eventually|afterwards?)\s+(?:\S+\s+){0,4}?" + kw, s))   # "later we'll push"
+
+
+def _scan(text, kw, asks):
+    """Whether the message asks for `kw`: some sentence asks, and no later one says not to. The later
+    "don't push" wins because a miss costs one click on the approval card and a wrong grant costs a push."""
+    hit = False
+    for s in _requests(text):
+        if re.search(r"\b" + _NEG + r"\s+(?:\w+\s+)?" + kw, s):
+            hit = False
+        elif not _vetoed(s, kw) and asks(s):
+            hit = True
+    return hit
+
+
+def _asked(text, v):
+    """True only when `text` reads as a request to run verb `v` (commit|push|merge), unvetoed."""
+    vg = v + r"(?:e?s|ed|ing)?"
+
+    def asks(s):
+        reqs = [                                                                         # verb right after an action cue
+            r"(?:can|could|would|will)\s+you\s+(?:please\s+|now\s+|then\s+|also\s+)?" + vg + r"\b",
+            r"(?:^|[.!?]\s+|\bplease\b|\bpls\b|\bnow\b|\bthen\b|\balso\b|\band\b|\bfirst\b|\bjust\b|go\s+ahead\s+and)\s*" + v + r"\b",
+            r"let'?s\s+" + vg + r"\b",
+            _IMP + r"(?:run|do|execute|use)\s+git\s+" + v + r"\b",                            # the command, named in prose
+        ]
+        if any(re.search(p, s) for p in reqs):
+            return True
+        if re.search(r"\b(?:what|which|why|how\s+much|how\s+many|when|where)\b[^.!?]*?\b" + vg + r"\b", s):
+            return False                                                                 # "what are we pushing up"
+        vn = v + r"(?:e?s|ing)?"                                                         # no -ed: "I merged it" reports
+        obj = re.search(r"\b" + vn + r"\s+(?:it|this|that|these|those|the|my|all|everything|now|up|origin|them|both|any)\b", s)
+        ser = re.search(r"\b" + vn + r"\b\s*(?:,|;|\.|!|\?|/|\band\b|\bthen\b|$)", s)       # "commit, push, and ..."
+        if re.search(r"\b(?:do|make)\s+(?:a|the)\s+(?:\w+\s+)?(?:git\s+)?" + v + r"\b", s):
+            return True                                                                  # "do the final push"
+        if obj or ser:
+            return not re.search(_DET + r"\s+" + v + r"\b", s)                           # reject noun usage "the commit"
+        return False
+
+    return _scan(text, r"\b" + vg + r"\b", asks)
+
+
+_PR_NOUN = r"(?:pull[\s-]*requests?|prs?|mrs?|merge[\s-]*requests?)"
 
 
 def _asked_pr(text):
     verb = r"(?:creat(?:e|ing)|open(?:ing)?|rais(?:e|ing)|mak(?:e|ing)|submit(?:ting)?|put\s+up|send)"
-    noun = r"(?:pull[\s-]*requests?|prs?|mrs?|merge[\s-]*requests?)"
-    if re.search(_NEG + r"\s+(?:\w+\s+){0,4}?" + noun + r"\b", text):
-        return False
-    return bool(re.search(r"\b" + verb + r"\s+(?:a\s+|an\s+|the\s+)?" + noun + r"\b", text))
+    ask = re.compile(r"\b" + verb + r"\s+(?:(?:a|an|the|all|every|each|both|any)\s+){0,2}(?:(?:release|draft|new|due)\s+)?"
+                     + _PR_NOUN + r"\b(?!\s+(?:template|description|title|body|checklist|page|number|link|url)s?\b)"
+                     r"|" + _IMP + r"(?:run|do|execute|use)\s+gh\s+pr\s+create\b")
+    return _scan(text, r"(?:(?:\w+\s+){0,3}?" + _PR_NOUN + r"\b|gh\s+pr\s+create\b)", lambda s: bool(ask.search(s)))
+
+
+def _asked_merge(text):
+    """ "merge", "merge it", "merge the PR", "merge it to main": a pull request merge. A local git merge
+    ("merge main into feature", "merge locally") is not one."""
+    def asks(s):
+        return not re.search(r"\bmerg\w*\s+(?!(?:it|this|that|them|these|those|(?:the\s+)?(?:prs?|pull))\b)(?:the\s+)?[\w./-]+\s+into\b|\blocal(?:ly)?\b", s)
+    return _asked(text, r"merge?") and _scan(text, r"\bmerg\w*\b", asks) or _scan(
+        text, r"gh\s+pr\s+merge\b", lambda s: bool(re.search(_IMP + r"(?:run|do|execute|use)\s+gh\s+pr\s+merge\b", s)))
 
 
 def _strip_pasted(s):
     """Remove quoted/pasted content before reading intent: a git verb the user QUOTED from a log,
     an issue, or a teammate's message is data, not their instruction (AGENTS.md's untrusted-content
-    invariant, applied to the grant itself). Fenced blocks, blockquote lines, and inline code go."""
+    invariant, applied to the grant itself). Pasted blocks, fenced blocks, blockquote lines, inline code
+    and quotations go. Claude Code wraps a paste in <pasted_content id="x"> ... </pasted_content id="x">
+    (seen on 2.1.332 in the prompt hook's payload); the id is random, so text inside cannot close it."""
+    s = re.sub(r"<pasted_content id=\"([^\"]*)\">.*?(?:</pasted_content id=\"\1\">|\Z)", " ", s, flags=re.S)
     s = re.sub(r"```.*?```", " ", s, flags=re.S)
     s = re.sub(r"~~~.*?~~~", " ", s, flags=re.S)
     s = re.sub(r"(?m)^\s*>.*$", " ", s)
+    s = re.sub(r"\b(run|do|execute|use)\s+`([^`\n]+)`", r"\1 \2", s, flags=re.I)   # "run `gh pr create`" names the act
     s = re.sub(r"`[^`]*`", " ", s)
+    s = re.sub(r"\"[^\"\n]{1,300}\"|(?<!\w)'[^'\n]{1,300}'(?!\w)", " ", s)
     return s
 
 
+def _clean(prompt):
+    text = _strip_pasted(prompt or "").lower().strip()
+    if text[:1] in ("'", '"') and text.count(text[0]) == 1 and "\n" not in text and len(text) <= 200:
+        # A stray opening quote on a short one-line message is a typo. A closed quotation is gone by now,
+        # and anything long or multi-line is more likely a pasted log cut short, so it stays unreadable.
+        text = text[1:]
+    return text
+
+
 def detect_grants(prompt):
-    text = " " + _strip_pasted(prompt or "").lower().strip() + " "
+    """The ship words, each including the steps before it: push; a pull request (push first); a merge
+    (push and pull request first); a release (all of them). A tag and a GitHub release have no entry of
+    their own: pushing the tag is a push, and the rest the guard does not hold."""
+    text = _clean(prompt)
     g = set()
     if _asked(text, r"commit"):
         g.add("commit")
     if _asked(text, r"push"):
         g.add("push")
     if _asked_pr(text):
-        g.add("pr")
-    if _asked(text, r"merge?") and not re.search(r"\bmerge\s+(?:main|master|develop)\s+into\b", text) and (
-            re.search(r"\b(?:prs?|pull[\s-]*requests?)\b", text)
-            or re.search(r"\bmerg\w*\s+(?:\w+\s+){0,3}?(?:to|into)\s+(?:the\s+)?(?:main|master|develop)\b", text)):
-        g.add("merge")                              # merge the PR, merge it to main
-    if _asked_release(text):
+        g |= {"push", "pr"}
+    if _asked_merge(text) or _asked_release(text):
         g |= {"push", "pr", "merge"}
     return g
 
 
 def _asked_release(text):
-    """"cut 0.6.0", "release 0.3.1", "create the releases", "do all the releases needed"."""
-    if re.search(_NEG + r"\s+(?:\w+\s+){0,3}?(?:cut|release)", text):
-        return False
+    """"cut 0.6.0", "release 0.3.1", "create the releases", and the bare words: "release", "release it",
+    "ship it", "tag it"."""
     noun = r"(?!\s+(?:notes?|builds?|branch(?:es)?|candidates?|tags?|is|are|was|has|features?|list|changelog|page|process|script|workflow|pipeline|checklist)\b)"
     ver = r"v?\d+\.\d+(?:\.\d+)?(?!\.?\d)" + noun
-    return bool(re.search(r"\bcut\s+(?:the\s+|a\s+)?(?:release\s+)?" + ver, text)
-                or re.search(r"(?:^|[.!?,]\s+|\band\b|\bthen\b|\bplease\b|\bnow\b)\s*release\s+" + ver, text)
-                or re.search(r"\b(?:create|cut|do|prepare|publish)\s+(?:all\s+)?(?:the\s+|any\s+)?"
-                             r"(?:new\s+)?releases?\b" + noun, text))
+    cue = r"(?:(?:ok(?:ay)?|yes|so|and|then|also|now|please|pls|just|go\s+ahead\s+and|let'?s|(?:can|could|would|will)\s+you)[\s,]+)*"
+    bare = re.compile(cue + r"(?:release|ship|tag|publish)(?:\s+(?:it|this|that|them|everything|all(?:\s+of\s+it)?|now|please))*[\s.!?]*")
+
+    def asks(s):
+        if (re.search(r"\bcut\s+(?:the\s+|a\s+)?(?:release\s+)?" + ver, s)
+                or re.search(r"(?:^|[.!?,]\s+|\band\b|\bthen\b|\bplease\b|\bnow\b)\s*release\s+" + ver, s)
+                or re.search(r"\b(?:create|cut|do|prepare|publish)\s+(?:all\s+)?(?:the\s+|any\s+|a\s+)?(?:new\s+)?releases?\b" + noun, s)):
+            return True
+        return any(bare.fullmatch(c.strip()) for c in re.split(r",|;|\band\b|\bthen\b", s) if c.strip())
+
+    return _scan(text, r"\b(?:cut|releas\w*|ship|tag|publish)\b", asks)
 
 
 GRANT_ASK = "this names the kit's turn-grant file, which only the prompt hook should write. Approve only if you meant it."
@@ -561,8 +640,8 @@ def classify(tokens, decision, grants=frozenset()):
                 return "deny", FORCE_DENY
             if is_no_verify(flags_only(args, PUSH_VALUE_FLAGS)):
                 return "deny", NOVERIFY_DENY
-            if decision == "ask":                       # Claude: silent only if you asked this turn
-                return ("allow", PUSH_OK) if "push" in grants else ("deny", PUSH_HOLD)
+            if decision == "ask":                       # Claude: silent only if you asked; otherwise one card
+                return ("allow", PUSH_OK) if "push" in grants else ("deny", PUSH_HOLD) if HOLD else ("ask", "git push" + _ASK)
             # Codex cannot ask. Asked for this turn: say nothing, so Codex's own approval decides.
             return None if "push" in grants else ("deny", PUSH_DENY)
         if sub == "commit":
@@ -583,7 +662,9 @@ def classify(tokens, decision, grants=frozenset()):
                 grant = "pr" if act == "create" else "merge"
                 if decision == "deny":                   # Codex: silent when asked this turn, as for a push
                     return None if grant in grants else ("deny", PR_DENY)
-                return ("allow", GRANT_OK % ("gh pr " + act)) if grant in grants else ("deny", PR_HOLD % ("gh pr " + act))
+                if grant in grants:
+                    return "allow", GRANT_OK % ("gh pr " + act)
+                return ("deny", PR_HOLD % ("gh pr " + act)) if HOLD else ("ask", "gh pr " + act + _ASK)
         return None
 
     if verb == "rm":
@@ -829,18 +910,99 @@ def is_continue(prompt):
     return len(p) <= 80 and not re.search(r"\b" + _NEG + r"\b", p) and bool(_CONTINUE.fullmatch(p))
 
 
+# A turn the tool starts itself reaches the prompt hook like a message: a finished background task, a
+# subagent handing back, a Stop hook's wake-up (seen on Claude Code 2.1.332 as <task-notification> and
+# <agent-message from=...>). Those words are not the user's, so such a turn neither grants nor replaces
+# what the user's last message granted. Only those two tags are read this way. Any other prompt that
+# opens with a tag grants nothing and ends the grant: it may be another session's message or the user's
+# own ("<b>stop</b> don't push"), and a wrong guess costs one click on the card.
+_SYSTEM_TURN = re.compile(r"<(?:task-notification|agent-message)[\s>]")
+_TAG_OPEN = re.compile(r"<[a-z][a-z0-9_-]*[\s>]")
+_CONFIRM = re.compile(r"(?:(?:yes|yep|yeah|yup|ok(?:ay)?|sure|cool|great|right|fine|please|pls|thanks|approved?|confirmed?|"
+                      r"lgtm|sounds\s+good|go\s+ahead|go\s+for\s+it|do\s+it|do\s+that|do\s+so|proceed|make\s+it\s+so)"
+                      r"[\s,.!]*)+")
+
+
+def proposed_grants(path, prompt):
+    """What the agent's last message offered to do, by name: a bare "yes" approves exactly that. Only a
+    sentence that asks or offers counts ("Shall I push?", "I can open the pull request"), and each act is
+    granted alone, not with the steps before it. Read from the session transcript, whose path a command
+    may not name (see the grant-file check in main)."""
+    try:
+        with open(path, "rb") as f:
+            f.seek(0, 2)
+            f.seek(max(0, f.tell() - 400000))
+            lines = f.read().decode("utf-8", "replace").splitlines()
+        said = None
+        for line in reversed(lines):
+            try:
+                d = json.loads(line)
+            except ValueError:
+                continue
+            if not isinstance(d, dict) or d.get("isSidechain") or d.get("type") not in ("assistant", "user"):
+                continue
+            content = (d.get("message") or {}).get("content")
+            if d["type"] == "user":
+                if isinstance(content, str) and content.strip() != (prompt or "").strip():
+                    return frozenset()   # another message came after the agent's last one
+                continue
+            if isinstance(content, list):
+                said = " ".join(str(b.get("text") or "") for b in content if isinstance(b, dict) and b.get("type") == "text")
+                if said.strip():
+                    break
+        if not said or not said.strip():
+            return frozenset()
+        # Only the agent's last question counts (its last sentence when it asked none), and only an act
+        # that directly follows the offer: "Want me to push and open the pull request?". A sentence that
+        # mentions a word ("Did the push fail?", "Want me to explain the merge?") offers nothing.
+        qs = [q.strip() for q in re.split(r"(?<=[.!?:])\s+|\n+", _strip_pasted(said).lower()) if q.strip()]
+        q = ([x for x in qs if x.endswith("?")] or qs or [""])[-1]
+        m = re.search(r"\b(?:(?:shall|should|can|could|may)\s+i|want\s+me\s+to|like\s+me\s+to|i\s+can|i\s+could|ready\s+to)\s+(.*)", q)
+        g = set()
+        if m and not re.search(r"\b(?:not|never|won'?t|don'?t|can'?t|cannot|without|no|later|after|once|when(?!\s+you)|before|tomorrow)\b", q):
+            for c in re.split(r",|;|\band\b|\bthen\b", m.group(1)):
+                c = re.sub(r"^(?:\s*(?:go\s+ahead|now|also|just|please))*\s*", "", c)
+                if re.match(r"push\b", c):
+                    g.add("push")
+                elif re.match(r"(?:open|create|raise)\s+(?:\w+\s+){0,2}?" + _PR_NOUN + r"\b", c):
+                    g.add("pr")
+                elif re.match(r"merge\b", c) and not re.search(r"\bmerge\s+\S+\s+(?:back\s+)?into\b|\blocal|\bconflict", c):
+                    g.add("merge")
+                elif re.match(r"(?:release|publish|ship)\b(?!\s+(?:notes?|branch|build|pull|pr)\b)", c):
+                    g |= {"push", "pr", "merge"}
+        return frozenset(g)
+    except Exception:
+        return frozenset()
+
+
 def capture_intent(data):
-    """UserPromptSubmit: record which git-writes the user's OWN message authorizes, for this turn."""
+    """UserPromptSubmit: record which git-writes the user's OWN message authorizes, until their next one."""
     try:
         import time
-        grants, issued = detect_grants(data.get("prompt", "")), None
+        session, prompt = data.get("session_id") or "", data.get("prompt", "")
+        prompt = prompt if isinstance(prompt, str) else ""
+        text = _clean(prompt)
         turn = data.get("turn_id") if CODEX else None
-        if started_by_agent(() if CODEX else CLAUDE_OWN) or (CODEX and not (turn and isinstance(turn, str))):
+        if not CODEX and _SYSTEM_TURN.match(_strip_pasted(prompt).lstrip()):
+            # Not the user's words: leave the record as it is, unless it has outlived the carry window (a
+            # wake-up hours later must not run under an old "release").
+            grants, issued = load_grants(session, with_time=True)
+            if grants and time.time() - issued > CARRY_SECONDS:
+                save_grants(session, frozenset())
+            sys.exit(0)
+        grants, issued = detect_grants(prompt), None
+        if (started_by_agent(() if CODEX else CLAUDE_OWN) or (CODEX and not (turn and isinstance(turn, str)))
+                or (not CODEX and _TAG_OPEN.match(_strip_pasted(prompt).lstrip()))):
             grants = frozenset()
-        elif not grants and is_continue(data.get("prompt", "")):
-            grants, issued = load_grants(data.get("session_id") or "", with_time=True)
-            if time.time() - issued > CARRY_SECONDS:   # the original time is kept, so continues never refresh it
-                grants = frozenset()
+        elif not grants:
+            if is_continue(text):
+                grants, issued = load_grants(session, with_time=True)
+                if time.time() - issued > CARRY_SECONDS:   # the original time is kept, so continues never refresh it
+                    grants, issued = frozenset(), None
+            if not CODEX and 0 < len(text) <= 60 and _CONFIRM.fullmatch(text):
+                grants = frozenset(grants) | proposed_grants(data.get("transcript_path"), prompt)
+    except SystemExit:
+        raise
     except Exception:
         grants, issued, turn = frozenset(), None, None   # a crash must fail towards "nothing authorized", never keep the last grant
     save_grants(data.get("session_id") or "", grants, issued, turn)
@@ -941,7 +1103,8 @@ def main():
     # The grant file is written by the prompt hook. A command that names it could forge a grant. This
     # raises the bar for an accident only: the agent's shell can write any file this hook can.
     # Antigravity's transcript is the same kind of source for a carried grant.
-    if re.search(r"agent-kit-grant|\.the-agent-kit[/\\]+grants|transcript(?:_full)?\.jsonl|antigravity-cli[/\\]+brain", cmd, re.I):
+    if re.search(r"agent-kit-grant|\.the-agent-kit[/\\]+grants|transcript(?:_full)?\.jsonl|antigravity-cli[/\\]+brain|"
+                 r"\.claude[/\\]+projects[/\\][^\s\"']*\.jsonl", cmd, re.I):
         emit(args.decision, GRANT_ASK)
     # Each tool reads its own record: Claude's prompt hook, Antigravity's lastUserInput, Codex's turn.
     if ANTIGRAVITY:
@@ -949,9 +1112,17 @@ def main():
     elif CODEX:
         grants = codex_grants(data)
     elif args.decision == "ask" and not started_by_agent(CLAUDE_OWN):
-        grants = load_grants(data.get("session_id") or "")
+        # A subagent shares its lead's session id. The user's word was given to the lead, so a worker's
+        # push gets the card, never the grant.
+        grants = frozenset() if data.get("agent_id") else load_grants(data.get("session_id") or "")
+        # The standing grant. Read from this hook's own environment, which the session's commands cannot
+        # change; a file in the repository would be a grant the agent could write for itself.
+        if not data.get("agent_id") and os.environ.get("AGENT_KIT_SHIP") == "auto":
+            grants = grants | {"push", "pr", "merge"}
     else:
         grants = frozenset()
+        global HOLD
+        HOLD = True
 
     # The pre-push overrides. Asked every time, never covered by a grant: a release push to a
     # release-only branch, or a forced push, is the owner's act, not something a chat request authorizes.

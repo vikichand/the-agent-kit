@@ -11,6 +11,47 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-28
+
+### Added
+
+- A standing grant for Claude Code, off by default: start it with `AGENT_KIT_SHIP=auto` set and a push,
+  pull request or merge runs without your word or the approval card. It does not reach a subagent or a
+  session another agent started, and force-push, `--no-verify` and deleting a remote branch or tag stay
+  refused.
+
+### Changed
+
+- **One word ships the whole step, and Claude Code asks where it used to refuse.** Before, a push,
+  pull request or merge your message had not named was refused and handed back for you to type. Now:
+  - Four words, each including the steps before it: "push", "raise the PRs", "merge", and "release"
+    (also "ship it", "tag it", "publish"). The rules tell the agent to do everything the word covers.
+  - Anything you did not ask for shows Claude Code's approval card: one key, no retyping. Codex and
+    Antigravity cannot ask, so they still refuse, as does a session another agent started.
+  - An explanation no longer cancels the request: "Push. I don't want to keep saying push" is a push.
+    "Don't push yet" and "should I push?" are not, and a later "don't push" still wins.
+  - "run gh pr create", a bare "merge" and a bare "release" count.
+  - "Yes" or "go ahead" approves what the agent's last message proposed by name, and nothing wider.
+  - Pasted text and quotations never grant and never veto.
+  - A background task finishing, or a subagent handing back, no longer wipes your grant, and its text
+    can no longer grant one. Two hours after you asked, such a turn ends the grant.
+  - A subagent no longer uses its lead's grant: its push shows the card.
+  - Force-push, `--no-verify` and deleting a remote branch or tag stay refused whatever you say.
+  - `AGENTS.md` Section 7 and the `writing-docs` skill now say "release" means published.
+
+- On Claude Code, the progress wake-up now says how long ago each background agent last made a tool
+  call, so one that has stalled stands out without reading its output.
+
+### Fixed
+
+- On Claude Code, the progress wake-ups no longer stop when the agent says "no work in progress"
+  while a background agent is still running. A small model had said it by mistake, which silenced
+  every later update for that request.
+
+- The push guard now reads "open the release pull request" (also "draft" or "new") as asking for the
+  pull request, and a message that starts with a stray opening quote as your own request. Before, both
+  were held.
+
 ## [0.8.0] - 2026-11-27
 
 ### Added
@@ -661,7 +702,8 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.8.0...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.9.0...develop
+[0.9.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.9.0
 [0.8.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.8.0
 [0.7.1]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.7.1
 [0.7.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.7.0

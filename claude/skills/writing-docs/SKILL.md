@@ -53,8 +53,8 @@ thorough.
 - For a squash merge, the pull request description becomes the commit message: write it as one, keep it free of session links, and pass an explicit body when merging (`gh pr merge --squash --body-file`).
 
 **Branches, tags and releases** (the project block's **Branches** line decides; this is the default).
-This says how; each step (merge, branch delete, tag, push, release) still runs only when the user names
-it (`AGENTS.md` Section 7).
+This says how; the steps run on the user's word: "push", "raise the PRs", "merge" or "release", each
+covering the steps before it (`AGENTS.md` Section 7).
 
 - A short-lived branch starts from the working branch, is named for its work (`ci/supply-chain`),
   merges back there and is deleted. It never targets a release-only branch. Fast-forward when you can;
@@ -62,8 +62,9 @@ it (`AGENTS.md` Section 7).
 - A release is one `release: X.Y.Z` commit that versions the changelog section and bumps any version
   files, then a pull request titled with the project and version whose description is that section.
 - Tag the release commit with an annotated tag, `git tag -a vX.Y.Z -m "<project> X.Y.Z"` (git: annotated
-  tags "are meant for release"), and create the release with `gh release create vX.Y.Z --verify-tag
-  --draft`, so `gh` never makes a tag of its own. The owner publishes it.
+  tags "are meant for release"), and create the release with `gh release create vX.Y.Z --verify-tag`,
+  so `gh` never makes a tag of its own. "Release" means published; add `--draft` when the user asked for
+  a draft or the project block keeps publishing to the owner.
 - After a squash-merged release, merge the release branch back into the working branch, or the next
   pull request carries the old commits again.
 
