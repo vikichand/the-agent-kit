@@ -807,6 +807,10 @@ These config choices are deliberate, because the obvious "more locked down" sett
     grants nor replaces your grant; two hours after you asked, such a turn ends it.
   - A subagent never uses its lead's grant.
   - A grant never covers force-push, `--no-verify` or deleting a remote branch or tag.
+  - **Standing grant, off by default (Claude Code only):** set `AGENT_KIT_SHIP=auto` in the shell you
+    start Claude Code from, and a push, pull request or merge runs without your word or the card. It
+    is an environment variable because a file in the repository is one the agent could write. It does
+    not reach a subagent or a session another agent started, and the line above still holds.
 
   A missed phrasing costs one key on the approval card, never a silent push. Codex
   works the same way through its own `UserPromptSubmit` hook, with a tighter record: it is tied to the

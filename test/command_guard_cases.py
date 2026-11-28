@@ -8,7 +8,7 @@ G = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__)
 # agent's shell must not look like a worker; the cases that need a marker set it themselves.
 AGENT_ENV = ("CLAUDE_CODE_CHILD_SESSION", "CODEX_THREAD_ID", "ANTIGRAVITY_CONVERSATION_ID", "CLAUDECODE",
              "CLAUDE_CODE_SESSION_ATTENDED", "CLAUDE_CODE_ENTRYPOINT")
-for _v in AGENT_ENV:
+for _v in AGENT_ENV + ("AGENT_KIT_SHIP",):
     os.environ.pop(_v, None)
 
 
@@ -845,7 +845,7 @@ except OSError:
     pass
 # A turn Claude Code starts itself (a finished background task, a subagent handing back, a wake-up) runs
 # the prompt hook too. It must neither grant nor replace what the user's last message granted.
-def claude_flow(prompts, cmd="git push", sid="corpus-flow-sess", transcript=None, extra=None, age=None):
+def claude_flow(prompts, cmd="git push", sid="corpus-flow-sess", transcript=None, extra=None, age=None, env=None):
     f = _grant_file(sid)
     try:
         os.remove(f)
@@ -864,7 +864,8 @@ def claude_flow(prompts, cmd="git push", sid="corpus-flow-sess", transcript=None
                 json.dump(rec, fh)
     payload = {"session_id": sid, "tool_input": {"command": cmd}}
     payload.update(extra or {})
-    r = subprocess.run([sys.executable, G, "--decision", "ask"], input=json.dumps(payload), capture_output=True, text=True)
+    r = subprocess.run([sys.executable, G, "--decision", "ask"], input=json.dumps(payload), capture_output=True, text=True,
+                       env=_env(env))
     try:
         os.remove(f)
     except OSError:
@@ -906,6 +907,7 @@ _T_MENTIONS = [said_last(t) for t in (
 )]
 _T_CHAIN = said_last("All green. Want me to push, open the pull request and merge it?")
 _T_REL = said_last("Everything is ready. Shall I release it?")
+_AUTO = {"AGENT_KIT_SHIP": "auto"}
 FLOW_CASES = [
     # (label, prompts, keyword arguments, expected)
     ("asked, then the command", ["push it"], {}, "allow"),
@@ -930,6 +932,13 @@ FLOW_CASES = [
     ("yes to an offer of three acts approves the last of them", ["fix it", "yes"], dict(transcript=_T_CHAIN, cmd="gh pr merge 5"), "allow"),
     ("yes to an offered release covers the merge", ["fix it", "yes"], dict(transcript=_T_REL, cmd="gh pr merge 5"), "allow"),
     ("the user's own message that opens with a tag ends the grant", ["push it", "<b>stop</b> don't push"], {}, "ask"),
+    ("the standing grant set outside the session ships without a word", ["fix it"], dict(env=_AUTO), "allow"),
+    ("the standing grant covers a merge", ["fix it"], dict(env=_AUTO, cmd="gh pr merge 5"), "allow"),
+    ("the standing grant does not cover a forced push", ["fix it"], dict(env=_AUTO, cmd="git push --force"), "deny"),
+    ("the standing grant does not reach a worker", ["fix it"], dict(env=_AUTO, extra={"agent_id": "a1"}), "ask"),
+    ("the standing grant does not reach a session another agent started", ["fix it"],
+     dict(env=dict(_AUTO, CODEX_THREAD_ID="t1")), "deny"),
+    ("any other value of it is off", ["fix it"], dict(env={"AGENT_KIT_SHIP": "1"}), "ask"),
     ("a worker's push gets the card, not its lead's grant", ["push it"], dict(extra={"agent_id": "a1", "agent_type": "general-purpose"}), "ask"),
     ("a forced push stays refused when asked for", ["push it"], dict(cmd="git push --force"), "deny"),
     ("--no-verify stays refused when asked for", ["push it"], dict(cmd="git push --no-verify"), "deny"),

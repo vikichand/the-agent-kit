@@ -1115,6 +1115,10 @@ def main():
         # A subagent shares its lead's session id. The user's word was given to the lead, so a worker's
         # push gets the card, never the grant.
         grants = frozenset() if data.get("agent_id") else load_grants(data.get("session_id") or "")
+        # The standing grant. Read from this hook's own environment, which the session's commands cannot
+        # change; a file in the repository would be a grant the agent could write for itself.
+        if not data.get("agent_id") and os.environ.get("AGENT_KIT_SHIP") == "auto":
+            grants = grants | {"push", "pr", "merge"}
     else:
         grants = frozenset()
         global HOLD

@@ -13,6 +13,13 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [0.9.0] - 2026-11-28
 
+### Added
+
+- A standing grant for Claude Code, off by default: start it with `AGENT_KIT_SHIP=auto` set and a push,
+  pull request or merge runs without your word or the approval card. It does not reach a subagent or a
+  session another agent started, and force-push, `--no-verify` and deleting a remote branch or tag stay
+  refused.
+
 ### Changed
 
 - **One word ships the whole step, and Claude Code asks where it used to refuse.** Before, a push,
