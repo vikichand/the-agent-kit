@@ -65,12 +65,11 @@ No `FAIL` means you are done. Install, update and uninstall each end with this c
 ### Updating
 
 ```bash
-~/.the-agent-kit/install.sh update    # the new kit on your machine (asks first), and the project you run it in
-~/.the-agent-kit/install.sh           # inside each other project: the new rules; your project's own block is kept
+~/.the-agent-kit/install.sh update    # the new kit on your machine and in every project that holds it (asks once)
 ```
 
-You do not need to remember: when a session starts, the kit tells you when a new release is out and
-when a project's rules are behind.
+One command, run from anywhere. Each project keeps its own block. You do not need to remember: when a
+session starts, the kit tells you when a new release is out and when a project's rules are behind.
 
 ## Let your agent do it
 
@@ -272,14 +271,30 @@ git clone https://github.com/vikichand/the-agent-kit.git && cd the-agent-kit && 
 
 `update` downloads the latest release, checks it really is the kit before touching anything, reports
 `old -> new`, and then runs the new copy's install, so a new hook or setting reaches your settings
-files the same way the first install did: listed, asked, backed up. Run inside a project, it then
-brings that project to the new kit too; every other project is brought current by running
-`~/.the-agent-kit/install.sh` inside it, with the project's own block kept.
+files the same way the first install did: listed, asked, backed up.
 
-**Why projects hold a copy at all.** Keeping the rules in each repo, rather than pointing every project
-at one machine-wide file, is deliberate: teammates, CI and cloud agents see only what is committed, and
+It then brings every project that holds the kit to the new one, each in the way it was installed (full
+rules, or the `--lean` stub) and with its own block kept. The projects are named before the one
+question of the run, so a single yes covers the machine and all of them. With no terminal and no
+`AGENT_KIT_APPLY=1`, it names them and changes nothing. When the kit is already current, `update`
+still brings a project that fell behind up to it.
+
+The projects are listed in `~/.the-agent-kit/.projects`, one path a line. `install.sh` adds the
+project it runs in, and the session-start check adds the project a session starts in when that project
+holds the kit, so projects installed before this list existed add themselves as you open them. A line
+is used only when it names the top of a git repo that holds the kit's record
+(`.agents/the-agent-kit.json`). A project that moved, was deleted or no longer holds the kit is
+dropped from the list and named. To leave a project out of `update`, delete its line; it comes back
+when you run `install.sh` there or start a session in it.
+
+Coming from 0.9.0 or older, the first `update` is still run by the old installer, which does the
+machine and the project you run it in. Run `update` once more and the other projects follow.
+
+**Why projects hold a copy at all.** Keeping the rules in each repo, with no pointer to one
+machine-wide file, is deliberate: teammates, CI and cloud agents see only what is committed, and
 neither tool can import a file outside the repo portably. The cost is that a project's copy can fall
-behind. The session-start check below is what tells you when it has.
+behind. `update` closes that gap on your machine, and the session-start check below tells you when a
+project is behind.
 
 ### Staying current without remembering to
 
@@ -597,21 +612,22 @@ run under `git` itself, so they survive flag-reordering, `--no-verify`, Codex, a
 
 ## Install
 
-Quick Start covers the usual path. One installer, four commands:
+Quick Start covers the usual path. One installer, five commands and three flags:
 
 | Command | What it does |
 |---|---|
 | `install.sh` | Install or reinstall. On the machine: copy the kit to `~/.the-agent-kit`, take out what the old kit installed and the new one no longer ships, then turn on its git hooks, add it to your Claude Code and Codex settings, install its four skills once for all three tools, and wire Antigravity's session-start check: listed, asked, backed up, then verified. Inside a git repo, then the project: full rules (`AGENTS.md` plus a `CLAUDE.md` that imports it), the depth tier and skills for all three tools (`.claude/` for Claude Code, `.agents/` for Codex and Antigravity), Antigravity's command guard and this repo's git hooks, with what the old kit wrote and this one no longer ships taken out (`.agents/the-agent-kit.json`). Ends with `check`. Safe to re-run. |
 | `install.sh --lean` | The same, but the project gets only its own block, for when the universal rules already live in your global files, so nothing is duplicated into context. |
 | `install.sh --print` | By hand: copy the kit and **print** the settings snippets and the git-hooks command for you to apply. |
-| `install.sh update` | Fetch the latest kit, check it is the kit, then run its install. Needs no kit beside it, so one downloaded `install.sh` bootstraps everything. |
+| `install.sh update` | Fetch the latest kit, check it is the kit, run its install, then bring every project listed in `~/.the-agent-kit/.projects` to it, after one yes. Needs no kit beside it, so one downloaded `install.sh` bootstraps everything. |
 | `install.sh uninstall` | Take out what the install records list: the project you run it in, then the machine, then `~/.the-agent-kit`. Asked first and checked after; a kit entry you changed is kept and named. |
 | `install.sh check` | Doctor: interpreter, guard firing, per-hook identity, settings wiring, the project's kit files against its record, the recommended and optional tools missing for each tool installed here, whether the kit's rules are loaded at all, whether the project's formatter leaves the kit's files alone, rules-file size, and one line on orphaned MCP processes. |
-| `install.sh --tidy` | List orphaned MCP server processes left by a crashed agent. Dry run; add `--kill` to end exactly the listed trees. See [`docs/mcp-orphans.md`](docs/mcp-orphans.md). This is only the quick check for leftover MCP servers; the `/tidy` skill covers branches, worktrees, files and dev servers too. |
+| `install.sh tidy` | List orphaned MCP server processes left by a crashed agent. Dry run; add `--kill` to end exactly the listed trees. See [`docs/mcp-orphans.md`](docs/mcp-orphans.md). This is only the quick check for leftover MCP servers; the `/tidy` skill covers branches, worktrees, files and dev servers too. |
 
-The names before this release still work in it, as they did, and print the new name: `--setup` (the
-machine half of `install.sh`), `--update`, `--update-rules` (the project half), `--undo` (the machine
-half of `uninstall`), `--extension`, `--global` and `--check`. They go in the next release.
+`install.sh --help` prints the same list. The older names are gone: `--setup`, `--global`,
+`--extension`, `--update`, `--update-rules`, `--undo`, `--check`, `--project` and `--tidy` now stop
+with the usage line and exit code 2. Use `install.sh`, `install.sh --print`, `install.sh --lean`,
+`update`, `install.sh` inside the project, `uninstall`, `check` and `tidy` in their place.
 
 **Why not a plugin.** Claude Code, Codex and Antigravity each have plugins, and the kit could ship its
 hooks and skills as one. It does not, because a plugin would not replace the install record, only sit

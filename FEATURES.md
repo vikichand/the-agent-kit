@@ -236,11 +236,12 @@ never updates or installs anything itself. `install.sh check` lists what is miss
   so distribution is one curl-able file - no clone, no package manager. Pulls the latest kit from GitHub
   into `~/.the-agent-kit`, so the clone stays disposable: stamps
   and compares the source commit, shows what changed, no-ops when current, and proves the download is the kit
-  before overwriting anything) · `uninstall` (the project it runs in, then the machine, then `~/.the-agent-kit`;
+  before overwriting anything; then brings every project listed in `~/.the-agent-kit/.projects` to the new
+  kit after one yes, each project block kept, a lean project left lean, a moved or deleted one dropped and named) · `uninstall` (the project it runs in, then the machine, then `~/.the-agent-kit`;
   what you changed stays, and the folder stays while a hook you changed still runs the guard from it) ·
-  `check` (doctor, with one line on orphaned MCP processes) · `--tidy` (list orphaned MCP trees, `--kill` to end them).
-  Install, update and uninstall each end with a check. The old names (`--setup`, `--update`, `--update-rules`,
-  `--undo`, `--extension`, `--global`, `--check`) work for one more release, as they did. Never overwrites;
+  `check` (doctor, with one line on orphaned MCP processes) · `tidy` (list orphaned MCP trees, `--kill` to end them).
+  Install, update and uninstall each end with a check. The older names (`--setup`, `--update`, `--update-rules`,
+  `--undo`, `--extension`, `--global`, `--check`, `--project`, `--tidy`) are gone and stop with the usage line. Never overwrites;
   detects a working Python; writes your settings only after you say yes, with a backup first.
   The doctor verifies each git hook **by identity**, not just presence, and prints `core.hooksPath` when a redirect is set.
 - **`docs/environment-setup-prompt.md`**: optional, agent-run recipe for a machine's MCP servers / plugins / skills
@@ -256,10 +257,13 @@ never updates or installs anything itself. `install.sh check` lists what is miss
   `AGENTS.md` addition names a line to cut, propose-never-edit.
 - **`test/`**: `run-tests.sh` (git-layer end-to-end + 12 doctor checks: foreign-hook false green, redirect actually
   followed, delegating shim not misreported, unfilled `PROJECT-CONFIG` warned with a false-positive control;
-  + 4 `--update-rules` cases: block preserved, marker-less refused, stub redirected, no-op detected
-  + 5 `--update` cases run offline against a working-tree source repo in a fake `HOME`: version stamped,
+  + 4 cases for an install over older rules: block preserved, marker-less refused, stub redirected, no-op detected
+  + 10 cases for the project list: install and the session-start check add a project once, `update` brings two
+  listed projects current and keeps a lean one lean, changes nothing without a yes, and drops a line that is
+  not a project holding the kit
+  + 5 `update` cases run offline against a working-tree source repo in a fake `HOME`: version stamped,
   second run no-ops, a non-kit repo is refused without clobbering the install, an update run from the
-  *installed* copy stays clean, and `update_kit` still hands off with `exec` - without which `--global`
+  *installed* copy stays clean, and `update_kit` still hands off with `exec` - without which the install
   overwrites the running script and the shell resumes at a stale byte offset inside the new file)
   + `command_guard_cases.py` (576 cases: guard classification + turn-scoped grants + intent detection + the Antigravity contract).
   **`test/adherence/`** answers the question the rest of `test/` cannot: the hooks and permission rules are

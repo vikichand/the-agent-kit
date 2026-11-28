@@ -11,6 +11,46 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+### Removed
+
+- **The old command names are gone.** `--setup`, `--global`, `--extension`, `--update`,
+  `--update-rules`, `--undo`, `--check`, `--project` and `--tidy`, with their bare forms (`setup`,
+  `global`, `extension`, `update-rules`, `undo`, `doctor`, `lean`), now stop with the usage line and
+  exit code 2. What to run in their place:
+
+  | Old | New |
+  |---|---|
+  | `--setup` | `install.sh` |
+  | `--global` | `install.sh --print` |
+  | `--extension` | `install.sh --lean` |
+  | `--update` | `install.sh update` |
+  | `--update-rules`, `--project` | `install.sh`, inside the project |
+  | `--undo` | `install.sh uninstall` |
+  | `--check`, `doctor` | `install.sh check` |
+  | `--tidy` | `install.sh tidy` |
+
+  The installer now has five commands (`install`, `update`, `uninstall`, `check`, `tidy`) and three
+  flags (`install --lean`, `install --print`, `tidy --kill`), plus `--help`.
+- A kit older than 0.6.0 can no longer update itself to this release: its `--update` hands over with
+  `--setup`. Download `install.sh` again and run it, as in the README's Quick Start.
+
+### Added
+
+- **One `update` for every project.** `install.sh update` brings the machine current and then every
+  project that holds the kit, each in the way it was installed (full rules or the `--lean` stub) and
+  with its own block kept. It names the projects before the one question of the run, so one yes covers
+  them all, and without a yes it changes none of them. Run it from anywhere.
+- The projects are listed in `~/.the-agent-kit/.projects`. `install.sh` adds the project it runs in,
+  and the session-start check adds the project a session starts in when it holds the kit, so your
+  existing projects list themselves as you open them. A project that moved, was deleted or no longer
+  holds the kit is dropped from the list and named.
+- `update` with the kit already current still brings a listed project that fell behind up to it.
+
+### Changed
+
+- Coming from 0.6.0 to 0.9.0, the first `update` is run by the old installer, which does the machine
+  and the project you run it in. Run `update` once more and the other projects follow.
+
 ## [0.9.0] - 2026-11-28
 
 ### Added
