@@ -287,8 +287,10 @@ is used only when it names the top of a git repo that holds the kit's record
 dropped from the list and named. To leave a project out of `update`, delete its line; it comes back
 when you run `install.sh` there or start a session in it.
 
-Coming from 0.9.0 or older, the first `update` is still run by the old installer, which does the
-machine and the project you run it in. Run `update` once more and the other projects follow.
+Coming from 0.6.0 to 0.9.0, run `install.sh update` (the old `--update` stops at the usage line and
+changes nothing). That first update is still run by the old installer, so it does the machine and the
+project you run it in, and the list starts with that one project. Every other project joins the list
+the next time a session starts in it or `install.sh` runs there, and `update` covers it from then on.
 
 **Why projects hold a copy at all.** Keeping the rules in each repo, with no pointer to one
 machine-wide file, is deliberate: teammates, CI and cloud agents see only what is committed, and
@@ -624,10 +626,18 @@ Quick Start covers the usual path. One installer, five commands and three flags:
 | `install.sh check` | Doctor: interpreter, guard firing, per-hook identity, settings wiring, the project's kit files against its record, the recommended and optional tools missing for each tool installed here, whether the kit's rules are loaded at all, whether the project's formatter leaves the kit's files alone, rules-file size, and one line on orphaned MCP processes. |
 | `install.sh tidy` | List orphaned MCP server processes left by a crashed agent. Dry run; add `--kill` to end exactly the listed trees. See [`docs/mcp-orphans.md`](docs/mcp-orphans.md). This is only the quick check for leftover MCP servers; the `/tidy` skill covers branches, worktrees, files and dev servers too. |
 
-`install.sh --help` prints the same list. The older names are gone: `--setup`, `--global`,
-`--extension`, `--update`, `--update-rules`, `--undo`, `--check`, `--project` and `--tidy` now stop
-with the usage line and exit code 2. Use `install.sh`, `install.sh --print`, `install.sh --lean`,
-`update`, `install.sh` inside the project, `uninstall`, `check` and `tidy` in their place.
+`install.sh --help` prints the same list. The older names now stop with the usage line and exit code 2:
+
+| Gone | Use |
+|---|---|
+| `--setup` | `install.sh` |
+| `--global` | `install.sh --print` |
+| `--extension` | `install.sh --lean` |
+| `--update` | `install.sh update` |
+| `--update-rules`, `--project` | `install.sh`, inside the project |
+| `--undo` | `install.sh uninstall` |
+| `--check` | `install.sh check` |
+| `--tidy` | `install.sh tidy` |
 
 **Why not a plugin.** Claude Code, Codex and Antigravity each have plugins, and the kit could ship its
 hooks and skills as one. It does not, because a plugin would not replace the install record, only sit

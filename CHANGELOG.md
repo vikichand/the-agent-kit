@@ -31,8 +31,9 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
   The installer now has five commands (`install`, `update`, `uninstall`, `check`, `tidy`) and three
   flags (`install --lean`, `install --print`, `tidy --kill`), plus `--help`.
-- A kit older than 0.6.0 can no longer update itself to this release: its `--update` hands over with
-  `--setup`. Download `install.sh` again and run it, as in the README's Quick Start.
+- Updating to this release from an installed kit: on 0.6.0 to 0.9.0 run `install.sh update`. The old
+  `--update` stops at the usage line and changes nothing. A kit older than 0.6.0 has only `--update`,
+  so download `install.sh` again and run it, as in the README's Quick Start.
 
 ### Added
 
@@ -49,7 +50,9 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 ### Changed
 
 - Coming from 0.6.0 to 0.9.0, the first `update` is run by the old installer, which does the machine
-  and the project you run it in. Run `update` once more and the other projects follow.
+  and the project you run it in. The list starts with that project; each other project joins it the
+  next time a session starts there or `install.sh` runs there, and `update` covers it from then on.
+- When one listed project cannot be updated, `update` names it, carries on with the rest and exits 1.
 
 ## [0.9.0] - 2026-11-28
 
