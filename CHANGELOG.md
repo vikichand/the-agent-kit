@@ -11,6 +11,8 @@ See [`docs/branches-and-releases.md`](docs/branches-and-releases.md).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-29
+
 ### Removed
 
 - **The old command names are gone.** `--setup`, `--global`, `--extension`, `--update`,
@@ -745,7 +747,8 @@ agents. A fresh install gives you everything below.
   with no case worse, but did not make small tasks faster. Codex results are partial.
 - Pinning CI actions did not happen reliably from wording alone, so the pre-commit hook enforces it.
 
-[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.9.0...develop
+[Unreleased]: https://github.com/vikichand/the-agent-kit/compare/v0.10.0...develop
+[0.10.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.10.0
 [0.9.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.9.0
 [0.8.0]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.8.0
 [0.7.1]: https://github.com/vikichand/the-agent-kit/releases/tag/v0.7.1
