@@ -1520,6 +1520,15 @@ if [ -n "$PY" ]; then
   has 'already at' "$o" && ! grep -q STALE-RULES-MARKER "$c/p1/AGENTS.md" \
     && pass "P8 update with the kit already current still brings a listed project current" \
     || bad "P8 a stale project was left alone because the kit was current: $(printf '%s' "$o" | tail -5)"
+  # P8b: one listed project that cannot be updated (its record is from a newer kit) is named, the rest
+  # are still brought current, and the run exits non-zero.
+  stale "$c/p1"; stale "$c/p2"
+  $PY -c 'import json,sys,time; p=sys.argv[1]; d=json.load(open(p,encoding="utf-8")); d["kit_time"]=int(time.time())-5; json.dump(d,open(p,"w",encoding="utf-8"))' "$(wq "$c/p2/.agents/the-agent-kit.json")"
+  run_ "$c/plain" 1 update
+  [ "$rc" != 0 ] && ! grep -q STALE-RULES-MARKER "$c/p1/AGENTS.md" && grep -q STALE-RULES-MARKER "$c/p2/AGENTS.md" \
+    && has "$C/p2 was not brought current" "$o" \
+    && pass "P8b a listed project that cannot be updated is named and the others are still brought current" \
+    || bad "P8b one failing project stopped the rest, or was not named (rc=$rc): $(printf '%s' "$o" | grep -i 'not brought\|newer kit')"
   # P9: the eight old names are gone: each is an unknown command, exit 2, with the usage line.
   left=""
   for n in --setup --global --extension --update --update-rules --undo --check --project setup global extension update-rules undo; do
