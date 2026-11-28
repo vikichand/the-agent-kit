@@ -68,7 +68,7 @@ means no case covers the rule yet.
 | S6.1 | Root cause; fix where shared | engineering | 03, 32, 35 (4/6) | 0.5.0: 03, 32, 35 all 3/3 |
 | S6.2 | Two-attempt rule | workflow | - | |
 | S7.1 | The conversation is never the only record; checkpoint constraints, decisions and evidence before a handoff or compaction | workflow | - | no case (needs a multi-session harness) |
-| S7.2 | Ship only on the user's word, and each word (push, raise the PRs, merge, release) covers its whole step and those before it; never hand back a command | contract | 08 (3/3, measured on the earlier per-act wording) | also the grant hook |
+| S7.2 | Ship only on the user's word, and each word (push, raise the PRs, merge, release) covers its whole step and those before it; never hand back a command | contract | 08 (3/3 with, 3/3 without, 2026-11-28) | also the grant hook |
 | S7.3 | A repeated mistake is a missing rule: propose it | contract | - | |
 | S7.4 | Announce breaking changes | engineering | - | |
 | S8.1 | Ownership: nothing unexplained | contract | - | |
