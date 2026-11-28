@@ -146,8 +146,8 @@ CASES = [
     ("python hooks/tidy-procs.py scan --root R", "ask", "silent"),
     ("python hooks/mcp-orphans.py --kill", "ask", "silent"), ("python3 hooks/mcp-orphans.py --kill --json", "ask", "silent"),
     ("python hooks/mcp-orphans.py --json", "ask", "silent"), ("python hooks/mcp-orphans.py", "ask", "silent"),
-    ("sh ~/.the-agent-kit/install.sh --tidy", "ask", "silent"),
-    ("sh ~/.the-agent-kit/install.sh --tidy --kill", "ask", "silent"),
+    ("sh ~/.the-agent-kit/install.sh tidy", "ask", "silent"),
+    ("sh ~/.the-agent-kit/install.sh tidy --kill", "ask", "silent"),
     (r"py -3 C:\Users\v\.the-agent-kit\hooks\tidy-scan.py apply --root C:\r --id path:x", "ask", "silent"),
     ("cd R && python hooks/tidy-scan.py apply --root R --id path:x", "ask", "silent"),
     # launcher and wrapper forms that used to slip through: a Windows shell wrapping the command, pythonw,
@@ -440,8 +440,8 @@ GRANT_CASES = [
     ("setx /M AGENT_KIT_RELEASE 1; git push origin main",         {"push"}, "ask", "ask"),
     ("AGENT_KIT_RELEASE+=1 git push origin main",                 {"push"}, "ask", "ask"),
     # consent for the installer to write the user's settings is the user's, never a grant's
-    ("AGENT_KIT_APPLY=1 sh install.sh --setup",      {"commit", "push"}, "ask", "ask"),
-    ("AGENT_KIT_APPLY=1 ~/.the-agent-kit/install.sh --update", set(),   "deny", "deny"),
+    ("AGENT_KIT_APPLY=1 sh install.sh install",      {"commit", "push"}, "ask", "ask"),
+    ("AGENT_KIT_APPLY=1 ~/.the-agent-kit/install.sh update", set(),   "deny", "deny"),
     # a heredoc commit with a grant is allowed, whatever its message mentions
     ("git commit -F - <<'EOF'\nfix: x\n\nmentions core.hooksPath\nEOF", {"commit"}, "ask", "silent"),
     # ...but never one whose unquoted body can execute

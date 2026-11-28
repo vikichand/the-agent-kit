@@ -227,7 +227,7 @@ check("in-repo stray is listed high", lambda: (lambda x: groups(x) == [("process
 check("stray tree is in scope when any member is", lambda: groups(SC(STRAY, {11: RA})) == [("processes.strays", 10)])
 r = SC(STRAY, {10: RB, 11: RB})
 check("out-of-repo stray becomes one note", lambda r=r: not r[0] and len(r[1]) == 1
-      and "1 orphaned MCP trees elsewhere" in r[1][0] and "install.sh --tidy" in r[1][0])
+      and "1 orphaned MCP trees elsewhere" in r[1][0] and "install.sh tidy" in r[1][0])
 check("a listening stray is low", lambda: (lambda x: x[0][0]["confidence"] == "low"
       and "listening on port 8080" in x[0][0]["evidence"])(SC(STRAY, {10: RA}, net({10: [8080]}))))
 check("editor exe is never listed", lambda: not SC([PARENT, proc(40, 1, r"C:\Apps\Code.exe --ext vite", 27000, name="Code.exe")],
